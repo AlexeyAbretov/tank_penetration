@@ -195,7 +195,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private hurtInfantry(unit: Infantry): void {
-    if (unit.hit()) {
+    if (unit.hit(GAME.shellDamage)) {
       this.score += 10;
       this.scoreText.setText(`SCORE  ${this.score}`);
       unit.kill();
@@ -326,7 +326,8 @@ export class GameScene extends Phaser.Scene {
     const lanes = [176, 248, 320, 392, 464, 536];
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
     const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
-    const unit = new Infantry(this, x, y);
+    const hp = Math.max(1, this.wave * GAME.infantryHpPerWave);
+    const unit = new Infantry(this, x, y, hp);
     this.infantry.add(unit);
     unit.march(this.wave);
   }
