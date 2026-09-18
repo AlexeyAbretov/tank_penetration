@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
-import { GAME } from '../gameConfig';
+import { GAME, upgradeCost } from '../gameConfig';
 import { createAnimations, createTextures } from '../gfx/textures';
+import { ShopPanel } from '../ui/ShopPanel';
 
 export class GameScene extends Phaser.Scene {
   private tank!: Tank;
@@ -12,15 +13,21 @@ export class GameScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private waveText!: Phaser.GameObjects.Text;
   private waveBanner!: Phaser.GameObjects.Text;
+  private coinsText!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
+  private shop!: ShopPanel;
   private blast!: Phaser.GameObjects.Particles.ParticleEmitter;
   private embers!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   private hp: number = GAME.baseHp;
   private score = 0;
+  private coins = 0;
   private wave = 0;
   private remainingToSpawn = 0;
   private awaitingClear = true;
+  private shopOpen = false;
+  private blastLevel = 0;
+  private damageLevel = 0;
   private gameOver = false;
 
   constructor() {
@@ -35,9 +42,13 @@ export class GameScene extends Phaser.Scene {
 
     this.hp = GAME.baseHp;
     this.score = 0;
+    this.coins = 0;
     this.wave = 0;
     this.remainingToSpawn = 0;
     this.awaitingClear = true;
+    this.shopOpen = false;
+    this.blastLevel = 0;
+    this.damageLevel = 0;
     this.gameOver = false;
 
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
@@ -97,6 +108,9 @@ export class GameScene extends Phaser.Scene {
         this.scene.restart();
         return;
       }
+      if (this.shopOpen) {
+        return;
+      }
       if (pointer.leftButtonDown()) {
         this.shoot();
       }
@@ -104,7 +118,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.gameOver) {
+    if (this.gameOver || this.shopOpen) {
       return;
     }
 
@@ -183,33 +197,42 @@ export class GameScene extends Phaser.Scene {
       this.hurtInfantry(direct);
     }
 
+    const blastRadius = this.blastLevel * GAME.blastRadiusPerLevel;
+    if (blastRadius <= 0) {
+      return;
+    }
+
     (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
       if (unit === direct || !unit.active || unit.reachedWall) {
         return;
       }
       const torso = this.torsoPoint(unit);
-      if (Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= GAME.blastRadius) {
+      if (Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= blastRadius) {
         this.hurtInfantry(unit);
       }
     });
   }
 
   private hurtInfantry(unit: Infantry): void {
-    if (unit.hit(GAME.shellDamage)) {
+    if (unit.hit(GAME.shellDamage + this.damageLevel)) {
       this.score += 10;
+      this.coins += GAME.killCoins;
       this.scoreText.setText(`SCORE  ${this.score}`);
+      this.coinsText.setText(`COINS  ${this.coins}`);
       unit.kill();
     }
   }
 
   private playBlast(x: number, y: number): void {
-    this.blast.emitParticleAt(x, y, 16);
+    const radius = this.blastLevel * GAME.blastRadiusPerLevel;
+    this.blast.emitParticleAt(x, y, radius > 0 ? 16 : 8);
     const flash = this.add.image(x, y, 'muzzle').setDepth(16).setBlendMode(Phaser.BlendModes.ADD);
+    flash.setScale(radius > 0 ? 1 : 0.55);
     this.tweens.add({
       targets: flash,
       alpha: 0,
-      scale: 2.2,
-      duration: 160,
+      scale: radius > 0 ? 2.2 : 1.1,
+      duration: radius > 0 ? 160 : 90,
       onComplete: () => flash.destroy(),
     });
   }
@@ -309,7 +332,40 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.awaitingClear = true;
-    this.time.delayedCall(GAME.waveRestMs, () => this.beginNextWave());
+    this.openShop();
+  }
+
+  private openShop(): void {
+    this.shopOpen = true;
+    this.shop.show(this.coins, this.blastLevel, this.damageLevel);
+  }
+
+  private closeShopAndContinue(): void {
+    this.shop.hide();
+    this.shopOpen = false;
+    this.beginNextWave();
+  }
+
+  private buyBlast(): void {
+    const cost = upgradeCost(this.blastLevel);
+    if (this.coins < cost) {
+      return;
+    }
+    this.coins -= cost;
+    this.blastLevel += 1;
+    this.coinsText.setText(`COINS  ${this.coins}`);
+    this.shop.refresh(this.coins, this.blastLevel, this.damageLevel);
+  }
+
+  private buyDamage(): void {
+    const cost = upgradeCost(this.damageLevel);
+    if (this.coins < cost) {
+      return;
+    }
+    this.coins -= cost;
+    this.damageLevel += 1;
+    this.coinsText.setText(`COINS  ${this.coins}`);
+    this.shop.refresh(this.coins, this.blastLevel, this.damageLevel);
   }
 
   private shoot(): void {
@@ -399,6 +455,16 @@ export class GameScene extends Phaser.Scene {
       })
       .setDepth(51);
 
+    this.coinsText = this.add
+      .text(28, 74, 'COINS  0', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '18px',
+        color: '#f3d56a',
+        stroke: '#2a0a08',
+        strokeThickness: 4,
+      })
+      .setDepth(51);
+
     this.waveBanner = this.add
       .text(GAME.width / 2, 120, '', {
         fontFamily: 'Cinzel, Georgia, serif',
@@ -444,6 +510,12 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.overlay.add([dim, title, hint]);
+
+    this.shop = new ShopPanel(this, {
+      onBuyBlast: () => this.buyBlast(),
+      onBuyDamage: () => this.buyDamage(),
+      onContinue: () => this.closeShopAndContinue(),
+    });
   }
 
   private applyCameraFx(): void {
