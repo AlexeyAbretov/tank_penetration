@@ -11,7 +11,7 @@ export class PickupTruck extends RangedEnemy {
   protected readonly bulletSpeed = 520;
   protected readonly shotDamage = 2;
   protected readonly idleTexture = 'pickup-0';
-  protected readonly muzzle = { x: -68, y: -40 };
+  protected readonly muzzle = { x: -72, y: -54 };
 
   static matches(index: number): boolean {
     return index % 5 === 4;

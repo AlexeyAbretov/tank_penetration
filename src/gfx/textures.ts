@@ -293,7 +293,66 @@ function createGunner(scene: Phaser.Scene): void {
 
 function drawPickup(g: Phaser.GameObjects.Graphics, wheelPhase: 0 | 1): void {
   g.fillStyle(0x000000, 0.35);
-  g.fillEllipse(80, 74, 130, 12);
+  g.fillEllipse(84, 74, 128, 12);
+
+  const body = 0x5a6a38;
+  const bodyDark = 0x3a4a24;
+  const metal = 0x2a2e22;
+
+  g.fillStyle(metal);
+  g.fillRoundedRect(14, 50, 136, 10, 3);
+
+  g.fillStyle(body);
+  g.fillRoundedRect(16, 40, 38, 20, 4);
+  g.fillStyle(bodyDark);
+  g.fillRect(18, 48, 34, 5);
+  g.fillStyle(0x1a1c16);
+  g.fillRect(12, 46, 8, 14);
+  g.fillStyle(0xd8d080);
+  g.fillCircle(15, 50, 3);
+
+  g.fillStyle(bodyDark);
+  g.fillRoundedRect(90, 34, 56, 26, 3);
+  g.fillStyle(0x4a5a30);
+  g.fillRect(92, 38, 52, 8);
+  g.fillStyle(0x2a341c);
+  g.fillRect(92, 44, 52, 4);
+  g.fillStyle(metal);
+  g.fillRect(90, 32, 56, 4);
+  g.fillRect(90, 32, 4, 22);
+  g.fillRect(142, 32, 4, 22);
+  g.fillStyle(bodyDark);
+  g.fillRect(144, 34, 6, 26);
+
+  g.fillStyle(0x2a341c);
+  g.fillRoundedRect(50, 14, 42, 46, 5);
+  g.fillStyle(body);
+  g.fillRoundedRect(52, 16, 38, 42, 4);
+  g.fillStyle(bodyDark);
+  g.fillRect(54, 40, 34, 8);
+
+  g.fillStyle(0x1a3040);
+  g.fillRoundedRect(54, 20, 22, 16, 3);
+  g.fillStyle(0x88c8e0, 0.9);
+  g.fillRoundedRect(56, 22, 18, 12, 2);
+  g.fillStyle(0xffffff, 0.35);
+  g.fillRect(58, 24, 6, 4);
+  g.fillStyle(0x88c8e0, 0.7);
+  g.fillRoundedRect(78, 22, 10, 12, 2);
+
+  g.fillStyle(0x2a2218);
+  g.fillCircle(118, 26, 7);
+  g.fillStyle(0x3a4a28);
+  g.fillRect(112, 30, 14, 14);
+
+  g.fillStyle(0x2a2a26);
+  g.fillRect(112, 16, 7, 16);
+  g.fillStyle(0x1a1a16);
+  g.fillRoundedRect(20, 18, 98, 5, 2);
+  g.fillStyle(0x4a4a42);
+  g.fillRect(20, 18, 10, 5);
+  g.fillStyle(0x6a6a60);
+  g.fillCircle(24, 20, 3);
 
   const spoke = wheelPhase === 0 ? 0 : 0.5;
   const drawWheel = (cx: number) => {
@@ -311,39 +370,8 @@ function drawPickup(g: Phaser.GameObjects.Graphics, wheelPhase: 0 | 1): void {
     g.lineTo(cx - Math.cos(spoke + 1.2) * 8, 62 - Math.sin(spoke + 1.2) * 8);
     g.strokePath();
   };
-  drawWheel(38);
-  drawWheel(118);
-
-  g.fillStyle(0x2a2e22);
-  g.fillRoundedRect(18, 38, 128, 22, 4);
-  g.fillStyle(0x5a6a38);
-  g.fillRoundedRect(20, 30, 78, 28, 6);
-  g.fillStyle(0x3a4a28);
-  g.fillRect(22, 42, 74, 8);
-
-  g.fillStyle(0x4a5a30);
-  g.fillRoundedRect(96, 34, 48, 24, 3);
-  g.fillStyle(0x2a341c);
-  g.fillRect(100, 38, 40, 8);
-
-  g.fillStyle(0x88c8e0, 0.85);
-  g.fillRoundedRect(28, 34, 28, 14, 3);
-  g.fillStyle(0x1a1c16);
-  g.fillRect(22, 48, 8, 6);
-
-  g.fillStyle(0x2a2218);
-  g.fillCircle(118, 30, 7);
-  g.fillStyle(0x3a4a28);
-  g.fillRect(112, 34, 14, 12);
-
-  g.fillStyle(0x2a2a26);
-  g.fillRect(108, 18, 8, 20);
-  g.fillStyle(0x1a1a16);
-  g.fillRoundedRect(18, 20, 96, 6, 2);
-  g.fillStyle(0x4a4a42);
-  g.fillRect(18, 21, 12, 4);
-  g.fillStyle(0x6a6a60);
-  g.fillCircle(22, 23, 3);
+  drawWheel(40);
+  drawWheel(126);
 }
 
 function createPickup(scene: Phaser.Scene): void {
