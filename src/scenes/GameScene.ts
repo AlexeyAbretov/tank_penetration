@@ -10,14 +10,17 @@ export class GameScene extends Phaser.Scene {
   private infantry!: Phaser.Physics.Arcade.Group;
   private hpFill!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
+  private waveText!: Phaser.GameObjects.Text;
+  private waveBanner!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
   private blast!: Phaser.GameObjects.Particles.ParticleEmitter;
   private embers!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   private hp: number = GAME.baseHp;
   private score = 0;
-  private spawnDelay = 1300;
-  private elapsed = 0;
+  private wave = 0;
+  private remainingToSpawn = 0;
+  private awaitingClear = true;
   private gameOver = false;
 
   constructor() {
@@ -32,8 +35,9 @@ export class GameScene extends Phaser.Scene {
 
     this.hp = GAME.baseHp;
     this.score = 0;
-    this.spawnDelay = 900;
-    this.elapsed = 0;
+    this.wave = 0;
+    this.remainingToSpawn = 0;
+    this.awaitingClear = true;
     this.gameOver = false;
 
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
@@ -86,12 +90,7 @@ export class GameScene extends Phaser.Scene {
 
     this.createUi();
     this.applyCameraFx();
-    this.spawnInfantry();
-    this.time.addEvent({
-      delay: 200,
-      loop: true,
-      callback: () => this.maybeSpawn(),
-    });
+    this.time.delayedCall(GAME.waveStartDelayMs, () => this.beginNextWave());
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.gameOver) {
@@ -109,7 +108,6 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.elapsed += delta;
     const pointer = this.input.activePointer;
     this.tank.tick(delta);
     this.tank.aimAt(pointer.worldX, pointer.worldY);
@@ -136,6 +134,8 @@ export class GameScene extends Phaser.Scene {
         this.hitBase(unit);
       }
     });
+
+    this.checkWaveClear();
   }
 
   private resolveShellHits(): void {
@@ -242,18 +242,74 @@ export class GameScene extends Phaser.Scene {
     return go;
   }
 
-  private maybeSpawn(): void {
+  private beginNextWave(): void {
     if (this.gameOver) {
       return;
     }
-    const rate = Math.max(420, this.spawnDelay - this.elapsed * 0.04);
-    if (Math.random() > 200 / rate) {
+
+    this.wave += 1;
+    this.awaitingClear = false;
+    this.remainingToSpawn = GAME.waveFirstCount + (this.wave - 1) * GAME.waveExtra;
+    this.waveText.setText(`WAVE  ${this.wave}`);
+    this.showWaveBanner();
+
+    this.time.delayedCall(GAME.waveAnnounceMs, () => {
+      if (this.gameOver) {
+        return;
+      }
+      this.releaseWave();
+    });
+  }
+
+  private showWaveBanner(): void {
+    this.waveBanner.setText(`ВОЛНА ${this.wave}`);
+    this.waveBanner.setAlpha(1);
+    this.waveBanner.setScale(0.86);
+    this.tweens.killTweensOf(this.waveBanner);
+    this.tweens.add({
+      targets: this.waveBanner,
+      scale: 1.08,
+      duration: 280,
+      ease: 'Back.Out',
+    });
+    this.tweens.add({
+      targets: this.waveBanner,
+      alpha: 0,
+      duration: 500,
+      delay: 900,
+    });
+  }
+
+  private releaseWave(): void {
+    const count = this.remainingToSpawn;
+    const gap = Math.max(GAME.waveMinGap, GAME.waveSpawnGap - (this.wave - 1) * 28);
+
+    for (let i = 0; i < count; i += 1) {
+      this.time.delayedCall(i * gap, () => {
+        if (this.gameOver) {
+          return;
+        }
+        this.spawnInfantry();
+        this.remainingToSpawn = Math.max(0, this.remainingToSpawn - 1);
+      });
+    }
+  }
+
+  private livingInfantryCount(): number {
+    return (this.infantry.getChildren() as Infantry[]).filter(
+      (unit) => unit.active && !unit.reachedWall,
+    ).length;
+  }
+
+  private checkWaveClear(): void {
+    if (this.gameOver || this.awaitingClear || this.remainingToSpawn > 0) {
       return;
     }
-    const pack = this.elapsed > 25000 ? Phaser.Math.Between(1, 3) : 1;
-    for (let i = 0; i < pack; i += 1) {
-      this.time.delayedCall(i * 180, () => this.spawnInfantry());
+    if (this.livingInfantryCount() > 0) {
+      return;
     }
+    this.awaitingClear = true;
+    this.time.delayedCall(GAME.waveRestMs, () => this.beginNextWave());
   }
 
   private shoot(): void {
@@ -267,10 +323,12 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver) {
       return;
     }
-    const y = Phaser.Math.Between(150, 560);
-    const unit = new Infantry(this, GAME.width + 20, y);
+    const lanes = [176, 248, 320, 392, 464, 536];
+    const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
+    const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
+    const unit = new Infantry(this, x, y);
     this.infantry.add(unit);
-    unit.march();
+    unit.march(this.wave);
   }
 
   private fireShell(x: number, y: number, angle: number): void {
@@ -329,6 +387,28 @@ export class GameScene extends Phaser.Scene {
         strokeThickness: 4,
       })
       .setDepth(51);
+
+    this.waveText = this.add
+      .text(28, 48, 'WAVE  0', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '18px',
+        color: '#e8c48a',
+        stroke: '#2a0a08',
+        strokeThickness: 4,
+      })
+      .setDepth(51);
+
+    this.waveBanner = this.add
+      .text(GAME.width / 2, 120, '', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '56px',
+        color: '#f3d56a',
+        stroke: '#4a1208',
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(60)
+      .setAlpha(0);
 
     this.add
       .text(GAME.width / 2, 708, 'мышь — прицел   ЛКМ — огонь', {

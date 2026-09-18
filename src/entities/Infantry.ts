@@ -22,9 +22,10 @@ export class Infantry extends Phaser.Physics.Arcade.Sprite {
     body.setAllowGravity(false);
   }
 
-  march(): void {
+  march(wave = 1): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setVelocityX(-Phaser.Math.Between(38, 56));
+    const speed = 36 + wave * 4 + Phaser.Math.Between(0, 10);
+    body.setVelocityX(-speed);
   }
 
   hit(): boolean {

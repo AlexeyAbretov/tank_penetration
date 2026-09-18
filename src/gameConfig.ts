@@ -12,4 +12,11 @@ export const GAME = {
   infantryDamage: 12,
   infantryHp: 1,
   bannerY: 638,
+  waveFirstCount: 6,
+  waveExtra: 4,
+  waveSpawnGap: 340,
+  waveMinGap: 150,
+  waveAnnounceMs: 1300,
+  waveRestMs: 2400,
+  waveStartDelayMs: 700,
 } as const;
