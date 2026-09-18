@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import { AssaultInfantry } from '../entities/AssaultInfantry';
+import { EnemyShot } from '../entities/EnemyShot';
+import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME, upgradeCost } from '../gameConfig';
@@ -393,8 +396,9 @@ export class GameScene extends Phaser.Scene {
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
     const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
     const hp = Math.max(1, this.wave * GAME.infantryHpPerWave);
-    const unit = new Infantry(this, x, y, hp, isGunner ? 'gunner' : 'assault');
-    unit.fireAtTank = (from) => this.fireEnemyShot(from);
+    const unit = isGunner
+      ? new GunnerInfantry(this, x, y, hp, this.enemyShots)
+      : new AssaultInfantry(this, x, y, hp);
     this.infantry.add(unit);
     unit.march(this.wave);
   }
@@ -421,26 +425,9 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private fireEnemyShot(from: Infantry): void {
-    if (!from.active || this.gameOver || this.shopOpen) {
-      return;
-    }
-    const x = from.x - 38;
-    const y = from.y - from.displayHeight * 0.42;
-    const angle = Phaser.Math.Angle.Between(x, y, this.tank.x + 24, this.tank.y);
-    const shot = this.physics.add.image(x, y, 'enemy-bullet');
-    this.enemyShots.add(shot);
-    shot.setDepth(14);
-    shot.setRotation(angle);
-    shot.setVelocity(Math.cos(angle) * GAME.shooterBulletSpeed, Math.sin(angle) * GAME.shooterBulletSpeed);
-    const body = shot.body as Phaser.Physics.Arcade.Body;
-    body.setAllowGravity(false);
-    body.setSize(14, 8);
-  }
-
   private updateEnemyShots(): void {
     this.enemyShots.getChildren().forEach((obj) => {
-      const shot = obj as Phaser.Physics.Arcade.Image;
+      const shot = obj as EnemyShot;
       if (!shot.active) {
         return;
       }
@@ -449,8 +436,9 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (this.tank.containsPoint(shot.x, shot.y)) {
+        const damage = shot.damage;
         shot.destroy();
-        this.damageTank(GAME.shooterDamage);
+        this.damageTank(damage);
       }
     });
   }
@@ -466,11 +454,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private hitBase(unit: Infantry): void {
-    if (unit.role === 'gunner') {
+    if (!unit.reachesBase) {
       return;
     }
     unit.kill();
-    this.damageTank(GAME.infantryDamage);
+    this.damageTank(unit.contactDamage);
   }
 
   private createUi(): void {
