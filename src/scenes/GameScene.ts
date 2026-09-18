@@ -66,18 +66,23 @@ export class GameScene extends Phaser.Scene {
     this.tank = new Tank(this, GAME.tankX, GAME.tankY);
     this.input.mouse?.disableContextMenu();
 
-    this.shells = this.physics.add.group({ maxSize: 24 });
-    this.infantry = this.physics.add.group({ classType: Infantry, maxSize: 40, runChildUpdate: false });
+    this.shells = this.physics.add.group();
+    this.infantry = this.physics.add.group();
 
-    this.physics.add.overlap(this.shells, this.infantry, (shellObj, infObj) => {
-      const shell = shellObj as Phaser.Physics.Arcade.Image;
-      const inf = infObj as Infantry;
-      if (!shell.active || !inf.active) {
-        return;
-      }
-      this.explode(shell.x, shell.y);
-      shell.destroy();
-    });
+    this.physics.add.overlap(
+      this.shells,
+      this.infantry,
+      (shellObj, infObj) => {
+        const shell = this.asImage(shellObj);
+        const unit = this.asInfantry(infObj);
+        if (!shell || !unit) {
+          return;
+        }
+        this.detonateShell(shell, unit);
+      },
+      undefined,
+      this,
+    );
 
     this.createUi();
     this.applyCameraFx();
@@ -113,6 +118,8 @@ export class GameScene extends Phaser.Scene {
       this.shoot();
     }
 
+    this.resolveShellHits();
+
     this.shells.getChildren().forEach((obj) => {
       const shell = obj as Phaser.Physics.Arcade.Image;
       if (shell.x > GAME.width + 40 || shell.x < 0 || shell.y < 0 || shell.y > GAME.bannerY) {
@@ -129,6 +136,110 @@ export class GameScene extends Phaser.Scene {
         this.hitBase(unit);
       }
     });
+  }
+
+  private resolveShellHits(): void {
+    const shells = this.shells.getChildren() as Phaser.Physics.Arcade.Image[];
+    const units = this.infantry.getChildren() as Infantry[];
+
+    for (const shell of shells) {
+      if (!shell.active) {
+        continue;
+      }
+      for (const unit of units) {
+        if (!unit.active || unit.reachedWall) {
+          continue;
+        }
+        if (this.shellHitsUnit(shell, unit)) {
+          this.detonateShell(shell, unit);
+          break;
+        }
+      }
+    }
+  }
+
+  private shellHitsUnit(shell: Phaser.Physics.Arcade.Image, unit: Infantry): boolean {
+    const torso = this.torsoPoint(unit);
+    return Phaser.Math.Distance.Between(shell.x, shell.y, torso.x, torso.y) <= GAME.shellHitRadius;
+  }
+
+  private torsoPoint(unit: Infantry): { x: number; y: number } {
+    return {
+      x: unit.x,
+      y: unit.y - unit.displayHeight * 0.42,
+    };
+  }
+
+  private detonateShell(shell: Phaser.Physics.Arcade.Image, direct?: Infantry): void {
+    if (!shell.active) {
+      return;
+    }
+    const x = shell.x;
+    const y = shell.y;
+    shell.destroy();
+    this.playBlast(x, y);
+
+    if (direct) {
+      this.hurtInfantry(direct);
+    }
+
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (unit === direct || !unit.active || unit.reachedWall) {
+        return;
+      }
+      const torso = this.torsoPoint(unit);
+      if (Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= GAME.blastRadius) {
+        this.hurtInfantry(unit);
+      }
+    });
+  }
+
+  private hurtInfantry(unit: Infantry): void {
+    if (unit.hit()) {
+      this.score += 10;
+      this.scoreText.setText(`SCORE  ${this.score}`);
+      unit.kill();
+    }
+  }
+
+  private playBlast(x: number, y: number): void {
+    this.blast.emitParticleAt(x, y, 16);
+    const flash = this.add.image(x, y, 'muzzle').setDepth(16).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scale: 2.2,
+      duration: 160,
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  private asImage(
+    obj:
+      | Phaser.Types.Physics.Arcade.GameObjectWithBody
+      | Phaser.Physics.Arcade.Body
+      | Phaser.Physics.Arcade.StaticBody
+      | Phaser.Tilemaps.Tile,
+  ): Phaser.Physics.Arcade.Image | null {
+    const go = 'gameObject' in obj && obj.gameObject ? obj.gameObject : obj;
+    if (!(go instanceof Phaser.Physics.Arcade.Image) || !go.active) {
+      return null;
+    }
+    return go;
+  }
+
+  private asInfantry(
+    obj:
+      | Phaser.Types.Physics.Arcade.GameObjectWithBody
+      | Phaser.Physics.Arcade.Body
+      | Phaser.Physics.Arcade.StaticBody
+      | Phaser.Tilemaps.Tile,
+  ): Infantry | null {
+    const go = 'gameObject' in obj && obj.gameObject ? obj.gameObject : obj;
+    if (!(go instanceof Infantry) || !go.active || go.reachedWall) {
+      return null;
+    }
+    return go;
   }
 
   private maybeSpawn(): void {
@@ -157,8 +268,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const y = Phaser.Math.Between(150, 560);
-    const unit = new Infantry(this, GAME.width + 40, y);
+    const unit = new Infantry(this, GAME.width + 20, y);
     this.infantry.add(unit);
+    unit.march();
   }
 
   private fireShell(x: number, y: number, angle: number): void {
@@ -169,8 +281,8 @@ export class GameScene extends Phaser.Scene {
     shell.setRotation(angle);
     shell.setVelocity(Math.cos(angle) * GAME.shellSpeed, Math.sin(angle) * GAME.shellSpeed);
     const body = shell.body as Phaser.Physics.Arcade.Body;
-    body.setSize(28, 12);
     body.setAllowGravity(false);
+    body.setCircle(18);
 
     const flash = this.add.image(x, y, 'muzzle').setDepth(26).setBlendMode(Phaser.BlendModes.ADD);
     flash.setRotation(angle);
@@ -180,32 +292,6 @@ export class GameScene extends Phaser.Scene {
       scale: 1.6,
       duration: 90,
       onComplete: () => flash.destroy(),
-    });
-  }
-
-  private explode(x: number, y: number): void {
-    this.blast.emitParticleAt(x, y, 16);
-    const flash = this.add.image(x, y, 'muzzle').setDepth(16).setBlendMode(Phaser.BlendModes.ADD);
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      scale: 2.2,
-      duration: 160,
-      onComplete: () => flash.destroy(),
-    });
-
-    this.infantry.getChildren().forEach((obj) => {
-      const unit = obj as Infantry;
-      if (!unit.active || unit.reachedWall) {
-        return;
-      }
-      if (Phaser.Math.Distance.Between(x, y, unit.x, unit.y) <= GAME.blastRadius) {
-        if (unit.hit()) {
-          this.score += 10;
-          this.scoreText.setText(`SCORE  ${this.score}`);
-          unit.kill();
-        }
-      }
     });
   }
 

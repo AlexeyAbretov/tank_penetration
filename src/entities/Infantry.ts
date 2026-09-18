@@ -16,10 +16,15 @@ export class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.play('infantry-walk');
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setSize(28, 44);
-    body.setOffset(16, 22);
-    body.setVelocityX(-Phaser.Math.Between(38, 56));
+    body.setSize(36, 52);
+    body.setOffset(14, 10);
     body.setImmovable(false);
+    body.setAllowGravity(false);
+  }
+
+  march(): void {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setVelocityX(-Phaser.Math.Between(38, 56));
   }
 
   hit(): boolean {
