@@ -3,6 +3,7 @@ import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
+import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME, upgradeCost } from '../gameConfig';
 import { createAnimations, createTextures, ensureRuntimeTextures } from '../gfx/textures';
@@ -183,7 +184,7 @@ export class GameScene extends Phaser.Scene {
 
   private shellHitsUnit(shell: Phaser.Physics.Arcade.Image, unit: Infantry): boolean {
     const torso = this.torsoPoint(unit);
-    return Phaser.Math.Distance.Between(shell.x, shell.y, torso.x, torso.y) <= GAME.shellHitRadius;
+    return Phaser.Math.Distance.Between(shell.x, shell.y, torso.x, torso.y) <= unit.hitRadius;
   }
 
   private torsoPoint(unit: Infantry): { x: number; y: number } {
@@ -321,7 +322,7 @@ export class GameScene extends Phaser.Scene {
         if (this.gameOver) {
           return;
         }
-        this.spawnInfantry(i % 4 === 2);
+        this.spawnInfantry(i);
         this.remainingToSpawn = Math.max(0, this.remainingToSpawn - 1);
       });
     }
@@ -388,7 +389,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnInfantry(isGunner = false): void {
+  private spawnInfantry(index = 0): void {
     if (this.gameOver) {
       return;
     }
@@ -396,9 +397,12 @@ export class GameScene extends Phaser.Scene {
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
     const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
     const hp = Math.max(1, this.wave * GAME.infantryHpPerWave);
-    const unit = isGunner
-      ? new GunnerInfantry(this, x, y, hp, this.enemyShots)
-      : new AssaultInfantry(this, x, y, hp);
+    const unit =
+      index % 5 === 4
+        ? new PickupTruck(this, x, y, hp, this.enemyShots)
+        : index % 4 === 2
+          ? new GunnerInfantry(this, x, y, hp, this.enemyShots)
+          : new AssaultInfantry(this, x, y, hp);
     this.infantry.add(unit);
     unit.march(this.wave);
   }

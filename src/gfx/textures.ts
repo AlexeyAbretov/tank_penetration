@@ -29,6 +29,7 @@ export function createTextures(scene: Phaser.Scene): void {
   createTankTurret(scene);
   createInfantry(scene);
   createGunner(scene);
+  createPickup(scene);
   createShell(scene);
   createEnemyBullet(scene);
   createMuzzle(scene);
@@ -40,6 +41,9 @@ export function createTextures(scene: Phaser.Scene): void {
 export function ensureRuntimeTextures(scene: Phaser.Scene): void {
   if (!scene.textures.exists('gunner-0')) {
     createGunner(scene);
+  }
+  if (!scene.textures.exists('pickup-0')) {
+    createPickup(scene);
   }
   if (!scene.textures.exists('enemy-bullet')) {
     createEnemyBullet(scene);
@@ -287,6 +291,66 @@ function createGunner(scene: Phaser.Scene): void {
   bake(scene, 'gunner-1', 64, 80, (g) => drawSoldier(g, 1, gunnerLook));
 }
 
+function drawPickup(g: Phaser.GameObjects.Graphics, wheelPhase: 0 | 1): void {
+  g.fillStyle(0x000000, 0.35);
+  g.fillEllipse(80, 74, 130, 12);
+
+  const spoke = wheelPhase === 0 ? 0 : 0.5;
+  const drawWheel = (cx: number) => {
+    g.fillStyle(0x1a1a16);
+    g.fillCircle(cx, 62, 14);
+    g.fillStyle(0x3a3a32);
+    g.fillCircle(cx, 62, 9);
+    g.fillStyle(0x1a1a16);
+    g.fillCircle(cx, 62, 3);
+    g.lineStyle(2, 0x8a8a80, 1);
+    g.beginPath();
+    g.moveTo(cx + Math.cos(spoke) * 8, 62 + Math.sin(spoke) * 8);
+    g.lineTo(cx - Math.cos(spoke) * 8, 62 - Math.sin(spoke) * 8);
+    g.moveTo(cx + Math.cos(spoke + 1.2) * 8, 62 + Math.sin(spoke + 1.2) * 8);
+    g.lineTo(cx - Math.cos(spoke + 1.2) * 8, 62 - Math.sin(spoke + 1.2) * 8);
+    g.strokePath();
+  };
+  drawWheel(38);
+  drawWheel(118);
+
+  g.fillStyle(0x2a2e22);
+  g.fillRoundedRect(18, 38, 128, 22, 4);
+  g.fillStyle(0x5a6a38);
+  g.fillRoundedRect(20, 30, 78, 28, 6);
+  g.fillStyle(0x3a4a28);
+  g.fillRect(22, 42, 74, 8);
+
+  g.fillStyle(0x4a5a30);
+  g.fillRoundedRect(96, 34, 48, 24, 3);
+  g.fillStyle(0x2a341c);
+  g.fillRect(100, 38, 40, 8);
+
+  g.fillStyle(0x88c8e0, 0.85);
+  g.fillRoundedRect(28, 34, 28, 14, 3);
+  g.fillStyle(0x1a1c16);
+  g.fillRect(22, 48, 8, 6);
+
+  g.fillStyle(0x2a2218);
+  g.fillCircle(118, 30, 7);
+  g.fillStyle(0x3a4a28);
+  g.fillRect(112, 34, 14, 12);
+
+  g.fillStyle(0x2a2a26);
+  g.fillRect(108, 18, 8, 20);
+  g.fillStyle(0x1a1a16);
+  g.fillRoundedRect(18, 20, 96, 6, 2);
+  g.fillStyle(0x4a4a42);
+  g.fillRect(18, 21, 12, 4);
+  g.fillStyle(0x6a6a60);
+  g.fillCircle(22, 23, 3);
+}
+
+function createPickup(scene: Phaser.Scene): void {
+  bake(scene, 'pickup-0', 160, 80, (g) => drawPickup(g, 0));
+  bake(scene, 'pickup-1', 160, 80, (g) => drawPickup(g, 1));
+}
+
 function createEnemyBullet(scene: Phaser.Scene): void {
   bake(scene, 'enemy-bullet', 18, 8, (g) => {
     g.fillStyle(0xffee88);
@@ -380,6 +444,14 @@ export function createAnimations(scene: Phaser.Scene): void {
       key: 'gunner-walk',
       frames: [{ key: 'gunner-0' }, { key: 'gunner-1' }],
       frameRate: 7,
+      repeat: -1,
+    });
+  }
+  if (!scene.anims.exists('pickup-drive')) {
+    scene.anims.create({
+      key: 'pickup-drive',
+      frames: [{ key: 'pickup-0' }, { key: 'pickup-1' }],
+      frameRate: 8,
       repeat: -1,
     });
   }

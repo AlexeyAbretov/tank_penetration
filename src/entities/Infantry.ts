@@ -9,6 +9,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   abstract readonly coinReward: number;
   abstract readonly reachesBase: boolean;
   abstract readonly contactDamage: number;
+  readonly hitRadius: number = GAME.shellHitRadius;
 
   private readonly barBg: Phaser.GameObjects.Rectangle;
   private readonly barFill: Phaser.GameObjects.Rectangle;
