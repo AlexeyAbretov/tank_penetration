@@ -1,9 +1,9 @@
 export const GAME = {
   width: 1280,
   height: 720,
-  tankX: 150,
+  tankX: 76,
   tankY: 360,
-  reachX: 200,
+  reachX: 115,
   fireDelay: 380,
   shellSpeed: 740,
   blastRadius: 48,

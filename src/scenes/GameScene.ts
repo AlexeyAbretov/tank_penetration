@@ -93,7 +93,7 @@ export class GameScene extends Phaser.Scene {
         this.scene.restart();
         return;
       }
-      if (pointer.rightButtonDown()) {
+      if (pointer.leftButtonDown()) {
         this.shoot();
       }
     });
@@ -109,7 +109,7 @@ export class GameScene extends Phaser.Scene {
     this.tank.tick(delta);
     this.tank.aimAt(pointer.worldX, pointer.worldY);
 
-    if (pointer.rightButtonDown()) {
+    if (pointer.leftButtonDown()) {
       this.shoot();
     }
 
@@ -245,7 +245,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(51);
 
     this.add
-      .text(GAME.width / 2, 708, 'мышь — прицел   ПКМ — огонь', {
+      .text(GAME.width / 2, 708, 'мышь — прицел   ЛКМ — огонь', {
         fontFamily: 'Georgia, serif',
         fontSize: '14px',
         color: '#e8c48a',
