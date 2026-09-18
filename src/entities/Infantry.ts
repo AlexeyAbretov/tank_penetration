@@ -48,7 +48,7 @@ export class Infantry extends Phaser.Physics.Arcade.Sprite {
     body.setVelocityX(-speed);
   }
 
-  hit(damage = GAME.shellDamage): boolean {
+  hit(damage: number = GAME.shellDamage): boolean {
     this.hp = Math.max(0, this.hp - damage);
     this.setTint(0xffccaa);
     this.scene.time.delayedCall(70, () => {
