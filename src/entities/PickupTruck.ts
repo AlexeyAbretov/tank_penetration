@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import type { SpawnContext } from './EnemyFactory';
+import { Infantry } from './Infantry';
 import { RangedEnemy } from './RangedEnemy';
 
 export class PickupTruck extends RangedEnemy {
@@ -10,6 +12,14 @@ export class PickupTruck extends RangedEnemy {
   protected readonly shotDamage = 2;
   protected readonly idleTexture = 'pickup-0';
   protected readonly muzzle = { x: -68, y: -40 };
+
+  static matches(index: number): boolean {
+    return index % 5 === 4;
+  }
+
+  static spawn(ctx: SpawnContext): Infantry {
+    return new PickupTruck(ctx.scene, ctx.x, ctx.y, ctx.hp, ctx.shots);
+  }
 
   constructor(
     scene: Phaser.Scene,

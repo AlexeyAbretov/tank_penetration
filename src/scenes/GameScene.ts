@@ -1,9 +1,7 @@
 import Phaser from 'phaser';
-import { AssaultInfantry } from '../entities/AssaultInfantry';
+import { EnemyFactory } from '../entities/EnemyFactory';
 import { EnemyShot } from '../entities/EnemyShot';
-import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
-import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME, upgradeCost } from '../gameConfig';
 import { createAnimations, createTextures, ensureRuntimeTextures } from '../gfx/textures';
@@ -397,12 +395,13 @@ export class GameScene extends Phaser.Scene {
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
     const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
     const hp = Math.max(1, this.wave * GAME.infantryHpPerWave);
-    const unit =
-      index % 5 === 4
-        ? new PickupTruck(this, x, y, hp, this.enemyShots)
-        : index % 4 === 2
-          ? new GunnerInfantry(this, x, y, hp, this.enemyShots)
-          : new AssaultInfantry(this, x, y, hp);
+    const unit = EnemyFactory.create(index, {
+      scene: this,
+      x,
+      y,
+      hp,
+      shots: this.enemyShots,
+    });
     this.infantry.add(unit);
     unit.march(this.wave);
   }

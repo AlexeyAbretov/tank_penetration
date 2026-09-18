@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import type { SpawnContext } from './EnemyFactory';
+import { Infantry } from './Infantry';
 import { RangedEnemy } from './RangedEnemy';
 
 export class GunnerInfantry extends RangedEnemy {
@@ -9,6 +11,14 @@ export class GunnerInfantry extends RangedEnemy {
   protected readonly shotDamage = 8;
   protected readonly idleTexture = 'gunner-0';
   protected readonly muzzle = { x: -38, y: -42 };
+
+  static matches(index: number): boolean {
+    return index % 4 === 2;
+  }
+
+  static spawn(ctx: SpawnContext): Infantry {
+    return new GunnerInfantry(ctx.scene, ctx.x, ctx.y, ctx.hp, ctx.shots);
+  }
 
   constructor(
     scene: Phaser.Scene,
