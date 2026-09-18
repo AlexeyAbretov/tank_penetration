@@ -28,11 +28,22 @@ export function createTextures(scene: Phaser.Scene): void {
   createTankHull(scene);
   createTankTurret(scene);
   createInfantry(scene);
+  createGunner(scene);
   createShell(scene);
+  createEnemyBullet(scene);
   createMuzzle(scene);
   createParticles(scene);
   createBanner(scene);
   createHpFrame(scene);
+}
+
+export function ensureRuntimeTextures(scene: Phaser.Scene): void {
+  if (!scene.textures.exists('gunner-0')) {
+    createGunner(scene);
+  }
+  if (!scene.textures.exists('enemy-bullet')) {
+    createEnemyBullet(scene);
+  }
 }
 
 function createBattlefield(scene: Phaser.Scene): void {
@@ -180,7 +191,16 @@ function createTankTurret(scene: Phaser.Scene): void {
   });
 }
 
-function drawSoldier(g: Phaser.GameObjects.Graphics, legPhase: 0 | 1): void {
+type SoldierLook = {
+  pants: number;
+  tunic: number;
+  vest: number;
+  helmet: number;
+  helmetLight: number;
+  longRifle: boolean;
+};
+
+function drawSoldier(g: Phaser.GameObjects.Graphics, legPhase: 0 | 1, look: SoldierLook): void {
   g.fillStyle(0x000000, 0.4);
   g.fillEllipse(32, 76, 36, 10);
 
@@ -189,39 +209,39 @@ function drawSoldier(g: Phaser.GameObjects.Graphics, legPhase: 0 | 1): void {
 
   g.fillStyle(0x1a120c);
   g.fillRoundedRect(backLegX - 2, 48, 14, 26, 4);
-  g.fillStyle(0x6a5238);
+  g.fillStyle(look.pants);
   g.fillRoundedRect(backLegX, 50, 10, 22, 3);
   g.fillStyle(0x2a1c12);
   g.fillRoundedRect(backLegX - 2, 68, 14, 8, 2);
 
   g.fillStyle(0x1a120c);
   g.fillRoundedRect(frontLegX - 2, 48, 14, 26, 4);
-  g.fillStyle(0xc4a36a);
+  g.fillStyle(look.tunic);
   g.fillRoundedRect(frontLegX, 50, 10, 22, 3);
   g.fillStyle(0x2a1c12);
   g.fillRoundedRect(frontLegX - 2, 68, 14, 8, 2);
 
   g.fillStyle(0x1a120c);
   g.fillRoundedRect(16, 26, 34, 30, 8);
-  g.fillStyle(0xd4b47a);
+  g.fillStyle(look.tunic);
   g.fillRoundedRect(20, 28, 26, 26, 6);
-  g.fillStyle(0x8a5a28);
+  g.fillStyle(look.vest);
   g.fillRect(22, 40, 22, 7);
   g.fillStyle(0x5a3a18);
   g.fillRect(24, 34, 18, 5);
 
-  g.fillStyle(0xc4a36a);
+  g.fillStyle(look.tunic);
   g.fillRoundedRect(14, 30, 10, 18, 3);
   g.fillRoundedRect(40, 32, 10, 16, 3);
 
   g.fillStyle(0x1a120c);
-  g.fillRoundedRect(4, 34, 40, 8, 3);
+  g.fillRoundedRect(look.longRifle ? 0 : 4, 34, look.longRifle ? 48 : 40, 8, 3);
   g.fillStyle(0x3a3228);
-  g.fillRoundedRect(6, 36, 36, 5, 2);
+  g.fillRoundedRect(look.longRifle ? 2 : 6, 36, look.longRifle ? 44 : 36, 5, 2);
   g.fillStyle(0x6a6248);
-  g.fillRect(6, 37, 12, 3);
+  g.fillRect(look.longRifle ? 2 : 6, 37, 12, 3);
   g.fillStyle(0x1a1c16);
-  g.fillRect(2, 34, 8, 8);
+  g.fillRect(look.longRifle ? 0 : 2, 34, 8, 8);
 
   g.fillStyle(0x1a120c);
   g.fillCircle(32, 22, 10);
@@ -229,9 +249,9 @@ function drawSoldier(g: Phaser.GameObjects.Graphics, legPhase: 0 | 1): void {
   g.fillCircle(32, 22, 8);
   g.fillStyle(0x1a120c);
   g.fillRoundedRect(20, 8, 24, 16, 5);
-  g.fillStyle(0x4a5a30);
+  g.fillStyle(look.helmet);
   g.fillRoundedRect(22, 10, 20, 14, 4);
-  g.fillStyle(0xdde8a8);
+  g.fillStyle(look.helmetLight);
   g.fillRect(24, 12, 10, 3);
   g.fillStyle(0x1a1e18);
   g.fillRect(22, 20, 20, 3);
@@ -239,9 +259,41 @@ function drawSoldier(g: Phaser.GameObjects.Graphics, legPhase: 0 | 1): void {
   g.fillRect(38, 14, 6, 6);
 }
 
+const assaultLook: SoldierLook = {
+  pants: 0x6a5238,
+  tunic: 0xc4a36a,
+  vest: 0x8a5a28,
+  helmet: 0x4a5a30,
+  helmetLight: 0xdde8a8,
+  longRifle: false,
+};
+
+const gunnerLook: SoldierLook = {
+  pants: 0x2a3a32,
+  tunic: 0x4a5a52,
+  vest: 0x1a2a22,
+  helmet: 0x2a3a28,
+  helmetLight: 0x8ab0c8,
+  longRifle: true,
+};
+
 function createInfantry(scene: Phaser.Scene): void {
-  bake(scene, 'infantry-0', 64, 80, (g) => drawSoldier(g, 0));
-  bake(scene, 'infantry-1', 64, 80, (g) => drawSoldier(g, 1));
+  bake(scene, 'infantry-0', 64, 80, (g) => drawSoldier(g, 0, assaultLook));
+  bake(scene, 'infantry-1', 64, 80, (g) => drawSoldier(g, 1, assaultLook));
+}
+
+function createGunner(scene: Phaser.Scene): void {
+  bake(scene, 'gunner-0', 64, 80, (g) => drawSoldier(g, 0, gunnerLook));
+  bake(scene, 'gunner-1', 64, 80, (g) => drawSoldier(g, 1, gunnerLook));
+}
+
+function createEnemyBullet(scene: Phaser.Scene): void {
+  bake(scene, 'enemy-bullet', 18, 8, (g) => {
+    g.fillStyle(0xffee88);
+    g.fillRoundedRect(0, 1, 18, 6, 2);
+    g.fillStyle(0xffffff);
+    g.fillRect(12, 2, 5, 4);
+  });
 }
 
 function createShell(scene: Phaser.Scene): void {
@@ -319,6 +371,14 @@ export function createAnimations(scene: Phaser.Scene): void {
     scene.anims.create({
       key: 'infantry-walk',
       frames: [{ key: 'infantry-0' }, { key: 'infantry-1' }],
+      frameRate: 7,
+      repeat: -1,
+    });
+  }
+  if (!scene.anims.exists('gunner-walk')) {
+    scene.anims.create({
+      key: 'gunner-walk',
+      frames: [{ key: 'gunner-0' }, { key: 'gunner-1' }],
       frameRate: 7,
       repeat: -1,
     });

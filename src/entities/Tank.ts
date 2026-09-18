@@ -15,7 +15,11 @@ export class Tank extends Phaser.GameObjects.Container {
     this.add([hull, this.turret]);
     scene.add.existing(this);
     this.setDepth(25);
-    this.setSize(160, 96);
+    this.  setSize(160, 96);
+  }
+
+  containsPoint(x: number, y: number): boolean {
+    return x > this.x - 72 && x < this.x + 96 && y > this.y - 48 && y < this.y + 52;
   }
 
   aimAt(x: number, y: number): void {

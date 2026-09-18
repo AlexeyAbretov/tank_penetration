@@ -2,12 +2,13 @@ import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME, upgradeCost } from '../gameConfig';
-import { createAnimations, createTextures } from '../gfx/textures';
+import { createAnimations, createTextures, ensureRuntimeTextures } from '../gfx/textures';
 import { ShopPanel } from '../ui/ShopPanel';
 
 export class GameScene extends Phaser.Scene {
   private tank!: Tank;
   private shells!: Phaser.Physics.Arcade.Group;
+  private enemyShots!: Phaser.Physics.Arcade.Group;
   private infantry!: Phaser.Physics.Arcade.Group;
   private hpFill!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
@@ -38,6 +39,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.textures.exists('battlefield')) {
       createTextures(this);
     }
+    ensureRuntimeTextures(this);
     createAnimations(this);
 
     this.hp = GAME.baseHp;
@@ -50,6 +52,7 @@ export class GameScene extends Phaser.Scene {
     this.blastLevel = 0;
     this.damageLevel = 0;
     this.gameOver = false;
+    this.registry.set('combat', true);
 
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
 
@@ -82,6 +85,7 @@ export class GameScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu();
 
     this.shells = this.physics.add.group();
+    this.enemyShots = this.physics.add.group();
     this.infantry = this.physics.add.group();
 
     this.physics.add.overlap(
@@ -138,6 +142,8 @@ export class GameScene extends Phaser.Scene {
         shell.destroy();
       }
     });
+
+    this.updateEnemyShots();
 
     this.infantry.getChildren().forEach((obj) => {
       const unit = obj as Infantry;
@@ -216,7 +222,7 @@ export class GameScene extends Phaser.Scene {
   private hurtInfantry(unit: Infantry): void {
     if (unit.hit(GAME.shellDamage + this.damageLevel)) {
       this.score += 10;
-      this.coins += GAME.killCoins;
+      this.coins += unit.coinReward;
       this.scoreText.setText(`SCORE  ${this.score}`);
       this.coinsText.setText(`COINS  ${this.coins}`);
       unit.kill();
@@ -312,7 +318,7 @@ export class GameScene extends Phaser.Scene {
         if (this.gameOver) {
           return;
         }
-        this.spawnInfantry();
+        this.spawnInfantry(i % 4 === 2);
         this.remainingToSpawn = Math.max(0, this.remainingToSpawn - 1);
       });
     }
@@ -337,12 +343,16 @@ export class GameScene extends Phaser.Scene {
 
   private openShop(): void {
     this.shopOpen = true;
+    this.registry.set('combat', false);
+    this.physics.world.pause();
     this.shop.show(this.coins, this.blastLevel, this.damageLevel);
   }
 
   private closeShopAndContinue(): void {
     this.shop.hide();
     this.shopOpen = false;
+    this.registry.set('combat', true);
+    this.physics.world.resume();
     this.beginNextWave();
   }
 
@@ -375,7 +385,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnInfantry(): void {
+  private spawnInfantry(isGunner = false): void {
     if (this.gameOver) {
       return;
     }
@@ -383,7 +393,8 @@ export class GameScene extends Phaser.Scene {
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
     const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
     const hp = Math.max(1, this.wave * GAME.infantryHpPerWave);
-    const unit = new Infantry(this, x, y, hp);
+    const unit = new Infantry(this, x, y, hp, isGunner ? 'gunner' : 'assault');
+    unit.fireAtTank = (from) => this.fireEnemyShot(from);
     this.infantry.add(unit);
     unit.march(this.wave);
   }
@@ -410,15 +421,56 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private hitBase(unit: Infantry): void {
-    unit.kill();
-    this.hp = Math.max(0, this.hp - GAME.infantryDamage);
+  private fireEnemyShot(from: Infantry): void {
+    if (!from.active || this.gameOver || this.shopOpen) {
+      return;
+    }
+    const x = from.x - 38;
+    const y = from.y - from.displayHeight * 0.42;
+    const angle = Phaser.Math.Angle.Between(x, y, this.tank.x + 24, this.tank.y);
+    const shot = this.physics.add.image(x, y, 'enemy-bullet');
+    this.enemyShots.add(shot);
+    shot.setDepth(14);
+    shot.setRotation(angle);
+    shot.setVelocity(Math.cos(angle) * GAME.shooterBulletSpeed, Math.sin(angle) * GAME.shooterBulletSpeed);
+    const body = shot.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(false);
+    body.setSize(14, 8);
+  }
+
+  private updateEnemyShots(): void {
+    this.enemyShots.getChildren().forEach((obj) => {
+      const shot = obj as Phaser.Physics.Arcade.Image;
+      if (!shot.active) {
+        return;
+      }
+      if (shot.x < 0 || shot.x > GAME.width || shot.y < 0 || shot.y > GAME.bannerY) {
+        shot.destroy();
+        return;
+      }
+      if (this.tank.containsPoint(shot.x, shot.y)) {
+        shot.destroy();
+        this.damageTank(GAME.shooterDamage);
+      }
+    });
+  }
+
+  private damageTank(amount: number): void {
+    this.hp = Math.max(0, this.hp - amount);
     this.hpFill.width = 236 * (this.hp / GAME.baseHp);
-    this.cameras.main.shake(160, 0.008);
-    this.cameras.main.flash(80, 180, 20, 10, false);
+    this.cameras.main.shake(120, 0.006);
+    this.cameras.main.flash(60, 180, 30, 10, false);
     if (this.hp <= 0) {
       this.endGame();
     }
+  }
+
+  private hitBase(unit: Infantry): void {
+    if (unit.role === 'gunner') {
+      return;
+    }
+    unit.kill();
+    this.damageTank(GAME.infantryDamage);
   }
 
   private createUi(): void {
@@ -538,6 +590,8 @@ export class GameScene extends Phaser.Scene {
 
   private endGame(): void {
     this.gameOver = true;
+    this.registry.set('combat', false);
+    this.physics.world.pause();
     this.infantry.getChildren().forEach((obj) => {
       (obj as Infantry).body?.stop();
     });

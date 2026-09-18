@@ -20,6 +20,11 @@ export const GAME = {
   waveAnnounceMs: 1300,
   waveStartDelayMs: 700,
   killCoins: 1,
+  shooterCoins: 2,
+  shooterHoldX: 640,
+  shooterFireDelay: 1500,
+  shooterBulletSpeed: 420,
+  shooterDamage: 8,
   upgradeBaseCost: 3,
   upgradeCostStep: 2,
 } as const;
