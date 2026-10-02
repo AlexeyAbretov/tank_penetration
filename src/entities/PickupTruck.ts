@@ -2,6 +2,7 @@
 // Урон пули меньше, чем у стрелка, но здоровье выше и награда больше.
 
 import Phaser from 'phaser';
+import { GAME } from '../gameConfig';
 import {
   PICKUP_FLASH_FRAME,
   PICKUP_FRAME,
@@ -40,8 +41,10 @@ export class PickupTruck extends RangedEnemy {
   static readonly flashPop = { x: 0.4, y: 0.45, ms: 140 };
   // Левый верх текстуры ствола внутри кадра машины 160×80.
   static readonly gunCut = { x: 7, y: 14 };
-  // Казённик: отдача сдвигает ствол вправо и чуть поднимает дуло вокруг этой точки.
+  // Казённик: ось, вокруг которой ствол поворачивается к танку и отскакивает назад.
   static readonly breech = { x: 108, y: 20 };
+  // Наконечник в кадре машины. От казённика эта точка уходит влево и крутится вместе со стволом.
+  static readonly muzzleTip = { x: 12, y: 20 };
 
   readonly coinReward = 3;
   // Зона попадания шире солдатской (46): снаряд задевает машину с большего расстояния.
@@ -57,8 +60,10 @@ export class PickupTruck extends RangedEnemy {
 
   // Ствол — отдельная картинка поверх кузова: так же, как в рисунке, металл перекрывает руку и станок.
   private gun!: Phaser.GameObjects.Image;
-  // x — пиксели текстуры назад (вправо по картинке). climb — подъём дула в радианах.
+  // x — пиксели текстуры назад вдоль ствола. climb — добавка к прицелу, подъём дула в радианах.
   private readonly recoil = { x: 0, climb: 0 };
+  // Поворот картинки ствола к танку, без отдачи. Ноль — строго влево.
+  private aim = 0;
 
   // Индексы 4, 9, 14, 19... — каждая пятая позиция, если считать с нуля и смотреть остаток 4.
   static matches(index: number): boolean {
@@ -137,6 +142,12 @@ export class PickupTruck extends RangedEnemy {
     return dead;
   }
 
+  // Дуло уже повёрнуто к танку: пуля выходит из наконечника и летит вдоль ствола.
+  protected override shotPose(): { x: number; y: number; angle: number } {
+    this.aim = PickupTruck.aimAt(this.x, this.y, this.scaleX);
+    return PickupTruck.muzzleAt(this.x, this.y, this.scaleX, this.aim);
+  }
+
   // Вспышка остаётся в точке дула, ствол в этот момент отскакивает назад.
   protected override onFire(x: number, y: number, angle: number): void {
     this.kickGun();
@@ -173,16 +184,78 @@ export class PickupTruck extends RangedEnemy {
     if (!this.gun.active) {
       return;
     }
-    const scale = this.scaleX;
-    const breechX = PickupTruck.breech.x + this.recoil.x;
-    const breechY = PickupTruck.breech.y;
-    this.gun.setPosition(
-      this.x + (breechX - PickupTruck.placed.originX * PICKUP_FRAME.w) * scale,
-      this.y + (breechY - PickupTruck.placed.originY * PICKUP_FRAME.h) * scale,
-    );
-    this.gun.setScale(scale);
-    this.gun.setRotation(this.recoil.climb);
+    this.aim = PickupTruck.aimAt(this.x, this.y, this.scaleX);
+    PickupTruck.poseGun(this.gun, this.x, this.y, this.scaleX, this.aim, this.recoil);
     this.gun.setAlpha(this.alpha);
+  }
+
+  // Угол картинки ствола, чтобы наконечник смотрел в корпус танка.
+  // Сама текстура при нуле уже смотрит влево, поэтому к углу на цель прибавляется разворот.
+  static aimAt(anchorX: number, anchorY: number, scale: number): number {
+    const mount = PickupTruck.mountPoint(anchorX, anchorY, scale);
+    const at = Phaser.Math.Angle.Between(mount.x, mount.y, GAME.tankX + 24, GAME.tankY);
+    return Phaser.Math.Angle.Wrap(at + Math.PI);
+  }
+
+  // Мировые координаты наконечника и направление пули. aim — поворот картинки без отдачи.
+  static muzzleAt(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+  ): { x: number; y: number; angle: number } {
+    const mount = PickupTruck.mountPoint(anchorX, anchorY, scale);
+    const tip = PickupTruck.turned(
+      aim,
+      PickupTruck.muzzleTip.x - PickupTruck.breech.x,
+      PickupTruck.muzzleTip.y - PickupTruck.breech.y,
+      scale,
+    );
+    return {
+      x: mount.x + tip.x,
+      y: mount.y + tip.y,
+      angle: Phaser.Math.Angle.Wrap(aim - Math.PI),
+    };
+  }
+
+  // Казённик на спрайте машины. anchor — точка опоры кузова, scale — его масштаб.
+  private static mountPoint(anchorX: number, anchorY: number, scale: number): { x: number; y: number } {
+    return {
+      x: anchorX + (PickupTruck.breech.x - PickupTruck.placed.originX * PICKUP_FRAME.w) * scale,
+      y: anchorY + (PickupTruck.breech.y - PickupTruck.placed.originY * PICKUP_FRAME.h) * scale,
+    };
+  }
+
+  // localX/localY — пиксели текстуры от казённика. Положительный X смотрит назад, к прикладу.
+  private static turned(
+    rotation: number,
+    localX: number,
+    localY: number,
+    scale: number,
+  ): { x: number; y: number } {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    return {
+      x: (localX * cos - localY * sin) * scale,
+      y: (localX * sin + localY * cos) * scale,
+    };
+  }
+
+  // Ставит ствол казёнником в крепление. Отдача сдвигается назад вдоль уже повёрнутого ствола.
+  static poseGun(
+    gun: Phaser.GameObjects.Image,
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): void {
+    const rotation = aim + recoil.climb;
+    const mount = PickupTruck.mountPoint(anchorX, anchorY, scale);
+    const kick = PickupTruck.turned(rotation, recoil.x, 0, scale);
+    gun.setPosition(mount.x + kick.x, mount.y + kick.y);
+    gun.setScale(scale);
+    gun.setRotation(rotation);
   }
 
   // Своя скорость: родительский march для пехоты слишком медленный.

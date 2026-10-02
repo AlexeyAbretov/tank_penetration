@@ -768,13 +768,8 @@ export class StudioScene extends Phaser.Scene {
     if (!rig.gun || !rig.recoil) {
       return;
     }
-    const breechX = PickupTruck.breech.x + rig.recoil.x;
-    const breechY = PickupTruck.breech.y;
-    rig.gun.setPosition(
-      (breechX - PickupTruck.placed.originX * PICKUP_FRAME.w) * scale,
-      (breechY - PickupTruck.placed.originY * PICKUP_FRAME.h) * scale,
-    );
-    rig.gun.setRotation(rig.recoil.climb);
+    // В просмотре пикап всегда стреляет влево, поэтому прицел нулевой. Отдача идёт вдоль ствола.
+    PickupTruck.poseGun(rig.gun, 0, 0, scale, 0, rig.recoil);
   }
 
   // Стрелок в бою рисует винтовку отдельно от тела. Здесь то же самое, иначе откат не виден.
@@ -847,13 +842,8 @@ export class StudioScene extends Phaser.Scene {
     if (!rig.gun || !rig.recoil) {
       return;
     }
-    const breechX = GunnerInfantry.breech.x + rig.recoil.x;
-    const breechY = GunnerInfantry.breech.y;
-    rig.gun.setPosition(
-      (breechX - Infantry.placed.originX * SOLDIER_FRAME.w) * scale,
-      (breechY - Infantry.placed.originY * SOLDIER_FRAME.h) * scale,
-    );
-    rig.gun.setRotation(rig.recoil.climb);
+    // В просмотре стрелок всегда стреляет влево, поэтому прицел нулевой. Отдача идёт вдоль ствола.
+    GunnerInfantry.poseRifle(rig.gun, 0, 0, scale, 0, rig.recoil);
   }
 
   // Снаряд, пуля и вспышки. Цвета снаряда берутся из сохранённого просмотра этих картинок.

@@ -78,17 +78,21 @@ export abstract class RangedEnemy extends Infantry {
     this.fire();
   }
 
-  // Создаёт одну пулю из точки дула в сторону танка.
-  private fire(): void {
-    // Координаты дула в мире: позиция юнита плюс смещение, заданное наследником.
+  // Откуда и куда летит пуля. Пикап подменяет это: дуло едет вместе с поворотом ствола.
+  protected shotPose(): { x: number; y: number; angle: number } {
     const x = this.x + this.muzzle.x;
     const y = this.y + this.muzzle.y;
     // Угол от дула к точке чуть правее центра танка, чтобы пуля целилась в корпус.
-    const angle = Phaser.Math.Angle.Between(x, y, GAME.tankX + 24, GAME.tankY);
-    const shot = new EnemyShot(this.scene, x, y, this.shotDamage);
-    this.shots.add(shot);
-    shot.launch(angle, this.bulletSpeed);
-    this.onFire(x, y, angle);
+    return { x, y, angle: Phaser.Math.Angle.Between(x, y, GAME.tankX + 24, GAME.tankY) };
+  }
+
+  // Создаёт одну пулю из точки дула в сторону танка.
+  private fire(): void {
+    const shot = this.shotPose();
+    const bullet = new EnemyShot(this.scene, shot.x, shot.y, this.shotDamage);
+    this.shots.add(bullet);
+    bullet.launch(shot.angle, this.bulletSpeed);
+    this.onFire(shot.x, shot.y, shot.angle);
   }
 
   // Точка дула и угол пули уже посчитаны. Наследник здесь рисует вспышку и отдачу.

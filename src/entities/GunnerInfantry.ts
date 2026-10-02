@@ -2,6 +2,7 @@
 // Винтовка — отдельная картинка поверх тела, чтобы при выстреле отъезжать и вспыхивать.
 
 import Phaser from 'phaser';
+import { GAME } from '../gameConfig';
 import {
   CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
@@ -22,8 +23,10 @@ export class GunnerInfantry extends RangedEnemy {
   static readonly muzzleOffset = { x: -38, y: -42 };
   // Левый верх винтовки внутри кадра солдата 64×80. Рисунок сидит на y = 34.
   static readonly rifleCut = { x: 0, y: 32 };
-  // Приклад: отдача сдвигает винтовку вправо и поднимает дуло вокруг этой точки.
+  // Приклад: ось, вокруг которой винтовка поворачивается к танку и отскакивает назад.
   static readonly breech = { x: 44, y: 38 };
+  // Дульный срез в кадре солдата. От приклада эта точка уходит влево и крутится вместе с винтовкой.
+  static readonly muzzleTip = { x: 0, y: 38 };
   // Откат короче, чем у станка пикапа: винтовка короткая, удар должен читаться и сразу гаснуть.
   static readonly recoilKick = { x: 5, climb: 0.12, ms: 90 };
   // Вспышка у среза. Доли меньше единицы: картинка сама шире дула.
@@ -48,8 +51,10 @@ export class GunnerInfantry extends RangedEnemy {
 
   // Винтовка поверх тела: так же, как в рисунке, она перекрывает руки.
   private rifle!: Phaser.GameObjects.Image;
-  // x — пиксели текстуры назад (вправо по картинке). climb — подъём дула в радианах.
+  // x — пиксели текстуры назад вдоль винтовки. climb — добавка к прицелу, подъём дула в радианах.
   private readonly recoil = { x: 0, climb: 0 };
+  // Поворот картинки винтовки к танку, без отдачи. Ноль — строго влево.
+  private aim = 0;
 
   // Каждый 3-й индекс из четвёрки: 2, 6, 10, 14...
   // Но 14 ещё и «каждый 5-й хвост» для пикапа (14 % 5 === 4).
@@ -144,6 +149,12 @@ export class GunnerInfantry extends RangedEnemy {
     return dead;
   }
 
+  // Дуло уже повёрнуто к танку: пуля выходит из среза и летит вдоль винтовки.
+  protected override shotPose(): { x: number; y: number; angle: number } {
+    this.aim = GunnerInfantry.aimAt(this.x, this.y, this.scaleX);
+    return GunnerInfantry.muzzleAt(this.x, this.y, this.scaleX, this.aim);
+  }
+
   // Вспышка остаётся в точке дула, винтовка в этот момент отскакивает назад.
   protected override onFire(x: number, y: number, angle: number): void {
     this.kickRifle();
@@ -179,17 +190,78 @@ export class GunnerInfantry extends RangedEnemy {
     if (!this.rifle.active) {
       return;
     }
-    const scale = this.scaleX;
-    const breechX = GunnerInfantry.breech.x + this.recoil.x;
-    const breechY = GunnerInfantry.breech.y;
-    this.rifle.setPosition(
-      this.x + (breechX - Infantry.placed.originX * SOLDIER_FRAME.w) * scale,
-      this.y + (breechY - Infantry.placed.originY * SOLDIER_FRAME.h) * scale,
-    );
-    this.rifle.setScale(scale);
-    // Дуло слева от приклада. По часовой стрелке срез идёт вверх: из «девяти часов» к «двенадцати».
-    this.rifle.setRotation(this.recoil.climb);
+    this.aim = GunnerInfantry.aimAt(this.x, this.y, this.scaleX);
+    GunnerInfantry.poseRifle(this.rifle, this.x, this.y, this.scaleX, this.aim, this.recoil);
     this.rifle.setAlpha(this.alpha);
+  }
+
+  // Угол картинки винтовки, чтобы срез смотрел в корпус танка.
+  // Сама текстура при нуле уже смотрит влево, поэтому к углу на цель прибавляется разворот.
+  static aimAt(anchorX: number, anchorY: number, scale: number): number {
+    const mount = GunnerInfantry.mountPoint(anchorX, anchorY, scale);
+    const at = Phaser.Math.Angle.Between(mount.x, mount.y, GAME.tankX + 24, GAME.tankY);
+    return Phaser.Math.Angle.Wrap(at + Math.PI);
+  }
+
+  // Мировые координаты среза и направление пули. aim — поворот картинки без отдачи.
+  static muzzleAt(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+  ): { x: number; y: number; angle: number } {
+    const mount = GunnerInfantry.mountPoint(anchorX, anchorY, scale);
+    const tip = GunnerInfantry.turned(
+      aim,
+      GunnerInfantry.muzzleTip.x - GunnerInfantry.breech.x,
+      GunnerInfantry.muzzleTip.y - GunnerInfantry.breech.y,
+      scale,
+    );
+    return {
+      x: mount.x + tip.x,
+      y: mount.y + tip.y,
+      angle: Phaser.Math.Angle.Wrap(aim - Math.PI),
+    };
+  }
+
+  // Приклад на спрайте солдата. anchor — точка ног, scale — масштаб тела.
+  private static mountPoint(anchorX: number, anchorY: number, scale: number): { x: number; y: number } {
+    return {
+      x: anchorX + (GunnerInfantry.breech.x - Infantry.placed.originX * SOLDIER_FRAME.w) * scale,
+      y: anchorY + (GunnerInfantry.breech.y - Infantry.placed.originY * SOLDIER_FRAME.h) * scale,
+    };
+  }
+
+  // localX/localY — пиксели текстуры от приклада. Положительный X смотрит назад, к прикладу.
+  private static turned(
+    rotation: number,
+    localX: number,
+    localY: number,
+    scale: number,
+  ): { x: number; y: number } {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    return {
+      x: (localX * cos - localY * sin) * scale,
+      y: (localX * sin + localY * cos) * scale,
+    };
+  }
+
+  // Ставит винтовку прикладом в руки. Отдача сдвигается назад вдоль уже повёрнутого ствола.
+  static poseRifle(
+    rifle: Phaser.GameObjects.Image,
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): void {
+    const rotation = aim + recoil.climb;
+    const mount = GunnerInfantry.mountPoint(anchorX, anchorY, scale);
+    const kick = GunnerInfantry.turned(rotation, recoil.x, 0, scale);
+    rifle.setPosition(mount.x + kick.x, mount.y + kick.y);
+    rifle.setScale(scale);
+    rifle.setRotation(rotation);
   }
 
   static renderRifle(g: Phaser.GameObjects.Graphics, look: SoldierLook = GUNNER_LOOK): void {
