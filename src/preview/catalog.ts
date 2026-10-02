@@ -45,8 +45,10 @@ export type PreviewEntity = {
   hint: string;
   exportName: string;
   kind: 'frames' | 'tank' | 'shot';
-  frameCount: 1 | 2;
+  frameCount: number;
   animFps?: number;
+  // Подпись под крутящимся спрайтом. У солдат это шаг, у пикапа — колёса.
+  motion?: string;
   gameScale: number;
   originX: number;
   originY: number;
@@ -216,11 +218,12 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'pickup',
     title: 'Пикап',
-    hint: 'Два кадра колёс. Масштаб, опора и хитбокс — как у машины на поле.',
+    hint: 'Шесть кадров прокрутки колёс. Масштаб, опора и хитбокс — как у машины на поле.',
     exportName: 'PICKUP_PAINT',
     kind: 'frames',
-    frameCount: 2,
+    frameCount: PickupTruck.wheelFrames,
     animFps: PickupTruck.driveFps,
+    motion: 'колёса',
     gameScale: PickupTruck.placed.scale,
     originX: PickupTruck.placed.originX,
     originY: PickupTruck.placed.originY,
@@ -266,8 +269,9 @@ export const ENTITIES: PreviewEntity[] = [
     hpColor: 0xe0a020,
     bake: (scene, paint, keys) => {
       const colors = paint as PickupPaint;
-      stamp(scene, keys[0], PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => PickupTruck.render(g, 0, colors));
-      stamp(scene, keys[1], PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => PickupTruck.render(g, 1, colors));
+      keys.forEach((key, phase) => {
+        stamp(scene, key, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => PickupTruck.render(g, phase, colors));
+      });
     },
   },
   {

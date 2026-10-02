@@ -97,11 +97,11 @@ export class StudioScene extends Phaser.Scene {
     const keys = this.keysFor(this.entity);
     this.entity.bake(this, this.paint, keys);
     this.liveKeys = keys;
-    if (this.entity.frameCount === 2) {
+    if (this.entity.frameCount > 1) {
       const anim = `studio-${this.entity.id}`;
       this.anims.create({
         key: anim,
-        frames: [{ key: keys[0] }, { key: keys[1] }],
+        frames: keys.map((key) => ({ key })),
         frameRate: this.entity.animFps ?? 7,
         repeat: -1,
       });
@@ -122,7 +122,7 @@ export class StudioScene extends Phaser.Scene {
     const view = readView();
     if (this.entity.kind === 'tank') {
       this.holders.push(this.makeTank(view));
-    } else if (this.entity.frameCount === 2 && view.animate && this.liveAnim) {
+    } else if (this.entity.frameCount > 1 && view.animate && this.liveAnim) {
       this.holders.push(this.makeSprite(this.liveKeys[0], view, true));
     } else {
       for (let i = 0; i < this.entity.frameCount; i += 1) {
@@ -379,11 +379,12 @@ export class StudioScene extends Phaser.Scene {
     if (this.entity.kind === 'tank') {
       return ['сборка'];
     }
-    if (this.entity.frameCount === 2 && view.animate) {
-      return [`шаг · ${this.entity.animFps ?? 7} кадров/с`];
+    if (this.entity.frameCount > 1 && view.animate) {
+      const motion = this.entity.motion ?? 'шаг';
+      return [`${motion} · ${this.entity.animFps ?? 7} кадров/с`];
     }
-    if (this.entity.frameCount === 2) {
-      return ['кадр 1', 'кадр 2'];
+    if (this.entity.frameCount > 1) {
+      return Array.from({ length: this.entity.frameCount }, (_, index) => `кадр ${index + 1}`);
     }
     return ['текстура'];
   }
@@ -433,8 +434,8 @@ export class StudioScene extends Phaser.Scene {
     if (entity.kind === 'tank') {
       return ['studio-tank-hull', 'studio-tank-turret'];
     }
-    if (entity.frameCount === 2) {
-      return [`studio-${entity.id}-0`, `studio-${entity.id}-1`];
+    if (entity.frameCount > 1) {
+      return Array.from({ length: entity.frameCount }, (_, index) => `studio-${entity.id}-${index}`);
     }
     return [`studio-${entity.id}`];
   }

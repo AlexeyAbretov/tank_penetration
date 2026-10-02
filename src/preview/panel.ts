@@ -65,7 +65,7 @@ export function markActive(id: string): void {
 }
 
 export function configureView(entity: PreviewEntity): void {
-  show('animate-row', entity.frameCount === 2);
+  show('animate-row', entity.frameCount > 1);
   show('hitbox-row', entity.kind === 'tank' || entity.hitbox !== undefined);
   show('hp-row', entity.hpColor !== undefined);
   show('muzzle-row', entity.kind === 'tank' || entity.muzzle !== undefined);

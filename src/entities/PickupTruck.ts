@@ -9,7 +9,10 @@ import { Infantry } from './Infantry';
 import { RangedEnemy } from './RangedEnemy';
 
 export class PickupTruck extends RangedEnemy {
-  static readonly driveFps = 8;
+  // Крест через центр повторяется каждые 180°. Шесть кадров делят эту половину оборота.
+  static readonly wheelFrames = 6;
+  // 12 кадров/с: полный оборот креста примерно за полсекунды, рядом со скоростью машины.
+  static readonly driveFps = 12;
   static readonly placed = {
     scale: 1.18,
     originX: 0.5,
@@ -53,7 +56,7 @@ export class PickupTruck extends RangedEnemy {
     shots: Phaser.Physics.Arcade.Group,
   ) {
     // hp + 1: машина чуть живучее пехоты той же волны.
-    // Жёлтая полоска HP, текстуры pickup-0 / pickup-1, анимация pickup-drive.
+    // Жёлтая полоска HP, текстуры pickup-0 … pickup-5, анимация pickup-drive.
     super(scene, x, y, hp + 1, 'pickup-0', 'pickup-drive', 0xe0a020, shots);
     const placed = PickupTruck.placed;
     // Машина нарисована крупнее солдата, дополнительный масштаб небольшой.
@@ -73,26 +76,29 @@ export class PickupTruck extends RangedEnemy {
     body.setVelocityX(-speed);
   }
 
-  // Два кадра колёс. Анимация pickup-drive чередует их.
+  // Кадры колёс. Анимация pickup-drive проигрывает их по порядку и замыкает круг.
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists('pickup-0')) {
-      bake(scene, 'pickup-0', PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => this.render(g, 0));
-      bake(scene, 'pickup-1', PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => this.render(g, 1));
+      for (let phase = 0; phase < PickupTruck.wheelFrames; phase += 1) {
+        bake(scene, `pickup-${phase}`, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => this.render(g, phase));
+      }
     }
     if (!scene.anims.exists('pickup-drive')) {
       scene.anims.create({
         key: 'pickup-drive',
-        frames: [{ key: 'pickup-0' }, { key: 'pickup-1' }],
-        frameRate: this.driveFps, // колёса чуть быстрее солдатского шага
+        frames: Array.from({ length: PickupTruck.wheelFrames }, (_, phase) => ({
+          key: `pickup-${phase}`,
+        })),
+        frameRate: this.driveFps,
         repeat: -1,
       });
     }
   }
 
-  // Пикап боком, нос влево (к танку). wheelPhase сдвигает спицы, чтобы колёса «крутились».
+  // Пикап боком, нос влево (к танку). wheelPhase — номер кадра, от него зависит угол спиц.
   static render(
     g: Phaser.GameObjects.Graphics,
-    wheelPhase: 0 | 1,
+    wheelPhase: number,
     paint: PickupPaint = PICKUP_PAINT,
   ): void {
     // Тень под машиной. Холст 160×80, низ около y = 74.
@@ -167,8 +173,11 @@ export class PickupTruck extends RangedEnemy {
     g.fillStyle(paint.railTip);
     g.fillCircle(24, 20, 3);
 
-    // В втором кадре спицы повёрнуты на 0.5 радиана, около 29 градусов.
-    const spokeAngle = wheelPhase === 0 ? 0 : 0.5;
+    // Линия через центр выглядит так же после поворота на 180° (π радиан).
+    // Кадры делят эту половину оборота поровну, следующий после последнего совпадает с первым.
+    // Минус: на экране Y растёт вниз, и положительный угол крутит колесо по часовой.
+    // Машина едет влево, верх покрышки должен уходить влево — это против часовой.
+    const spokeAngle = -(wheelPhase * Math.PI) / PickupTruck.wheelFrames;
     // Колесо в точке cx. Два вызова рисуют переднее и заднее.
     const drawWheel = (cx: number) => {
       g.fillStyle(paint.wheel); // покрышка
