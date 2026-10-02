@@ -81,11 +81,16 @@ export class Tank extends Phaser.GameObjects.Container {
 
   // Башня и ствол внутри. Крутится целиком, откат двигает только ствол.
   private readonly aim: Phaser.GameObjects.Container;
+  private readonly hull: Phaser.GameObjects.Image;
   private readonly gun: Phaser.GameObjects.Image;
   // После гибели корпус уже спрятан, повторный die ничего не делает.
   private dead = false;
+  // Редкий выхлоп, пока мотор работает. Гаснет в момент гибели.
+  private engine?: Phaser.GameObjects.Particles.ParticleEmitter;
   // Столб над обломками. Живёт, пока контейнер танка на сцене.
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Сколько миллисекунд танк уже тарахтит. Из этого времени считается тряска.
+  private engineMs = 0;
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
 
@@ -95,7 +100,7 @@ export class Tank extends Phaser.GameObjects.Container {
 
     const layout = Tank.layout;
     // Корпус чуть правее и ниже центра контейнера.
-    const hull = scene.add.image(layout.hullX, layout.hullY, 'tank-hull');
+    this.hull = scene.add.image(layout.hullX, layout.hullY, 'tank-hull');
     // Ось на днище башни. Дети заданы относительно неё, поэтому при наклоне низ стоит на месте.
     this.aim = scene.add.container(layout.seatX, layout.seatY);
     const turret = scene.add.image(layout.turretX - layout.seatX, layout.turretY - layout.seatY, 'tank-turret');
@@ -105,15 +110,43 @@ export class Tank extends Phaser.GameObjects.Container {
     // Ствол последним: маска на нём перекрывает лоб башни.
     this.aim.add([turret, this.gun]);
 
-    this.add([hull, this.aim]);
+    this.add([this.hull, this.aim]);
     scene.add.existing(this);
     // Танк рисуется поверх солдат, снарядов и вспышек выстрела врага.
     this.setDepth(25);
     // Размер контейнера. Попадания пуль проверяются своим прямоугольником в containsPoint.
     this.setSize(160, 96);
+    const exhaust = Tank.exhaustAnchor();
+    this.engine = Tank.engineAt(scene, x + exhaust.x, y + exhaust.y);
+    // preupdate идёт каждый кадр, даже когда сцена боя сама стоит на паузе магазина.
+    const onIdle = (_time: number, delta: number) => this.idle(delta);
+    scene.events.on(Phaser.Scenes.Events.PRE_UPDATE, onIdle);
     this.once('destroy', () => {
+      scene.events.off(Phaser.Scenes.Events.PRE_UPDATE, onIdle);
+      this.stopEngine();
       this.smoke?.destroy();
     });
+  }
+
+  // Лёгкая тряска всего живого танка и выхлоп, который едет вместе с кормой.
+  private idle(delta: number): void {
+    if (this.dead || !this.engine) {
+      return;
+    }
+    this.engineMs += delta;
+    const wobble = this.engineMs * 0.028;
+    const dx = Math.sin(wobble) * 0.45 + Math.sin(wobble * 2.17) * 0.28;
+    const dy = Math.cos(wobble * 1.31) * 0.35 + Math.sin(wobble * 2.63) * 0.18;
+    const layout = Tank.layout;
+    this.hull.setPosition(layout.hullX + dx, layout.hullY + dy);
+    this.aim.setPosition(layout.seatX + dx, layout.seatY + dy);
+    const exhaust = Tank.exhaustAnchor();
+    this.engine.setPosition(this.x + exhaust.x + dx, this.y + exhaust.y + dy);
+  }
+
+  private stopEngine(): void {
+    this.engine?.destroy();
+    this.engine = undefined;
   }
 
   // Попала ли точка (пуля) в прямоугольник вокруг танка.
@@ -197,6 +230,7 @@ export class Tank extends Phaser.GameObjects.Container {
       return;
     }
     this.dead = true;
+    this.stopEngine();
     this.scene.tweens.killTweensOf(this.gun);
     for (const child of [...this.list]) {
       const node = child as unknown as Phaser.GameObjects.Components.Visible;
@@ -472,6 +506,38 @@ export class Tank extends Phaser.GameObjects.Container {
     g.fillCircle(108, ground - 48, 8);
   }
 
+  // Решётка моторного отсека на корме крыши, в координатах контейнера танка.
+  static exhaustAnchor(): { x: number; y: number } {
+    const deckX = 36;
+    const deckY = 30;
+    return {
+      x: Tank.layout.hullX + (deckX - TANK_HULL_FRAME.w / 2),
+      y: Tank.layout.hullY + (deckY - TANK_HULL_FRAME.h / 2),
+    };
+  }
+
+  // Редкий серый выхлоп. Тоньше и ниже столба над обломками.
+  static engineAt(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    scale = 1,
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    const engine = scene.add.particles(x, y, Tank.puffKey(scene), {
+      lifespan: { min: 900, max: 1600 },
+      frequency: 40,
+      quantity: 2,
+      speed: { min: 12 * scale, max: 30 * scale },
+      angle: { min: -165, max: -105 },
+      scale: { start: 0.4 * scale, end: 1.55 * scale },
+      alpha: { start: 0.72, end: 0 },
+      color: [0xe6e2da, 0xb4aea6, 0x7c766e],
+      gravityY: -18 * scale,
+    });
+    engine.setDepth(26);
+    return engine;
+  }
+
   // Точка над проломом корпуса в координатах контейнера танка. От неё поднимается дым.
   static smokeAnchor(): { x: number; y: number } {
     const ground = TANK_WRECK_FRAME.h / 2 + 41;
@@ -483,13 +549,8 @@ export class Tank extends Phaser.GameObjects.Container {
     };
   }
 
-  // Непрерывный столб над обломками. Толще и выше, чем у пикапа.
-  static smokeAt(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    scale = 1,
-  ): Phaser.GameObjects.Particles.ParticleEmitter {
+  // Мягкое пятно для обоих дымов: выхлопа на ходу и столба над обломками.
+  private static puffKey(scene: Phaser.Scene): string {
     const key = 'smoke-puff';
     if (!scene.textures.exists(key)) {
       bake(scene, key, 32, 32, (g) => {
@@ -501,7 +562,17 @@ export class Tank extends Phaser.GameObjects.Container {
         g.fillCircle(16, 16, 4);
       });
     }
-    const smoke = scene.add.particles(x, y, key, {
+    return key;
+  }
+
+  // Непрерывный столб над обломками. Толще и выше, чем у пикапа.
+  static smokeAt(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    scale = 1,
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    const smoke = scene.add.particles(x, y, Tank.puffKey(scene), {
       lifespan: { min: 1100, max: 2100 },
       frequency: 90,
       quantity: 1,
