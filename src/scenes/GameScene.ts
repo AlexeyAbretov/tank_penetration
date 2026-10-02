@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
+import { BarbedWire } from '../entities/BarbedWire';
 import { EnemyFactory } from '../entities/EnemyFactory';
 import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
@@ -57,6 +58,9 @@ export class GameScene extends Phaser.Scene {
   private blastLevel = 0;
   // Сколько раз купили урон. Прибавляется к GAME.shellDamage.
   private damageLevel = 0;
+  // Проволока одна на всю партию. После поражения create сбрасывает и флаг, и ссылку.
+  private wireOwned = false;
+  private wire?: BarbedWire;
   private gameOver = false;
 
   constructor() {
@@ -88,6 +92,8 @@ export class GameScene extends Phaser.Scene {
     this.shopOpen = false;
     this.blastLevel = 0;
     this.damageLevel = 0;
+    this.wireOwned = false;
+    this.wire = undefined;
     this.gameOver = false;
     // registry — общее хранилище игры. Враги читают 'combat', чтобы замереть в магазине.
     this.registry.set('combat', true);
@@ -206,6 +212,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.updateEnemyShots();
+    this.snareOnWire(delta);
 
     this.infantry.getChildren().forEach((obj) => {
       const unit = obj as Infantry;
@@ -294,8 +301,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Один удар по врагу. Если здоровья не осталось — очки, монеты и анимация смерти.
-  private hurtInfantry(unit: Infantry): void {
-    if (unit.hit(GAME.shellDamage + this.damageLevel)) {
+  // damage задаёт проволока: её удар всегда 1, без уровня урона снаряда.
+  private hurtInfantry(unit: Infantry, damage = GAME.shellDamage + this.damageLevel): void {
+    if (unit.hit(damage)) {
       this.score += 10;
       this.coins += unit.coinReward;
       this.scoreText.setText(`SCORE  ${this.score}`);
@@ -440,7 +448,7 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('combat', false);
     // Замирают скорости снарядов и шаги. Без паузы пули долетели бы, пока игрок читает магазин.
     this.physics.world.pause();
-    this.shop.show(this.coins, this.blastLevel, this.damageLevel);
+    this.shop.show(this.coins, this.blastLevel, this.damageLevel, this.wireOwned);
   }
 
   private closeShopAndContinue(): void {
@@ -460,7 +468,7 @@ export class GameScene extends Phaser.Scene {
     this.coins -= cost;
     this.blastLevel += 1;
     this.coinsText.setText(`COINS  ${this.coins}`);
-    this.shop.refresh(this.coins, this.blastLevel, this.damageLevel);
+    this.shop.refresh(this.coins, this.blastLevel, this.damageLevel, this.wireOwned);
   }
 
   private buyDamage(): void {
@@ -471,7 +479,36 @@ export class GameScene extends Phaser.Scene {
     this.coins -= cost;
     this.damageLevel += 1;
     this.coinsText.setText(`COINS  ${this.coins}`);
-    this.shop.refresh(this.coins, this.blastLevel, this.damageLevel);
+    this.shop.refresh(this.coins, this.blastLevel, this.damageLevel, this.wireOwned);
+  }
+
+  // Одна полоса на всю высоту поля. Повторный клик по уже купленной карточке сюда не доходит.
+  private buyWire(): void {
+    if (this.wireOwned || this.coins < GAME.barbedWireCost) {
+      return;
+    }
+    this.coins -= GAME.barbedWireCost;
+    this.wireOwned = true;
+    this.wire = new BarbedWire(this);
+    this.coinsText.setText(`COINS  ${this.coins}`);
+    this.shop.refresh(this.coins, this.blastLevel, this.damageLevel, this.wireOwned);
+  }
+
+  // Пехота, которая идёт к базе, упирается в проволоку.
+  // Удар сразу при касании, потом ещё раз каждые barbedWireIntervalMs.
+  private snareOnWire(delta: number): void {
+    const wire = this.wire;
+    if (!wire) {
+      return;
+    }
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (!wire.blocks(unit)) {
+        return;
+      }
+      if (unit.snare(GAME.barbedWireFace, delta)) {
+        this.hurtInfantry(unit, GAME.barbedWireDamage);
+      }
+    });
   }
 
   // Танк сам решает, прошёл ли кулдаун. Сцена только создаёт снаряд, если выстрел разрешён.
@@ -684,6 +721,7 @@ export class GameScene extends Phaser.Scene {
     this.shop = new ShopPanel(this, {
       onBuyBlast: () => this.buyBlast(),
       onBuyDamage: () => this.buyDamage(),
+      onBuyWire: () => this.buyWire(),
       onContinue: () => this.closeShopAndContinue(),
     });
   }

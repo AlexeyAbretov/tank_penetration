@@ -30,6 +30,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // true, когда юнит уже «выбыл»: дошёл до базы или его убили.
   // По такому юниту больше не стреляют и он сам больше не действует.
   reachedWall = false;
+  // Сколько миллисекунд до следующего удара проволокой. 0 — можно бить сейчас.
+  private wireHurtMs = 0;
 
   // Сколько монет даёт убийство. Каждая разновидность врага задаёт своё число.
   // abstract: наследник обязан написать это поле, иначе TypeScript не соберёт файл.
@@ -129,6 +131,31 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     const speed = 36 + wave * 4 + Phaser.Math.Between(0, 10);
     // Отрицательный X — движение влево, к танку. Y не трогаем: дорожка не меняется.
     body.setVelocityX(-speed);
+  }
+
+  // Упирает юнита в правый край проволоки и гасит шаг.
+  // true, когда пора снять HP: в первое касание и потом каждые barbedWireIntervalMs.
+  snare(faceX: number, delta: number): boolean {
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    if (!body) {
+      return false;
+    }
+    body.setVelocityX(0);
+    // body.left — передний край хитбокса. Если кадр занёс его в проволоку, выталкиваем назад.
+    if (body.left < faceX) {
+      const push = faceX - body.left;
+      body.x += push;
+      this.x += push;
+    }
+    if (this.anims.isPlaying) {
+      this.anims.stop();
+    }
+    this.wireHurtMs -= delta;
+    if (this.wireHurtMs > 0) {
+      return false;
+    }
+    this.wireHurtMs = GAME.barbedWireIntervalMs;
+    return true;
   }
 
   // Наносит урон. Возвращает true, если после удара здоровья не осталось — сцена тогда вызовет kill.
