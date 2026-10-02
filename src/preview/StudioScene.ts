@@ -264,7 +264,12 @@ export class StudioScene extends Phaser.Scene {
     const extra = this.entity.kind === 'tank' ? view.scale : 1;
     const availW = Math.max(40, width - padX * 2 - gutter * Math.max(0, count - 1));
     const availH = Math.max(40, height - padTop - padBottom);
-    const fit = Math.min(availW / (localW * extra * count), availH / (localH * extra));
+    // Снаряд, вспышка и пуля мелкие. Без общего окна они растягиваются на весь холст
+    // и даже при минимальном увеличении выглядят крупнее танка.
+    const frame = this.entity.kind === 'shot' ? tankFrameSpan() : null;
+    const spanW = frame ? Math.max(localW, frame.w) : localW;
+    const spanH = frame ? Math.max(localH, frame.h) : localH;
+    const fit = Math.min(availW / (spanW * extra * count), availH / (spanH * extra));
     const scale = Math.max(0.05, fit * view.zoom);
     const step = localW * extra * scale + gutter;
     const midX = (bounds.left + bounds.right) / 2;
@@ -448,6 +453,31 @@ export class StudioScene extends Phaser.Scene {
       `${this.entity.texW}×${this.entity.texH} · масштаб ${view.scale.toFixed(2)} · зум ×${view.zoom.toFixed(1)}`,
     );
   }
+}
+
+// Габарит танка при угле башни по умолчанию. Мелкие выстрелы вписываются в это окно,
+// чтобы пиксель текстуры на холсте совпадал с пикселем танка при том же увеличении.
+function tankFrameSpan(): { w: number; h: number } {
+  const layout = Tank.layout;
+  const cos = Math.cos(-0.3);
+  const sin = Math.sin(-0.3);
+  let left = layout.hullX - TANK_HULL_FRAME.w / 2;
+  let right = layout.hullX + TANK_HULL_FRAME.w / 2;
+  let top = layout.hullY - TANK_HULL_FRAME.h / 2;
+  let bottom = layout.hullY + TANK_HULL_FRAME.h / 2;
+  for (const ox of [-layout.turretOriginX, 1 - layout.turretOriginX]) {
+    for (const oy of [-layout.turretOriginY, 1 - layout.turretOriginY]) {
+      const x = ox * TANK_TURRET_FRAME.w;
+      const y = oy * TANK_TURRET_FRAME.h;
+      const rx = layout.turretX + x * cos - y * sin;
+      const ry = layout.turretY + x * sin + y * cos;
+      left = Math.min(left, rx);
+      right = Math.max(right, rx);
+      top = Math.min(top, ry);
+      bottom = Math.max(bottom, ry);
+    }
+  }
+  return { w: right - left, h: bottom - top };
 }
 
 function paintCross(g: Phaser.GameObjects.Graphics): void {
