@@ -6,6 +6,10 @@
 
 export const SOLDIER_FRAME = { w: 64, h: 80 };
 export const PICKUP_FRAME = { w: 160, h: 80 };
+// Ствол вырезан из кадра машины, чтобы в бою он мог отъезжать отдельно от кузова.
+export const PICKUP_GUN_FRAME = { w: 104, h: 12 };
+// Широкий веер у дула. Пуля узкая, вспышка заметно выше и ниже неё.
+export const PICKUP_FLASH_FRAME = { w: 56, h: 64 };
 export const TANK_HULL_FRAME = { w: 176, h: 110 };
 export const TANK_TURRET_FRAME = { w: 168, h: 48 };
 export const SHELL_FRAME = { w: 54, h: 22 };

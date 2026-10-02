@@ -13,6 +13,7 @@ export type ViewState = {
   origin: boolean;
   hp: boolean;
   muzzle: boolean;
+  fire: boolean;
   addBlend: boolean;
   angle: number;
   rotation: number;
@@ -47,7 +48,7 @@ export function bindPanel(handlers: PanelHandlers): void {
     list.append(button);
   }
 
-  for (const id of ['zoom', 'scale', 'animate', 'checker', 'bounds', 'hitbox', 'origin', 'hp', 'muzzle', 'add', 'angle', 'spin']) {
+  for (const id of ['zoom', 'scale', 'animate', 'checker', 'bounds', 'hitbox', 'origin', 'hp', 'muzzle', 'fire', 'add', 'angle', 'spin']) {
     document.getElementById(id)?.addEventListener('input', () => {
       writeReadouts();
       handlers.view();
@@ -69,6 +70,7 @@ export function configureView(entity: PreviewEntity): void {
   show('hitbox-row', entity.kind === 'tank' || entity.hitbox !== undefined);
   show('hp-row', entity.hpColor !== undefined);
   show('muzzle-row', entity.kind === 'tank' || entity.muzzle !== undefined);
+  show('fire-row', entity.shot !== undefined);
   show('add-row', Boolean(entity.addBlend));
   show('angle-row', entity.kind === 'tank');
   show('spin-row', entity.kind === 'shot');
@@ -125,6 +127,7 @@ export function readView(): ViewState {
     origin: checked('origin'),
     hp: checked('hp'),
     muzzle: checked('muzzle'),
+    fire: checked('fire'),
     addBlend: checked('add'),
     angle: num('angle', -0.3),
     rotation: num('spin', 0),

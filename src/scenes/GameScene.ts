@@ -518,8 +518,8 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({
       targets: flash,
       alpha: 0,
-      scale: 1.6,
-      duration: 90,
+      scale: Tank.muzzleFlash.scale,
+      duration: Tank.muzzleFlash.ms,
       onComplete: () => flash.destroy(),
     });
   }
@@ -549,10 +549,6 @@ export class GameScene extends Phaser.Scene {
     this.hp = Math.max(0, this.hp - amount);
     // Полная полоска — 236 пикселей. Доля hp / baseHp умножает ширину.
     this.hpFill.width = 236 * (this.hp / GAME.baseHp);
-    // Короткий тряска камеры: длительность 120 мс, сила 0.006.
-    this.cameras.main.shake(120, 0.006);
-    // Красная вспышка. false в конце — не заставлять камеру сбрасывать уже идущие эффекты особым способом API.
-    this.cameras.main.flash(60, 180, 30, 10, false);
     if (this.hp <= 0) {
       this.endGame();
     }

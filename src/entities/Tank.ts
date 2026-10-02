@@ -33,6 +33,11 @@ export class Tank extends Phaser.GameObjects.Container {
     hitDown: 52,
   };
 
+  // Откат башни: картинка башни на короткое время уезжает в x = 10 и возвращается.
+  static readonly recoilSlide = { x: 10, ms: 40 };
+  // Круглая вспышка у дула раздувается и гаснет. Её же показывает просмотр спрайтов.
+  static readonly muzzleFlash = { scale: 1.6, ms: 90 };
+
   // Башня хранится отдельно: на неё вешают поворот, откат и точку выстрела.
   private readonly turret: Phaser.GameObjects.Image;
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
@@ -100,8 +105,8 @@ export class Tank extends Phaser.GameObjects.Container {
     // Короткий откат: башня на 40 мс уезжает влево и возвращается (yoyo).
     this.scene.tweens.add({
       targets: this.turret,
-      x: 10,
-      duration: 40,
+      x: Tank.recoilSlide.x,
+      duration: Tank.recoilSlide.ms,
       yoyo: true,
     });
     return this.getMuzzle();

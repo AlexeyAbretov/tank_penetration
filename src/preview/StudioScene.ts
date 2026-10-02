@@ -1,8 +1,24 @@
 // Холст просмотра: запекает текстуры выбранной сущности и рисует их с рамками игры.
 
 import Phaser from 'phaser';
+import { EnemyShot } from '../entities/EnemyShot';
+import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
-import { TANK_HULL_FRAME, TANK_TURRET_FRAME } from '../gfx/looks';
+import {
+  BULLET_FRAME,
+  MUZZLE_FRAME,
+  PICKUP_FLASH_FRAME,
+  PICKUP_FRAME,
+  PICKUP_GUN_FRAME,
+  SHELL_FRAME,
+  TANK_HULL_FRAME,
+  TANK_TURRET_FRAME,
+  type BulletPaint,
+  type MuzzlePaint,
+  type PickupPaint,
+  type ShellPaint,
+} from '../gfx/looks';
+import { bake } from '../gfx/textures';
 import { ENTITIES, type PreviewEntity } from './catalog';
 import { formatLook, type Paint } from './format';
 import {
@@ -32,6 +48,9 @@ export class StudioScene extends Phaser.Scene {
   private backdrop!: Phaser.GameObjects.Graphics;
   private ground!: Phaser.GameObjects.Graphics;
   private bakeQueued = false;
+  private rig?: ShotRig;
+  private flies: Fly[] = [];
+  private bodyKeys: string[] = [];
 
   constructor() {
     super('studio');
@@ -97,6 +116,10 @@ export class StudioScene extends Phaser.Scene {
     const keys = this.keysFor(this.entity);
     this.entity.bake(this, this.paint, keys);
     this.liveKeys = keys;
+    if (this.entity.id === 'pickup') {
+      this.bakePickupBody();
+    }
+    this.refreshFx();
     if (this.entity.frameCount > 1) {
       const anim = `studio-${this.entity.id}`;
       this.anims.create({
@@ -112,6 +135,7 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private buildHolders(): void {
+    this.disarm();
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
     this.captions.forEach((caption) => caption.destroy());
@@ -120,10 +144,18 @@ export class StudioScene extends Phaser.Scene {
       return;
     }
     const view = readView();
+    const firing = view.fire && this.entity.shot !== undefined;
     if (this.entity.kind === 'tank') {
       this.holders.push(this.makeTank(view));
-    } else if (this.entity.frameCount > 1 && view.animate && this.liveAnim) {
-      this.holders.push(this.makeSprite(this.liveKeys[0], view, true));
+    } else if (firing && this.entity.id === 'pickup') {
+      this.holders.push(this.makePickup(view));
+    } else if (firing || (this.entity.frameCount > 1 && view.animate && this.liveAnim)) {
+      const holder = this.makeSprite(this.liveKeys[0], view, view.animate && Boolean(this.liveAnim));
+      this.holders.push(holder);
+      if (firing && this.entity.muzzle) {
+        const pixel = this.pixel(view);
+        this.arm(holder, { x: this.entity.muzzle.x * pixel, y: this.entity.muzzle.y * pixel }, Math.PI, pixel);
+      }
     } else {
       for (let i = 0; i < this.entity.frameCount; i += 1) {
         this.holders.push(this.makeSprite(this.liveKeys[i], view, false));
@@ -198,6 +230,18 @@ export class StudioScene extends Phaser.Scene {
       const y = layout.turretY + Math.sin(view.angle) * layout.muzzleLength;
       guides.fillStyle(0xffee66, 1);
       guides.fillCircle(x, y, 4);
+    }
+    if (view.fire && this.entity.shot) {
+      this.arm(
+        root,
+        {
+          x: layout.turretX + Math.cos(view.angle) * layout.muzzleLength,
+          y: layout.turretY + Math.sin(view.angle) * layout.muzzleLength,
+        },
+        view.angle,
+        1,
+        { pivot },
+      );
     }
     return root;
   }
@@ -381,6 +425,11 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private labels(view: ViewState): string[] {
+    if (view.fire && this.entity.shot) {
+      const motion =
+        this.entity.frameCount > 1 && view.animate ? `${this.entity.motion ?? 'шаг'} · ` : '';
+      return [`${motion}выстрел · ${this.entity.shot.delay} мс`];
+    }
     if (this.entity.kind === 'tank') {
       return ['сборка'];
     }
@@ -392,6 +441,269 @@ export class StudioScene extends Phaser.Scene {
       return Array.from({ length: this.entity.frameCount }, (_, index) => `кадр ${index + 1}`);
     }
     return ['текстура'];
+  }
+
+  update(_time: number, delta: number): void {
+    const rig = this.rig;
+    if (rig && readView().fire) {
+      rig.cooldown -= delta;
+      if (rig.cooldown <= 0) {
+        rig.cooldown = rig.delay;
+        this.emitShot();
+      }
+      if (rig.gun && rig.recoil) {
+        this.placePickupGun(readView().scale, rig);
+      }
+    }
+    for (const fly of this.flies) {
+      fly.image.x += (fly.vx * delta) / 1000;
+      fly.image.y += (fly.vy * delta) / 1000;
+      fly.life -= delta;
+    }
+    this.flies = this.flies.filter((fly) => {
+      if (fly.life > 0 && fly.image.active) {
+        return true;
+      }
+      if (fly.image.active) {
+        fly.image.destroy();
+      }
+      return false;
+    });
+  }
+
+  // Пикап в бою рисует ствол отдельно от кузова. Здесь то же самое, иначе откат не виден.
+  private bakePickupBody(): void {
+    this.dropPickupBody();
+    const paint = this.paint as PickupPaint;
+    this.bodyKeys = Array.from({ length: PickupTruck.wheelFrames }, (_, phase) => {
+      const key = `studio-pickup-body-${phase}`;
+      this.restamp(key, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => PickupTruck.render(g, phase, paint, false));
+      return key;
+    });
+    this.restamp('studio-pickup-gun', PICKUP_GUN_FRAME.w, PICKUP_GUN_FRAME.h, (g) =>
+      PickupTruck.renderGun(g, paint),
+    );
+    this.anims.create({
+      key: 'studio-pickup-body',
+      frames: this.bodyKeys.map((key) => ({ key })),
+      frameRate: PickupTruck.driveFps,
+      repeat: -1,
+    });
+  }
+
+  private dropPickupBody(): void {
+    if (this.anims.exists('studio-pickup-body')) {
+      this.anims.remove('studio-pickup-body');
+    }
+    for (const key of [...this.bodyKeys, 'studio-pickup-gun']) {
+      if (this.textures.exists(key)) {
+        this.textures.remove(key);
+      }
+    }
+    this.bodyKeys = [];
+  }
+
+  private makePickup(view: ViewState): Phaser.GameObjects.Container {
+    const root = this.add.container(0, 0);
+    const sprite = this.add.sprite(0, 0, this.bodyKeys[0]);
+    sprite.setOrigin(this.entity.originX, this.entity.originY);
+    sprite.setScale(view.scale);
+    if (view.animate) {
+      sprite.play('studio-pickup-body');
+    }
+    root.add(sprite);
+    const gun = this.add.image(0, 0, 'studio-pickup-gun');
+    gun.setOrigin(
+      (PickupTruck.breech.x - PickupTruck.gunCut.x) / PICKUP_GUN_FRAME.w,
+      (PickupTruck.breech.y - PickupTruck.gunCut.y) / PICKUP_GUN_FRAME.h,
+    );
+    gun.setScale(view.scale);
+    root.add(gun);
+    const guides = this.add.graphics();
+    root.add(guides);
+    this.paintSpriteGuides(guides, view);
+    const recoil = { x: 0, climb: 0 };
+    const pixel = this.pixel(view);
+    this.arm(
+      root,
+      { x: this.entity.muzzle!.x * pixel, y: this.entity.muzzle!.y * pixel },
+      Math.PI,
+      pixel,
+      { gun, recoil },
+    );
+    this.placePickupGun(view.scale, this.rig!);
+    return root;
+  }
+
+  private placePickupGun(scale: number, rig: ShotRig): void {
+    if (!rig.gun || !rig.recoil) {
+      return;
+    }
+    const breechX = PickupTruck.breech.x + rig.recoil.x;
+    const breechY = PickupTruck.breech.y;
+    rig.gun.setPosition(
+      (breechX - PickupTruck.placed.originX * PICKUP_FRAME.w) * scale,
+      (breechY - PickupTruck.placed.originY * PICKUP_FRAME.h) * scale,
+    );
+    rig.gun.setRotation(rig.recoil.climb);
+  }
+
+  // Снаряд, пуля и обе вспышки. Цвета берутся из сохранённого просмотра этих картинок.
+  private refreshFx(): void {
+    const paintOf = (id: string) => loadPaint(ENTITIES.find((entry) => entry.id === id) ?? ENTITIES[0]);
+    this.restamp('studio-fx-shell', SHELL_FRAME.w, SHELL_FRAME.h, (g) =>
+      Tank.renderShell(g, paintOf('shell') as ShellPaint),
+    );
+    this.restamp('studio-fx-muzzle', MUZZLE_FRAME.w, MUZZLE_FRAME.h, (g) =>
+      Tank.renderMuzzle(g, paintOf('muzzle') as MuzzlePaint),
+    );
+    this.restamp('studio-fx-bullet', BULLET_FRAME.w, BULLET_FRAME.h, (g) =>
+      EnemyShot.render(g, paintOf('bullet') as BulletPaint),
+    );
+    this.restamp('studio-fx-pickup-flash', PICKUP_FLASH_FRAME.w, PICKUP_FLASH_FRAME.h, (g) =>
+      PickupTruck.renderFlash(g),
+    );
+  }
+
+  private restamp(
+    key: string,
+    width: number,
+    height: number,
+    draw: (g: Phaser.GameObjects.Graphics) => void,
+  ): void {
+    if (this.textures.exists(key)) {
+      this.textures.remove(key);
+    }
+    bake(this, key, width, height, draw);
+    this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+
+  private pixel(view: ViewState): number {
+    return this.entity.gameScale === 0 ? 1 : view.scale / this.entity.gameScale;
+  }
+
+  private arm(
+    root: Phaser.GameObjects.Container,
+    muzzle: { x: number; y: number },
+    angle: number,
+    pixel: number,
+    extra?: Pick<ShotRig, 'pivot' | 'gun' | 'recoil'>,
+  ): void {
+    const shot = this.entity.shot;
+    if (!shot) {
+      return;
+    }
+    this.rig = {
+      delay: shot.delay,
+      cooldown: 0,
+      root,
+      angle,
+      muzzle,
+      speed: shot.speed,
+      projectile: shot.projectile,
+      flash: shot.flash,
+      pixel,
+      ...extra,
+    };
+  }
+
+  private disarm(): void {
+    if (this.rig?.recoil) {
+      this.tweens.killTweensOf(this.rig.recoil);
+    }
+    if (this.rig?.pivot) {
+      this.tweens.killTweensOf(this.rig.pivot);
+    }
+    this.rig = undefined;
+    this.flies = [];
+  }
+
+  private emitShot(): void {
+    const rig = this.rig;
+    if (!rig) {
+      return;
+    }
+    if (rig.pivot) {
+      const layout = Tank.layout;
+      const angle = readView().angle;
+      rig.angle = angle;
+      rig.muzzle = {
+        x: layout.turretX + Math.cos(angle) * layout.muzzleLength,
+        y: layout.turretY + Math.sin(angle) * layout.muzzleLength,
+      };
+      this.tweens.killTweensOf(rig.pivot);
+      rig.pivot.x = layout.turretX;
+      this.tweens.add({
+        targets: rig.pivot,
+        x: Tank.recoilSlide.x,
+        duration: Tank.recoilSlide.ms,
+        yoyo: true,
+      });
+    }
+    if (rig.recoil) {
+      const kick = PickupTruck.recoilKick;
+      this.tweens.killTweensOf(rig.recoil);
+      rig.recoil.x = kick.x;
+      rig.recoil.climb = kick.climb;
+      this.tweens.add({
+        targets: rig.recoil,
+        x: 0,
+        climb: 0,
+        duration: kick.ms,
+        ease: 'Quad.Out',
+      });
+    }
+    const shot = this.add.image(
+      rig.muzzle.x,
+      rig.muzzle.y,
+      rig.projectile === 'shell' ? 'studio-fx-shell' : 'studio-fx-bullet',
+    );
+    shot.setRotation(rig.angle);
+    shot.setScale(rig.pixel);
+    if (rig.projectile === 'shell') {
+      shot.setBlendMode(Phaser.BlendModes.ADD);
+    }
+    rig.root.add(shot);
+    this.flies.push({
+      image: shot,
+      vx: Math.cos(rig.angle) * rig.speed * rig.pixel,
+      vy: Math.sin(rig.angle) * rig.speed * rig.pixel,
+      life: 900,
+    });
+    this.spawnFlash(rig);
+  }
+
+  private spawnFlash(rig: ShotRig): void {
+    if (rig.flash === 'muzzle') {
+      const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-muzzle');
+      flash.setBlendMode(Phaser.BlendModes.ADD);
+      flash.setRotation(rig.angle);
+      rig.root.add(flash);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        scale: Tank.muzzleFlash.scale,
+        duration: Tank.muzzleFlash.ms,
+        onComplete: () => flash.destroy(),
+      });
+      return;
+    }
+    if (rig.flash === 'pickup') {
+      const pop = PickupTruck.flashPop;
+      const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-pickup-flash');
+      flash.setOrigin(0, 0.5);
+      flash.setBlendMode(Phaser.BlendModes.ADD);
+      flash.setRotation(rig.angle);
+      flash.setScale(pop.x * rig.pixel, pop.y * rig.pixel);
+      rig.root.add(flash);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: pop.ms,
+        ease: 'Quad.In',
+        onComplete: () => flash.destroy(),
+      });
+    }
   }
 
   private paintBackdrop(groundY?: number): void {
@@ -419,6 +731,7 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private dropArt(): void {
+    this.disarm();
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
     this.captions.forEach((caption) => caption.destroy());
@@ -427,6 +740,7 @@ export class StudioScene extends Phaser.Scene {
       this.anims.remove(this.liveAnim);
     }
     this.liveAnim = undefined;
+    this.dropPickupBody();
     for (const key of this.liveKeys) {
       if (this.textures.exists(key)) {
         this.textures.remove(key);
@@ -514,3 +828,25 @@ function loadPaint(entity: PreviewEntity): Paint {
 function savePaint(id: string, paint: Paint): void {
   localStorage.setItem(STORAGE + id, JSON.stringify(paint));
 }
+
+type ShotRig = {
+  delay: number;
+  cooldown: number;
+  root: Phaser.GameObjects.Container;
+  angle: number;
+  muzzle: { x: number; y: number };
+  speed: number;
+  projectile: 'shell' | 'bullet';
+  flash?: 'muzzle' | 'pickup';
+  pixel: number;
+  pivot?: Phaser.GameObjects.Container;
+  gun?: Phaser.GameObjects.Image;
+  recoil?: { x: number; climb: number };
+};
+
+type Fly = {
+  image: Phaser.GameObjects.Image;
+  vx: number;
+  vy: number;
+  life: number;
+};

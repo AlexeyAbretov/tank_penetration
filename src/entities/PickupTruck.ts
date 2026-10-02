@@ -2,7 +2,13 @@
 // Урон пули меньше, чем у стрелка, но здоровье выше и награда больше.
 
 import Phaser from 'phaser';
-import { PICKUP_FRAME, PICKUP_PAINT, type PickupPaint } from '../gfx/looks';
+import {
+  PICKUP_FLASH_FRAME,
+  PICKUP_FRAME,
+  PICKUP_GUN_FRAME,
+  PICKUP_PAINT,
+  type PickupPaint,
+} from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import type { SpawnContext } from './SpawnContext';
 import { Infantry } from './Infantry';
@@ -24,19 +30,34 @@ export class PickupTruck extends RangedEnemy {
   };
   // Дуло на высоте рук стрелка, выше крыши кабины.
   static readonly muzzleOffset = { x: -80, y: -54 };
+  // Почти непрерывная очередь: пауза 280 мс. Пули слабее винтовки, но их много.
+  static readonly shotInterval = 280;
+  static readonly shotSpeed = 520;
+  // Откат: пиксели текстуры назад и подъём дула. Потом ствол возвращается за ms.
+  static readonly recoilKick = { x: 11, climb: 0.07, ms: 110 };
+  // Веер у дула. Доли меньше единицы: картинка вспышки сама по себе шире пули.
+  static readonly flashPop = { x: 0.4, y: 0.45, ms: 140 };
+  // Левый верх текстуры ствола внутри кадра машины 160×80.
+  static readonly gunCut = { x: 7, y: 14 };
+  // Казённик: отдача сдвигает ствол вправо и чуть поднимает дуло вокруг этой точки.
+  static readonly breech = { x: 108, y: 20 };
 
   readonly coinReward = 3;
   // Зона попадания шире солдатской (46): снаряд задевает машину с большего расстояния.
   // override: у родителя Infantry это поле уже есть, здесь мы задаём своё значение.
   override readonly hitRadius: number = 86;
   protected readonly holdX = 640;
-  // Почти непрерывная очередь: пауза 280 мс.
-  protected readonly fireDelay = 280;
-  protected readonly bulletSpeed = 520;
+  protected readonly fireDelay = PickupTruck.shotInterval;
+  protected readonly bulletSpeed = PickupTruck.shotSpeed;
   // Слабее винтовки стрелка, но выстрелов много.
   protected readonly shotDamage = 2;
   protected readonly idleTexture = 'pickup-0';
   protected readonly muzzle = PickupTruck.muzzleOffset;
+
+  // Ствол — отдельная картинка поверх кузова: так же, как в рисунке, металл перекрывает руку и станок.
+  private gun!: Phaser.GameObjects.Image;
+  // x — пиксели текстуры назад (вправо по картинке). climb — подъём дула в радианах.
+  private readonly recoil = { x: 0, climb: 0 };
 
   // Индексы 4, 9, 14, 19... — каждая пятая позиция, если считать с нуля и смотреть остаток 4.
   static matches(index: number): boolean {
@@ -67,6 +88,83 @@ export class PickupTruck extends RangedEnemy {
     // Хитбокс шире и ниже, чем у солдата: это корпус машины, не человек.
     body.setSize(placed.bodyW, placed.bodyH);
     body.setOffset(placed.bodyX, placed.bodyY);
+
+    this.gun = scene.add.image(x, y, 'pickup-gun');
+    this.gun.setOrigin(
+      (PickupTruck.breech.x - PickupTruck.gunCut.x) / PICKUP_GUN_FRAME.w,
+      (PickupTruck.breech.y - PickupTruck.gunCut.y) / PICKUP_GUN_FRAME.h,
+    );
+    // Та же глубина, что у кузова. Картинку добавляем позже, поэтому при равной глубине ствол сверху.
+    this.gun.setDepth(this.depth);
+    this.once('destroy', () => {
+      this.scene.tweens.killTweensOf(this.recoil);
+      this.gun.destroy();
+    });
+    this.syncGun();
+  }
+
+  override preUpdate(time: number, delta: number): void {
+    super.preUpdate(time, delta);
+    this.syncGun();
+  }
+
+  override hit(damage?: number): boolean {
+    const dead = damage === undefined ? super.hit() : super.hit(damage);
+    this.gun.setTint(0xffccaa);
+    this.scene.time.delayedCall(70, () => {
+      if (this.gun.active) {
+        this.gun.clearTint();
+      }
+    });
+    return dead;
+  }
+
+  // Вспышка остаётся в точке дула, ствол в этот момент отскакивает назад.
+  protected override onFire(x: number, y: number, angle: number): void {
+    this.kickGun();
+    const flash = this.scene.add.image(x, y, 'pickup-flash').setOrigin(0, 0.5).setDepth(16);
+    flash.setRotation(angle);
+    flash.setBlendMode(Phaser.BlendModes.ADD);
+    // Шире пули, но меньше кузова. Вдоль выстрела не сжимаем: иначе вспышка снова становится чёрточкой.
+    const pop = PickupTruck.flashPop;
+    flash.setScale(pop.x, pop.y);
+    this.scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: pop.ms,
+      ease: 'Quad.In',
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  private kickGun(): void {
+    this.scene.tweens.killTweensOf(this.recoil);
+    const kick = PickupTruck.recoilKick;
+    this.recoil.x = kick.x;
+    this.recoil.climb = kick.climb;
+    this.scene.tweens.add({
+      targets: this.recoil,
+      x: 0,
+      climb: 0,
+      duration: kick.ms,
+      ease: 'Quad.Out',
+    });
+  }
+
+  private syncGun(): void {
+    if (!this.gun.active) {
+      return;
+    }
+    const scale = this.scaleX;
+    const breechX = PickupTruck.breech.x + this.recoil.x;
+    const breechY = PickupTruck.breech.y;
+    this.gun.setPosition(
+      this.x + (breechX - PickupTruck.placed.originX * PICKUP_FRAME.w) * scale,
+      this.y + (breechY - PickupTruck.placed.originY * PICKUP_FRAME.h) * scale,
+    );
+    this.gun.setScale(scale);
+    this.gun.setRotation(this.recoil.climb);
+    this.gun.setAlpha(this.alpha);
   }
 
   // Своя скорость: родительский march для пехоты слишком медленный.
@@ -80,8 +178,17 @@ export class PickupTruck extends RangedEnemy {
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists('pickup-0')) {
       for (let phase = 0; phase < PickupTruck.wheelFrames; phase += 1) {
-        bake(scene, `pickup-${phase}`, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => this.render(g, phase));
+        // Без ствола: в бою его рисует отдельный спрайт и двигает при отдаче.
+        bake(scene, `pickup-${phase}`, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) =>
+          this.render(g, phase, PICKUP_PAINT, false),
+        );
       }
+    }
+    if (!scene.textures.exists('pickup-gun')) {
+      bake(scene, 'pickup-gun', PICKUP_GUN_FRAME.w, PICKUP_GUN_FRAME.h, (g) => this.renderGun(g));
+    }
+    if (!scene.textures.exists('pickup-flash')) {
+      bake(scene, 'pickup-flash', PICKUP_FLASH_FRAME.w, PICKUP_FLASH_FRAME.h, (g) => this.renderFlash(g));
     }
     if (!scene.anims.exists('pickup-drive')) {
       scene.anims.create({
@@ -100,6 +207,7 @@ export class PickupTruck extends RangedEnemy {
     g: Phaser.GameObjects.Graphics,
     wheelPhase: number,
     paint: PickupPaint = PICKUP_PAINT,
+    withGun = true,
   ): void {
     // Тень под машиной. Холст 160×80, низ около y = 74.
     g.fillStyle(0x000000, 0.35);
@@ -164,18 +272,17 @@ export class PickupTruck extends RangedEnemy {
     // Упор в кузов. Ствол на высоте рук, выше крыши, носом влево.
     g.fillStyle(paint.mount);
     g.fillRect(100, 20, 6, 14);
-    g.fillStyle(paint.barrel);
-    g.fillRoundedRect(86, 16, 22, 8, 2);
-    g.fillRoundedRect(10, 18, 80, 4, 1);
-    g.fillStyle(paint.muzzleFace);
-    g.fillRect(10, 18, 8, 4);
-    g.fillStyle(paint.muzzleTip);
-    g.fillCircle(12, 20, 3);
+    // В бою ствол живёт отдельно. В просмотре его рисуем прямо на кадре машины.
+    if (withGun) {
+      this.drawBarrel(g, paint, 0, 0);
+    }
 
-    // Голова выше ствола, кисти лежат на нём.
+    // Голова выше ствола. Кисти на стволе: в бою они едут вместе с оружием, в просмотре рисуются здесь.
     g.fillStyle(paint.skin);
     g.fillCircle(120, 13, 5);
-    g.fillRect(92, 18, 8, 4);
+    if (withGun) {
+      this.drawHands(g, paint, 0, 0);
+    }
     g.fillStyle(paint.driver);
     g.fillRoundedRect(112, 2, 16, 9, 3);
     g.fillRect(110, 9, 20, 3);
@@ -206,5 +313,53 @@ export class PickupTruck extends RangedEnemy {
     };
     drawWheel(40); // переднее, под капотом
     drawWheel(126); // заднее, под кузовом
+  }
+
+  // Ствол в своих координатах. ox и oy сдвигают рисунок: для текстуры ствола это вырез из кадра машины.
+  private static drawBarrel(
+    g: Phaser.GameObjects.Graphics,
+    paint: PickupPaint,
+    ox: number,
+    oy: number,
+  ): void {
+    g.fillStyle(paint.barrel);
+    g.fillRoundedRect(86 + ox, 16 + oy, 22, 8, 2);
+    g.fillRoundedRect(10 + ox, 18 + oy, 80, 4, 1);
+    g.fillStyle(paint.muzzleFace);
+    g.fillRect(10 + ox, 18 + oy, 8, 4);
+    g.fillStyle(paint.muzzleTip);
+    g.fillCircle(12 + ox, 20 + oy, 3);
+  }
+
+  private static drawHands(
+    g: Phaser.GameObjects.Graphics,
+    paint: PickupPaint,
+    ox: number,
+    oy: number,
+  ): void {
+    g.fillStyle(paint.skin);
+    g.fillRect(92 + ox, 18 + oy, 8, 4);
+  }
+
+  static renderGun(g: Phaser.GameObjects.Graphics, paint: PickupPaint = PICKUP_PAINT): void {
+    const ox = -PickupTruck.gunCut.x;
+    const oy = -PickupTruck.gunCut.y;
+    this.drawBarrel(g, paint, ox, oy);
+    this.drawHands(g, paint, ox, oy);
+  }
+
+  // Веер из дула. Левый край — срез ствола, вперёд — вправо.
+  // Крупные лепестки торчат вверх и вниз: пуля остаётся узкой жёлтой чёрточкой посередине.
+  static renderFlash(g: Phaser.GameObjects.Graphics): void {
+    const y = PICKUP_FLASH_FRAME.h / 2;
+    g.fillStyle(0xff4a10, 1);
+    g.fillTriangle(0, y, 30, 1, 16, y);
+    g.fillTriangle(0, y, 30, PICKUP_FLASH_FRAME.h - 1, 16, y);
+    g.fillStyle(0xffaa33, 1);
+    g.fillTriangle(0, y, 54, 16, 54, 48);
+    g.fillStyle(0xfff3c4, 1);
+    g.fillTriangle(0, y, 26, 22, 26, 42);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(7, y, 6);
   }
 }

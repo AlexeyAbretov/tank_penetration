@@ -88,5 +88,9 @@ export abstract class RangedEnemy extends Infantry {
     const shot = new EnemyShot(this.scene, x, y, this.shotDamage);
     this.shots.add(shot);
     shot.launch(angle, this.bulletSpeed);
+    this.onFire(x, y, angle);
   }
+
+  // Точка дула и угол пули уже посчитаны. Пикап здесь рисует вспышку и отдачу ствола.
+  protected onFire(_x: number, _y: number, _angle: number): void {}
 }

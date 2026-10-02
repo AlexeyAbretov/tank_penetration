@@ -7,6 +7,7 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
+import { GAME } from '../gameConfig';
 import {
   ASSAULT_LOOK,
   BULLET_FRAME,
@@ -60,6 +61,13 @@ export type PreviewEntity = {
   muzzle?: { x: number; y: number };
   hpColor?: number;
   addBlend?: boolean;
+  // Если задано, в просмотре есть галочка «Стрельба»: темп, снаряд и вспышка как в бою.
+  shot?: {
+    delay: number;
+    speed: number;
+    projectile: 'shell' | 'bullet';
+    flash?: 'muzzle' | 'pickup';
+  };
   bake: (scene: Phaser.Scene, paint: Paint, keys: string[]) => void;
 };
 
@@ -160,6 +168,12 @@ export const ENTITIES: PreviewEntity[] = [
         ['bore', 'Срез канала'],
       ]),
     ],
+    shot: {
+      delay: GAME.fireDelay,
+      speed: GAME.shellSpeed,
+      projectile: 'shell',
+      flash: 'muzzle',
+    },
     bake: (scene, paint, keys) => {
       const colors = paint as TankPaint;
       stamp(scene, keys[0], TANK_HULL_FRAME.w, TANK_HULL_FRAME.h, (g) => Tank.renderHull(g, colors));
@@ -209,6 +223,11 @@ export const ENTITIES: PreviewEntity[] = [
     hitbox: soldierHit,
     muzzle: GunnerInfantry.muzzleOffset,
     hpColor: 0x3a8ad4,
+    shot: {
+      delay: GunnerInfantry.shotInterval,
+      speed: GunnerInfantry.shotSpeed,
+      projectile: 'bullet',
+    },
     bake: (scene, paint, keys) => {
       const look = paint as SoldierLook;
       stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 0, look));
@@ -270,6 +289,12 @@ export const ENTITIES: PreviewEntity[] = [
     },
     muzzle: PickupTruck.muzzleOffset,
     hpColor: 0xe0a020,
+    shot: {
+      delay: PickupTruck.shotInterval,
+      speed: PickupTruck.shotSpeed,
+      projectile: 'bullet',
+      flash: 'pickup',
+    },
     bake: (scene, paint, keys) => {
       const colors = paint as PickupPaint;
       keys.forEach((key, phase) => {
