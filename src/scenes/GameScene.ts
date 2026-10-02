@@ -10,6 +10,7 @@ import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME, upgradeCost } from '../gameConfig';
+import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import { createTextures } from '../gfx/textures';
 import { ShopPanel } from '../ui/ShopPanel';
 
@@ -36,6 +37,8 @@ export class GameScene extends Phaser.Scene {
   private shop!: ShopPanel;
   // Вспышка искр в точке взрыва снаряда. Излучатель выключен, пока не попросят вспышку.
   private blast!: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Искры, которые пуля высекает из брони. Сам по себе поток не идёт.
+  private armorSparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   // Медленные угольки по всему полю, для атмосферы. Горят всегда.
   private embers!: Phaser.GameObjects.Particles.ParticleEmitter;
 
@@ -118,6 +121,9 @@ export class GameScene extends Phaser.Scene {
       quantity: 18, // сколько искр в одной вспышке, если не передать число в emitParticleAt
     });
     this.blast.setDepth(16);
+
+    // Танк на глубине 25. Искры поверх брони, иначе вспышка прячется под корпус.
+    this.armorSparks = createArmorSparks(this);
 
     this.tank = new Tank(this, GAME.tankX, GAME.tankY);
     // Прячем меню браузера ещё и на объекте мыши Phaser, не только в HTML.
@@ -536,12 +542,21 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (this.tank.containsPoint(shot.x, shot.y)) {
-        // Урон читаем до destroy: после удаления объект лучше не трогать.
+        // Урон и точку удара читаем до destroy: после удаления объект лучше не трогать.
         const damage = shot.damage;
+        const x = shot.x;
+        const y = shot.y;
+        const travel = shot.rotation;
         shot.destroy();
+        this.sparkOnTank(x, y, travel);
         this.damageTank(damage);
       }
     });
+  }
+
+  // Пуля врезалась в броню. Искры летят назад, туда, откуда прилетел выстрел.
+  private sparkOnTank(x: number, y: number, travel: number): void {
+    emitArmorSparks(this.armorSparks, x, y, travel);
   }
 
   // Общий путь урона по базе: и пуля, и солдат, дошедший до стены.

@@ -3,6 +3,7 @@
 // Graphics рисует фигуры, bake сохраняет их как текстуру по строковому имени.
 
 import Phaser from 'phaser';
+import { ensureArmorSpark } from './sparks';
 
 // Рисует одноразовый холст и превращает его в текстуру с именем key.
 // После этого холст удаляется: на сцене остаётся только сохранённая картинка.
@@ -46,7 +47,7 @@ function mulberry32(seed: number): () => number {
 // Фон и элементы интерфейса. Картинки сущностей сцена просит у их классов.
 export function createTextures(scene: Phaser.Scene): void {
   createBattlefield(scene); // фон поля
-  createParticles(scene); // искра взрыва и уголёк
+  createParticles(scene); // искра взрыва, искра по броне и уголёк
   createBanner(scene); // нижняя декоративная лента
   createHpFrame(scene); // рамка полоски здоровья базы
 }
@@ -142,12 +143,13 @@ function createBattlefield(scene: Phaser.Scene): void {
   });
 }
 
-// Две крошечные частицы: белая искра взрыва и оранжевый уголёк фона.
+// Круглая искра взрыва, черта рикошета и уголёк фона.
 function createParticles(scene: Phaser.Scene): void {
   bake(scene, 'spark', 12, 12, (g) => {
     g.fillStyle(0xffffff);
     g.fillCircle(6, 6, 5);
   });
+  ensureArmorSpark(scene);
   bake(scene, 'ember', 8, 8, (g) => {
     g.fillStyle(0xff6622);
     g.fillCircle(4, 4, 3);

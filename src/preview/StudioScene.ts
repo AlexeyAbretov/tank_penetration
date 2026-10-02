@@ -24,6 +24,7 @@ import {
   type ShellPaint,
   type SoldierLook,
 } from '../gfx/looks';
+import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import { bake } from '../gfx/textures';
 import { ENTITIES, type PreviewEntity } from './catalog';
 import { formatLook, type Paint } from './format';
@@ -43,6 +44,8 @@ import {
 } from './panel';
 
 const STORAGE = 'tank-defense-studio:v1:';
+// Сколько секунд снаряд летит от дула до плиты. Одинаково для танка, стрелка и пикапа.
+const PLATE_FLIGHT_S = 0.36;
 
 export class StudioScene extends Phaser.Scene {
   private entity: PreviewEntity = ENTITIES[0];
@@ -56,6 +59,7 @@ export class StudioScene extends Phaser.Scene {
   private bakeQueued = false;
   private rig?: ShotRig;
   private flies: Fly[] = [];
+  private readonly sparkPoint = new Phaser.Math.Vector2();
   private bodyKeys: string[] = [];
   private gunnerBodyKeys: string[] = [];
 
@@ -337,6 +341,11 @@ export class StudioScene extends Phaser.Scene {
       holder.setScale(scale * extra);
       holder.setPosition(centerX - midX * scale * extra, centerY - midY * scale * extra);
     });
+    // Искры живут на сцене, не в контейнере: в контейнере их кадры не рисуются.
+    // Масштаб тот же, что у сборки, поэтому размер вспышки совпадает с боем.
+    if (this.rig?.sparks && this.holders[0]) {
+      this.rig.sparks.setScale(this.holders[0].scaleX);
+    }
 
     const footY = this.holders[0]?.y ?? centerY;
     this.paintBackdrop(footY);
@@ -363,7 +372,7 @@ export class StudioScene extends Phaser.Scene {
   // Координаты — локальные, до увеличения контейнера.
   private contentBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
     if (this.entity.kind === 'tank') {
-      return this.tankBounds(view);
+      return this.withPlate(this.tankBounds(view), view);
     }
     const entity = this.entity;
     const s = view.scale;
@@ -387,7 +396,86 @@ export class StudioScene extends Phaser.Scene {
       top = Math.min(top, -16);
       bottom = Math.max(bottom, 16);
     }
-    return { left, top, right, bottom };
+    return this.withPlate({ left, top, right, bottom }, view);
+  }
+
+  // Плита стоит на линии выстрела. Без неё в кадре остаётся только спрайт, и стена уезжает за край.
+  private withPlate(
+    box: { left: number; top: number; right: number; bottom: number },
+    view: ViewState,
+  ): { left: number; top: number; right: number; bottom: number } {
+    const plate = this.plateFor(view);
+    if (!plate) {
+      return box;
+    }
+    let left = box.left;
+    let right = box.right;
+    let top = box.top;
+    let bottom = box.bottom;
+    for (const across of [-plate.half, plate.half]) {
+      for (const forward of [0, plate.depth]) {
+        const x = plate.x - Math.sin(plate.angle) * across + Math.cos(plate.angle) * forward;
+        const y = plate.y + Math.cos(plate.angle) * across + Math.sin(plate.angle) * forward;
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+    }
+    // Запас сверху: искры взлетают выше плиты и не должны обрезаться краем холста.
+    return { left: left - 28, top: top - 56, right: right + 28, bottom: bottom + 36 };
+  }
+
+  // Лицо плиты в тех же локальных координатах, что и летящий снаряд.
+  private plateFor(view: ViewState): Plate | null {
+    const shot = this.entity.shot;
+    if (!view.fire || !shot) {
+      return null;
+    }
+    const pixel = this.pixel(view);
+    let angle = Math.PI;
+    let muzzle = { x: 0, y: 0 };
+    if (this.entity.kind === 'tank') {
+      const layout = Tank.layout;
+      angle = view.angle;
+      muzzle = {
+        x: layout.turretX + Math.cos(angle) * layout.muzzleLength,
+        y: layout.turretY + Math.sin(angle) * layout.muzzleLength,
+      };
+    } else if (this.entity.muzzle) {
+      muzzle = { x: this.entity.muzzle.x * pixel, y: this.entity.muzzle.y * pixel };
+    } else {
+      return null;
+    }
+    const distance = shot.speed * pixel * PLATE_FLIGHT_S;
+    return {
+      x: muzzle.x + Math.cos(angle) * distance,
+      y: muzzle.y + Math.sin(angle) * distance,
+      angle,
+      half: 84,
+      depth: 18,
+    };
+  }
+
+  private addPlate(root: Phaser.GameObjects.Container, plate: Plate): void {
+    const g = this.add.graphics();
+    g.setPosition(plate.x, plate.y);
+    g.setRotation(plate.angle);
+    const top = -plate.half;
+    const height = plate.half * 2;
+    g.fillStyle(0x2c261e, 1);
+    g.fillRect(0, top, plate.depth, height);
+    g.fillStyle(0x6e675b, 1);
+    g.fillRect(0, top, 5, height);
+    g.fillStyle(0x9a9080, 1);
+    g.fillRect(0, top, 2, height);
+    g.lineStyle(2, 0x16110c, 1);
+    g.strokeRect(0, top, plate.depth, height);
+    g.fillStyle(0xd2c2a4, 1);
+    for (const y of [-plate.half * 0.55, 0, plate.half * 0.55]) {
+      g.fillCircle(3, y, 2.4);
+    }
+    root.add(g);
   }
 
   private tankBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
@@ -440,7 +528,7 @@ export class StudioScene extends Phaser.Scene {
     if (view.fire && this.entity.shot) {
       const motion =
         this.entity.frameCount > 1 && view.animate ? `${this.entity.motion ?? 'шаг'} · ` : '';
-      return [`${motion}выстрел · ${this.entity.shot.delay} мс`];
+      return [`${motion}выстрел о стену · ${this.entity.shot.delay} мс`];
     }
     if (this.entity.kind === 'tank') {
       return ['сборка'];
@@ -472,10 +560,27 @@ export class StudioScene extends Phaser.Scene {
         }
       }
     }
+    const plate = rig?.plate;
     for (const fly of this.flies) {
       fly.image.x += (fly.vx * delta) / 1000;
       fly.image.y += (fly.vy * delta) / 1000;
       fly.life -= delta;
+      if (!plate || !fly.image.active || !rig?.sparks) {
+        continue;
+      }
+      // into < 0 — снаряд ещё не долетел до лица плиты. 0 — удар.
+      const dx = fly.image.x - plate.x;
+      const dy = fly.image.y - plate.y;
+      const into = dx * Math.cos(plate.angle) + dy * Math.sin(plate.angle);
+      const across = -dx * Math.sin(plate.angle) + dy * Math.cos(plate.angle);
+      if (into < 0 || Math.abs(across) > plate.half) {
+        continue;
+      }
+      const x = fly.image.x;
+      const y = fly.image.y;
+      fly.image.destroy();
+      fly.life = 0;
+      this.sparkOnPlate(x, y, rig.angle);
     }
     this.flies = this.flies.filter((fly) => {
       if (fly.life > 0 && fly.image.active) {
@@ -704,6 +809,24 @@ export class StudioScene extends Phaser.Scene {
       pixel,
       ...extra,
     };
+    const plate = this.plateFor(readView());
+    if (!plate) {
+      return;
+    }
+    this.addPlate(root, plate);
+    this.rig.plate = plate;
+    this.rig.sparks = createArmorSparks(this);
+  }
+
+  // x, y — локальные координаты контейнера. Эмиттер стоит в мире и уменьшен масштабом сборки.
+  private sparkOnPlate(x: number, y: number, travel: number): void {
+    const rig = this.rig;
+    if (!rig?.sparks) {
+      return;
+    }
+    const scale = rig.sparks.scaleX || 1;
+    rig.root.getWorldTransformMatrix().transformPoint(x, y, this.sparkPoint);
+    emitArmorSparks(rig.sparks, this.sparkPoint.x / scale, this.sparkPoint.y / scale, travel);
   }
 
   private disarm(): void {
@@ -713,6 +836,7 @@ export class StudioScene extends Phaser.Scene {
     if (this.rig?.pivot) {
       this.tweens.killTweensOf(this.rig.pivot);
     }
+    this.rig?.sparks?.destroy();
     this.rig = undefined;
     this.flies = [];
   }
@@ -959,6 +1083,16 @@ type ShotRig = {
   pivot?: Phaser.GameObjects.Container;
   gun?: Phaser.GameObjects.Image;
   recoil?: { x: number; climb: number };
+  plate?: Plate;
+  sparks?: Phaser.GameObjects.Particles.ParticleEmitter;
+};
+
+type Plate = {
+  x: number;
+  y: number;
+  angle: number;
+  half: number;
+  depth: number;
 };
 
 type Fly = {
