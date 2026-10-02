@@ -47,6 +47,7 @@ export class PickupTruck extends RangedEnemy {
   static readonly muzzleTip = { x: 12, y: 20 };
 
   readonly coinReward = 3;
+  private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
   // Зона попадания шире солдатской (46): снаряд задевает машину с большего расстояния.
   // override: у родителя Infantry это поле уже есть, здесь мы задаём своё значение.
   override readonly hitRadius: number = 86;
@@ -105,6 +106,7 @@ export class PickupTruck extends RangedEnemy {
     this.once('destroy', () => {
       this.scene.tweens.killTweensOf(this.recoil);
       this.gun.destroy();
+      this.smoke?.destroy();
     });
     this.syncGun();
   }
@@ -129,6 +131,8 @@ export class PickupTruck extends RangedEnemy {
       this.gun.setVisible(false);
     }
     this.playDeathBlast();
+    const anchor = PickupTruck.smokeAnchor(this.scaleX);
+    this.smoke = PickupTruck.smokeAt(this.scene, this.x + anchor.x, this.y + anchor.y, this.scaleX);
   }
 
   override hit(damage?: number): boolean {
@@ -475,11 +479,50 @@ export class PickupTruck extends RangedEnemy {
     g.lineTo(72, 50);
     g.strokePath();
 
-    // Дым над мотором. Верх кадра — это воздух над крышей, не земля.
-    g.fillStyle(0x3a342c, 0.4);
-    g.fillCircle(48, 30, 9);
-    g.fillCircle(60, 22, 7);
-    g.fillCircle(72, 16, 5);
+    // Копоть у щели капота. Сам столб дыма — частицы, их в текстуру не запечь.
+    g.fillStyle(0x2a2622, 0.7);
+    g.fillCircle(48, 34, 6);
+  }
+
+  // Точка над щелью капота в координатах спрайта. От неё поднимается дым.
+  static smokeAnchor(scale: number): { x: number; y: number } {
+    return {
+      x: (48 - PickupTruck.placed.originX * PICKUP_FRAME.w) * scale,
+      y: (34 - PickupTruck.placed.originY * PICKUP_FRAME.h) * scale,
+    };
+  }
+
+  // Непрерывный столб. Эмиттер живёт, пока его не уничтожат вместе с обломками.
+  static smokeAt(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    scale = 1,
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    const key = 'smoke-puff';
+    if (!scene.textures.exists(key)) {
+      bake(scene, key, 32, 32, (g) => {
+        g.fillStyle(0xffffff, 0.18);
+        g.fillCircle(16, 16, 15);
+        g.fillStyle(0xffffff, 0.4);
+        g.fillCircle(16, 16, 9);
+        g.fillStyle(0xffffff, 0.75);
+        g.fillCircle(16, 16, 4);
+      });
+    }
+    const smoke = scene.add.particles(x, y, key, {
+      lifespan: { min: 900, max: 1700 },
+      frequency: 110,
+      quantity: 1,
+      speed: { min: 10 * scale, max: 28 * scale },
+      angle: { min: -105, max: -75 },
+      scale: { start: 0.35 * scale, end: 1.6 * scale },
+      alpha: { start: 0.72, end: 0 },
+      color: [0xd8d0c4, 0xa09890, 0x6a645c],
+      gravityY: -18 * scale,
+    });
+    smoke.setDepth(12);
+    return smoke;
   }
 
   // Вспышка по центру машины. Обломки уже под ней: вспышка гаснет, корпус остаётся.

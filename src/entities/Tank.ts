@@ -84,6 +84,8 @@ export class Tank extends Phaser.GameObjects.Container {
   private readonly gun: Phaser.GameObjects.Image;
   // После гибели корпус уже спрятан, повторный die ничего не делает.
   private dead = false;
+  // Столб над обломками. Живёт, пока контейнер танка на сцене.
+  private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
 
@@ -108,7 +110,10 @@ export class Tank extends Phaser.GameObjects.Container {
     // Танк рисуется поверх солдат, снарядов и вспышек выстрела врага.
     this.setDepth(25);
     // Размер контейнера. Попадания пуль проверяются своим прямоугольником в containsPoint.
-    this.  setSize(160, 96);
+    this.setSize(160, 96);
+    this.once('destroy', () => {
+      this.smoke?.destroy();
+    });
   }
 
   // Попала ли точка (пуля) в прямоугольник вокруг танка.
@@ -205,6 +210,8 @@ export class Tank extends Phaser.GameObjects.Container {
     this.add(wreck);
     // Взрыв чуть выше середины корпуса: оттуда растёт ножка гриба.
     Tank.nukeAt(this.scene, this.x + layout.hullX, this.y + layout.hullY - 12);
+    const anchor = Tank.smokeAnchor();
+    this.smoke = Tank.smokeAt(this.scene, this.x + anchor.x, this.y + anchor.y);
   }
 
   // Мировые координаты конца ствола.
@@ -460,11 +467,53 @@ export class Tank extends Phaser.GameObjects.Container {
     this.fillTurned(g, paint.barrel, 132, ground - 4, 62, 8, -0.2);
     this.fillTurned(g, paint.muzzleRing, 104, ground - 8, 12, 12, -0.2);
 
-    // Дым над проломом. Верх кадра — воздух, не земля.
-    g.fillStyle(0x3a342c, 0.45);
-    g.fillCircle(96, ground - 62, 12);
-    g.fillCircle(114, ground - 76, 9);
-    g.fillCircle(128, ground - 88, 6);
+    // Копоть у пролома. Сам столб дыма — частицы, их в текстуру не запечь.
+    g.fillStyle(0x2a221c, 0.75);
+    g.fillCircle(108, ground - 48, 8);
+  }
+
+  // Точка над проломом корпуса в координатах контейнера танка. От неё поднимается дым.
+  static smokeAnchor(): { x: number; y: number } {
+    const ground = TANK_WRECK_FRAME.h / 2 + 41;
+    const tx = 108;
+    const ty = ground - 44;
+    return {
+      x: Tank.layout.hullX + (tx - TANK_WRECK_FRAME.w / 2),
+      y: Tank.layout.hullY + (ty - TANK_WRECK_FRAME.h / 2),
+    };
+  }
+
+  // Непрерывный столб над обломками. Толще и выше, чем у пикапа.
+  static smokeAt(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    scale = 1,
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
+    const key = 'smoke-puff';
+    if (!scene.textures.exists(key)) {
+      bake(scene, key, 32, 32, (g) => {
+        g.fillStyle(0xffffff, 0.18);
+        g.fillCircle(16, 16, 15);
+        g.fillStyle(0xffffff, 0.4);
+        g.fillCircle(16, 16, 9);
+        g.fillStyle(0xffffff, 0.75);
+        g.fillCircle(16, 16, 4);
+      });
+    }
+    const smoke = scene.add.particles(x, y, key, {
+      lifespan: { min: 1100, max: 2100 },
+      frequency: 90,
+      quantity: 1,
+      speed: { min: 14 * scale, max: 36 * scale },
+      angle: { min: -108, max: -72 },
+      scale: { start: 0.5 * scale, end: 2.2 * scale },
+      alpha: { start: 0.78, end: 0 },
+      color: [0xc8c0b4, 0x8a8278, 0x524c46],
+      gravityY: -22 * scale,
+    });
+    smoke.setDepth(26);
+    return smoke;
   }
 
   // Прямоугольник, повёрнутый вокруг своего центра. angle в радианах, по часовой: ось Y вниз.

@@ -71,6 +71,8 @@ export class StudioScene extends Phaser.Scene {
   private blastPending = false;
   private blastTimer?: Phaser.Time.TimerEvent;
   private deathFx: Phaser.GameObjects.GameObject[] = [];
+  private wreckSmoke?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private wreckSmokeScale = 0;
 
   constructor() {
     super('studio');
@@ -297,6 +299,8 @@ export class StudioScene extends Phaser.Scene {
       fx.destroy();
     }
     this.deathFx = [];
+    this.wreckSmoke?.destroy();
+    this.wreckSmoke = undefined;
   }
 
   private makeTank(view: ViewState): Phaser.GameObjects.Container {
@@ -462,6 +466,36 @@ export class StudioScene extends Phaser.Scene {
     this.ground.clear();
     this.ground.lineStyle(1, 0x8a6248, 0.7);
     this.ground.lineBetween(padX, footY, width - padX, footY);
+    this.placeWreckSmoke(view);
+  }
+
+  // Столб над обломками. Частицы живут на сцене: в контейнере холста они не рисуются.
+  private placeWreckSmoke(view: ViewState): void {
+    const holder = this.holders[0];
+    const wreck = view.death && this.entity.death === 'wreck';
+    const nuke = view.death && this.entity.death === 'nuke';
+    if ((!wreck && !nuke) || !holder) {
+      this.wreckSmoke?.destroy();
+      this.wreckSmoke = undefined;
+      return;
+    }
+    const puff = wreck
+      ? Math.abs(view.scale * holder.scaleX)
+      : Math.abs(holder.scaleX);
+    const anchor = wreck
+      ? PickupTruck.smokeAnchor(view.scale)
+      : Tank.smokeAnchor();
+    const x = holder.x + anchor.x * holder.scaleX;
+    const y = holder.y + anchor.y * holder.scaleY;
+    if (!this.wreckSmoke?.active || Math.abs(puff - this.wreckSmokeScale) > 0.05) {
+      this.wreckSmoke?.destroy();
+      this.wreckSmoke = wreck
+        ? PickupTruck.smokeAt(this, x, y, puff)
+        : Tank.smokeAt(this, x, y, puff);
+      this.wreckSmokeScale = puff;
+      return;
+    }
+    this.wreckSmoke.setPosition(x, y);
   }
 
   // Прямоугольник всего, что рисуется вокруг сущности: текстура, полоска HP, дуло, крест опоры.
