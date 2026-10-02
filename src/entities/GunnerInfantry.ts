@@ -1,21 +1,16 @@
 // Стрелок: доходит до середины поля, встаёт и редко, но больно стреляет по танку.
 
 import Phaser from 'phaser';
+import { GUNNER_LOOK, SOLDIER_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import type { SpawnContext } from './SpawnContext';
-import { Infantry, type SoldierLook } from './Infantry';
+import { Infantry } from './Infantry';
 import { RangedEnemy } from './RangedEnemy';
 
 export class GunnerInfantry extends RangedEnemy {
-  // Стрелок темнее и в сине-сером, винтовка длиннее — её дуло вылезает левее тела.
-  private static readonly look: SoldierLook = {
-    pants: 0x2a3a32,
-    tunic: 0x4a5a52,
-    vest: 0x1a2a22,
-    helmet: 0x2a3a28,
-    helmetLight: 0x8ab0c8,
-    longRifle: true,
-  };
+  static readonly walkFps = 7;
+  // Дуло длинной винтовки левее и выше точки ног спрайта.
+  static readonly muzzleOffset = { x: -38, y: -42 };
 
   // Дороже штурмовика: убивать стрелка выгоднее.
   readonly coinReward = 2;
@@ -29,8 +24,7 @@ export class GunnerInfantry extends RangedEnemy {
   protected readonly shotDamage = 8;
   // Стоящий кадр: первая картинка из пары шага.
   protected readonly idleTexture = 'gunner-0';
-  // Дуло длинной винтовки левее и выше точки ног спрайта.
-  protected readonly muzzle = { x: -38, y: -42 };
+  protected readonly muzzle = GunnerInfantry.muzzleOffset;
 
   // Каждый 3-й индекс из четвёрки: 2, 6, 10, 14...
   // Но 14 ещё и «каждый 5-й хвост» для пикапа (14 % 5 === 4).
@@ -46,14 +40,18 @@ export class GunnerInfantry extends RangedEnemy {
   // Кадры шага стрелка. Рисунок общий с пехотой, цвета — look этого класса.
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists('gunner-0')) {
-      bake(scene, 'gunner-0', 64, 80, (g) => this.drawSoldier(g, 0, this.look));
-      bake(scene, 'gunner-1', 64, 80, (g) => this.drawSoldier(g, 1, this.look));
+      bake(scene, 'gunner-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        this.drawSoldier(g, 0, GUNNER_LOOK),
+      );
+      bake(scene, 'gunner-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        this.drawSoldier(g, 1, GUNNER_LOOK),
+      );
     }
     if (!scene.anims.exists('gunner-walk')) {
       scene.anims.create({
         key: 'gunner-walk',
         frames: [{ key: 'gunner-0' }, { key: 'gunner-1' }],
-        frameRate: 7,
+        frameRate: this.walkFps,
         repeat: -1,
       });
     }

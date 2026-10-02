@@ -3,21 +3,14 @@
 
 // Phaser нужен из-за типа Scene в конструкторе.
 import Phaser from 'phaser';
+import { ASSAULT_LOOK, SOLDIER_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import { Infantry, type SoldierLook } from './Infantry';
+import { Infantry } from './Infantry';
 // Тип спавна в своём файле. Импорт из EnemyFactory замкнул бы круг: фабрика уже импортирует этот класс.
 import type { SpawnContext } from './SpawnContext';
 
 export class AssaultInfantry extends Infantry {
-  // Пустынный штурмовик: песочная форма, короткая винтовка.
-  private static readonly look: SoldierLook = {
-    pants: 0x6a5238,
-    tunic: 0xc4a36a,
-    vest: 0x8a5a28,
-    helmet: 0x4a5a30,
-    helmetLight: 0xdde8a8,
-    longRifle: false,
-  };
+  static readonly walkFps = 7;
 
   // Убийство даёт 1 монету.
   readonly coinReward = 1;
@@ -41,8 +34,12 @@ export class AssaultInfantry extends Infantry {
   // Два кадра шага и анимация, которая их чередует. Повторный вызов ничего не рисует заново.
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists('infantry-0')) {
-      bake(scene, 'infantry-0', 64, 80, (g) => this.drawSoldier(g, 0, this.look));
-      bake(scene, 'infantry-1', 64, 80, (g) => this.drawSoldier(g, 1, this.look));
+      bake(scene, 'infantry-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        this.drawSoldier(g, 0, ASSAULT_LOOK),
+      );
+      bake(scene, 'infantry-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        this.drawSoldier(g, 1, ASSAULT_LOOK),
+      );
     }
     // exists: после поражения сцена создаётся снова, а анимация живёт в общем менеджере.
     if (!scene.anims.exists('infantry-walk')) {
@@ -50,7 +47,7 @@ export class AssaultInfantry extends Infantry {
         key: 'infantry-walk',
         // Кадры — две отдельные текстуры, не разрезанный лист.
         frames: [{ key: 'infantry-0' }, { key: 'infantry-1' }],
-        frameRate: 7, // 7 кадров в секунду
+        frameRate: this.walkFps,
         repeat: -1, // крутить без конца
       });
     }

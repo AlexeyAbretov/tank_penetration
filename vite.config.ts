@@ -18,5 +18,12 @@ export default defineConfig({
   build: {
     // Готовый JavaScript может использовать синтаксис ES2022 (современные браузеры).
     target: 'es2022',
+    rollupOptions: {
+      // Две страницы: игра и просмотр спрайтов (preview.html).
+      input: {
+        main: 'index.html',
+        preview: 'preview.html',
+      },
+    },
   },
 });

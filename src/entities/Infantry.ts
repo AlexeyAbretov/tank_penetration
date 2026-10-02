@@ -4,20 +4,23 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
+import type { SoldierLook } from '../gfx/looks';
 
-// Набор цветов одного солдата. Числа — 0xRRGGBB.
-// Меняя набор, drawSoldier рисует и штурмовика, и стрелка без второй копии фигур.
-export type SoldierLook = {
-  pants: number; // штаны
-  tunic: number; // гимнастёрка
-  vest: number; // пояс или разгрузка
-  helmet: number; // каска
-  helmetLight: number; // светлая полоска на каске
-  longRifle: boolean; // true — винтовка длиннее и начинается левее
-};
+// Цвета лежат в gfx/looks.ts: один набор рисует и штурмовика, и стрелка.
+export type { SoldierLook };
 
 // extends Sprite: враг — это картинка, у которой ещё есть физическое тело (скорость и хитбокс).
 export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
+  // Как солдат стоит на поле. Пикап задаёт свой набор после вызова super.
+  static readonly placed = {
+    scale: 1.45,
+    originX: 0.5,
+    originY: 0.88,
+    bodyW: 36,
+    bodyH: 52,
+    bodyX: 14,
+    bodyY: 10,
+  };
   // Текущее здоровье. Уменьшается, когда попадает снаряд танка.
   hp: number;
   // Здоровье в момент появления. Полоска HP считается как hp / maxHp.
@@ -62,21 +65,22 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.maxHp = hp;
     this.hp = hp;
 
+    const placed = Infantry.placed;
     // depth 10: враги рисуются поверх земли (0) и искр (2), но под снарядами (15) и танком (25).
     this.setDepth(10);
     // Точка «ног»: картинка стоит на координате (x, y) почти нижним краем, чуть выше центра по X.
-    this.setOrigin(0.5, 0.88);
+    this.setOrigin(placed.originX, placed.originY);
     // Спрайт солдата нарисован мелким (64×80), на поле его увеличиваем.
-    this.setScale(1.45);
+    this.setScale(placed.scale);
     // Запускаем бесконечную анимацию шага. Ключ регистрирует класс конкретного врага.
     this.play(walkKey);
 
     // body в типах Phaser бывает разным. Здесь это обычное динамическое тело, не статика.
     const body = this.body as Phaser.Physics.Arcade.Body;
     // Хитбокс меньше картинки: 36×52 пикселя текстуры, чтобы попадать по корпусу, а не по воздуху вокруг.
-    body.setSize(36, 52);
+    body.setSize(placed.bodyW, placed.bodyH);
     // Сдвигаем хитбокс внутри текстуры, чтобы он совпал с туловищем, а не с левым верхним углом картинки.
-    body.setOffset(14, 10);
+    body.setOffset(placed.bodyX, placed.bodyY);
     // Врага можно толкать физикой. Сейчас снаряды всё равно проверяются вручную по дистанции.
     body.setImmovable(false);
     // У тела своя гравитация. Выключаем её, чтобы юнит не падал, даже если у мира гравитацию включат.
@@ -179,7 +183,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
 
   // Один кадр солдата. legPhase 0 и 1 меняют местами ноги, из двух кадров получается шаг.
   // Тип 0 | 1 запрещает передать любое другое число.
-  protected static drawSoldier(
+  static drawSoldier(
     g: Phaser.GameObjects.Graphics,
     legPhase: 0 | 1,
     look: SoldierLook,
@@ -193,29 +197,29 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     const frontLegX = legPhase === 0 ? 36 : 22;
 
     // Задняя нога рисуется первой, чтобы передняя перекрыла её и казалась ближе.
-    g.fillStyle(0x1a120c); // тёмный контур
+    g.fillStyle(look.outline); // тёмный контур
     g.fillRoundedRect(backLegX - 2, 48, 14, 26, 4);
     g.fillStyle(look.pants);
     g.fillRoundedRect(backLegX, 50, 10, 22, 3);
-    g.fillStyle(0x2a1c12); // ботинок
+    g.fillStyle(look.boots); // ботинок
     g.fillRoundedRect(backLegX - 2, 68, 14, 8, 2);
 
     // Передняя нога теми же размерами, другой цвет штанины — так ноги читаются раздельно.
-    g.fillStyle(0x1a120c);
+    g.fillStyle(look.outline);
     g.fillRoundedRect(frontLegX - 2, 48, 14, 26, 4);
     g.fillStyle(look.tunic);
     g.fillRoundedRect(frontLegX, 50, 10, 22, 3);
-    g.fillStyle(0x2a1c12);
+    g.fillStyle(look.boots);
     g.fillRoundedRect(frontLegX - 2, 68, 14, 8, 2);
 
     // Туловище: контур, гимнастёрка, пояс, ремень.
-    g.fillStyle(0x1a120c);
+    g.fillStyle(look.outline);
     g.fillRoundedRect(16, 26, 34, 30, 8);
     g.fillStyle(look.tunic);
     g.fillRoundedRect(20, 28, 26, 26, 6);
     g.fillStyle(look.vest);
     g.fillRect(22, 40, 22, 7);
-    g.fillStyle(0x5a3a18);
+    g.fillStyle(look.belt);
     g.fillRect(24, 34, 18, 5);
 
     // Руки по бокам корпуса.
@@ -224,31 +228,31 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     g.fillRoundedRect(40, 32, 10, 16, 3);
 
     // Винтовка поперёк тела. Длинная у стрелка начинается с x = 0 и длиной 48, короткая — с x = 4 и длиной 40.
-    g.fillStyle(0x1a120c);
+    g.fillStyle(look.rifle);
     g.fillRoundedRect(look.longRifle ? 0 : 4, 34, look.longRifle ? 48 : 40, 8, 3);
-    g.fillStyle(0x3a3228); // деревянная ложа
+    g.fillStyle(look.rifleWood); // деревянная ложа
     g.fillRoundedRect(look.longRifle ? 2 : 6, 36, look.longRifle ? 44 : 36, 5, 2);
-    g.fillStyle(0x6a6248); // светлое цевьё у приклада
+    g.fillStyle(look.rifleWoodLight); // светлое цевьё у приклада
     g.fillRect(look.longRifle ? 2 : 6, 37, 12, 3);
-    g.fillStyle(0x1a1c16); // тёмный дульный срез слева, оружие смотрит к танку
+    g.fillStyle(look.rifleMetal); // тёмный дульный срез слева, оружие смотрит к танку
     g.fillRect(look.longRifle ? 0 : 2, 34, 8, 8);
 
     // Голова: контур, лицо, каска.
-    g.fillStyle(0x1a120c);
+    g.fillStyle(look.outline);
     g.fillCircle(32, 22, 10);
-    g.fillStyle(0xe8c49a); // цвет кожи
+    g.fillStyle(look.skin); // цвет кожи
     g.fillCircle(32, 22, 8);
-    g.fillStyle(0x1a120c);
+    g.fillStyle(look.outline);
     g.fillRoundedRect(20, 8, 24, 16, 5);
     g.fillStyle(look.helmet);
     g.fillRoundedRect(22, 10, 20, 14, 4);
     g.fillStyle(look.helmetLight);
     g.fillRect(24, 12, 10, 3);
     // Тёмная полоса козырька или ремешка.
-    g.fillStyle(0x1a1e18);
+    g.fillStyle(look.visor);
     g.fillRect(22, 20, 20, 3);
     // Маленький знак на боку каски.
-    g.fillStyle(0x8a9a58);
+    g.fillStyle(look.emblem);
     g.fillRect(38, 14, 6, 6);
   }
 }

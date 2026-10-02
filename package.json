@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "studio": "vite --open /preview.html",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },

@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Спрайты — Tank Defense</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #120806;
+        color: #f3e6d0;
+        font: 14px/1.4 "Segoe UI", sans-serif;
+        color-scheme: dark;
+      }
+
+      #app {
+        height: 100%;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        padding: 10px 16px;
+        border-bottom: 1px solid #3a2418;
+        background: #1a0c09;
+      }
+
+      header h1 {
+        margin: 0;
+        font-family: Cinzel, serif;
+        font-size: 18px;
+        letter-spacing: 0.04em;
+      }
+
+      header p {
+        margin: 0;
+        color: #cbb89a;
+      }
+
+      header a {
+        margin-left: auto;
+        color: #f0d56a;
+      }
+
+      #workspace {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr) 320px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      #list,
+      #panel {
+        min-height: 0;
+        background: #1c100c;
+      }
+
+      #list {
+        overflow: auto;
+      }
+
+      #list {
+        border-right: 1px solid #3a2418;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      #list button,
+      #actions button {
+        font: inherit;
+        color: #f3e6d0;
+        background: #2a1812;
+        border: 1px solid #4a3024;
+        border-radius: 6px;
+        padding: 8px 10px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      #list button.active {
+        background: #5a2414;
+        border-color: #c9a227;
+      }
+
+      #stage {
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+      }
+
+      #stage canvas {
+        display: block;
+      }
+
+      #panel {
+        border-left: 1px solid #3a2418;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      #view,
+      #actions,
+      #meta {
+        padding: 10px 12px;
+      }
+
+      #view {
+        border-bottom: 1px solid #3a2418;
+      }
+
+      #fields {
+        overflow: auto;
+        padding: 4px 12px 12px;
+        flex: 1;
+        min-height: 0;
+      }
+
+      h2,
+      h3 {
+        margin: 12px 0 8px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #c9a227;
+      }
+
+      #view h2,
+      #fields h3:first-child {
+        margin-top: 0;
+      }
+
+      label.slider,
+      label.row,
+      label.check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 6px 0;
+      }
+
+      label.slider span:first-child,
+      label.row span {
+        width: 118px;
+        flex: none;
+      }
+
+      label.slider input[type='range'],
+      label.row input[type='text'] {
+        flex: 1;
+        min-width: 0;
+      }
+
+      label.row input[type='color'] {
+        width: 36px;
+        height: 26px;
+        padding: 0;
+        border: 1px solid #4a3024;
+        background: transparent;
+      }
+
+      label.row input[type='text'] {
+        font-family: Consolas, monospace;
+        background: #120806;
+        color: #f3e6d0;
+        border: 1px solid #4a3024;
+        border-radius: 4px;
+        padding: 4px 6px;
+      }
+
+      .readout {
+        width: 92px;
+        flex: none;
+        text-align: right;
+        color: #cbb89a;
+        font-variant-numeric: tabular-nums;
+      }
+
+      #scale-game {
+        color: #8d7760;
+      }
+
+      .legend {
+        margin: 8px 0 0;
+        color: #cbb89a;
+        font-size: 12px;
+      }
+
+      .legend i {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-right: 4px;
+        vertical-align: -1px;
+      }
+
+      .gold {
+        background: #f0d56a;
+      }
+      .green {
+        background: #66e080;
+      }
+      .red {
+        background: #ff5544;
+      }
+      .yellow {
+        background: #ffee66;
+      }
+
+      #actions {
+        display: flex;
+        gap: 8px;
+        border-top: 1px solid #3a2418;
+      }
+
+      #actions button {
+        flex: 1;
+        text-align: center;
+      }
+
+      #meta {
+        border-top: 1px solid #3a2418;
+        color: #cbb89a;
+        font-size: 12px;
+      }
+
+      #meta p {
+        margin: 0 0 8px;
+      }
+
+      #status {
+        color: #f3e6d0;
+      }
+
+      #stored {
+        color: #e0a020;
+      }
+
+      #snippet {
+        margin: 0;
+        max-height: 160px;
+        overflow: auto;
+        white-space: pre;
+        font-family: Consolas, monospace;
+        font-size: 12px;
+        color: #f3e6d0;
+      }
+
+      details summary {
+        cursor: pointer;
+        color: #f0d56a;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Спрайты</h1>
+        <p>Меняй параметры и сразу смотри рисунок. Игру запускать не нужно.</p>
+        <a href="./index.html">Открыть игру</a>
+      </header>
+      <div id="workspace">
+        <nav id="list" aria-label="Сущности"></nav>
+        <main id="stage"></main>
+        <aside id="panel">
+          <div id="view">
+            <h2>Просмотр</h2>
+            <label class="slider">
+              <span>Увеличение</span>
+              <input id="zoom" type="range" min="0.4" max="3" step="0.05" value="1" />
+              <span id="zoom-val" class="readout">×1.0</span>
+            </label>
+            <label class="slider">
+              <span>Масштаб</span>
+              <input id="scale" type="range" min="0.4" max="4" step="0.01" value="1" />
+              <span id="scale-val" class="readout">1.00</span>
+            </label>
+            <p id="scale-game">в игре 1</p>
+            <label id="animate-row" class="check">
+              <input id="animate" type="checkbox" checked />
+              <span>Анимация</span>
+            </label>
+            <label class="check">
+              <input id="checker" type="checkbox" />
+              <span>Шахматный фон</span>
+            </label>
+            <label class="check">
+              <input id="bounds" type="checkbox" checked />
+              <span>Рамка текстуры</span>
+            </label>
+            <label id="hitbox-row" class="check">
+              <input id="hitbox" type="checkbox" checked />
+              <span>Хитбокс</span>
+            </label>
+            <label class="check">
+              <input id="origin" type="checkbox" checked />
+              <span>Точка опоры</span>
+            </label>
+            <label id="hp-row" class="check">
+              <input id="hp" type="checkbox" checked />
+              <span>Полоска HP</span>
+            </label>
+            <label id="muzzle-row" class="check">
+              <input id="muzzle" type="checkbox" checked />
+              <span>Дуло</span>
+            </label>
+            <label id="add-row" class="check" hidden>
+              <input id="add" type="checkbox" checked />
+              <span>Свечение ADD</span>
+            </label>
+            <label id="angle-row" class="slider" hidden>
+              <span>Угол башни</span>
+              <input id="angle" type="range" min="-0.85" max="0.85" step="0.01" value="-0.3" />
+              <span id="angle-val" class="readout">-0.30</span>
+            </label>
+            <label id="spin-row" class="slider" hidden>
+              <span>Поворот</span>
+              <input id="spin" type="range" min="-3.14" max="3.14" step="0.01" value="0" />
+              <span id="spin-val" class="readout">0.00</span>
+            </label>
+            <p class="legend">
+              <i class="gold"></i>текстура
+              <i class="green"></i>хитбокс
+              <i class="red"></i>опора
+              <i class="yellow"></i>дуло
+            </p>
+          </div>
+          <div id="fields"></div>
+          <div id="actions">
+            <button id="reset" type="button">Сбросить к коду</button>
+            <button id="copy" type="button">Копировать</button>
+          </div>
+          <div id="meta">
+            <p id="status"></p>
+            <p id="stored" hidden>Цвета сохранены в этом браузере. Сброс вернёт файл looks.ts.</p>
+            <p id="hint"></p>
+            <details id="code">
+              <summary>Код для src/gfx/looks.ts</summary>
+              <pre id="snippet"></pre>
+            </details>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <script type="module" src="/src/preview/main.ts"></script>
+  </body>
+</html>
