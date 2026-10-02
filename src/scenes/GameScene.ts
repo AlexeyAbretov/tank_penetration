@@ -1,49 +1,81 @@
+// Главная сцена. Phaser один раз вызывает create(), потом каждый кадр — update().
+// Здесь собраны правила боя: выстрел, попадания, волны, магазин, конец игры.
+
 import Phaser from 'phaser';
+import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { EnemyFactory } from '../entities/EnemyFactory';
 import { EnemyShot } from '../entities/EnemyShot';
+import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
+import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME, upgradeCost } from '../gameConfig';
-import { createAnimations, createTextures, ensureRuntimeTextures } from '../gfx/textures';
+import { createTextures } from '../gfx/textures';
 import { ShopPanel } from '../ui/ShopPanel';
 
+// Имя класса сцены — GameScene. В main.ts она передана в config.scene.
 export class GameScene extends Phaser.Scene {
+  // Восклицательный знак: поле появится не в конструкторе, а в create().
+  // TypeScript верит, что к моменту использования оно уже задано.
   private tank!: Tank;
+  // Группа снарядов танка. Группа — список объектов, по которому удобно бегать и ловить пересечения.
   private shells!: Phaser.Physics.Arcade.Group;
+  // Пули стрелков и пикапов.
   private enemyShots!: Phaser.Physics.Arcade.Group;
+  // Все живые и ещё не удалённые враги.
   private infantry!: Phaser.Physics.Arcade.Group;
+  // Красная полоска здоровья базы. Её ширина показывает оставшиеся HP.
   private hpFill!: Phaser.GameObjects.Rectangle;
   private scoreText!: Phaser.GameObjects.Text;
   private waveText!: Phaser.GameObjects.Text;
+  // Крупная надпись «ВОЛНА N» по центру, которая гаснет.
   private waveBanner!: Phaser.GameObjects.Text;
   private coinsText!: Phaser.GameObjects.Text;
+  // Затемнение и текст «БАЗА РАЗБИТА». Спрятаны, пока игрок жив.
   private overlay!: Phaser.GameObjects.Container;
   private shop!: ShopPanel;
+  // Вспышка искр в точке взрыва снаряда. Излучатель выключен, пока не попросят вспышку.
   private blast!: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Медленные угольки по всему полю, для атмосферы. Горят всегда.
   private embers!: Phaser.GameObjects.Particles.ParticleEmitter;
 
+  // Текущее здоровье базы.
   private hp: number = GAME.baseHp;
   private score = 0;
   private coins = 0;
+  // Номер текущей волны. До первой равен 0, beginNextWave сразу делает 1.
   private wave = 0;
+  // Сколько врагов волны ещё не вышли на поле.
   private remainingToSpawn = 0;
+  // true между волнами: волна ещё не выпущена или уже зачищена и ждёт магазин.
   private awaitingClear = true;
   private shopOpen = false;
+  // Сколько раз купили радиус взрыва. 0 — снаряд бьёт только прямую цель.
   private blastLevel = 0;
+  // Сколько раз купили урон. Прибавляется к GAME.shellDamage.
   private damageLevel = 0;
   private gameOver = false;
 
   constructor() {
+    // Ключ сцены 'game'. По нему сцену можно перезапустить: this.scene.restart().
     super('game');
   }
 
+  // create вызывается при старте и при каждом restart. Объекты сцены к этому моменту уже сброшены.
   create(): void {
+    // Текстуры живут в общем менеджере игры, не в сцене.
+    // После restart фон уже есть, заново его рисовать не нужно.
     if (!this.textures.exists('battlefield')) {
       createTextures(this);
     }
-    ensureRuntimeTextures(this);
-    createAnimations(this);
+    // Классы сами проверяют, есть ли их картинки, и дорисовывают только пропавшие.
+    Tank.ensureTextures(this);
+    AssaultInfantry.ensureTextures(this);
+    GunnerInfantry.ensureTextures(this);
+    PickupTruck.ensureTextures(this);
+    EnemyShot.ensureTextures(this);
 
+    // Повторный заход в create (после поражения) обязан начать с чистого счёта.
     this.hp = GAME.baseHp;
     this.score = 0;
     this.coins = 0;
@@ -54,24 +86,28 @@ export class GameScene extends Phaser.Scene {
     this.blastLevel = 0;
     this.damageLevel = 0;
     this.gameOver = false;
+    // registry — общее хранилище игры. Враги читают 'combat', чтобы замереть в магазине.
     this.registry.set('combat', true);
 
+    // Картинку фона кладём в центр экрана. depth 0 — самый дальний слой.
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
 
+    // Угольки: эмиттер стоит в (700, 360), но каждая частица выбирает свою точку из диапазонов x/y.
     this.embers = this.add.particles(700, 360, 'ember', {
-      x: { min: 40, max: 1260 },
-      y: { min: 80, max: 620 },
-      lifespan: { min: 900, max: 2200 },
-      speedY: { min: -40, max: -12 },
-      speedX: { min: -12, max: 18 },
-      scale: { start: 0.8, end: 0 },
-      alpha: { start: 0.7, end: 0 },
-      blendMode: Phaser.BlendModes.ADD,
-      frequency: 80,
+      x: { min: 40, max: 1260 }, // почти вся ширина поля
+      y: { min: 80, max: 620 }, // выше баннера
+      lifespan: { min: 900, max: 2200 }, // сколько миллисекунд живёт одна искорка
+      speedY: { min: -40, max: -12 }, // отрицательный Y — вверх
+      speedX: { min: -12, max: 18 }, // небольшой снос в стороны
+      scale: { start: 0.8, end: 0 }, // к концу жизни сжимается в точку
+      alpha: { start: 0.7, end: 0 }, // и растворяется
+      blendMode: Phaser.BlendModes.ADD, // цвет складывается с фоном, искорка светится, а не перекрывает
+      frequency: 80, // новая частица каждые 80 мс
       quantity: 1,
     });
     this.embers.setDepth(2);
 
+    // Взрыв снаряда. emitting: false — сам по себе поток не идёт, только по команде emitParticleAt.
     this.blast = this.add.particles(0, 0, 'spark', {
       lifespan: 380,
       speed: { min: 60, max: 280 },
@@ -79,21 +115,26 @@ export class GameScene extends Phaser.Scene {
       alpha: { start: 1, end: 0 },
       blendMode: Phaser.BlendModes.ADD,
       emitting: false,
-      quantity: 18,
+      quantity: 18, // сколько искр в одной вспышке, если не передать число в emitParticleAt
     });
     this.blast.setDepth(16);
 
     this.tank = new Tank(this, GAME.tankX, GAME.tankY);
+    // Прячем меню браузера ещё и на объекте мыши Phaser, не только в HTML.
     this.input.mouse?.disableContextMenu();
 
+    // Пустые группы. Снаряды и враги попадут в них в момент выстрела и спавна.
     this.shells = this.physics.add.group();
     this.enemyShots = this.physics.add.group();
     this.infantry = this.physics.add.group();
 
+    // Если тело снаряда пересеклось с телом врага, Arcade вызовет эту функцию.
+    // Попадание дополнительно проверяется по дистанции в resolveShellHits: тела меньше «радиуса урона».
     this.physics.add.overlap(
       this.shells,
       this.infantry,
       (shellObj, infObj) => {
+        // Колбэк получает широкий тип «тело или объект». Приводим к нужным классам.
         const shell = this.asImage(shellObj);
         const unit = this.asInfantry(infObj);
         if (!shell || !unit) {
@@ -101,19 +142,23 @@ export class GameScene extends Phaser.Scene {
         }
         this.detonateShell(shell, unit);
       },
-      undefined,
-      this,
+      undefined, // свой фильтр пересечения не нужен, хватает стандартного
+      this, // this внутри колбэка — сцена, а не undefined
     );
 
     this.createUi();
     this.applyCameraFx();
+    // Первая волна не сразу: игрок успевает увидеть поле.
     this.time.delayedCall(GAME.waveStartDelayMs, () => this.beginNextWave());
 
+    // Разовый клик. Зажатая кнопка обрабатывается отдельно в update.
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // После поражения любой клик перезапускает сцену: create() выполнится заново.
       if (this.gameOver) {
         this.scene.restart();
         return;
       }
+      // Пока открыт магазин, клик по полю не стреляет. Кнопки магазина ловят событие сами.
       if (this.shopOpen) {
         return;
       }
@@ -123,23 +168,30 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Кадр игры. _time не используется (общее время сцены). delta — длина кадра в миллисекундах.
   update(_time: number, delta: number): void {
+    // На паузе магазина и после поражения сцена не крутит бой.
+    // Физический мир в эти моменты тоже стоит, но ранний return дешевле лишних проверок.
     if (this.gameOver || this.shopOpen) {
       return;
     }
 
     const pointer = this.input.activePointer;
     this.tank.tick(delta);
+    // worldX/worldY — координаты курсора в игровом мире, а не в пикселях окна браузера.
     this.tank.aimAt(pointer.worldX, pointer.worldY);
 
+    // Зажатая левая кнопка стреляет с кулдауном танка, не только в момент нажатия.
     if (pointer.leftButtonDown()) {
       this.shoot();
     }
 
+    // Ручная проверка «снаряд близко к торсу» дополняет overlap физических тел.
     this.resolveShellHits();
 
     this.shells.getChildren().forEach((obj) => {
       const shell = obj as Phaser.Physics.Arcade.Image;
+      // Снаряд улетел за экран или в зону нижнего баннера — удаляем, чтобы не копить объекты.
       if (shell.x > GAME.width + 40 || shell.x < 0 || shell.y < 0 || shell.y > GAME.bannerY) {
         shell.destroy();
       }
@@ -149,9 +201,11 @@ export class GameScene extends Phaser.Scene {
 
     this.infantry.getChildren().forEach((obj) => {
       const unit = obj as Infantry;
+      // Уже мёртвый или уже засчитанный контакт повторно базу не бьёт.
       if (!unit.active || unit.reachedWall) {
         return;
       }
+      // Линия стены. Стрелки до неё не доходят: они встают на x = 640.
       if (unit.x <= GAME.reachX) {
         this.hitBase(unit);
       }
@@ -160,6 +214,7 @@ export class GameScene extends Phaser.Scene {
     this.checkWaveClear();
   }
 
+  // Перебирает пары снаряд–враг и взрывает снаряд, если он попал в радиус торса.
   private resolveShellHits(): void {
     const shells = this.shells.getChildren() as Phaser.Physics.Arcade.Image[];
     const units = this.infantry.getChildren() as Infantry[];
@@ -174,17 +229,21 @@ export class GameScene extends Phaser.Scene {
         }
         if (this.shellHitsUnit(shell, unit)) {
           this.detonateShell(shell, unit);
+          // Один снаряд взрывается один раз. Дальше по списку врагов не идём:
+          // соседей в радиусе добьёт уже сам взрыв, если куплен blastLevel.
           break;
         }
       }
     }
   }
 
+  // Попадание считается по расстоянию до точки груди, не до точки ног спрайта.
   private shellHitsUnit(shell: Phaser.Physics.Arcade.Image, unit: Infantry): boolean {
     const torso = this.torsoPoint(unit);
     return Phaser.Math.Distance.Between(shell.x, shell.y, torso.x, torso.y) <= unit.hitRadius;
   }
 
+  // Точка на корпусе: origin спрайта у ног, поэтому грудь выше y на долю высоты картинки.
   private torsoPoint(unit: Infantry): { x: number; y: number } {
     return {
       x: unit.x,
@@ -192,10 +251,13 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
+  // Взрыв снаряда. direct — кого задели напрямую. Остальных заденет радиус, если он куплен.
   private detonateShell(shell: Phaser.Physics.Arcade.Image, direct?: Infantry): void {
+    // Повторный вызов на том же снаряде (overlap и ручная проверка в одном кадре) ничего не делает.
     if (!shell.active) {
       return;
     }
+    // Координаты запоминаем до destroy: после удаления читать shell.x уже нельзя полагаться.
     const x = shell.x;
     const y = shell.y;
     shell.destroy();
@@ -206,11 +268,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     const blastRadius = this.blastLevel * GAME.blastRadiusPerLevel;
+    // Нулевой уровень — только прямое попадание, круг по соседям не считаем.
     if (blastRadius <= 0) {
       return;
     }
 
     (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      // Прямую цель уже ударили выше, второй раз в этом взрыве её не трогаем.
       if (unit === direct || !unit.active || unit.reachedWall) {
         return;
       }
@@ -221,6 +285,7 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Один удар по врагу. Если здоровья не осталось — очки, монеты и анимация смерти.
   private hurtInfantry(unit: Infantry): void {
     if (unit.hit(GAME.shellDamage + this.damageLevel)) {
       this.score += 10;
@@ -231,6 +296,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Искры и короткая вспышка muzzle в точке взрыва. На прокачанном радиусе вспышка крупнее.
   private playBlast(x: number, y: number): void {
     const radius = this.blastLevel * GAME.blastRadiusPerLevel;
     this.blast.emitParticleAt(x, y, radius > 0 ? 16 : 8);
@@ -245,6 +311,8 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // overlap может передать и спрайт, и его физическое тело, и даже тайл карты.
+  // Функция достаёт живую картинку снаряда или возвращает null.
   private asImage(
     obj:
       | Phaser.Types.Physics.Arcade.GameObjectWithBody
@@ -252,6 +320,7 @@ export class GameScene extends Phaser.Scene {
       | Phaser.Physics.Arcade.StaticBody
       | Phaser.Tilemaps.Tile,
   ): Phaser.Physics.Arcade.Image | null {
+    // Если пришло тело, настоящий объект лежит в gameObject. Если пришёл сам спрайт — берём его.
     const go = 'gameObject' in obj && obj.gameObject ? obj.gameObject : obj;
     if (!(go instanceof Phaser.Physics.Arcade.Image) || !go.active) {
       return null;
@@ -259,6 +328,7 @@ export class GameScene extends Phaser.Scene {
     return go;
   }
 
+  // То же приведение, но к классу врага, и только если он ещё участвует в бою.
   private asInfantry(
     obj:
       | Phaser.Types.Physics.Arcade.GameObjectWithBody
@@ -273,13 +343,16 @@ export class GameScene extends Phaser.Scene {
     return go;
   }
 
+  // Начинает волну: увеличивает номер, показывает надпись, через паузу выпускает врагов.
   private beginNextWave(): void {
     if (this.gameOver) {
       return;
     }
 
     this.wave += 1;
+    // Пока волна идёт, checkWaveClear не имеет права открыть магазин.
     this.awaitingClear = false;
+    // Волна 1: 6 врагов. Волна 2: 10. Формула: база + (номер - 1) * добавка.
     this.remainingToSpawn = GAME.waveFirstCount + (this.wave - 1) * GAME.waveExtra;
     this.waveText.setText(`WAVE  ${this.wave}`);
     this.showWaveBanner();
@@ -292,46 +365,55 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Анимация заголовка волны: выскакивает и гаснет. Сама волна в этот момент ещё не идёт.
   private showWaveBanner(): void {
     this.waveBanner.setText(`ВОЛНА ${this.wave}`);
     this.waveBanner.setAlpha(1);
     this.waveBanner.setScale(0.86);
+    // Если игрок как-то вызвал баннер повторно, старые твины не должны тянуть масштаб.
     this.tweens.killTweensOf(this.waveBanner);
     this.tweens.add({
       targets: this.waveBanner,
       scale: 1.08,
       duration: 280,
-      ease: 'Back.Out',
+      ease: 'Back.Out', // лёгкий отскок в конце, надпись «доезжает» чуть дальше и возвращается
     });
     this.tweens.add({
       targets: this.waveBanner,
       alpha: 0,
       duration: 500,
-      delay: 900,
+      delay: 900, // сначала надпись читается, потом полсекунды растворяется
     });
   }
 
+  // Ставит таймер на каждого врага. Чем дальше волна, тем короче пауза между ними.
   private releaseWave(): void {
     const count = this.remainingToSpawn;
+    // На каждой волне промежуток меньше на 28 мс, но не ниже waveMinGap.
     const gap = Math.max(GAME.waveMinGap, GAME.waveSpawnGap - (this.wave - 1) * 28);
 
     for (let i = 0; i < count; i += 1) {
+      // i * gap: первый враг сразу (0 мс), второй через gap, третий через 2 * gap.
       this.time.delayedCall(i * gap, () => {
         if (this.gameOver) {
           return;
         }
         this.spawnInfantry(i);
+        // Уменьшаем счётчик в момент появления, не в момент планирования.
+        // Пока число больше нуля, волна не считается выпущенной до конца.
         this.remainingToSpawn = Math.max(0, this.remainingToSpawn - 1);
       });
     }
   }
 
+  // Сколько врагов ещё на поле и не засчитаны как дошедшие до стены.
   private livingInfantryCount(): number {
     return (this.infantry.getChildren() as Infantry[]).filter(
       (unit) => unit.active && !unit.reachedWall,
     ).length;
   }
 
+  // Волна зачищена, когда все запланированные враги вышли и ни одного живого не осталось.
   private checkWaveClear(): void {
     if (this.gameOver || this.awaitingClear || this.remainingToSpawn > 0) {
       return;
@@ -339,13 +421,16 @@ export class GameScene extends Phaser.Scene {
     if (this.livingInfantryCount() > 0) {
       return;
     }
+    // Сразу ставим флаг, чтобы следующий кадр не открыл магазин второй раз.
     this.awaitingClear = true;
     this.openShop();
   }
 
   private openShop(): void {
     this.shopOpen = true;
+    // Враги в preUpdate видят combat === false и перестают стрелять.
     this.registry.set('combat', false);
+    // Замирают скорости снарядов и шаги. Без паузы пули долетели бы, пока игрок читает магазин.
     this.physics.world.pause();
     this.shop.show(this.coins, this.blastLevel, this.damageLevel);
   }
@@ -358,6 +443,7 @@ export class GameScene extends Phaser.Scene {
     this.beginNextWave();
   }
 
+  // Покупка радиуса. Если монет мало, выходим: карточка всё равно присылает клик.
   private buyBlast(): void {
     const cost = upgradeCost(this.blastLevel);
     if (this.coins < cost) {
@@ -380,6 +466,7 @@ export class GameScene extends Phaser.Scene {
     this.shop.refresh(this.coins, this.blastLevel, this.damageLevel);
   }
 
+  // Танк сам решает, прошёл ли кулдаун. Сцена только создаёт снаряд, если выстрел разрешён.
   private shoot(): void {
     const shot = this.tank.tryFire();
     if (shot) {
@@ -387,13 +474,18 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Ставит одного врага справа за экраном, на случайной дорожке.
   private spawnInfantry(index = 0): void {
     if (this.gameOver) {
       return;
     }
+    // Шесть горизонтальных линий. Y растёт вниз, 176 — верхняя дорожка, 536 — нижняя.
     const lanes = [176, 248, 320, 392, 464, 536];
+    // Between включает оба конца. К дорожке добавляется дрожание ±16, чтобы строй не был линейкой.
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
+    // Стартуют правее видимой области, поэтому на экран въезжают, а не появляются вдруг.
     const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
+    // Волна 1 — 1 HP, волна 5 — 5 HP, при множителе infantryHpPerWave равном 1.
     const hp = Math.max(1, this.wave * GAME.infantryHpPerWave);
     const unit = EnemyFactory.create(index, {
       scene: this,
@@ -403,18 +495,22 @@ export class GameScene extends Phaser.Scene {
       shots: this.enemyShots,
     });
     this.infantry.add(unit);
+    // Скорость зависит от номера волны. Пикап подменяет эту формулу своей.
     unit.march(this.wave);
   }
 
+  // Создаёт летящий снаряд танка и короткую вспышку у дула.
   private fireShell(x: number, y: number, angle: number): void {
     const shell = this.physics.add.image(x, y, 'shell');
     this.shells.add(shell);
     shell.setDepth(15);
     shell.setBlendMode(Phaser.BlendModes.ADD);
+    // Картинка снаряда — горизонтальная вспышка, её крутим по углу ствола.
     shell.setRotation(angle);
     shell.setVelocity(Math.cos(angle) * GAME.shellSpeed, Math.sin(angle) * GAME.shellSpeed);
     const body = shell.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
+    // Круглое тело радиуса 18 нужно overlap-проверке. Урон по дистанции использует hitRadius врага.
     body.setCircle(18);
 
     const flash = this.add.image(x, y, 'muzzle').setDepth(26).setBlendMode(Phaser.BlendModes.ADD);
@@ -428,6 +524,7 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Пули врагов: убрать за экраном или снять HP, если влетели в прямоугольник танка.
   private updateEnemyShots(): void {
     this.enemyShots.getChildren().forEach((obj) => {
       const shot = obj as EnemyShot;
@@ -439,6 +536,7 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (this.tank.containsPoint(shot.x, shot.y)) {
+        // Урон читаем до destroy: после удаления объект лучше не трогать.
         const damage = shot.damage;
         shot.destroy();
         this.damageTank(damage);
@@ -446,16 +544,21 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Общий путь урона по базе: и пуля, и солдат, дошедший до стены.
   private damageTank(amount: number): void {
     this.hp = Math.max(0, this.hp - amount);
+    // Полная полоска — 236 пикселей. Доля hp / baseHp умножает ширину.
     this.hpFill.width = 236 * (this.hp / GAME.baseHp);
+    // Короткий тряска камеры: длительность 120 мс, сила 0.006.
     this.cameras.main.shake(120, 0.006);
+    // Красная вспышка. false в конце — не заставлять камеру сбрасывать уже идущие эффекты особым способом API.
     this.cameras.main.flash(60, 180, 30, 10, false);
     if (this.hp <= 0) {
       this.endGame();
     }
   }
 
+  // Солдат дошёл до линии. Стрелок и пикап имеют reachesBase = false и здесь выходят.
   private hitBase(unit: Infantry): void {
     if (!unit.reachesBase) {
       return;
@@ -464,7 +567,9 @@ export class GameScene extends Phaser.Scene {
     this.damageTank(unit.contactDamage);
   }
 
+  // Надписи, полоска HP, плашка поражения и магазин. Игровые объекты к этому моменту уже созданы.
   private createUi(): void {
+    // Декоративная красная лента внизу экрана.
     this.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
 
     this.add
@@ -508,6 +613,7 @@ export class GameScene extends Phaser.Scene {
       })
       .setDepth(51);
 
+    // Пустая строка: текст подставится в showWaveBanner. alpha 0 — пока невидима.
     this.waveBanner = this.add
       .text(GAME.width / 2, 120, '', {
         fontFamily: 'Cinzel, Georgia, serif',
@@ -530,10 +636,14 @@ export class GameScene extends Phaser.Scene {
       .setDepth(51)
       .setAlpha(0.8);
 
+    // Рамка полоски в правом верхнем углу. Сама красная заливка — отдельный прямоугольник,
+    // потому что у картинки рамки нельзя плавно менять ширину внутренней полосы.
     this.add.image(1128, 28, 'hp-frame').setDepth(51);
+    // Тёмная подложка фиксированной ширины 236. origin (0, 0.5) — левый край остаётся на месте.
     this.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
     this.hpFill = this.add.rectangle(1018, 28, 236, 10, 0xd42a2a).setOrigin(0, 0.5).setDepth(52);
 
+    // Плашка поражения в центре. Видна только в endGame.
     this.overlay = this.add.container(GAME.width / 2, GAME.height / 2).setDepth(80).setVisible(false);
     const dim = this.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.55);
     const title = this.add
@@ -554,6 +664,7 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
     this.overlay.add([dim, title, hint]);
 
+    // Стрелки передают методы сцены. () => нужно, чтобы this внутри buyBlast остался сценой.
     this.shop = new ShopPanel(this, {
       onBuyBlast: () => this.buyBlast(),
       onBuyDamage: () => this.buyDamage(),
@@ -561,21 +672,24 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Затемнение по краям и лёгкое свечение ярких мест. На геймплей не влияет.
   private applyCameraFx(): void {
     const camera = this.cameras.main;
     try {
+      // Виньетка: центр светлый, углы темнее. Числа — сила и радиус эффекта конкретной версии Phaser 4.
       camera.filters.internal.addVignette(0.5, 0.5, 0.85, 0.18);
     } catch {
-      // Vignette signature may differ between Phaser 4 minor versions.
+      // Если в другой мелкой версии Phaser сигнатура другая, игра просто остаётся без виньетки.
     }
     try {
+      // Bloom раздувает яркие пиксели (вспышки, искры). threshold — с какой яркости начинать.
       Phaser.Actions.AddEffectBloom(camera, {
         threshold: 0.62,
         blurRadius: 1.2,
         blurSteps: 3,
       });
     } catch {
-      // Bloom is optional atmosphere; gameplay does not depend on it.
+      // Свечение необязательно. Бой считается и без него.
     }
   }
 
@@ -583,6 +697,7 @@ export class GameScene extends Phaser.Scene {
     this.gameOver = true;
     this.registry.set('combat', false);
     this.physics.world.pause();
+    // Останавливаем тех, кто ещё шёл, чтобы они не уезжали под надписью поражения.
     this.infantry.getChildren().forEach((obj) => {
       (obj as Infantry).body?.stop();
     });

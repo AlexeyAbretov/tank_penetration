@@ -1,75 +1,137 @@
+// Пехотинец — общий предок всех врагов.
+// Это абстрактный класс: сам по себе на поле не появляется,
+// от него наследуют штурмовик, стрелок и пикап.
+
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
 
+// Набор цветов одного солдата. Числа — 0xRRGGBB.
+// Меняя набор, drawSoldier рисует и штурмовика, и стрелка без второй копии фигур.
+export type SoldierLook = {
+  pants: number; // штаны
+  tunic: number; // гимнастёрка
+  vest: number; // пояс или разгрузка
+  helmet: number; // каска
+  helmetLight: number; // светлая полоска на каске
+  longRifle: boolean; // true — винтовка длиннее и начинается левее
+};
+
+// extends Sprite: враг — это картинка, у которой ещё есть физическое тело (скорость и хитбокс).
 export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
+  // Текущее здоровье. Уменьшается, когда попадает снаряд танка.
   hp: number;
+  // Здоровье в момент появления. Полоска HP считается как hp / maxHp.
   readonly maxHp: number;
+  // true, когда юнит уже «выбыл»: дошёл до базы или его убили.
+  // По такому юниту больше не стреляют и он сам больше не действует.
   reachedWall = false;
 
+  // Сколько монет даёт убийство. Каждая разновидность врага задаёт своё число.
+  // abstract: наследник обязан написать это поле, иначе TypeScript не соберёт файл.
   abstract readonly coinReward: number;
+  // true — юнит идёт до стены и бьёт базу. false — останавливается и стреляет издалека.
   abstract readonly reachesBase: boolean;
+  // Урон базе, если юнит дошёл до линии reachX. У стрелков 0: они бьют пулями.
   abstract readonly contactDamage: number;
+  // Насколько близко снаряд должен подлететь к торсу, чтобы засчитать попадание.
+  // У пикапа это поле переопределено и больше, потому что машина крупнее солдата.
   readonly hitRadius: number = GAME.shellHitRadius;
 
+  // Тёмный фон полоски здоровья над головой.
   private readonly barBg: Phaser.GameObjects.Rectangle;
+  // Цветная часть полоски. Её ширина уменьшается вместе с hp.
   private readonly barFill: Phaser.GameObjects.Rectangle;
 
+  // protected constructor: создать Infantry напрямую нельзя, только через наследника.
   protected constructor(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    hp: number,
-    texture: string,
-    walkKey: string,
-    barColor: number,
+    scene: Phaser.Scene, // сцена, на которую встанет спрайт
+    x: number, // стартовая координата, обычно правее экрана
+    y: number, // «дорожка», по которой он идёт влево
+    hp: number, // здоровье этой волны
+    texture: string, // имя картинки, нарисованной в textures.ts
+    walkKey: string, // имя анимации ходьбы
+    barColor: number, // цвет полоски HP, формат 0xRRGGBB
   ) {
+    // Sprite запоминает сцену, позицию и первую картинку.
     super(scene, x, y, texture);
+    // Пока спрайт не добавлен в сцену, его не видно и update его не касается.
     scene.add.existing(this);
+    // Включаем Arcade-физику: появится body со скоростью и размером.
     scene.physics.add.existing(this);
 
     this.maxHp = hp;
     this.hp = hp;
 
+    // depth 10: враги рисуются поверх земли (0) и искр (2), но под снарядами (15) и танком (25).
     this.setDepth(10);
+    // Точка «ног»: картинка стоит на координате (x, y) почти нижним краем, чуть выше центра по X.
     this.setOrigin(0.5, 0.88);
+    // Спрайт солдата нарисован мелким (64×80), на поле его увеличиваем.
     this.setScale(1.45);
+    // Запускаем бесконечную анимацию шага. Ключ регистрирует класс конкретного врага.
     this.play(walkKey);
 
+    // body в типах Phaser бывает разным. Здесь это обычное динамическое тело, не статика.
     const body = this.body as Phaser.Physics.Arcade.Body;
+    // Хитбокс меньше картинки: 36×52 пикселя текстуры, чтобы попадать по корпусу, а не по воздуху вокруг.
     body.setSize(36, 52);
+    // Сдвигаем хитбокс внутри текстуры, чтобы он совпал с туловищем, а не с левым верхним углом картинки.
     body.setOffset(14, 10);
+    // Врага можно толкать физикой. Сейчас снаряды всё равно проверяются вручную по дистанции.
     body.setImmovable(false);
+    // У тела своя гравитация. Выключаем её, чтобы юнит не падал, даже если у мира гравитацию включат.
     body.setAllowGravity(false);
 
+    // Полоска рисуется отдельными прямоугольниками, не частью спрайта,
+    // поэтому её позицию каждый кадр подгоняем под юнита в syncBar.
     this.barBg = scene.add.rectangle(x, y, 30, 5, 0x2a0a0a).setDepth(11);
+    // origin (0, 0.5): полоска растёт вправо от левого края, вертикально по центру.
     this.barFill = scene.add.rectangle(x, y, 30, 5, barColor).setOrigin(0, 0.5).setDepth(12);
+    // Когда спрайт уничтожат, полоски сами не исчезнут — у них другой родитель. Убираем их вручную.
     this.once('destroy', () => {
       this.barBg.destroy();
       this.barFill.destroy();
     });
+    // Первый раз ставим полоску над головой сразу, не дожидаясь кадра.
     this.syncBar();
   }
 
+  // Phaser вызывает preUpdate у каждого спрайта перед отрисовкой кадра.
+  // time — миллисекунды с запуска игры, delta — миллисекунды с прошлого кадра.
   preUpdate(time: number, delta: number): void {
+    // Родитель двигает анимацию и применяет скорость тела к координатам.
     super.preUpdate(time, delta);
+    // Пока юнит жив и едет, полоска едет вместе с ним.
     this.syncBar();
+    // Мёртвый юнит или открытый магазин (combat === false) — поведение замирает.
     if (this.reachedWall || this.scene.registry.get('combat') === false) {
       return;
     }
+    // Наследник здесь решает: просто идти или ещё и стрелять.
     this.act(delta);
   }
 
+  // Пустая реализация для штурмовика: ему достаточно скорости, заданной в march.
+  // Стрелки этот метод переопределяют.
+  // Подчёркивание у _delta: аргумент обязателен по сигнатуре, но здесь не используется.
   protected act(_delta: number): void {}
 
+  // Даёт скорость влево. Чем выше номер волны, тем быстрее шаг.
   march(wave = 1): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
+    // База 36 + 4 за волну + случайные 0..10, чтобы юниты одной волны не шли строем с одной скоростью.
     const speed = 36 + wave * 4 + Phaser.Math.Between(0, 10);
+    // Отрицательный X — движение влево, к танку. Y не трогаем: дорожка не меняется.
     body.setVelocityX(-speed);
   }
 
+  // Наносит урон. Возвращает true, если после удара здоровья не осталось — сцена тогда вызовет kill.
   hit(damage: number = GAME.shellDamage): boolean {
+    // Ниже нуля здоровье не опускаем.
     this.hp = Math.max(0, this.hp - damage);
+    // Короткий красно-белый оттенок всей картинки: визуальный «попадание».
     this.setTint(0xffccaa);
+    // Через 70 мс оттенок снимаем. Если юнит уже уничтожен, clearTint не вызываем.
     this.scene.time.delayedCall(70, () => {
       if (this.active) {
         this.clearTint();
@@ -79,28 +141,114 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     return this.hp <= 0;
   }
 
+  // Уход с поля: остановка, погасшая полоска, сжатие и удаление.
+  // Имя kill совпадает с методом Sprite, поэтому сцена вызывает именно эту версию.
   kill(): void {
     this.reachedWall = true;
+    // Скорость в ноль. ?. — если тела уже нет, строка не упадёт.
     this.body?.stop();
+    // Анимация шага останавливается, иначе ноги дёргаются, пока спрайт тает.
     this.anims.stop();
     this.barBg.setVisible(false);
     this.barFill.setVisible(false);
+    // Tween — плавное изменение свойств за duration миллисекунд.
     this.scene.tweens.add({
       targets: this,
-      alpha: 0,
-      scale: 0.6,
+      alpha: 0, // полностью прозрачный
+      scale: 0.6, // чуть меньше
       duration: 180,
+      // В конце удаляем спрайт. Событие destroy уберёт полоски, если они ещё живы.
       onComplete: () => this.destroy(),
     });
   }
 
+  // Кладёт полоску над макушкой и обрезает цветную часть по доле здоровья.
   private syncBar(): void {
+    // Полоску уже уничтожили — трогать её нельзя.
     if (!this.barBg.active) {
       return;
     }
+    // displayHeight учитывает scale. 0.95 высоты вверх от точки ног — примерно над шлемом.
     const top = this.y - this.displayHeight * 0.95;
     this.barBg.setPosition(this.x, top);
+    // Цветная полоска шириной 30, origin слева, поэтому левый край на 15 пикселей левее центра.
     this.barFill.setPosition(this.x - 15, top);
+    // При полном HP ширина 30, при половине — 15, при нуле — 0.
     this.barFill.width = 30 * (this.hp / this.maxHp);
+  }
+
+  // Один кадр солдата. legPhase 0 и 1 меняют местами ноги, из двух кадров получается шаг.
+  // Тип 0 | 1 запрещает передать любое другое число.
+  protected static drawSoldier(
+    g: Phaser.GameObjects.Graphics,
+    legPhase: 0 | 1,
+    look: SoldierLook,
+  ): void {
+    // Тень под ногами. Солдат нарисован в квадрате примерно 64×80, низ картинки — это y около 76.
+    g.fillStyle(0x000000, 0.4);
+    g.fillEllipse(32, 76, 36, 10);
+
+    // В кадре 0 задняя нога левее, в кадре 1 — правее. Передняя нога наоборот.
+    const backLegX = legPhase === 0 ? 22 : 36;
+    const frontLegX = legPhase === 0 ? 36 : 22;
+
+    // Задняя нога рисуется первой, чтобы передняя перекрыла её и казалась ближе.
+    g.fillStyle(0x1a120c); // тёмный контур
+    g.fillRoundedRect(backLegX - 2, 48, 14, 26, 4);
+    g.fillStyle(look.pants);
+    g.fillRoundedRect(backLegX, 50, 10, 22, 3);
+    g.fillStyle(0x2a1c12); // ботинок
+    g.fillRoundedRect(backLegX - 2, 68, 14, 8, 2);
+
+    // Передняя нога теми же размерами, другой цвет штанины — так ноги читаются раздельно.
+    g.fillStyle(0x1a120c);
+    g.fillRoundedRect(frontLegX - 2, 48, 14, 26, 4);
+    g.fillStyle(look.tunic);
+    g.fillRoundedRect(frontLegX, 50, 10, 22, 3);
+    g.fillStyle(0x2a1c12);
+    g.fillRoundedRect(frontLegX - 2, 68, 14, 8, 2);
+
+    // Туловище: контур, гимнастёрка, пояс, ремень.
+    g.fillStyle(0x1a120c);
+    g.fillRoundedRect(16, 26, 34, 30, 8);
+    g.fillStyle(look.tunic);
+    g.fillRoundedRect(20, 28, 26, 26, 6);
+    g.fillStyle(look.vest);
+    g.fillRect(22, 40, 22, 7);
+    g.fillStyle(0x5a3a18);
+    g.fillRect(24, 34, 18, 5);
+
+    // Руки по бокам корпуса.
+    g.fillStyle(look.tunic);
+    g.fillRoundedRect(14, 30, 10, 18, 3);
+    g.fillRoundedRect(40, 32, 10, 16, 3);
+
+    // Винтовка поперёк тела. Длинная у стрелка начинается с x = 0 и длиной 48, короткая — с x = 4 и длиной 40.
+    g.fillStyle(0x1a120c);
+    g.fillRoundedRect(look.longRifle ? 0 : 4, 34, look.longRifle ? 48 : 40, 8, 3);
+    g.fillStyle(0x3a3228); // деревянная ложа
+    g.fillRoundedRect(look.longRifle ? 2 : 6, 36, look.longRifle ? 44 : 36, 5, 2);
+    g.fillStyle(0x6a6248); // светлое цевьё у приклада
+    g.fillRect(look.longRifle ? 2 : 6, 37, 12, 3);
+    g.fillStyle(0x1a1c16); // тёмный дульный срез слева, оружие смотрит к танку
+    g.fillRect(look.longRifle ? 0 : 2, 34, 8, 8);
+
+    // Голова: контур, лицо, каска.
+    g.fillStyle(0x1a120c);
+    g.fillCircle(32, 22, 10);
+    g.fillStyle(0xe8c49a); // цвет кожи
+    g.fillCircle(32, 22, 8);
+    g.fillStyle(0x1a120c);
+    g.fillRoundedRect(20, 8, 24, 16, 5);
+    g.fillStyle(look.helmet);
+    g.fillRoundedRect(22, 10, 20, 14, 4);
+    g.fillStyle(look.helmetLight);
+    g.fillRect(24, 12, 10, 3);
+    // Тёмная полоса козырька или ремешка.
+    g.fillStyle(0x1a1e18);
+    g.fillRect(22, 20, 20, 3);
+    // Маленький знак на боку каски.
+    g.fillStyle(0x8a9a58);
+    g.fillRect(38, 14, 6, 6);
   }
 }

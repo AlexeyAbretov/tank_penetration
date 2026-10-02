@@ -1,39 +1,54 @@
 <!doctype html>
+<!-- Язык страницы — русский: браузер и скринридеры ориентируются на него. -->
 <html lang="ru">
   <head>
+    <!-- Кодировка UTF-8, чтобы кириллица в игре отображалась правильно. -->
     <meta charset="UTF-8" />
+    <!-- На телефоне ширина страницы равна ширине экрана, без уменьшения «как на десктопе». -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Текст вкладки браузера. -->
     <title>Tank Defense</title>
+    <!-- Заранее устанавливаем соединение со шрифтовым сервером Google, чтобы шрифт приехал быстрее. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Шрифт Cinzel жирностью 700 и 900. Его используют заголовки в игре. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap"
       rel="stylesheet"
     />
     <style>
+      /* Страница на весь экран, без белых полей браузера. */
       html,
       body {
         margin: 0;
         height: 100%;
+        /* Почти чёрный фон вокруг холста, если игра не занимает всё окно. */
         background: #090505;
+        /* Страница не скроллится: игра на весь экран. */
         overflow: hidden;
       }
 
+      /* Контейнер, внутрь которого Phaser вставит <canvas>. */
       #game {
         width: 100%;
         height: 100%;
+        /* Flex центрирует холст, если вокруг него останется место. */
         display: flex;
         align-items: center;
         justify-content: center;
       }
 
+      /* Холст Phaser — блочный элемент, чтобы под ним не появлялся лишний зазор. */
       canvas {
         display: block;
       }
     </style>
   </head>
+  <!-- oncontextmenu: запасной запрет меню по правому клику, если клик пришёл мимо холста. -->
   <body oncontextmenu="return false;">
+    <!-- Пустой div. main.ts говорит Phaser: parent: 'game' — рисуй сюда. -->
     <div id="game"></div>
+    <!-- type="module": браузер грузит TypeScript/JS как модуль. Vite подменяет этот путь при разработке. -->
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
