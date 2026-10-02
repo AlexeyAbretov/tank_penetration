@@ -66,7 +66,7 @@ export type PreviewEntity = {
     delay: number;
     speed: number;
     projectile: 'shell' | 'bullet';
-    flash?: 'muzzle' | 'pickup';
+    flash?: 'muzzle' | 'pickup' | 'gunner';
   };
   bake: (scene: Phaser.Scene, paint: Paint, keys: string[]) => void;
 };
@@ -208,7 +208,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'gunner',
     title: 'Стрелок',
-    hint: 'То же тело, другие цвета и длинная винтовка. Жёлтая точка — откуда в игре вылетает пуля.',
+    hint: 'То же тело, другие цвета и длинная винтовка. Жёлтая точка — откуда вылетает пуля. При выстреле ствол откатывается и вспыхивает.',
     exportName: 'GUNNER_LOOK',
     kind: 'frames',
     frameCount: 2,
@@ -227,6 +227,7 @@ export const ENTITIES: PreviewEntity[] = [
       delay: GunnerInfantry.shotInterval,
       speed: GunnerInfantry.shotSpeed,
       projectile: 'bullet',
+      flash: 'gunner',
     },
     bake: (scene, paint, keys) => {
       const look = paint as SoldierLook;

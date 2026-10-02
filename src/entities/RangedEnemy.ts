@@ -91,6 +91,6 @@ export abstract class RangedEnemy extends Infantry {
     this.onFire(x, y, angle);
   }
 
-  // Точка дула и угол пули уже посчитаны. Пикап здесь рисует вспышку и отдачу ствола.
+  // Точка дула и угол пули уже посчитаны. Наследник здесь рисует вспышку и отдачу.
   protected onFire(_x: number, _y: number, _angle: number): void {}
 }

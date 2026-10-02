@@ -2,21 +2,27 @@
 
 import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
+import { GunnerInfantry } from '../entities/GunnerInfantry';
+import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import {
   BULLET_FRAME,
+  GUNNER_FLASH_FRAME,
+  GUNNER_RIFLE_FRAME,
   MUZZLE_FRAME,
   PICKUP_FLASH_FRAME,
   PICKUP_FRAME,
   PICKUP_GUN_FRAME,
   SHELL_FRAME,
+  SOLDIER_FRAME,
   TANK_HULL_FRAME,
   TANK_TURRET_FRAME,
   type BulletPaint,
   type MuzzlePaint,
   type PickupPaint,
   type ShellPaint,
+  type SoldierLook,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { ENTITIES, type PreviewEntity } from './catalog';
@@ -51,6 +57,7 @@ export class StudioScene extends Phaser.Scene {
   private rig?: ShotRig;
   private flies: Fly[] = [];
   private bodyKeys: string[] = [];
+  private gunnerBodyKeys: string[] = [];
 
   constructor() {
     super('studio');
@@ -119,6 +126,9 @@ export class StudioScene extends Phaser.Scene {
     if (this.entity.id === 'pickup') {
       this.bakePickupBody();
     }
+    if (this.entity.id === 'gunner') {
+      this.bakeGunnerBody();
+    }
     this.refreshFx();
     if (this.entity.frameCount > 1) {
       const anim = `studio-${this.entity.id}`;
@@ -149,6 +159,8 @@ export class StudioScene extends Phaser.Scene {
       this.holders.push(this.makeTank(view));
     } else if (firing && this.entity.id === 'pickup') {
       this.holders.push(this.makePickup(view));
+    } else if (firing && this.entity.id === 'gunner') {
+      this.holders.push(this.makeGunner(view));
     } else if (firing || (this.entity.frameCount > 1 && view.animate && this.liveAnim)) {
       const holder = this.makeSprite(this.liveKeys[0], view, view.animate && Boolean(this.liveAnim));
       this.holders.push(holder);
@@ -452,7 +464,12 @@ export class StudioScene extends Phaser.Scene {
         this.emitShot();
       }
       if (rig.gun && rig.recoil) {
-        this.placePickupGun(readView().scale, rig);
+        const scale = readView().scale;
+        if (this.entity.id === 'gunner') {
+          this.placeGunnerRifle(scale, rig);
+        } else {
+          this.placePickupGun(scale, rig);
+        }
       }
     }
     for (const fly of this.flies) {
@@ -548,7 +565,86 @@ export class StudioScene extends Phaser.Scene {
     rig.gun.setRotation(rig.recoil.climb);
   }
 
-  // Снаряд, пуля и обе вспышки. Цвета берутся из сохранённого просмотра этих картинок.
+  // Стрелок в бою рисует винтовку отдельно от тела. Здесь то же самое, иначе откат не виден.
+  private bakeGunnerBody(): void {
+    this.dropGunnerBody();
+    const look = this.paint as SoldierLook;
+    this.gunnerBodyKeys = ([0, 1] as const).map((phase) => {
+      const key = `studio-gunner-body-${phase}`;
+      this.restamp(key, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        Infantry.drawSoldier(g, phase, look, false),
+      );
+      return key;
+    });
+    this.restamp('studio-gunner-rifle', GUNNER_RIFLE_FRAME.w, GUNNER_RIFLE_FRAME.h, (g) =>
+      GunnerInfantry.renderRifle(g, look),
+    );
+    this.anims.create({
+      key: 'studio-gunner-body',
+      frames: this.gunnerBodyKeys.map((key) => ({ key })),
+      frameRate: GunnerInfantry.walkFps,
+      repeat: -1,
+    });
+  }
+
+  private dropGunnerBody(): void {
+    if (this.anims.exists('studio-gunner-body')) {
+      this.anims.remove('studio-gunner-body');
+    }
+    for (const key of [...this.gunnerBodyKeys, 'studio-gunner-rifle']) {
+      if (this.textures.exists(key)) {
+        this.textures.remove(key);
+      }
+    }
+    this.gunnerBodyKeys = [];
+  }
+
+  private makeGunner(view: ViewState): Phaser.GameObjects.Container {
+    const root = this.add.container(0, 0);
+    const sprite = this.add.sprite(0, 0, this.gunnerBodyKeys[0]);
+    sprite.setOrigin(this.entity.originX, this.entity.originY);
+    sprite.setScale(view.scale);
+    if (view.animate) {
+      sprite.play('studio-gunner-body');
+    }
+    root.add(sprite);
+    const rifle = this.add.image(0, 0, 'studio-gunner-rifle');
+    rifle.setOrigin(
+      (GunnerInfantry.breech.x - GunnerInfantry.rifleCut.x) / GUNNER_RIFLE_FRAME.w,
+      (GunnerInfantry.breech.y - GunnerInfantry.rifleCut.y) / GUNNER_RIFLE_FRAME.h,
+    );
+    rifle.setScale(view.scale);
+    root.add(rifle);
+    const guides = this.add.graphics();
+    root.add(guides);
+    this.paintSpriteGuides(guides, view);
+    const recoil = { x: 0, climb: 0 };
+    const pixel = this.pixel(view);
+    this.arm(
+      root,
+      { x: this.entity.muzzle!.x * pixel, y: this.entity.muzzle!.y * pixel },
+      Math.PI,
+      pixel,
+      { gun: rifle, recoil },
+    );
+    this.placeGunnerRifle(view.scale, this.rig!);
+    return root;
+  }
+
+  private placeGunnerRifle(scale: number, rig: ShotRig): void {
+    if (!rig.gun || !rig.recoil) {
+      return;
+    }
+    const breechX = GunnerInfantry.breech.x + rig.recoil.x;
+    const breechY = GunnerInfantry.breech.y;
+    rig.gun.setPosition(
+      (breechX - Infantry.placed.originX * SOLDIER_FRAME.w) * scale,
+      (breechY - Infantry.placed.originY * SOLDIER_FRAME.h) * scale,
+    );
+    rig.gun.setRotation(rig.recoil.climb);
+  }
+
+  // Снаряд, пуля и вспышки. Цвета снаряда берутся из сохранённого просмотра этих картинок.
   private refreshFx(): void {
     const paintOf = (id: string) => loadPaint(ENTITIES.find((entry) => entry.id === id) ?? ENTITIES[0]);
     this.restamp('studio-fx-shell', SHELL_FRAME.w, SHELL_FRAME.h, (g) =>
@@ -562,6 +658,9 @@ export class StudioScene extends Phaser.Scene {
     );
     this.restamp('studio-fx-pickup-flash', PICKUP_FLASH_FRAME.w, PICKUP_FLASH_FRAME.h, (g) =>
       PickupTruck.renderFlash(g),
+    );
+    this.restamp('studio-fx-gunner-flash', GUNNER_FLASH_FRAME.w, GUNNER_FLASH_FRAME.h, (g) =>
+      GunnerInfantry.renderFlash(g),
     );
   }
 
@@ -641,7 +740,7 @@ export class StudioScene extends Phaser.Scene {
       });
     }
     if (rig.recoil) {
-      const kick = PickupTruck.recoilKick;
+      const kick = this.entity.id === 'gunner' ? GunnerInfantry.recoilKick : PickupTruck.recoilKick;
       this.tweens.killTweensOf(rig.recoil);
       rig.recoil.x = kick.x;
       rig.recoil.climb = kick.climb;
@@ -703,6 +802,23 @@ export class StudioScene extends Phaser.Scene {
         ease: 'Quad.In',
         onComplete: () => flash.destroy(),
       });
+      return;
+    }
+    if (rig.flash === 'gunner') {
+      const pop = GunnerInfantry.flashPop;
+      const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-gunner-flash');
+      flash.setOrigin(0, 0.5);
+      flash.setBlendMode(Phaser.BlendModes.ADD);
+      flash.setRotation(rig.angle);
+      flash.setScale(pop.x * rig.pixel, pop.y * rig.pixel);
+      rig.root.add(flash);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: pop.ms,
+        ease: 'Quad.In',
+        onComplete: () => flash.destroy(),
+      });
     }
   }
 
@@ -741,6 +857,7 @@ export class StudioScene extends Phaser.Scene {
     }
     this.liveAnim = undefined;
     this.dropPickupBody();
+    this.dropGunnerBody();
     for (const key of this.liveKeys) {
       if (this.textures.exists(key)) {
         this.textures.remove(key);
@@ -837,7 +954,7 @@ type ShotRig = {
   muzzle: { x: number; y: number };
   speed: number;
   projectile: 'shell' | 'bullet';
-  flash?: 'muzzle' | 'pickup';
+  flash?: 'muzzle' | 'pickup' | 'gunner';
   pixel: number;
   pivot?: Phaser.GameObjects.Container;
   gun?: Phaser.GameObjects.Image;

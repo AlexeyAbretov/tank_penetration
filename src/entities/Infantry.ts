@@ -187,6 +187,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     g: Phaser.GameObjects.Graphics,
     legPhase: 0 | 1,
     look: SoldierLook,
+    withRifle = true,
   ): void {
     // Тень под ногами. Солдат нарисован в квадрате примерно 64×80, низ картинки — это y около 76.
     g.fillStyle(0x000000, 0.4);
@@ -227,15 +228,10 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     g.fillRoundedRect(14, 30, 10, 18, 3);
     g.fillRoundedRect(40, 32, 10, 16, 3);
 
-    // Винтовка поперёк тела. Длинная у стрелка начинается с x = 0 и длиной 48, короткая — с x = 4 и длиной 40.
-    g.fillStyle(look.rifle);
-    g.fillRoundedRect(look.longRifle ? 0 : 4, 34, look.longRifle ? 48 : 40, 8, 3);
-    g.fillStyle(look.rifleWood); // деревянная ложа
-    g.fillRoundedRect(look.longRifle ? 2 : 6, 36, look.longRifle ? 44 : 36, 5, 2);
-    g.fillStyle(look.rifleWoodLight); // светлое цевьё у приклада
-    g.fillRect(look.longRifle ? 2 : 6, 37, 12, 3);
-    g.fillStyle(look.rifleMetal); // тёмный дульный срез слева, оружие смотрит к танку
-    g.fillRect(look.longRifle ? 0 : 2, 34, 8, 8);
+    // У стрелка в бою винтовка — отдельная картинка, поэтому тело можно запечь без неё.
+    if (withRifle) {
+      this.drawRifle(g, look);
+    }
 
     // Голова: контур, лицо, каска.
     g.fillStyle(look.outline);
@@ -254,5 +250,30 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     // Маленький знак на боку каски.
     g.fillStyle(look.emblem);
     g.fillRect(38, 14, 6, 6);
+  }
+
+  // Винтовка поперёк тела. ox/oy сдвигают рисунок: для отдельной текстуры это вырез из кадра солдата.
+  // Длинная начинается с x = 0 и длиной 48, короткая — с x = 4 и длиной 40.
+  // Дульный срез слева: оружие смотрит к танку.
+  static drawRifle(
+    g: Phaser.GameObjects.Graphics,
+    look: SoldierLook,
+    ox = 0,
+    oy = 0,
+  ): void {
+    const x = (look.longRifle ? 0 : 4) + ox;
+    const length = look.longRifle ? 48 : 40;
+    const woodX = (look.longRifle ? 2 : 6) + ox;
+    const woodLen = look.longRifle ? 44 : 36;
+    const metalX = (look.longRifle ? 0 : 2) + ox;
+    const y = 34 + oy;
+    g.fillStyle(look.rifle);
+    g.fillRoundedRect(x, y, length, 8, 3);
+    g.fillStyle(look.rifleWood);
+    g.fillRoundedRect(woodX, y + 2, woodLen, 5, 2);
+    g.fillStyle(look.rifleWoodLight);
+    g.fillRect(woodX, y + 3, 12, 3);
+    g.fillStyle(look.rifleMetal);
+    g.fillRect(metalX, y, 8, 8);
   }
 }
