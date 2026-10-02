@@ -3,7 +3,7 @@
 
 // Phaser нужен из-за типа Scene в конструкторе.
 import Phaser from 'phaser';
-import { ASSAULT_LOOK, SOLDIER_FRAME } from '../gfx/looks';
+import { ASSAULT_LOOK, CORPSE_FRAME, SOLDIER_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { Infantry } from './Infantry';
 // Тип спавна в своём файле. Импорт из EnemyFactory замкнул бы круг: фабрика уже импортирует этот класс.
@@ -11,6 +11,7 @@ import type { SpawnContext } from './SpawnContext';
 
 export class AssaultInfantry extends Infantry {
   static readonly walkFps = 7;
+  static readonly corpseKey = 'infantry-corpse';
 
   // Убийство даёт 1 монету.
   readonly coinReward = 1;
@@ -41,6 +42,11 @@ export class AssaultInfantry extends Infantry {
         this.drawSoldier(g, 1, ASSAULT_LOOK),
       );
     }
+    if (!scene.textures.exists(this.corpseKey)) {
+      bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) =>
+        this.drawCorpse(g, ASSAULT_LOOK),
+      );
+    }
     // exists: после поражения сцена создаётся снова, а анимация живёт в общем менеджере.
     if (!scene.anims.exists('infantry-walk')) {
       scene.anims.create({
@@ -56,5 +62,9 @@ export class AssaultInfantry extends Infantry {
   constructor(scene: Phaser.Scene, x: number, y: number, hp: number) {
     // Картинки infantry-0 / infantry-1 и анимация infantry-walk, красная полоска HP.
     super(scene, x, y, hp, 'infantry-0', 'infantry-walk', 0xd42a2a);
+  }
+
+  protected override corpseTexture(): string | null {
+    return AssaultInfantry.corpseKey;
   }
 }

@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import {
+  CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
   GUNNER_LOOK,
   GUNNER_RIFLE_FRAME,
@@ -16,6 +17,7 @@ import { RangedEnemy } from './RangedEnemy';
 
 export class GunnerInfantry extends RangedEnemy {
   static readonly walkFps = 7;
+  static readonly corpseKey = 'gunner-corpse';
   // Дуло длинной винтовки левее и выше точки ног спрайта.
   static readonly muzzleOffset = { x: -38, y: -42 };
   // Левый верх винтовки внутри кадра солдата 64×80. Рисунок сидит на y = 34.
@@ -70,6 +72,11 @@ export class GunnerInfantry extends RangedEnemy {
         this.drawSoldier(g, 1, GUNNER_LOOK, false),
       );
     }
+    if (!scene.textures.exists(this.corpseKey)) {
+      bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) =>
+        this.drawCorpse(g, GUNNER_LOOK),
+      );
+    }
     if (!scene.textures.exists('gunner-rifle')) {
       bake(scene, 'gunner-rifle', GUNNER_RIFLE_FRAME.w, GUNNER_RIFLE_FRAME.h, (g) => this.renderRifle(g));
     }
@@ -112,6 +119,18 @@ export class GunnerInfantry extends RangedEnemy {
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     this.syncRifle();
+  }
+
+  protected override corpseTexture(): string | null {
+    return GunnerInfantry.corpseKey;
+  }
+
+  // Винтовка — отдельный спрайт поверх тела. На трупе она уже нарисована в текстуре.
+  protected override onDie(slain: boolean): void {
+    if (!slain || !this.rifle.active) {
+      return;
+    }
+    this.rifle.setVisible(false);
   }
 
   override hit(damage?: number): boolean {

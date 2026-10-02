@@ -62,6 +62,8 @@ export type PreviewEntity = {
   muzzle?: { x: number; y: number };
   hpColor?: number;
   addBlend?: boolean;
+  // Галочка «Смерть»: труп солдата или взрыв и обломки пикапа.
+  death?: 'corpse' | 'wreck';
   // Если задано, в просмотре есть галочка «Стрельба»: темп, снаряд и вспышка как в бою.
   shot?: {
     delay: number;
@@ -187,7 +189,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'assault',
     title: 'Штурмовик',
-    hint: 'Два кадра шага. Полоска HP в игре рисуется отдельно от текстуры — здесь она для сверки места.',
+    hint: 'Два кадра шага. Полоска HP в игре рисуется отдельно от текстуры — здесь она для сверки места. «Смерть» кладёт тело в кровь.',
     exportName: 'ASSAULT_LOOK',
     kind: 'frames',
     frameCount: 2,
@@ -201,6 +203,7 @@ export const ENTITIES: PreviewEntity[] = [
     fields: soldierFields(),
     hitbox: soldierHit,
     hpColor: 0xd42a2a,
+    death: 'corpse',
     bake: (scene, paint, keys) => {
       const look = paint as SoldierLook;
       stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 0, look));
@@ -210,7 +213,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'gunner',
     title: 'Стрелок',
-    hint: 'То же тело, другие цвета и длинная винтовка. Жёлтая точка — откуда вылетает пуля. При выстреле ствол откатывается и вспыхивает.',
+    hint: 'То же тело, другие цвета и длинная винтовка. Жёлтая точка — откуда вылетает пуля. При выстреле ствол откатывается и вспыхивает. «Смерть» кладёт тело в кровь.',
     exportName: 'GUNNER_LOOK',
     kind: 'frames',
     frameCount: 2,
@@ -225,6 +228,7 @@ export const ENTITIES: PreviewEntity[] = [
     hitbox: soldierHit,
     muzzle: GunnerInfantry.muzzleOffset,
     hpColor: 0x3a8ad4,
+    death: 'corpse',
     shot: {
       delay: GunnerInfantry.shotInterval,
       speed: GunnerInfantry.shotSpeed,
@@ -240,7 +244,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'pickup',
     title: 'Пикап',
-    hint: 'Шесть кадров прокрутки колёс. Масштаб, опора и хитбокс — как у машины на поле.',
+    hint: 'Шесть кадров прокрутки колёс. Масштаб, опора и хитбокс — как у машины на поле. «Смерть» взрывает кузов и оставляет обломки.',
     exportName: 'PICKUP_PAINT',
     kind: 'frames',
     frameCount: PickupTruck.wheelFrames,
@@ -292,6 +296,7 @@ export const ENTITIES: PreviewEntity[] = [
     },
     muzzle: PickupTruck.muzzleOffset,
     hpColor: 0xe0a020,
+    death: 'wreck',
     shot: {
       delay: PickupTruck.shotInterval,
       speed: PickupTruck.shotSpeed,

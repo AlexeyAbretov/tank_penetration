@@ -21,6 +21,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     bodyX: 14,
     bodyY: 10,
   };
+  // Сколько убитый солдат лежит в луже, прежде чем спрайт удалится.
+  private static readonly corpseMs = 5000;
   // Текущее здоровье. Уменьшается, когда попадает снаряд танка.
   hp: number;
   // Здоровье в момент появления. Полоска HP считается как hp / maxHp.
@@ -145,16 +147,51 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     return this.hp <= 0;
   }
 
-  // Уход с поля: остановка, погасшая полоска, сжатие и удаление.
+  // Картинка лежащего тела. null — у этого врага трупа нет, kill сожмёт спрайт как раньше.
+  protected corpseTexture(): string | null {
+    return null;
+  }
+
+  // Момент снятия с поля, до смены картинки. Стрелок здесь прячет отдельную винтовку.
+  // _slain: true, если здоровье уже кончилось. Дошедший до стены живым передаёт false.
+  protected onDie(_slain: boolean): void {}
+
+  // Уход с поля: остановка и погасшая полоска.
+  // Убитый юнит с картинкой останков остаётся на поле. У кого её нет — сжимается и тает.
   // Имя kill совпадает с методом Sprite, поэтому сцена вызывает именно эту версию.
   kill(): void {
+    // Повторный вызов (снаряд ещё касается тела) не должен запускать второй таймер.
+    if (this.reachedWall) {
+      return;
+    }
     this.reachedWall = true;
-    // Скорость в ноль. ?. — если тела уже нет, строка не упадёт.
-    this.body?.stop();
-    // Анимация шага останавливается, иначе ноги дёргаются, пока спрайт тает.
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    // Скорость в ноль и тело выключено: снаряды пролетают труп, не взрываясь о него.
+    body?.stop();
+    if (body) {
+      body.enable = false;
+    }
+    // Анимация шага останавливается, иначе следующий кадр вернёт стоящую картинку.
     this.anims.stop();
+    this.clearTint();
     this.barBg.setVisible(false);
     this.barFill.setVisible(false);
+
+    const slain = this.hp <= 0;
+    this.onDie(slain);
+    const corpse = slain ? this.corpseTexture() : null;
+    if (corpse) {
+      this.setTexture(corpse);
+      // Ниже живых солдат (глубина 10), чтобы идущие наступали на тела, а не прятались под ними.
+      this.setDepth(8);
+      this.scene.time.delayedCall(Infantry.corpseMs, () => {
+        if (this.active) {
+          this.destroy();
+        }
+      });
+      return;
+    }
+
     // Tween — плавное изменение свойств за duration миллисекунд.
     this.scene.tweens.add({
       targets: this,
@@ -250,6 +287,88 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     // Маленький знак на боку каски.
     g.fillStyle(look.emblem);
     g.fillRect(38, 14, 6, 6);
+  }
+
+  // Убитый солдат лёжа, головой к танку. Низ кадра — та же линия, что тень живого (y ≈ 76).
+  static drawCorpse(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
+    // Сначала широкая лужа, тело рисуется поверх неё.
+    g.fillStyle(0x2a0608, 0.55);
+    g.fillEllipse(48, 74, 92, 22);
+    g.fillStyle(0x5a1014, 0.95);
+    g.fillEllipse(46, 72, 74, 14);
+    g.fillStyle(0x8e181c, 0.9);
+    g.fillEllipse(38, 71, 36, 8);
+    g.fillStyle(0xc42428, 0.75);
+    g.fillEllipse(32, 70, 14, 5);
+    g.fillStyle(0x7a1418, 0.95);
+    g.fillCircle(12, 68, 3);
+    g.fillCircle(18, 77, 2);
+    g.fillCircle(82, 65, 2.5);
+    g.fillCircle(90, 75, 3);
+    g.fillCircle(70, 78, 2);
+
+    // Задняя нога чуть выше, передняя ближе к нижнему краю — так ноги не сливаются.
+    g.fillStyle(look.outline);
+    g.fillRoundedRect(58, 50, 28, 12, 4);
+    g.fillStyle(look.pants);
+    g.fillRoundedRect(60, 52, 22, 8, 3);
+    g.fillStyle(look.boots);
+    g.fillRoundedRect(80, 49, 12, 11, 2);
+
+    g.fillStyle(look.outline);
+    g.fillRoundedRect(54, 61, 30, 12, 4);
+    g.fillStyle(look.pants);
+    g.fillRoundedRect(56, 63, 24, 8, 3);
+    g.fillStyle(look.boots);
+    g.fillRoundedRect(78, 62, 14, 11, 2);
+
+    // Рука вытянута вперёд, к голове, отдельно от туловища.
+    g.fillStyle(look.outline);
+    g.fillRoundedRect(14, 58, 22, 10, 4);
+    g.fillStyle(look.tunic);
+    g.fillRoundedRect(16, 60, 18, 6, 3);
+
+    g.fillStyle(look.outline);
+    g.fillRoundedRect(30, 48, 38, 22, 7);
+    g.fillStyle(look.tunic);
+    g.fillRoundedRect(32, 50, 34, 18, 6);
+    g.fillStyle(look.belt);
+    g.fillRect(50, 52, 6, 14);
+    g.fillStyle(look.vest);
+    g.fillRect(36, 60, 16, 6);
+    // Пятно на гимнастёрке, чтобы тело читалось лежащим в крови, а не рядом с ней.
+    g.fillStyle(0x7a1216, 0.9);
+    g.fillEllipse(44, 58, 12, 7);
+
+    // Винтовка выпала и лежит в луже. Длинная у стрелка, короткая у штурмовика.
+    const rifleX = look.longRifle ? 4 : 10;
+    const rifleLen = look.longRifle ? 40 : 32;
+    g.fillStyle(look.rifle);
+    g.fillRoundedRect(rifleX, 66, rifleLen, 5, 2);
+    g.fillStyle(look.rifleWood);
+    g.fillRoundedRect(rifleX + 4, 67, rifleLen - 10, 3, 1);
+    g.fillStyle(look.rifleMetal);
+    g.fillRect(rifleX - 2, 65, 7, 6);
+
+    // Голова на земле, каска съехала набок.
+    g.fillStyle(look.outline);
+    g.fillCircle(28, 56, 10);
+    g.fillStyle(look.skin);
+    g.fillCircle(27, 58, 7);
+    g.fillStyle(look.helmet);
+    g.fillEllipse(31, 50, 22, 12);
+    g.fillStyle(look.helmetLight);
+    g.fillRect(24, 47, 9, 3);
+    g.fillStyle(look.visor);
+    g.fillRect(22, 54, 16, 3);
+    g.fillStyle(look.emblem);
+    g.fillRect(38, 48, 5, 5);
+
+    // Второй слой крови поверх ног и шеи, чтобы фигура сидела в луже.
+    g.fillStyle(0x6a1014, 0.4);
+    g.fillEllipse(46, 68, 58, 10);
+    g.fillStyle(0x8e181c, 0.85);
+    g.fillEllipse(24, 64, 16, 7);
   }
 
   // Винтовка поперёк тела. ox/oy сдвигают рисунок: для отдельной текстуры это вырез из кадра солдата.

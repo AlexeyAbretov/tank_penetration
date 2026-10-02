@@ -17,6 +17,7 @@ import { RangedEnemy } from './RangedEnemy';
 export class PickupTruck extends RangedEnemy {
   // Крест через центр повторяется каждые 180°. Шесть кадров делят эту половину оборота.
   static readonly wheelFrames = 6;
+  static readonly corpseKey = 'pickup-wreck';
   // 12 кадров/с: полный оборот креста примерно за полсекунды, рядом со скоростью машины.
   static readonly driveFps = 12;
   static readonly placed = {
@@ -108,6 +109,23 @@ export class PickupTruck extends RangedEnemy {
     this.syncGun();
   }
 
+  protected override corpseTexture(): string | null {
+    return PickupTruck.corpseKey;
+  }
+
+  // Взрыв в момент гибели, потом на поле остаётся текстура разбитой машины.
+  // Ствол — отдельный спрайт: на обломках он уже нарисован сломанным.
+  protected override onDie(slain: boolean): void {
+    if (!slain) {
+      return;
+    }
+    this.scene.tweens.killTweensOf(this.recoil);
+    if (this.gun.active) {
+      this.gun.setVisible(false);
+    }
+    this.playDeathBlast();
+  }
+
   override hit(damage?: number): boolean {
     const dead = damage === undefined ? super.hit() : super.hit(damage);
     this.gun.setTint(0xffccaa);
@@ -183,6 +201,9 @@ export class PickupTruck extends RangedEnemy {
           this.render(g, phase, PICKUP_PAINT, false),
         );
       }
+    }
+    if (!scene.textures.exists(this.corpseKey)) {
+      bake(scene, this.corpseKey, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => this.renderWreck(g));
     }
     if (!scene.textures.exists('pickup-gun')) {
       bake(scene, 'pickup-gun', PICKUP_GUN_FRAME.w, PICKUP_GUN_FRAME.h, (g) => this.renderGun(g));
@@ -313,6 +334,157 @@ export class PickupTruck extends RangedEnemy {
     };
     drawWheel(40); // переднее, под капотом
     drawWheel(126); // заднее, под кузовом
+  }
+
+  // Разбитый пикап в том же кадре 160×80, чтобы колёса остались на линии земли живой машины.
+  static renderWreck(g: Phaser.GameObjects.Graphics, paint: PickupPaint = PICKUP_PAINT): void {
+    g.fillStyle(0x140806, 0.6);
+    g.fillEllipse(82, 73, 140, 18);
+    g.fillStyle(0x6a140c, 0.5);
+    g.fillEllipse(70, 71, 78, 10);
+
+    // Переднее колесо сорвано и лежит плашмя слева от рамы.
+    g.fillStyle(paint.wheel);
+    g.fillEllipse(20, 67, 28, 12);
+    g.fillStyle(paint.wheelDisk);
+    g.fillEllipse(20, 67, 14, 6);
+
+    // Ствол отломан и валяется перед кабиной.
+    g.fillStyle(paint.barrel);
+    g.fillRoundedRect(34, 66, 42, 5, 1);
+    g.fillStyle(paint.muzzleTip);
+    g.fillCircle(34, 68, 3);
+
+    g.fillStyle(paint.metal);
+    g.fillRoundedRect(32, 56, 100, 8, 2);
+
+    // Капот смят и выгорел, из щели торчит пламя.
+    g.fillStyle(paint.bodyDark);
+    g.fillRoundedRect(34, 46, 30, 14, 3);
+    g.fillStyle(0x1a0c08);
+    g.fillRect(38, 48, 16, 8);
+    g.fillStyle(0xff4a10);
+    g.fillTriangle(40, 46, 48, 32, 56, 46);
+    g.fillStyle(0xffe080);
+    g.fillTriangle(44, 46, 48, 36, 52, 46);
+
+    // Заднее колесо ещё на оси, но покрышка спущена.
+    g.fillStyle(paint.wheel);
+    g.fillEllipse(114, 64, 26, 18);
+    g.fillStyle(paint.wheelDisk);
+    g.fillEllipse(114, 64, 12, 8);
+    g.fillStyle(paint.wheel);
+    g.fillCircle(114, 64, 3);
+
+    // Кузов короче: борт вырван, в досках дыра.
+    g.fillStyle(paint.bodyDark);
+    g.fillRoundedRect(100, 42, 34, 18, 2);
+    g.fillStyle(paint.bodyLight);
+    g.fillRect(102, 44, 22, 6);
+    g.fillStyle(0x1a120c);
+    g.fillRect(110, 46, 12, 8);
+    g.fillStyle(paint.metal);
+    g.fillRect(132, 44, 4, 18);
+    g.fillStyle(paint.body);
+    g.fillRect(138, 58, 16, 6);
+
+    // Крыша кабины просела, стекло — чёрная дыра с трещиной.
+    g.fillStyle(paint.cabin);
+    g.fillRoundedRect(60, 38, 36, 22, 3);
+    g.fillStyle(paint.body);
+    g.fillRoundedRect(62, 40, 32, 18, 2);
+    g.fillStyle(0x0c0e12);
+    g.fillRect(66, 42, 16, 9);
+    g.lineStyle(1, 0xd8e4ea, 0.8);
+    g.beginPath();
+    g.moveTo(68, 43);
+    g.lineTo(78, 50);
+    g.lineTo(72, 50);
+    g.strokePath();
+
+    // Дым над мотором. Верх кадра — это воздух над крышей, не земля.
+    g.fillStyle(0x3a342c, 0.4);
+    g.fillCircle(48, 30, 9);
+    g.fillCircle(60, 22, 7);
+    g.fillCircle(72, 16, 5);
+  }
+
+  // Вспышка по центру машины. Обломки уже под ней: вспышка гаснет, корпус остаётся.
+  private playDeathBlast(): void {
+    const scale = this.scaleX;
+    const x = this.x - 8 * scale;
+    const y = this.y - 26 * scale;
+    PickupTruck.burstAt(this.scene, x, y);
+    this.scene.time.delayedCall(90, () => {
+      PickupTruck.burstAt(this.scene, x + 22 * scale, y + 8 * scale);
+    });
+  }
+
+  // Один клуб взрыва. scale увеличивает радиус, скорость и осколки вместе с картинкой в просмотре.
+  static burstAt(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    scale = 1,
+    keys: { spark?: string; muzzle?: string } = {},
+  ): Phaser.GameObjects.GameObject[] {
+    const sparkKey = keys.spark ?? 'spark';
+    const muzzleKey = keys.muzzle ?? 'muzzle';
+    if (!scene.textures.exists(sparkKey)) {
+      bake(scene, sparkKey, 12, 12, (g) => {
+        g.fillStyle(0xffffff);
+        g.fillCircle(6, 6, 5);
+      });
+    }
+    const sparks = scene.add.particles(x, y, sparkKey, {
+      lifespan: { min: 280, max: 640 },
+      speed: { min: 40 * scale, max: 420 * scale },
+      scale: { start: 1.7 * scale, end: 0 },
+      alpha: { start: 1, end: 0 },
+      blendMode: Phaser.BlendModes.ADD,
+      color: [0xfff6d0, 0xff8a22, 0xff2a10],
+      gravityY: 460 * scale,
+      emitting: false,
+    });
+    sparks.setDepth(18);
+    sparks.explode(32);
+    scene.time.delayedCall(700, () => sparks.destroy());
+
+    const fire = scene.add.circle(x, y, 26 * scale, 0xff4a12, 0.95).setDepth(17);
+    const core = scene.add.circle(x, y, 12 * scale, 0xfff4c8, 1).setDepth(19);
+    const flash = scene.add.image(x, y, muzzleKey).setDepth(18).setBlendMode(Phaser.BlendModes.ADD);
+    flash.setScale(1.6 * scale);
+    scene.tweens.add({
+      targets: [fire, core, flash],
+      alpha: 0,
+      scale: 3.4 * scale,
+      duration: 320,
+      onComplete: () => {
+        fire.destroy();
+        core.destroy();
+        flash.destroy();
+      },
+    });
+
+    const bits: Phaser.GameObjects.Rectangle[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const bit = scene.add
+        .rectangle(x, y, 10 * scale, 4 * scale, i % 2 === 0 ? 0x3a4a24 : 0x1a1c16)
+        .setDepth(16);
+      const angle = Phaser.Math.FloatBetween(-Math.PI * 0.9, -Math.PI * 0.1);
+      const dist = Phaser.Math.Between(50, 150) * scale;
+      scene.tweens.add({
+        targets: bit,
+        x: x + Math.cos(angle) * dist,
+        y: y + Math.sin(angle) * dist + 36 * scale,
+        angle: Phaser.Math.Between(-160, 160),
+        alpha: 0,
+        duration: 460,
+        onComplete: () => bit.destroy(),
+      });
+      bits.push(bit);
+    }
+    return [sparks, fire, core, flash, ...bits];
   }
 
   // Ствол в своих координатах. ox и oy сдвигают рисунок: для текстуры ствола это вырез из кадра машины.

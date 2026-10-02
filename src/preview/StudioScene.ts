@@ -8,6 +8,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import {
   BULLET_FRAME,
+  CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
   GUNNER_RIFLE_FRAME,
   MUZZLE_FRAME,
@@ -63,6 +64,11 @@ export class StudioScene extends Phaser.Scene {
   private readonly sparkPoint = new Phaser.Math.Vector2();
   private bodyKeys: string[] = [];
   private gunnerBodyKeys: string[] = [];
+  // true, пока галочка «Смерть» включена. Взрыв пикапа играем один раз при включении, не на каждый ползунок.
+  private deathOn = false;
+  private blastPending = false;
+  private blastTimer?: Phaser.Time.TimerEvent;
+  private deathFx: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super('studio');
@@ -151,6 +157,7 @@ export class StudioScene extends Phaser.Scene {
 
   private buildHolders(): void {
     this.disarm();
+    this.clearDeathFx();
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
     this.captions.forEach((caption) => caption.destroy());
@@ -159,8 +166,13 @@ export class StudioScene extends Phaser.Scene {
       return;
     }
     const view = readView();
-    const firing = view.fire && this.entity.shot !== undefined;
-    if (this.entity.kind === 'tank') {
+    const dying = view.death && this.entity.death !== undefined;
+    this.blastPending = dying && this.entity.death === 'wreck' && !this.deathOn;
+    this.deathOn = dying;
+    const firing = !dying && view.fire && this.entity.shot !== undefined;
+    if (dying) {
+      this.holders.push(this.makeDeath(view));
+    } else if (this.entity.kind === 'tank') {
       this.holders.push(this.makeTank(view));
     } else if (firing && this.entity.id === 'pickup') {
       this.holders.push(this.makePickup(view));
@@ -179,6 +191,7 @@ export class StudioScene extends Phaser.Scene {
       }
     }
     this.place();
+    this.publish();
   }
 
   private makeSprite(key: string, view: ViewState, play: boolean): Phaser.GameObjects.Container {
@@ -200,6 +213,53 @@ export class StudioScene extends Phaser.Scene {
     root.add(guides);
     this.paintSpriteGuides(guides, view);
     return root;
+  }
+
+  private frameOf(view: ViewState): { w: number; h: number } {
+    if (view.death && this.entity.death === 'corpse') {
+      return CORPSE_FRAME;
+    }
+    return { w: this.entity.texW, h: this.entity.texH };
+  }
+
+  private makeDeath(view: ViewState): Phaser.GameObjects.Container {
+    const wreck = this.entity.death === 'wreck';
+    const frame = wreck ? PICKUP_FRAME : CORPSE_FRAME;
+    this.restamp('studio-death', frame.w, frame.h, (g) => {
+      if (wreck) {
+        PickupTruck.renderWreck(g, this.paint as PickupPaint);
+      } else {
+        Infantry.drawCorpse(g, this.paint as SoldierLook);
+      }
+    });
+    return this.makeSprite('studio-death', view, false);
+  }
+
+  // Взрыв в координатах холста. visual — во сколько раз картинка крупнее, чем на поле боя.
+  private playStudioBlast(holder: Phaser.GameObjects.Container): void {
+    const view = readView();
+    const fit = holder.scaleX;
+    const visual = fit * (view.scale / PickupTruck.placed.scale);
+    const x = holder.x - 8 * view.scale * fit;
+    const y = holder.y - 26 * view.scale * fit;
+    const keys = { muzzle: 'studio-fx-muzzle' };
+    this.deathFx.push(...PickupTruck.burstAt(this, x, y, visual, keys));
+    this.blastTimer = this.time.delayedCall(90, () => {
+      this.blastTimer = undefined;
+      this.deathFx.push(
+        ...PickupTruck.burstAt(this, x + 22 * view.scale * fit, y + 8 * view.scale * fit, visual, keys),
+      );
+    });
+  }
+
+  private clearDeathFx(): void {
+    this.blastTimer?.remove(false);
+    this.blastTimer = undefined;
+    for (const fx of this.deathFx) {
+      this.tweens.killTweensOf(fx);
+      fx.destroy();
+    }
+    this.deathFx = [];
   }
 
   private makeTank(view: ViewState): Phaser.GameObjects.Container {
@@ -254,16 +314,17 @@ export class StudioScene extends Phaser.Scene {
 
   private paintSpriteGuides(g: Phaser.GameObjects.Graphics, view: ViewState): void {
     const entity = this.entity;
+    const frame = this.frameOf(view);
     const s = view.scale;
-    const left = -entity.originX * entity.texW * s;
-    const top = -entity.originY * entity.texH * s;
-    const width = entity.texW * s;
-    const height = entity.texH * s;
+    const left = -entity.originX * frame.w * s;
+    const top = -entity.originY * frame.h * s;
+    const width = frame.w * s;
+    const height = frame.h * s;
     if (view.bounds) {
       g.lineStyle(1, 0xf0d56a, 0.9);
       g.strokeRect(left, top, width, height);
     }
-    if (view.hitbox && entity.hitbox) {
+    if (!view.death && view.hitbox && entity.hitbox) {
       g.lineStyle(2, 0x66e080, 0.95);
       g.strokeRect(
         left + entity.hitbox.ox * s,
@@ -275,7 +336,7 @@ export class StudioScene extends Phaser.Scene {
     if (view.origin) {
       paintCross(g);
     }
-    if (view.muzzle && entity.muzzle) {
+    if (!view.death && view.muzzle && entity.muzzle) {
       // Смещение дула в игре задано при игровом масштабе. Если ползунок масштаба другой, точка едет вместе с рисунком.
       const fit = entity.gameScale === 0 ? 1 : view.scale / entity.gameScale;
       const x = entity.muzzle.x * fit;
@@ -285,7 +346,7 @@ export class StudioScene extends Phaser.Scene {
       g.fillStyle(0xffee66, 1);
       g.fillCircle(x, y, 3);
     }
-    if (view.hp && entity.hpColor !== undefined) {
+    if (!view.death && view.hp && entity.hpColor !== undefined) {
       const barY = -height * 0.95;
       g.fillStyle(0x2a0a0a, 1);
       g.fillRect(-15, barY - 2.5, 30, 5);
@@ -336,6 +397,10 @@ export class StudioScene extends Phaser.Scene {
     if (this.rig?.sparks && this.holders[0]) {
       this.rig.sparks.setScale(this.holders[0].scaleX);
     }
+    if (this.blastPending && this.holders[0]) {
+      this.blastPending = false;
+      this.playStudioBlast(this.holders[0]);
+    }
 
     const footY = this.holders[0]?.y ?? centerY;
     this.paintBackdrop(footY);
@@ -365,15 +430,16 @@ export class StudioScene extends Phaser.Scene {
       return this.withPlate(this.tankBounds(view), view);
     }
     const entity = this.entity;
+    const frame = this.frameOf(view);
     const s = view.scale;
-    let left = -entity.originX * entity.texW * s;
-    let right = (1 - entity.originX) * entity.texW * s;
-    let top = -entity.originY * entity.texH * s;
-    let bottom = (1 - entity.originY) * entity.texH * s;
-    if (view.hp && entity.hpColor !== undefined) {
-      top = Math.min(top, -entity.texH * s * 0.95 - 6);
+    let left = -entity.originX * frame.w * s;
+    let right = (1 - entity.originX) * frame.w * s;
+    let top = -entity.originY * frame.h * s;
+    let bottom = (1 - entity.originY) * frame.h * s;
+    if (!view.death && view.hp && entity.hpColor !== undefined) {
+      top = Math.min(top, -frame.h * s * 0.95 - 6);
     }
-    if (view.muzzle && entity.muzzle) {
+    if (!view.death && view.muzzle && entity.muzzle) {
       const fit = entity.gameScale === 0 ? 1 : s / entity.gameScale;
       left = Math.min(left, entity.muzzle.x * fit - 6);
       right = Math.max(right, entity.muzzle.x * fit + 6);
@@ -503,6 +569,12 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private labels(view: ViewState): string[] {
+    if (view.death && this.entity.death === 'wreck') {
+      return ['взрыв · обломки'];
+    }
+    if (view.death && this.entity.death === 'corpse') {
+      return ['тело в крови'];
+    }
     if (view.fire && this.entity.shot) {
       const motion =
         this.entity.frameCount > 1 && view.animate ? `${this.entity.motion ?? 'шаг'} · ` : '';
@@ -951,6 +1023,7 @@ export class StudioScene extends Phaser.Scene {
 
   private dropArt(): void {
     this.disarm();
+    this.clearDeathFx();
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
     this.captions.forEach((caption) => caption.destroy());
@@ -981,10 +1054,11 @@ export class StudioScene extends Phaser.Scene {
 
   private publish(): void {
     const view = readView();
+    const frame = this.frameOf(view);
     setSnippet(formatLook(this.entity.exportName, this.entity.defaults, this.paint));
     setStoredNote(localStorage.getItem(STORAGE + this.entity.id) !== null);
     setStatus(
-      `${this.entity.texW}×${this.entity.texH} · масштаб ${view.scale.toFixed(2)} · зум ×${view.zoom.toFixed(1)}`,
+      `${frame.w}×${frame.h} · масштаб ${view.scale.toFixed(2)} · зум ×${view.zoom.toFixed(1)}`,
     );
   }
 }
