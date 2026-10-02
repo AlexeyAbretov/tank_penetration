@@ -12,6 +12,7 @@ import {
   TANK_HULL_FRAME,
   TANK_PAINT,
   TANK_TURRET_FRAME,
+  TANK_WRECK_FRAME,
   type MuzzlePaint,
   type ShellPaint,
   type TankPaint,
@@ -69,9 +70,20 @@ export class Tank extends Phaser.GameObjects.Container {
   // Круглая вспышка у дула раздувается и гаснет. Её же показывает просмотр спрайтов.
   static readonly muzzleFlash = { scale: 1.6, ms: 90 };
 
+  // Размеры ядерного гриба в пикселях корпуса. Просмотр берёт те же числа,
+  // чтобы шапка помещалась в кадр вместе с обломками.
+  static readonly doom = {
+    rise: 168,
+    half: 210,
+  };
+
+  static readonly wreckKey = 'tank-wreck';
+
   // Башня и ствол внутри. Крутится целиком, откат двигает только ствол.
   private readonly aim: Phaser.GameObjects.Container;
   private readonly gun: Phaser.GameObjects.Image;
+  // После гибели корпус уже спрятан, повторный die ничего не делает.
+  private dead = false;
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
 
@@ -101,7 +113,11 @@ export class Tank extends Phaser.GameObjects.Container {
 
   // Попала ли точка (пуля) в прямоугольник вокруг танка.
   // Границы подогнаны вручную под рисунок: влево 72, вправо 96, вверх 48, вниз 52.
+  // Мёртвый танк пуль уже не ловит: на его месте только обломки.
   containsPoint(x: number, y: number): boolean {
+    if (this.dead) {
+      return false;
+    }
     const hit = Tank.layout;
     return (
       x > this.x - hit.hitLeft &&
@@ -169,6 +185,28 @@ export class Tank extends Phaser.GameObjects.Container {
     return shot;
   }
 
+  // Гибель базы: живой танк гаснет, на его месте остаётся куча обломков,
+  // а над ней на секунду встаёт ядерный гриб.
+  die(): void {
+    if (this.dead) {
+      return;
+    }
+    this.dead = true;
+    this.scene.tweens.killTweensOf(this.gun);
+    for (const child of [...this.list]) {
+      const node = child as unknown as Phaser.GameObjects.Components.Visible;
+      node.setVisible(false);
+    }
+    const layout = Tank.layout;
+    if (!this.scene.textures.exists(Tank.wreckKey)) {
+      Tank.createWreck(this.scene);
+    }
+    const wreck = this.scene.add.image(layout.hullX, layout.hullY, Tank.wreckKey);
+    this.add(wreck);
+    // Взрыв чуть выше середины корпуса: оттуда растёт ножка гриба.
+    Tank.nukeAt(this.scene, this.x + layout.hullX, this.y + layout.hullY - 12);
+  }
+
   // Мировые координаты конца ствола.
   private getMuzzle(): { x: number; y: number; angle: number } {
     const angle = this.aim.rotation;
@@ -197,6 +235,9 @@ export class Tank extends Phaser.GameObjects.Container {
     }
     if (!scene.textures.exists('muzzle')) {
       this.createMuzzle(scene);
+    }
+    if (!scene.textures.exists(Tank.wreckKey)) {
+      this.createWreck(scene);
     }
   }
 
@@ -352,5 +393,338 @@ export class Tank extends Phaser.GameObjects.Container {
     g.fillCircle(24, 24, 12);
     g.fillStyle(paint.core); // белая точка
     g.fillCircle(24, 24, 5);
+  }
+
+  // Куча обломков вместо целого танка. Кадр шире корпуса: башня и ствол лежат рядом.
+  private static createWreck(scene: Phaser.Scene): void {
+    bake(scene, Tank.wreckKey, TANK_WRECK_FRAME.w, TANK_WRECK_FRAME.h, (g) => this.renderWreck(g));
+  }
+
+  static renderWreck(g: Phaser.GameObjects.Graphics, paint: TankPaint = TANK_PAINT): void {
+    // Центр кадра совпадает с центром живого корпуса. Земля — на 41 пиксель ниже, как тень гусеницы.
+    const ground = TANK_WRECK_FRAME.h / 2 + 41;
+
+    g.fillStyle(0x120806, 0.9);
+    g.fillEllipse(118, ground + 2, 210, 30);
+    g.fillStyle(0x4a160c, 0.65);
+    g.fillEllipse(124, ground, 108, 16);
+
+    // Гусеница разорвана на два куска, один каток выпал и лежит плашмя.
+    g.fillStyle(paint.track);
+    g.fillRoundedRect(36, ground - 18, 72, 20, 4);
+    g.fillRoundedRect(138, ground - 12, 48, 14, 3);
+    g.fillStyle(paint.wheelOuter);
+    g.fillEllipse(28, ground - 2, 26, 14);
+    g.fillStyle(paint.wheelDisk);
+    g.fillEllipse(28, ground - 2, 14, 7);
+    g.fillStyle(paint.wheelOuter);
+    g.fillCircle(58, ground - 10, 9);
+    g.fillStyle(paint.wheelDisk);
+    g.fillCircle(58, ground - 10, 5);
+    g.fillStyle(paint.wheelHub);
+    g.fillCircle(58, ground - 10, 2);
+    g.fillStyle(paint.wheelOuter);
+    g.fillCircle(84, ground - 8, 8);
+    g.fillStyle(paint.wheelDisk);
+    g.fillCircle(84, ground - 8, 4);
+    g.fillStyle(paint.wheelOuter);
+    g.fillEllipse(168, ground - 4, 22, 16);
+    g.fillStyle(paint.wheelDisk);
+    g.fillEllipse(168, ground - 4, 10, 7);
+
+    // Корпус просел и выгорел. В борту дыра, из неё ещё торчит пламя.
+    g.fillStyle(0x140e0a);
+    g.fillRoundedRect(44, ground - 42, 108, 32, 4);
+    g.fillStyle(paint.armorDark);
+    g.fillRoundedRect(50, ground - 36, 64, 16, 3);
+    g.fillStyle(paint.armor);
+    g.fillRect(52, ground - 34, 40, 6);
+    g.fillStyle(0x0c0806);
+    g.fillEllipse(108, ground - 26, 36, 18);
+    g.fillStyle(0xff4a10);
+    g.fillTriangle(96, ground - 28, 108, ground - 52, 122, ground - 28);
+    g.fillStyle(0xffe080);
+    g.fillTriangle(102, ground - 28, 108, ground - 42, 116, ground - 28);
+
+    // Сорванный лист крыши и погнутый нос лежат отдельно от корпуса.
+    this.fillTurned(g, paint.armorLight, 70, ground - 36, 40, 10, -0.7);
+    this.fillTurned(g, paint.nose, 154, ground - 6, 28, 12, 0.9);
+    g.fillStyle(paint.rivet);
+    g.fillCircle(64, ground - 22, 3);
+
+    // Башня на боку справа, ствол отломлен и валяется перед ней.
+    this.fillTurned(g, paint.turret, 198, ground - 10, 52, 22, 0.65);
+    this.fillTurned(g, paint.turretLight, 196, ground - 16, 36, 8, 0.65);
+    g.fillStyle(paint.hatch);
+    g.fillCircle(206, ground - 6, 5);
+    this.fillTurned(g, paint.barrel, 132, ground - 4, 62, 8, -0.2);
+    this.fillTurned(g, paint.muzzleRing, 104, ground - 8, 12, 12, -0.2);
+
+    // Дым над проломом. Верх кадра — воздух, не земля.
+    g.fillStyle(0x3a342c, 0.45);
+    g.fillCircle(96, ground - 62, 12);
+    g.fillCircle(114, ground - 76, 9);
+    g.fillCircle(128, ground - 88, 6);
+  }
+
+  // Прямоугольник, повёрнутый вокруг своего центра. angle в радианах, по часовой: ось Y вниз.
+  private static fillTurned(
+    g: Phaser.GameObjects.Graphics,
+    color: number,
+    cx: number,
+    cy: number,
+    width: number,
+    height: number,
+    angle: number,
+  ): void {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const corners: ReadonlyArray<readonly [number, number]> = [
+      [-width / 2, -height / 2],
+      [width / 2, -height / 2],
+      [width / 2, height / 2],
+      [-width / 2, height / 2],
+    ];
+    g.fillStyle(color);
+    g.beginPath();
+    corners.forEach(([px, py], index) => {
+      const x = cx + px * cos - py * sin;
+      const y = cy + px * sin + py * cos;
+      if (index === 0) {
+        g.moveTo(x, y);
+      } else {
+        g.lineTo(x, y);
+      }
+    });
+    g.closePath();
+    g.fillPath();
+  }
+
+  // Ядерный взрыв: белая вспышка, ударная волна по земле и гриб, который темнеет и гаснет.
+  // scale увеличивает радиус вместе с картинкой в просмотре. Обломки в этот метод не входят:
+  // их рисуют заранее, вспышка их только закрывает.
+  static nukeAt(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    scale = 1,
+  ): Phaser.GameObjects.GameObject[] {
+    const made: Phaser.GameObjects.GameObject[] = [];
+    const rise = Tank.doom.rise * scale;
+    const groundY = y + 28 * scale;
+
+    scene.cameras.main.flash(320, 255, 246, 230);
+
+    const flash = scene.add
+      .circle(x, y, 36 * scale, 0xffffff, 1)
+      .setDepth(46)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setScale(0.3);
+    scene.tweens.add({
+      targets: flash,
+      scale: 8,
+      alpha: 0,
+      duration: 240,
+      ease: 'Cubic.Out',
+      onComplete: () => flash.destroy(),
+    });
+
+    const fire = scene.add
+      .circle(x, y, 34 * scale, 0xff5a12, 0.95)
+      .setDepth(42)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const core = scene.add
+      .circle(x, y, 14 * scale, 0xfff6d0, 1)
+      .setDepth(45)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    scene.tweens.add({
+      targets: fire,
+      scale: 4.4,
+      alpha: 0,
+      y: y - 36 * scale,
+      duration: 520,
+      ease: 'Cubic.Out',
+      onComplete: () => fire.destroy(),
+    });
+    scene.tweens.add({
+      targets: core,
+      scale: 3.2,
+      alpha: 0,
+      y: y - 48 * scale,
+      duration: 400,
+      ease: 'Cubic.Out',
+      onComplete: () => core.destroy(),
+    });
+
+    // Плоское кольцо по земле: ударная волна, не шар.
+    const ring = scene.add
+      .ellipse(x, groundY, 32 * scale, 12 * scale, 0xfff4d0, 0)
+      .setStrokeStyle(Math.max(2, 5 * scale), 0xfff6d8, 0.95)
+      .setDepth(40)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    scene.tweens.add({
+      targets: ring,
+      scaleX: 12,
+      scaleY: 4.5,
+      alpha: 0,
+      duration: 680,
+      ease: 'Cubic.Out',
+      onComplete: () => ring.destroy(),
+    });
+
+    // Ножка растёт от земли вверх. origin снизу, поэтому scaleY тянет её к небу, а не в обе стороны.
+    const stem = scene.add
+      .ellipse(x, groundY, 46 * scale, 22 * scale, 0x5c4636, 0.95)
+      .setOrigin(0.5, 1)
+      .setDepth(36);
+    scene.tweens.add({
+      targets: stem,
+      scaleY: 8,
+      scaleX: 1.55,
+      duration: 880,
+      ease: 'Cubic.Out',
+    });
+    scene.tweens.add({
+      targets: stem,
+      alpha: 0,
+      delay: 620,
+      duration: 520,
+      onComplete: () => stem.destroy(),
+    });
+
+    const capY = y - 8 * scale;
+    const cap = scene.add.ellipse(x, capY, 72 * scale, 30 * scale, 0x6a5646, 0.94).setDepth(38);
+    const capHot = scene.add
+      .ellipse(x, capY + 6 * scale, 60 * scale, 18 * scale, 0xffb040, 0.95)
+      .setDepth(39)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const capCore = scene.add
+      .ellipse(x, capY, 22 * scale, 12 * scale, 0xfff8e4, 1)
+      .setDepth(41)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const crownY = groundY - rise;
+    scene.tweens.add({
+      targets: [cap, capHot, capCore],
+      y: crownY,
+      scaleX: 5.6,
+      scaleY: 2.15,
+      duration: 920,
+      ease: 'Cubic.Out',
+    });
+    scene.tweens.add({
+      targets: capCore,
+      alpha: 0,
+      delay: 160,
+      duration: 280,
+      onComplete: () => capCore.destroy(),
+    });
+    scene.tweens.add({
+      targets: capHot,
+      alpha: 0,
+      delay: 280,
+      duration: 460,
+      onComplete: () => capHot.destroy(),
+    });
+    scene.tweens.add({
+      targets: cap,
+      alpha: 0,
+      delay: 700,
+      duration: 520,
+      onComplete: () => cap.destroy(),
+    });
+
+    // Боковые доли шапки разъезжаются в стороны и делают силуэт грибом, а не столбом.
+    for (const side of [-1, 1]) {
+      const lobe = scene.add
+        .ellipse(x + side * 16 * scale, capY, 40 * scale, 24 * scale, 0x5a4638, 0.88)
+        .setDepth(37);
+      scene.tweens.add({
+        targets: lobe,
+        x: x + side * 150 * scale,
+        y: crownY + 16 * scale,
+        scaleX: 2.6,
+        scaleY: 1.5,
+        duration: 920,
+        ease: 'Cubic.Out',
+      });
+      scene.tweens.add({
+        targets: lobe,
+        alpha: 0,
+        delay: 640,
+        duration: 480,
+        onComplete: () => lobe.destroy(),
+      });
+      made.push(lobe);
+    }
+
+    if (!scene.textures.exists('spark')) {
+      bake(scene, 'spark', 12, 12, (g) => {
+        g.fillStyle(0xffffff);
+        g.fillCircle(6, 6, 5);
+      });
+    }
+    const sparks = scene.add.particles(x, y, 'spark', {
+      lifespan: { min: 380, max: 980 },
+      speed: { min: 80 * scale, max: 560 * scale },
+      angle: { min: -110, max: -70 },
+      scale: { start: 2.1 * scale, end: 0 },
+      alpha: { start: 1, end: 0 },
+      blendMode: Phaser.BlendModes.ADD,
+      color: [0xffffff, 0xffe090, 0xff6a10, 0xff2200],
+      gravityY: 260 * scale,
+      emitting: false,
+    });
+    sparks.setDepth(44);
+    sparks.explode(56);
+    const smoke = scene.add.particles(x, groundY - 10 * scale, 'spark', {
+      lifespan: { min: 700, max: 1300 },
+      speed: { min: 20 * scale, max: 140 * scale },
+      angle: { min: -100, max: -80 },
+      scale: { start: 2.2 * scale, end: 5 * scale },
+      alpha: { start: 0.4, end: 0 },
+      color: [0x8a7868, 0x4a4038],
+      gravityY: -30 * scale,
+      emitting: false,
+    });
+    smoke.setDepth(35);
+    smoke.explode(22);
+    scene.time.delayedCall(1400, () => {
+      if (sparks.scene) {
+        sparks.destroy();
+      }
+      if (smoke.scene) {
+        smoke.destroy();
+      }
+    });
+
+    const scrap = [0x3d4a28, 0x1a1c16, 0x2a341c, 0x4a5830, 0x6a4a22];
+    for (let i = 0; i < 10; i += 1) {
+      const wide = i % 3 === 0;
+      const bit = scene.add
+        .rectangle(
+          x,
+          y,
+          (wide ? 20 : 11) * scale,
+          (wide ? 8 : 5) * scale,
+          scrap[i % scrap.length],
+        )
+        .setDepth(43);
+      const angle = Phaser.Math.FloatBetween(-Math.PI * 0.95, -Math.PI * 0.05);
+      const dist = Phaser.Math.Between(90, 240) * scale;
+      scene.tweens.add({
+        targets: bit,
+        x: x + Math.cos(angle) * dist,
+        y: y + Math.sin(angle) * dist + 60 * scale,
+        angle: Phaser.Math.Between(-240, 240),
+        alpha: 0,
+        duration: Phaser.Math.Between(560, 920),
+        ease: 'Quad.Out',
+        onComplete: () => bit.destroy(),
+      });
+      made.push(bit);
+    }
+
+    made.push(flash, fire, core, ring, stem, cap, capHot, capCore, sparks, smoke);
+    return made;
   }
 }

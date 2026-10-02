@@ -159,9 +159,11 @@ export class GameScene extends Phaser.Scene {
 
     // Разовый клик. Зажатая кнопка обрабатывается отдельно в update.
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // После поражения любой клик перезапускает сцену: create() выполнится заново.
+      // Пока гриб ещё стоит, клик не сбрасывает бой: сначала нужно увидеть обломки и плашку.
       if (this.gameOver) {
-        this.scene.restart();
+        if (this.overlay.visible) {
+          this.scene.restart();
+        }
         return;
       }
       // Пока открыт магазин, клик по полю не стреляет. Кнопки магазина ловят событие сами.
@@ -561,11 +563,14 @@ export class GameScene extends Phaser.Scene {
 
   // Общий путь урона по базе: и пуля, и солдат, дошедший до стены.
   private damageTank(amount: number): void {
+    if (this.gameOver) {
+      return;
+    }
     this.hp = Math.max(0, this.hp - amount);
     // Полная полоска — 236 пикселей. Доля hp / baseHp умножает ширину.
     this.hpFill.width = 236 * (this.hp / GAME.baseHp);
     if (this.hp <= 0) {
-      this.endGame();
+      this.beginDefeat();
     }
   }
 
@@ -654,7 +659,7 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
     this.hpFill = this.add.rectangle(1018, 28, 236, 10, 0xd42a2a).setOrigin(0, 0.5).setDepth(52);
 
-    // Плашка поражения в центре. Видна только в endGame.
+    // Плашка поражения в центре. Появляется, когда ядерный гриб уже гаснет.
     this.overlay = this.add.container(GAME.width / 2, GAME.height / 2).setDepth(80).setVisible(false);
     const dim = this.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.55);
     const title = this.add
@@ -704,14 +709,21 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private endGame(): void {
+  // HP кончились. Бой встаёт сразу, плашка — после взрыва, чтобы гриб и обломки успели прочитаться.
+  private beginDefeat(): void {
     this.gameOver = true;
     this.registry.set('combat', false);
     this.physics.world.pause();
+    this.shells.clear(true, true);
+    this.enemyShots.clear(true, true);
     // Останавливаем тех, кто ещё шёл, чтобы они не уезжали под надписью поражения.
     this.infantry.getChildren().forEach((obj) => {
       (obj as Infantry).body?.stop();
     });
-    this.overlay.setVisible(true);
+    this.tank.die();
+    this.cameras.main.shake(680, 0.014);
+    this.time.delayedCall(1300, () => {
+      this.overlay.setVisible(true);
+    });
   }
 }

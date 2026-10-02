@@ -20,11 +20,13 @@ import {
   TANK_GUN_FRAME,
   TANK_HULL_FRAME,
   TANK_TURRET_FRAME,
+  TANK_WRECK_FRAME,
   type BulletPaint,
   type MuzzlePaint,
   type PickupPaint,
   type ShellPaint,
   type SoldierLook,
+  type TankPaint,
 } from '../gfx/looks';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import { bake } from '../gfx/textures';
@@ -167,7 +169,8 @@ export class StudioScene extends Phaser.Scene {
     }
     const view = readView();
     const dying = view.death && this.entity.death !== undefined;
-    this.blastPending = dying && this.entity.death === 'wreck' && !this.deathOn;
+    this.blastPending =
+      dying && (this.entity.death === 'wreck' || this.entity.death === 'nuke') && !this.deathOn;
     this.deathOn = dying;
     const firing = !dying && view.fire && this.entity.shot !== undefined;
     if (dying) {
@@ -219,10 +222,16 @@ export class StudioScene extends Phaser.Scene {
     if (view.death && this.entity.death === 'corpse') {
       return CORPSE_FRAME;
     }
+    if (view.death && this.entity.death === 'nuke') {
+      return TANK_WRECK_FRAME;
+    }
     return { w: this.entity.texW, h: this.entity.texH };
   }
 
   private makeDeath(view: ViewState): Phaser.GameObjects.Container {
+    if (this.entity.death === 'nuke') {
+      return this.makeTankWreck(view);
+    }
     const wreck = this.entity.death === 'wreck';
     const frame = wreck ? PICKUP_FRAME : CORPSE_FRAME;
     this.restamp('studio-death', frame.w, frame.h, (g) => {
@@ -233,6 +242,26 @@ export class StudioScene extends Phaser.Scene {
       }
     });
     return this.makeSprite('studio-death', view, false);
+  }
+
+  private makeTankWreck(view: ViewState): Phaser.GameObjects.Container {
+    const layout = Tank.layout;
+    this.restamp('studio-death', TANK_WRECK_FRAME.w, TANK_WRECK_FRAME.h, (g) => {
+      Tank.renderWreck(g, this.paint as TankPaint);
+    });
+    const root = this.add.container(0, 0);
+    const wreck = this.add.image(layout.hullX, layout.hullY, 'studio-death');
+    root.add(wreck);
+    const guides = this.add.graphics();
+    root.add(guides);
+    if (view.bounds) {
+      guides.lineStyle(1, 0xf0d56a, 0.9);
+      strokeImage(guides, wreck);
+    }
+    if (view.origin) {
+      paintCross(guides);
+    }
+    return root;
   }
 
   // Взрыв в координатах холста. visual — во сколько раз картинка крупнее, чем на поле боя.
@@ -250,6 +279,14 @@ export class StudioScene extends Phaser.Scene {
         ...PickupTruck.burstAt(this, x + 22 * view.scale * fit, y + 8 * view.scale * fit, visual, keys),
       );
     });
+  }
+
+  // Гриб в мировых координатах холста. Масштаб контейнера уже включает зум просмотра.
+  private playStudioNuke(holder: Phaser.GameObjects.Container): void {
+    const layout = Tank.layout;
+    const x = holder.x + layout.hullX * holder.scaleX;
+    const y = holder.y + (layout.hullY - 12) * holder.scaleY;
+    this.deathFx.push(...Tank.nukeAt(this, x, y, Math.abs(holder.scaleX)));
   }
 
   private clearDeathFx(): void {
@@ -399,7 +436,11 @@ export class StudioScene extends Phaser.Scene {
     }
     if (this.blastPending && this.holders[0]) {
       this.blastPending = false;
-      this.playStudioBlast(this.holders[0]);
+      if (this.entity.death === 'nuke') {
+        this.playStudioNuke(this.holders[0]);
+      } else {
+        this.playStudioBlast(this.holders[0]);
+      }
     }
 
     const footY = this.holders[0]?.y ?? centerY;
@@ -427,7 +468,11 @@ export class StudioScene extends Phaser.Scene {
   // Координаты — локальные, до увеличения контейнера.
   private contentBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
     if (this.entity.kind === 'tank') {
-      return this.withPlate(this.tankBounds(view), view);
+      const box = this.tankBounds(view);
+      if (view.death) {
+        return box;
+      }
+      return this.withPlate(box, view);
     }
     const entity = this.entity;
     const frame = this.frameOf(view);
@@ -532,6 +577,15 @@ export class StudioScene extends Phaser.Scene {
 
   private tankBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
     const layout = Tank.layout;
+    if (view.death && this.entity.death === 'nuke') {
+      // Запас сверху и по бокам — под шапку гриба. Иначе взрыв обрезается краем холста.
+      return {
+        left: layout.hullX - Tank.doom.half - 24,
+        top: layout.hullY - 12 - Tank.doom.rise - 48,
+        right: layout.hullX + Tank.doom.half + 24,
+        bottom: layout.hullY + TANK_WRECK_FRAME.h / 2,
+      };
+    }
     let left = layout.hullX - TANK_HULL_FRAME.w / 2;
     let right = layout.hullX + TANK_HULL_FRAME.w / 2;
     let top = layout.hullY - TANK_HULL_FRAME.h / 2;
@@ -569,6 +623,9 @@ export class StudioScene extends Phaser.Scene {
   }
 
   private labels(view: ViewState): string[] {
+    if (view.death && this.entity.death === 'nuke') {
+      return ['ядерный взрыв · обломки'];
+    }
     if (view.death && this.entity.death === 'wreck') {
       return ['взрыв · обломки'];
     }

@@ -62,8 +62,8 @@ export type PreviewEntity = {
   muzzle?: { x: number; y: number };
   hpColor?: number;
   addBlend?: boolean;
-  // Галочка «Смерть»: труп солдата или взрыв и обломки пикапа.
-  death?: 'corpse' | 'wreck';
+  // Галочка «Смерть»: труп солдата, взрыв пикапа или ядерный гриб танка.
+  death?: 'corpse' | 'wreck' | 'nuke';
   // Если задано, в просмотре есть галочка «Стрельба»: темп, снаряд и вспышка как в бою.
   shot?: {
     delay: number;
@@ -131,7 +131,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'tank',
     title: 'Танк',
-    hint: 'Корпус и башня собраны как в бою. Башня и ствол крутятся вместе вокруг днища башни.',
+    hint: 'Корпус и башня собраны как в бою. Башня и ствол крутятся вместе вокруг днища башни. «Смерть» поднимает ядерный гриб и оставляет обломки.',
     exportName: 'TANK_PAINT',
     kind: 'tank',
     frameCount: 1,
@@ -177,6 +177,7 @@ export const ENTITIES: PreviewEntity[] = [
       projectile: 'shell',
       flash: 'muzzle',
     },
+    death: 'nuke',
     bake: (scene, paint, keys) => {
       const colors = paint as TankPaint;
       stamp(scene, keys[0], TANK_HULL_FRAME.w, TANK_HULL_FRAME.h, (g) => Tank.renderHull(g, colors));
