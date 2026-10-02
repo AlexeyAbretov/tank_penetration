@@ -12,6 +12,12 @@ export const CORPSE_FRAME = { w: 96, h: 80 };
 export const GUNNER_RIFLE_FRAME = { w: 50, h: 12 };
 // Короткая вспышка у среза. Уже и ниже веера пикапа.
 export const GUNNER_FLASH_FRAME = { w: 26, h: 18 };
+// Труба гранатомёта. Нос слева, казённик справа: в покое смотрит к танку.
+export const LAUNCHER_FRAME = { w: 58, h: 20 };
+// Вспышка у среза трубы. Левый край — дуло, язычок растёт вправо.
+export const ROCKET_FLASH_FRAME = { w: 30, h: 22 };
+// Ракета: носик справа, как у пули, чтобы поворот картинки совпал с углом полёта.
+export const ROCKET_FRAME = { w: 26, h: 10 };
 export const PICKUP_FRAME = { w: 160, h: 80 };
 // Ствол вырезан из кадра машины, чтобы в бою он мог отъезжать отдельно от кузова.
 export const PICKUP_GUN_FRAME = { w: 104, h: 12 };
@@ -81,6 +87,22 @@ export const GUNNER_LOOK = {
   helmet: 0x2a3a28,
   helmetLight: 0x8ab0c8,
   longRifle: true,
+} satisfies SoldierLook;
+
+// Ракетчик: оливковая форма и медный блик каски, чтобы не слиться со стрелком.
+export const ROCKET_LOOK = {
+  ...soldierBase,
+  pants: 0x3a4030,
+  tunic: 0x6a7048,
+  vest: 0x6a3420,
+  helmet: 0x3a4428,
+  helmetLight: 0xe8a050,
+  longRifle: true,
+  rifle: 0x2a3224,
+  rifleWood: 0x4a3820,
+  rifleWoodLight: 0x8a6840,
+  rifleMetal: 0x3a3e34,
+  emblem: 0xd08030,
 } satisfies SoldierLook;
 
 export type TankPaint = {

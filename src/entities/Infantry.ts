@@ -1,6 +1,6 @@
 // Пехотинец — общий предок всех врагов.
 // Это абстрактный класс: сам по себе на поле не появляется,
-// от него наследуют штурмовик, стрелок и пикап.
+// от него наследуют штурмовик, стрелок, ракетчик и пикап.
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
@@ -343,7 +343,12 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Убитый солдат лёжа, головой к танку. Низ кадра — та же линия, что тень живого (y ≈ 76).
-  static drawCorpse(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
+  // drop — что лежит рядом с телом. По умолчанию винтовка. Свой предмет передаёт наследник.
+  static drawCorpse(
+    g: Phaser.GameObjects.Graphics,
+    look: SoldierLook,
+    drop: (g: Phaser.GameObjects.Graphics, look: SoldierLook) => void = Infantry.drawDroppedRifle,
+  ): void {
     // Сначала широкая лужа, тело рисуется поверх неё.
     g.fillStyle(0x2a0608, 0.55);
     g.fillEllipse(48, 74, 92, 22);
@@ -393,15 +398,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     g.fillStyle(0x7a1216, 0.9);
     g.fillEllipse(44, 58, 12, 7);
 
-    // Винтовка выпала и лежит в луже. Длинная у стрелка, короткая у штурмовика.
-    const rifleX = look.longRifle ? 4 : 10;
-    const rifleLen = look.longRifle ? 40 : 32;
-    g.fillStyle(look.rifle);
-    g.fillRoundedRect(rifleX, 66, rifleLen, 5, 2);
-    g.fillStyle(look.rifleWood);
-    g.fillRoundedRect(rifleX + 4, 67, rifleLen - 10, 3, 1);
-    g.fillStyle(look.rifleMetal);
-    g.fillRect(rifleX - 2, 65, 7, 6);
+    drop(g, look);
 
     // Голова на земле, каска съехала набок.
     g.fillStyle(look.outline);
@@ -422,6 +419,18 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     g.fillEllipse(46, 68, 58, 10);
     g.fillStyle(0x8e181c, 0.85);
     g.fillEllipse(24, 64, 16, 7);
+  }
+
+  // Винтовка выпала и лежит в луже. Длинная у стрелка, короткая у штурмовика.
+  private static drawDroppedRifle(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
+    const rifleX = look.longRifle ? 4 : 10;
+    const rifleLen = look.longRifle ? 40 : 32;
+    g.fillStyle(look.rifle);
+    g.fillRoundedRect(rifleX, 66, rifleLen, 5, 2);
+    g.fillStyle(look.rifleWood);
+    g.fillRoundedRect(rifleX + 4, 67, rifleLen - 10, 3, 1);
+    g.fillStyle(look.rifleMetal);
+    g.fillRect(rifleX - 2, 65, 7, 6);
   }
 
   // Винтовка поперёк тела. ox/oy сдвигают рисунок: для отдельной текстуры это вырез из кадра солдата.

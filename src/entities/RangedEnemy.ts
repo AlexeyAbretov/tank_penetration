@@ -1,5 +1,5 @@
 // Общий предок врагов, которые не доходят до стены, а встают и стреляют по танку.
-// Конкретные числа (где встать, как часто стрелять) задают GunnerInfantry и PickupTruck.
+// Конкретные числа (где встать, как часто стрелять) задают стрелка, ракетчика и пикап.
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
@@ -26,7 +26,7 @@ export abstract class RangedEnemy extends Infantry {
   readonly contactDamage = 0;
 
   // Общая группа пуль сцены. Сюда кладём каждый выстрел, чтобы сцена могла их обновлять.
-  private readonly shots: Phaser.Physics.Arcade.Group;
+  protected readonly shots: Phaser.Physics.Arcade.Group;
   // false, пока юнит ещё идёт к рубежу.
   private shooting = false;
   // Сколько миллисекунд осталось до следующего выстрела. Стартовые 350 — короткая задержка после остановки.
@@ -89,10 +89,15 @@ export abstract class RangedEnemy extends Infantry {
   // Создаёт одну пулю из точки дула в сторону танка.
   private fire(): void {
     const shot = this.shotPose();
-    const bullet = new EnemyShot(this.scene, shot.x, shot.y, this.shotDamage);
-    this.shots.add(bullet);
-    bullet.launch(shot.angle, this.bulletSpeed);
+    this.spawnShot(shot.x, shot.y, shot.angle);
     this.onFire(shot.x, shot.y, shot.angle);
+  }
+
+  // Обычная пуля. Ракетчик подменяет это своей ракетой.
+  protected spawnShot(x: number, y: number, angle: number): void {
+    const bullet = new EnemyShot(this.scene, x, y, this.shotDamage);
+    this.shots.add(bullet);
+    bullet.launch(angle, this.bulletSpeed);
   }
 
   // Точка дула и угол пули уже посчитаны. Наследник здесь рисует вспышку и отдачу.

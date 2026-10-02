@@ -6,6 +6,7 @@ import { AssaultInfantry } from './AssaultInfantry';
 import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
 import { PickupTruck } from './PickupTruck';
+import { RocketInfantry } from './RocketInfantry';
 import type { SpawnContext } from './SpawnContext';
 
 // Сцена и другие файлы по-прежнему могут взять тип рядом с фабрикой.
@@ -17,9 +18,9 @@ type EnemyKind = {
 };
 
 export class EnemyFactory {
-  // Новая техника по порядку появления. Пока здесь только пикап: он выходит на 20-й волне.
-  // Следующий класс в этом списке выйдет на 30-й, ещё один на 40-й. Пустой слот ничего не добавляет.
-  private static readonly vehicles: EnemyKind[] = [PickupTruck];
+  // Новые враги по порядку появления. Пикап — 20-я волна, ракетчик — 30-я.
+  // Следующий класс в этом списке выйдет на 40-й. Пустой слот ничего не добавляет.
+  private static readonly vehicles: EnemyKind[] = [PickupTruck, RocketInfantry];
 
   private static readonly cache = new Map<number, EnemyKind[]>();
 
@@ -83,7 +84,7 @@ export class EnemyFactory {
   }
 
   // Юнит шага «раз в 5 волн», если на этой волне никто не дебютирует.
-  // Открытые типы чередуются. Пикап входит в череду после своей 20-й волны.
+  // Открытые типы чередуются. Пикап входит в череду после 20-й, ракетчик — после 30-й.
   private static stepKind(step: number, wave: number): EnemyKind {
     const pool = this.pool(wave);
     return pool[step % pool.length];

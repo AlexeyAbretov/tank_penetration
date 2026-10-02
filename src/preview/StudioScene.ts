@@ -5,12 +5,17 @@ import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
+import { RocketInfantry } from '../entities/RocketInfantry';
+import { Rocket } from '../entities/Rocket';
 import { Tank } from '../entities/Tank';
 import {
   BULLET_FRAME,
   CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
   GUNNER_RIFLE_FRAME,
+  LAUNCHER_FRAME,
+  ROCKET_FLASH_FRAME,
+  ROCKET_FRAME,
   MUZZLE_FRAME,
   PICKUP_FLASH_FRAME,
   PICKUP_FRAME,
@@ -66,6 +71,7 @@ export class StudioScene extends Phaser.Scene {
   private readonly sparkPoint = new Phaser.Math.Vector2();
   private bodyKeys: string[] = [];
   private gunnerBodyKeys: string[] = [];
+  private rocketBodyKeys: string[] = [];
   // true, пока галочка «Смерть» включена. Взрыв пикапа играем один раз при включении, не на каждый ползунок.
   private deathOn = false;
   private blastPending = false;
@@ -144,6 +150,9 @@ export class StudioScene extends Phaser.Scene {
     if (this.entity.id === 'gunner') {
       this.bakeGunnerBody();
     }
+    if (this.entity.id === 'rocketman') {
+      this.bakeRocketBody();
+    }
     this.refreshFx();
     if (this.entity.frameCount > 1) {
       const anim = `studio-${this.entity.id}`;
@@ -183,6 +192,8 @@ export class StudioScene extends Phaser.Scene {
       this.holders.push(this.makePickup(view));
     } else if (firing && this.entity.id === 'gunner') {
       this.holders.push(this.makeGunner(view));
+    } else if (firing && this.entity.id === 'rocketman') {
+      this.holders.push(this.makeRocket(view));
     } else if (firing || (this.entity.frameCount > 1 && view.animate && this.liveAnim)) {
       const holder = this.makeSprite(this.liveKeys[0], view, view.animate && Boolean(this.liveAnim));
       this.holders.push(holder);
@@ -240,7 +251,11 @@ export class StudioScene extends Phaser.Scene {
       if (wreck) {
         PickupTruck.renderWreck(g, this.paint as PickupPaint);
       } else {
-        Infantry.drawCorpse(g, this.paint as SoldierLook);
+        if (this.entity.paintCorpse) {
+          this.entity.paintCorpse(g, this.paint);
+        } else {
+          Infantry.drawCorpse(g, this.paint as SoldierLook);
+        }
       }
     });
     return this.makeSprite('studio-death', view, false);
@@ -696,6 +711,8 @@ export class StudioScene extends Phaser.Scene {
         const scale = readView().scale;
         if (this.entity.id === 'gunner') {
           this.placeGunnerRifle(scale, rig);
+        } else if (this.entity.id === 'rocketman') {
+          this.placeRocketLauncher(scale, rig);
         } else {
           this.placePickupGun(scale, rig);
         }
@@ -706,6 +723,21 @@ export class StudioScene extends Phaser.Scene {
       fly.image.x += (fly.vx * delta) / 1000;
       fly.image.y += (fly.vy * delta) / 1000;
       fly.life -= delta;
+      if (fly.trail && rig) {
+        fly.puffMs = (fly.puffMs ?? 0) - delta;
+        if (fly.puffMs <= 0) {
+          fly.puffMs = 40;
+          const puff = this.add.circle(fly.image.x, fly.image.y, 4, 0xc8c4bc, 0.5);
+          rig.root.add(puff);
+          this.tweens.add({
+            targets: puff,
+            alpha: 0,
+            scale: 2.6,
+            duration: 460,
+            onComplete: () => puff.destroy(),
+          });
+        }
+      }
       if (!plate || !fly.image.active || !rig?.sparks) {
         continue;
       }
@@ -719,9 +751,14 @@ export class StudioScene extends Phaser.Scene {
       }
       const x = fly.image.x;
       const y = fly.image.y;
+      const trail = fly.trail;
       fly.image.destroy();
       fly.life = 0;
-      this.sparkOnPlate(x, y, rig.angle);
+      if (trail) {
+        this.burstOnPlate(x, y);
+      } else {
+        this.sparkOnPlate(x, y, rig.angle);
+      }
     }
     this.flies = this.flies.filter((fly) => {
       if (fly.life > 0 && fly.image.active) {
@@ -872,6 +909,65 @@ export class StudioScene extends Phaser.Scene {
     return root;
   }
 
+  private placeRocketLauncher(scale: number, rig: ShotRig): void {
+    if (!rig.gun || !rig.recoil) {
+      return;
+    }
+    // В просмотре пуск всегда влево, труба уже на плече. Отдача идёт вдоль ствола.
+    RocketInfantry.poseLauncher(rig.gun, 0, 0, scale, 0, rig.recoil, true);
+  }
+
+  // Стрельба в просмотре показывает стойку с колена: в бою он пускает ракету только так.
+  private bakeRocketBody(): void {
+    this.dropRocketBody();
+    const look = this.paint as SoldierLook;
+    this.restamp('studio-rocketman-kneel', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+      RocketInfantry.drawKneel(g, look),
+    );
+    this.restamp('studio-rocketman-launcher', LAUNCHER_FRAME.w, LAUNCHER_FRAME.h, (g) =>
+      RocketInfantry.renderLauncher(g, look),
+    );
+    this.rocketBodyKeys = ['studio-rocketman-kneel', 'studio-rocketman-launcher'];
+  }
+
+  private dropRocketBody(): void {
+    for (const key of this.rocketBodyKeys) {
+      if (this.textures.exists(key)) {
+        this.textures.remove(key);
+      }
+    }
+    this.rocketBodyKeys = [];
+  }
+
+  private makeRocket(view: ViewState): Phaser.GameObjects.Container {
+    const root = this.add.container(0, 0);
+    const sprite = this.add.sprite(0, 0, 'studio-rocketman-kneel');
+    sprite.setOrigin(this.entity.originX, this.entity.originY);
+    sprite.setScale(view.scale);
+    root.add(sprite);
+    const launcher = this.add.image(0, 0, 'studio-rocketman-launcher');
+    launcher.setOrigin(
+      RocketInfantry.breech.x / LAUNCHER_FRAME.w,
+      RocketInfantry.breech.y / LAUNCHER_FRAME.h,
+    );
+    launcher.setScale(view.scale);
+    root.add(launcher);
+    const guides = this.add.graphics();
+    root.add(guides);
+    this.paintSpriteGuides(guides, view);
+    const recoil = { x: 0, climb: 0 };
+    const pixel = this.pixel(view);
+    this.arm(
+      root,
+      { x: this.entity.muzzle!.x * pixel, y: this.entity.muzzle!.y * pixel },
+      Math.PI,
+      pixel,
+      { gun: launcher, recoil },
+    );
+    this.placeRocketLauncher(view.scale, this.rig!);
+    return root;
+  }
+
   private placeGunnerRifle(scale: number, rig: ShotRig): void {
     if (!rig.gun || !rig.recoil) {
       return;
@@ -897,6 +993,10 @@ export class StudioScene extends Phaser.Scene {
     );
     this.restamp('studio-fx-gunner-flash', GUNNER_FLASH_FRAME.w, GUNNER_FLASH_FRAME.h, (g) =>
       GunnerInfantry.renderFlash(g),
+    );
+    this.restamp('studio-fx-rocket', ROCKET_FRAME.w, ROCKET_FRAME.h, (g) => Rocket.render(g));
+    this.restamp('studio-fx-rocket-flash', ROCKET_FLASH_FRAME.w, ROCKET_FLASH_FRAME.h, (g) =>
+      RocketInfantry.renderFlash(g),
     );
   }
 
@@ -996,7 +1096,12 @@ export class StudioScene extends Phaser.Scene {
       });
     }
     if (rig.recoil) {
-      const kick = this.entity.id === 'gunner' ? GunnerInfantry.recoilKick : PickupTruck.recoilKick;
+      const kick =
+        this.entity.id === 'gunner'
+          ? GunnerInfantry.recoilKick
+          : this.entity.id === 'rocketman'
+            ? RocketInfantry.recoilKick
+            : PickupTruck.recoilKick;
       this.tweens.killTweensOf(rig.recoil);
       rig.recoil.x = kick.x;
       rig.recoil.climb = kick.climb;
@@ -1008,13 +1113,15 @@ export class StudioScene extends Phaser.Scene {
         ease: 'Quad.Out',
       });
     }
-    const shot = this.add.image(
-      rig.muzzle.x,
-      rig.muzzle.y,
-      rig.projectile === 'shell' ? 'studio-fx-shell' : 'studio-fx-bullet',
-    );
+    const shotKey =
+      rig.projectile === 'shell'
+        ? 'studio-fx-shell'
+        : rig.projectile === 'rocket'
+          ? 'studio-fx-rocket'
+          : 'studio-fx-bullet';
+    const shot = this.add.image(rig.muzzle.x, rig.muzzle.y, shotKey);
     shot.setRotation(rig.angle);
-    shot.setScale(rig.pixel);
+    shot.setScale(rig.projectile === 'rocket' ? rig.pixel * 1.8 : rig.pixel);
     if (rig.projectile === 'shell') {
       shot.setBlendMode(Phaser.BlendModes.ADD);
     }
@@ -1024,6 +1131,8 @@ export class StudioScene extends Phaser.Scene {
       vx: Math.cos(rig.angle) * rig.speed * rig.pixel,
       vy: Math.sin(rig.angle) * rig.speed * rig.pixel,
       life: 900,
+      trail: rig.projectile === 'rocket',
+      puffMs: 0,
     });
     this.spawnFlash(rig);
   }
@@ -1075,7 +1184,45 @@ export class StudioScene extends Phaser.Scene {
         ease: 'Quad.In',
         onComplete: () => flash.destroy(),
       });
+      return;
     }
+    if (rig.flash === 'rocket') {
+      const pop = RocketInfantry.flashPop;
+      const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-rocket-flash');
+      flash.setOrigin(0, 0.5);
+      flash.setBlendMode(Phaser.BlendModes.ADD);
+      flash.setRotation(rig.angle);
+      flash.setScale(pop.x * rig.pixel, pop.y * rig.pixel);
+      rig.root.add(flash);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: pop.ms,
+        ease: 'Quad.In',
+        onComplete: () => flash.destroy(),
+      });
+    }
+  }
+
+  // Взрыв ракеты в локальных координатах сборки, чтобы он масштабировался вместе со спрайтом.
+  private burstOnPlate(x: number, y: number): void {
+    const rig = this.rig;
+    if (!rig) {
+      return;
+    }
+    const fire = this.add.circle(x, y, 8, 0xff4a12, 0.95);
+    const core = this.add.circle(x, y, 3, 0xfff4c8, 1);
+    rig.root.add([fire, core]);
+    this.tweens.add({
+      targets: [fire, core],
+      alpha: 0,
+      scale: 2.2,
+      duration: 180,
+      onComplete: () => {
+        fire.destroy();
+        core.destroy();
+      },
+    });
   }
 
   private paintBackdrop(groundY?: number): void {
@@ -1115,6 +1262,7 @@ export class StudioScene extends Phaser.Scene {
     this.liveAnim = undefined;
     this.dropPickupBody();
     this.dropGunnerBody();
+    this.dropRocketBody();
     for (const key of this.liveKeys) {
       if (this.textures.exists(key)) {
         this.textures.remove(key);
@@ -1228,8 +1376,8 @@ type ShotRig = {
   angle: number;
   muzzle: { x: number; y: number };
   speed: number;
-  projectile: 'shell' | 'bullet';
-  flash?: 'muzzle' | 'pickup' | 'gunner';
+  projectile: 'shell' | 'bullet' | 'rocket';
+  flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket';
   pixel: number;
   pivot?: Phaser.GameObjects.Container;
   gun?: Phaser.GameObjects.Image;
@@ -1251,4 +1399,6 @@ type Fly = {
   vx: number;
   vy: number;
   life: number;
+  trail?: boolean;
+  puffMs?: number;
 };

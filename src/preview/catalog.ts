@@ -6,6 +6,7 @@ import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
+import { RocketInfantry } from '../entities/RocketInfantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import {
@@ -13,6 +14,7 @@ import {
   BULLET_FRAME,
   BULLET_PAINT,
   GUNNER_LOOK,
+  ROCKET_LOOK,
   MUZZLE_FRAME,
   MUZZLE_PAINT,
   PICKUP_FRAME,
@@ -68,10 +70,12 @@ export type PreviewEntity = {
   shot?: {
     delay: number;
     speed: number;
-    projectile: 'shell' | 'bullet';
-    flash?: 'muzzle' | 'pickup' | 'gunner';
+    projectile: 'shell' | 'bullet' | 'rocket';
+    flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket';
   };
   bake: (scene: Phaser.Scene, paint: Paint, keys: string[]) => void;
+  // Труп, если он не общая винтовка пехоты. Ракетчик кладёт рядом трубу.
+  paintCorpse?: (g: Phaser.GameObjects.Graphics, paint: Paint) => void;
 };
 
 function asPaint(source: object): Paint {
@@ -240,6 +244,42 @@ export const ENTITIES: PreviewEntity[] = [
       const look = paint as SoldierLook;
       stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 0, look));
       stamp(scene, keys[1], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 1, look));
+    },
+  },
+  {
+    id: 'rocketman',
+    title: 'Ракетчик',
+    hint: 'Оливковая форма и труба на груди. «Стрельба» сажает его на колено: труба ложится на плечо, ракета оставляет дым и взрывается о стену. «Смерть» кладёт тело в кровь.',
+    exportName: 'ROCKET_LOOK',
+    kind: 'frames',
+    frameCount: 2,
+    animFps: RocketInfantry.walkFps,
+    gameScale: Infantry.placed.scale,
+    originX: Infantry.placed.originX,
+    originY: Infantry.placed.originY,
+    texW: SOLDIER_FRAME.w,
+    texH: SOLDIER_FRAME.h,
+    defaults: asPaint(ROCKET_LOOK),
+    fields: soldierFields(),
+    hitbox: soldierHit,
+    muzzle: RocketInfantry.muzzleOffset,
+    hpColor: 0xe07020,
+    death: 'corpse',
+    paintCorpse: (g, paint) => RocketInfantry.drawCorpse(g, paint as SoldierLook),
+    shot: {
+      delay: RocketInfantry.shotInterval,
+      speed: RocketInfantry.shotSpeed,
+      projectile: 'rocket',
+      flash: 'rocket',
+    },
+    bake: (scene, paint, keys) => {
+      const look = paint as SoldierLook;
+      stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        RocketInfantry.drawMarch(g, 0, look, true),
+      );
+      stamp(scene, keys[1], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        RocketInfantry.drawMarch(g, 1, look, true),
+      );
     },
   },
   {

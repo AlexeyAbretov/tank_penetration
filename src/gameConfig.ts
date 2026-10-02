@@ -49,7 +49,7 @@ export const GAME = {
   infantryRampUntil: 10,
   // После рампы один новый юнит раз в столько волн. Между ними растут только статы.
   waveStepEvery: 5,
-  // На круглой волне выходит новая техника, если она заведена в фабрике. Первая — на 20-й.
+  // На круглой волне выходит новый враг, если он заведён в фабрике. Первый — на 20-й.
   vehicleEvery: 10,
   // Потолок юнитов в одной волне. Дальше растёт только сила, не число.
   waveMaxCount: 100,
@@ -84,7 +84,7 @@ export function gunnerDebutWave(): number {
   return GAME.infantryRampUntil;
 }
 
-// Волна дебюта техники. Индекс 0 — 20-я волна, 1 — 30-я, дальше каждые vehicleEvery.
+// Волна дебюта врага из списка фабрики. Индекс 0 — 20-я волна, 1 — 30-я, дальше каждые vehicleEvery.
 export function vehicleDebutWave(index: number): number {
   return GAME.vehicleEvery * (index + 2);
 }

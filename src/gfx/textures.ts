@@ -1,5 +1,5 @@
 // Картинки поля и интерфейса. Спрайты сущностей рисуют сами классы:
-// Tank (корпус, башня, снаряд, вспышка), AssaultInfantry, GunnerInfantry, PickupTruck, EnemyShot.
+// Tank (корпус, башня, снаряд, вспышка), AssaultInfantry, GunnerInfantry, RocketInfantry, PickupTruck, EnemyShot.
 // Graphics рисует фигуры, bake сохраняет их как текстуру по строковому имени.
 
 import Phaser from 'phaser';

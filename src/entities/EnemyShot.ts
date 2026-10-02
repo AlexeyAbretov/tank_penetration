@@ -26,8 +26,8 @@ export class EnemyShot extends Phaser.Physics.Arcade.Image {
     g.fillRect(12, 2, 5, 4);
   }
 
-  constructor(scene: Phaser.Scene, x: number, y: number, damage: number) {
-    super(scene, x, y, 'enemy-bullet');
+  constructor(scene: Phaser.Scene, x: number, y: number, damage: number, texture = 'enemy-bullet') {
+    super(scene, x, y, texture);
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.damage = damage;

@@ -9,6 +9,8 @@ import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
+import { Rocket } from '../entities/Rocket';
+import { RocketInfantry } from '../entities/RocketInfantry';
 import { Tank } from '../entities/Tank';
 import { GAME, upgradeCost } from '../gameConfig';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
@@ -22,7 +24,7 @@ export class GameScene extends Phaser.Scene {
   private tank!: Tank;
   // Группа снарядов танка. Группа — список объектов, по которому удобно бегать и ловить пересечения.
   private shells!: Phaser.Physics.Arcade.Group;
-  // Пули стрелков и пикапов.
+  // Пули стрелков и пикапов и ракеты ракетчика.
   private enemyShots!: Phaser.Physics.Arcade.Group;
   // Все живые и ещё не удалённые враги.
   private infantry!: Phaser.Physics.Arcade.Group;
@@ -79,6 +81,8 @@ export class GameScene extends Phaser.Scene {
     Tank.ensureTextures(this);
     AssaultInfantry.ensureTextures(this);
     GunnerInfantry.ensureTextures(this);
+    RocketInfantry.ensureTextures(this);
+    Rocket.ensureTextures(this);
     PickupTruck.ensureTextures(this);
     EnemyShot.ensureTextures(this);
 
@@ -587,7 +591,11 @@ export class GameScene extends Phaser.Scene {
         const y = shot.y;
         const travel = shot.rotation;
         shot.destroy();
-        this.sparkOnTank(x, y, travel);
+        if (shot instanceof Rocket) {
+          Rocket.burstAt(this, x, y);
+        } else {
+          this.sparkOnTank(x, y, travel);
+        }
         this.damageTank(damage);
       }
     });
