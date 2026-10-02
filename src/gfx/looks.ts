@@ -156,10 +156,10 @@ export type PickupPaint = {
   glassShine: number;
   driver: number;
   driverShirt: number;
-  antenna: number;
-  rail: number;
-  railLight: number;
-  railTip: number;
+  mount: number;
+  barrel: number;
+  muzzleFace: number;
+  muzzleTip: number;
   wheel: number;
   wheelDisk: number;
   spoke: number;
@@ -178,10 +178,10 @@ export const PICKUP_PAINT = {
   glassShine: 0xffffff,
   driver: 0x2a2218,
   driverShirt: 0x3a4a28,
-  antenna: 0x2a2a26,
-  rail: 0x1a1a16,
-  railLight: 0x4a4a42,
-  railTip: 0x6a6a60,
+  mount: 0x2a2a26,
+  barrel: 0x1a1a16,
+  muzzleFace: 0x4a4a42,
+  muzzleTip: 0x6a6a60,
   wheel: 0x1a1a16,
   wheelDisk: 0x3a3a32,
   spoke: 0x8a8a80,

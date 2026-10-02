@@ -162,15 +162,15 @@ export class PickupTruck extends RangedEnemy {
     g.fillStyle(paint.driverShirt);
     g.fillRect(112, 30, 14, 14);
 
-    // Антенна или стойка и длинный поручень вдоль крыши.
-    g.fillStyle(paint.antenna);
+    // Станок пулемёта у кабины и ствол вдоль крыши, носом влево.
+    g.fillStyle(paint.mount);
     g.fillRect(112, 16, 7, 16);
-    g.fillStyle(paint.rail);
+    g.fillStyle(paint.barrel);
     g.fillRoundedRect(20, 18, 98, 5, 2);
-    g.fillStyle(paint.railLight);
+    // Светлая полоска у дульного среза.
+    g.fillStyle(paint.muzzleFace);
     g.fillRect(20, 18, 10, 5);
-    // Наконечник поручня.
-    g.fillStyle(paint.railTip);
+    g.fillStyle(paint.muzzleTip);
     g.fillCircle(24, 20, 3);
 
     // Линия через центр выглядит так же после поворота на 180° (π радиан).
