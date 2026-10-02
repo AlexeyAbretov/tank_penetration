@@ -1,8 +1,9 @@
 // Штурмовик: обычный солдат. Идёт влево до базы и бьёт её при контакте.
-// Это тип врага «по умолчанию», если номер в волне не подошёл стрелку или пикапу.
+// С первой волны и до 10-й волна состоит из них. Дальше фабрика дописывает других.
 
 // Phaser нужен из-за типа Scene в конструкторе.
 import Phaser from 'phaser';
+import { waveHp } from '../gameConfig';
 import { ASSAULT_LOOK, CORPSE_FRAME, SOLDIER_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { Infantry } from './Infantry';
@@ -20,16 +21,12 @@ export class AssaultInfantry extends Infantry {
   // Столько здоровья базы снимает один дошедший солдат.
   readonly contactDamage = 12;
 
-  // Фабрика спрашивает по очереди: «этот номер в волне — твой?».
-  // Штурмовик отвечает «да» всегда, поэтому в списке фабрики он стоит последним.
-  // _index не используется: подчёркивание показывает, что аргумент нужен только ради общей сигнатуры.
-  static matches(_index: number): boolean {
-    return true;
-  }
-
   // Собирает солдата из данных, которые сцена передала фабрике.
+  // Штурмовик на поле с первой волны, поэтому ранг роста равен номеру волны.
   static spawn(ctx: SpawnContext): Infantry {
-    return new AssaultInfantry(ctx.scene, ctx.x, ctx.y, ctx.hp);
+    const unit = new AssaultInfantry(ctx.scene, ctx.x, ctx.y, waveHp(ctx.wave));
+    unit.paceWave = ctx.wave;
+    return unit;
   }
 
   // Два кадра шага и анимация, которая их чередует. Повторный вызов ничего не рисует заново.

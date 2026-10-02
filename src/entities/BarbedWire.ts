@@ -71,6 +71,8 @@ export class BarbedWire extends Phaser.GameObjects.Image {
       return false;
     }
     const body = unit.body as Phaser.Physics.Arcade.Body | null;
-    return !!body && body.left <= GAME.barbedWireFace;
+    // Масштаб 1.45 оставляет левый край на долю пикселя правее линии упора.
+    // Строгое сравнение с face видит касание один кадр, и удары раз в 3 с не повторяются.
+    return !!body && body.left <= GAME.barbedWireFace + 1;
   }
 }

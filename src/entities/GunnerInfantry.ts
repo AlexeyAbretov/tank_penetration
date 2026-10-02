@@ -2,7 +2,7 @@
 // Винтовка — отдельная картинка поверх тела, чтобы при выстреле отъезжать и вспыхивать.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
+import { GAME, growthRank, gunnerDebutWave, waveHp } from '../gameConfig';
 import {
   CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
@@ -56,15 +56,12 @@ export class GunnerInfantry extends RangedEnemy {
   // Поворот картинки винтовки к танку, без отдачи. Ноль — строго влево.
   private aim = 0;
 
-  // Каждый 3-й индекс из четвёрки: 2, 6, 10, 14...
-  // Но 14 ещё и «каждый 5-й хвост» для пикапа (14 % 5 === 4).
-  // Пикап в фабрике проверяется раньше, поэтому такой номер станет машиной, не стрелком.
-  static matches(index: number): boolean {
-    return index % 4 === 2;
-  }
-
   static spawn(ctx: SpawnContext): Infantry {
-    return new GunnerInfantry(ctx.scene, ctx.x, ctx.y, ctx.hp, ctx.shots);
+    // На волне дебюта ранг 1: здоровье и шаг как у первой волны. Дальше ранг растёт.
+    const rank = growthRank(ctx.wave, gunnerDebutWave());
+    const unit = new GunnerInfantry(ctx.scene, ctx.x, ctx.y, waveHp(rank), ctx.shots);
+    unit.paceWave = rank;
+    return unit;
   }
 
   // Кадры шага без винтовки: в бою её рисует отдельный спрайт и двигает при отдаче.

@@ -43,6 +43,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Насколько близко снаряд должен подлететь к торсу, чтобы засчитать попадание.
   // У пикапа это поле переопределено и больше, потому что машина крупнее солдата.
   readonly hitRadius: number = GAME.shellHitRadius;
+  // Ранг роста скорости. У штурмовика это номер волны.
+  // У стрелка и пикапа на волне появления равен 1, дальше растёт по одной за волну.
+  protected paceWave = 1;
 
   // Тёмный фон полоски здоровья над головой.
   private readonly barBg: Phaser.GameObjects.Rectangle;
@@ -124,11 +127,11 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Подчёркивание у _delta: аргумент обязателен по сигнатуре, но здесь не используется.
   protected act(_delta: number): void {}
 
-  // Даёт скорость влево. Чем выше номер волны, тем быстрее шаг.
-  march(wave = 1): void {
+  // Даёт скорость влево. Чем выше ранг роста, тем быстрее шаг.
+  march(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
-    // База 36 + 4 за волну + случайные 0..10, чтобы юниты одной волны не шли строем с одной скоростью.
-    const speed = 36 + wave * 4 + Phaser.Math.Between(0, 10);
+    // База 36 + 4 за ранг + случайные 0..10, чтобы юниты одной волны не шли строем с одной скоростью.
+    const speed = 36 + this.paceWave * 4 + Phaser.Math.Between(0, 10);
     // Отрицательный X — движение влево, к танку. Y не трогаем: дорожка не меняется.
     body.setVelocityX(-speed);
   }
@@ -141,11 +144,12 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
       return false;
     }
     body.setVelocityX(0);
-    // body.left — передний край хитбокса. Если кадр занёс его в проволоку, выталкиваем назад.
+    // body.left — передний край хитбокса. Если кадр занёс его в проволоку, выталкиваем тело назад.
+    // Спрайт не двигаем: postUpdate сам перенесёт этот сдвиг на картинку.
+    // Иначе сдвиг сложится дважды, тело на следующем кадре окажется правее линии,
+    // и удары раз в barbedWireIntervalMs прекратятся.
     if (body.left < faceX) {
-      const push = faceX - body.left;
-      body.x += push;
-      this.x += push;
+      body.x += faceX - body.left;
     }
     if (this.anims.isPlaying) {
       this.anims.stop();
@@ -159,19 +163,41 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Наносит урон. Возвращает true, если после удара здоровья не осталось — сцена тогда вызовет kill.
-  hit(damage: number = GAME.shellDamage): boolean {
+  // wire: удар колючки. У него своя красная вспышка, не бледный оттенок снаряда.
+  hit(damage: number = GAME.shellDamage, wire = false): boolean {
     // Ниже нуля здоровье не опускаем.
     this.hp = Math.max(0, this.hp - damage);
-    // Короткий красно-белый оттенок всей картинки: визуальный «попадание».
-    this.setTint(0xffccaa);
-    // Через 70 мс оттенок снимаем. Если юнит уже уничтожен, clearTint не вызываем.
-    this.scene.time.delayedCall(70, () => {
-      if (this.active) {
-        this.clearTint();
-      }
-    });
+    if (wire && this.hp > 0) {
+      this.blinkWire();
+    } else if (!wire) {
+      // Короткий красно-белый оттенок всей картинки: визуальный «попадание».
+      this.setTint(0xffccaa);
+      // Через 70 мс оттенок снимаем. Если юнит уже уничтожен, clearTint не вызываем.
+      this.scene.time.delayedCall(70, () => {
+        if (this.active) {
+          this.clearTint();
+        }
+      });
+    }
     this.syncBar();
     return this.hp <= 0;
+  }
+
+  // Два красных мигания. Удар проволоки раз в 3 с, бледная вспышка снаряда на нём не читается.
+  private blinkWire(): void {
+    const redden = () => {
+      if (!this.active || this.reachedWall) {
+        return;
+      }
+      this.setTint(0xff1a1a);
+      this.scene.time.delayedCall(120, () => {
+        if (this.active && !this.reachedWall) {
+          this.clearTint();
+        }
+      });
+    };
+    redden();
+    this.scene.time.delayedCall(220, redden);
   }
 
   // Картинка лежащего тела. null — у этого врага трупа нет, kill сожмёт спрайт как раньше.

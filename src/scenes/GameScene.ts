@@ -302,8 +302,9 @@ export class GameScene extends Phaser.Scene {
 
   // Один удар по врагу. Если здоровья не осталось — очки, монеты и анимация смерти.
   // damage задаёт проволока: её удар всегда 1, без уровня урона снаряда.
-  private hurtInfantry(unit: Infantry, damage = GAME.shellDamage + this.damageLevel): void {
-    if (unit.hit(damage)) {
+  // wire включает красное мигание вместо вспышки снаряда.
+  private hurtInfantry(unit: Infantry, damage = GAME.shellDamage + this.damageLevel, wire = false): void {
+    if (unit.hit(damage, wire)) {
       this.score += 10;
       this.coins += unit.coinReward;
       this.scoreText.setText(`SCORE  ${this.score}`);
@@ -368,8 +369,8 @@ export class GameScene extends Phaser.Scene {
     this.wave += 1;
     // Пока волна идёт, checkWaveClear не имеет права открыть магазин.
     this.awaitingClear = false;
-    // Волна 1: 6 врагов. Волна 2: 10. Формула: база + (номер - 1) * добавка.
-    this.remainingToSpawn = GAME.waveFirstCount + (this.wave - 1) * GAME.waveExtra;
+    // Сколько тел в этой волне. Между шагами число то же, растёт только сила.
+    this.remainingToSpawn = EnemyFactory.count(this.wave);
     this.waveText.setText(`WAVE  ${this.wave}`);
     this.showWaveBanner();
 
@@ -506,7 +507,7 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       if (unit.snare(GAME.barbedWireFace, delta)) {
-        this.hurtInfantry(unit, GAME.barbedWireDamage);
+        this.hurtInfantry(unit, GAME.barbedWireDamage, true);
       }
     });
   }
@@ -530,18 +531,17 @@ export class GameScene extends Phaser.Scene {
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
     // Стартуют правее видимой области, поэтому на экран въезжают, а не появляются вдруг.
     const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
-    // Волна 1 — 1 HP, волна 5 — 5 HP, при множителе infantryHpPerWave равном 1.
-    const hp = Math.max(1, this.wave * GAME.infantryHpPerWave);
+    // Кого ставить на этот номер, решает состав волны в фабрике.
     const unit = EnemyFactory.create(index, {
       scene: this,
       x,
       y,
-      hp,
+      wave: this.wave,
       shots: this.enemyShots,
     });
     this.infantry.add(unit);
-    // Скорость зависит от номера волны. Пикап подменяет эту формулу своей.
-    unit.march(this.wave);
+    // Скорость берёт ранг роста, который спавн записал в юнита. Пикап подменяет формулу своей.
+    unit.march();
   }
 
   // Создаёт летящий снаряд танка и короткую вспышку у дула.

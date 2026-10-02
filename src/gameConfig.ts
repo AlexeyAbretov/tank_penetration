@@ -26,7 +26,7 @@ export const GAME = {
   barbedWireTop: 72,
   barbedWireBottom: 630,
   // Одна покупка на всю игру, не растёт как уровни взрыва и урона.
-  barbedWireCost: 50,
+  barbedWireCost: 1,
   // Урон пехоте при касании проволоки и дальше каждые barbedWireIntervalMs.
   barbedWireDamage: 1,
   // Пауза между ударами проволоки по одному и тому же солдату, миллисекунды.
@@ -39,19 +39,25 @@ export const GAME = {
   blastRadiusPerLevel: 1,
   // Здоровье базы (танка) в начале игры и после рестарта.
   baseHp: 100,
-  // Здоровье пехоты за каждую волну: на волне 3 это 3 HP, если множитель равен 1.
+  // Здоровье пехоты за каждый ранг роста: ранг 3 — это 3 HP, если множитель равен 1.
   infantryHpPerWave: 1,
   // Ниже этой линии Y снаряды исчезают: там уже декоративный баннер, не поле боя.
   bannerY: 638,
-  // Сколько врагов в первой волне.
-  waveFirstCount: 6,
-  // На каждую следующую волну врагов становится больше на это число.
-  waveExtra: 4,
+  // Штурмовиков в первой волне.
+  waveStartCount: 5,
+  // До этой волны включительно каждую волну прибавляется один пехотинец.
+  infantryRampUntil: 10,
+  // После рампы один новый юнит раз в столько волн. Между ними растут только статы.
+  waveStepEvery: 5,
+  // На круглой волне выходит новая техника, если она заведена в фабрике. Первая — на 20-й.
+  vehicleEvery: 10,
+  // Потолок юнитов в одной волне. Дальше растёт только сила, не число.
+  waveMaxCount: 100,
   // Пауза между появлениями врагов в первой волне, в миллисекундах.
   waveSpawnGap: 340,
   // Пауза не может стать меньше этого значения, даже на поздних волнах.
   waveMinGap: 150,
-  // Сколько миллисекунд на экране висит надпись «ВОЛНА N», прежде чем враги пойдут.
+  // Сколько миллисекунд на экране висит на5дпись «ВОЛНА N», прежде чем враги пойдут.
   waveAnnounceMs: 1300,
   // Задержка перед первой волной после загрузки сцены.
   waveStartDelayMs: 700,
@@ -65,4 +71,25 @@ export const GAME = {
 // level 0 → 3 монеты, level 1 → 5, level 2 → 7 и так далее.
 export function upgradeCost(level: number): number {
   return GAME.upgradeBaseCost + level * GAME.upgradeCostStep;
+}
+
+// Ранг роста на волне wave, если тип впервые вышел на debutWave.
+// На волне дебюта ранг 1: дефолтные скорость и здоровье. Каждая следующая волна прибавляет 1.
+export function growthRank(wave: number, debutWave: number): number {
+  return Math.max(1, wave - debutWave + 1);
+}
+
+// Первый стрелок выходит на 10-й волне: это последний пехотинец рампы.
+export function gunnerDebutWave(): number {
+  return GAME.infantryRampUntil;
+}
+
+// Волна дебюта техники. Индекс 0 — 20-я волна, 1 — 30-я, дальше каждые vehicleEvery.
+export function vehicleDebutWave(index: number): number {
+  return GAME.vehicleEvery * (index + 2);
+}
+
+// Здоровье по рангу роста. Ранг 1 — базовое HP, дальше линейно вверх.
+export function waveHp(rank: number): number {
+  return Math.max(1, rank * GAME.infantryHpPerWave);
 }

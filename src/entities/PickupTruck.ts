@@ -2,7 +2,7 @@
 // Урон пули меньше, чем у стрелка, но здоровье выше и награда больше.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
+import { GAME, growthRank, vehicleDebutWave, waveHp } from '../gameConfig';
 import {
   PICKUP_FLASH_FRAME,
   PICKUP_FRAME,
@@ -66,14 +66,14 @@ export class PickupTruck extends RangedEnemy {
   // Поворот картинки ствола к танку, без отдачи. Ноль — строго влево.
   private aim = 0;
 
-  // Индексы 4, 9, 14, 19... — каждая пятая позиция, если считать с нуля и смотреть остаток 4.
-  static matches(index: number): boolean {
-    return index % 5 === 4;
-  }
-
   static spawn(ctx: SpawnContext): Infantry {
+    // На 20-й волне ранг 1: здоровье и скорость как у первой волны. Дальше ранг растёт.
     // Возвращаемый тип — общий Infantry, чтобы фабрика не зависела от конкретного класса.
-    return new PickupTruck(ctx.scene, ctx.x, ctx.y, ctx.hp, ctx.shots);
+    // Пикап — первая техника в списке фабрики, поэтому индекс дебюта 0.
+    const rank = growthRank(ctx.wave, vehicleDebutWave(0));
+    const unit = new PickupTruck(ctx.scene, ctx.x, ctx.y, waveHp(rank), ctx.shots);
+    unit.paceWave = rank;
+    return unit;
   }
 
   constructor(
@@ -263,9 +263,9 @@ export class PickupTruck extends RangedEnemy {
   }
 
   // Своя скорость: родительский march для пехоты слишком медленный.
-  override march(wave = 1): void {
+  override march(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
-    const speed = 78 + wave * 6 + Phaser.Math.Between(0, 8);
+    const speed = 78 + this.paceWave * 6 + Phaser.Math.Between(0, 8);
     body.setVelocityX(-speed);
   }
 
