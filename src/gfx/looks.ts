@@ -15,7 +15,9 @@ export const PICKUP_GUN_FRAME = { w: 104, h: 12 };
 // Широкий веер у дула. Пуля узкая, вспышка заметно выше и ниже неё.
 export const PICKUP_FLASH_FRAME = { w: 56, h: 64 };
 export const TANK_HULL_FRAME = { w: 176, h: 110 };
-export const TANK_TURRET_FRAME = { w: 168, h: 48 };
+// Башня без ствола. Маска нарисована на стволе и крутится вместе с ним.
+export const TANK_TURRET_FRAME = { w: 88, h: 48 };
+export const TANK_GUN_FRAME = { w: 100, h: 22 };
 export const SHELL_FRAME = { w: 54, h: 22 };
 export const MUZZLE_FRAME = { w: 48, h: 48 };
 export const BULLET_FRAME = { w: 18, h: 8 };

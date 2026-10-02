@@ -16,6 +16,7 @@ import {
   PICKUP_GUN_FRAME,
   SHELL_FRAME,
   SOLDIER_FRAME,
+  TANK_GUN_FRAME,
   TANK_HULL_FRAME,
   TANK_TURRET_FRAME,
   type BulletPaint,
@@ -207,11 +208,14 @@ export class StudioScene extends Phaser.Scene {
     root.setScale(view.scale);
     const hull = this.add.image(layout.hullX, layout.hullY, this.liveKeys[0]);
     root.add(hull);
-    const pivot = this.add.container(layout.turretX, layout.turretY);
+    // Башня и ствол крутятся вокруг днища башни, как в бою.
+    const pivot = this.add.container(layout.seatX, layout.seatY);
     pivot.setRotation(view.angle);
-    const turret = this.add.image(0, 0, this.liveKeys[1]);
+    const turret = this.add.image(layout.turretX - layout.seatX, layout.turretY - layout.seatY, this.liveKeys[1]);
     turret.setOrigin(layout.turretOriginX, layout.turretOriginY);
-    pivot.add(turret);
+    const gun = this.add.image(layout.gunX - layout.seatX, layout.gunY - layout.seatY, this.liveKeys[2]);
+    gun.setOrigin(layout.gunOriginX, layout.gunOriginY);
+    pivot.add([turret, gun]);
     root.add(pivot);
 
     const guides = this.add.graphics();
@@ -221,12 +225,8 @@ export class StudioScene extends Phaser.Scene {
       strokeImage(guides, hull);
       const frame = this.add.graphics();
       frame.lineStyle(1, 0xf0d56a, 0.9);
-      frame.strokeRect(
-        -turret.originX * turret.width,
-        -turret.originY * turret.height,
-        turret.width,
-        turret.height,
-      );
+      strokeImage(frame, turret);
+      strokeImage(frame, gun);
       pivot.add(frame);
     }
     if (view.hitbox) {
@@ -241,23 +241,13 @@ export class StudioScene extends Phaser.Scene {
     if (view.origin) {
       paintCross(guides);
     }
+    const muzzle = Tank.muzzleAt(view.angle);
     if (view.muzzle) {
-      const x = layout.turretX + Math.cos(view.angle) * layout.muzzleLength;
-      const y = layout.turretY + Math.sin(view.angle) * layout.muzzleLength;
       guides.fillStyle(0xffee66, 1);
-      guides.fillCircle(x, y, 4);
+      guides.fillCircle(muzzle.x, muzzle.y, 4);
     }
     if (view.fire && this.entity.shot) {
-      this.arm(
-        root,
-        {
-          x: layout.turretX + Math.cos(view.angle) * layout.muzzleLength,
-          y: layout.turretY + Math.sin(view.angle) * layout.muzzleLength,
-        },
-        view.angle,
-        1,
-        { pivot },
-      );
+      this.arm(root, muzzle, view.angle, 1, { gun });
     }
     return root;
   }
@@ -436,12 +426,8 @@ export class StudioScene extends Phaser.Scene {
     let angle = Math.PI;
     let muzzle = { x: 0, y: 0 };
     if (this.entity.kind === 'tank') {
-      const layout = Tank.layout;
       angle = view.angle;
-      muzzle = {
-        x: layout.turretX + Math.cos(angle) * layout.muzzleLength,
-        y: layout.turretY + Math.sin(angle) * layout.muzzleLength,
-      };
+      muzzle = Tank.muzzleAt(angle);
     } else if (this.entity.muzzle) {
       muzzle = { x: this.entity.muzzle.x * pixel, y: this.entity.muzzle.y * pixel };
     } else {
@@ -485,25 +471,17 @@ export class StudioScene extends Phaser.Scene {
     let top = layout.hullY - TANK_HULL_FRAME.h / 2;
     let bottom = layout.hullY + TANK_HULL_FRAME.h / 2;
 
-    const cos = Math.cos(view.angle);
-    const sin = Math.sin(view.angle);
-    const turretX = [-layout.turretOriginX, 1 - layout.turretOriginX];
-    const turretY = [-layout.turretOriginY, 1 - layout.turretOriginY];
-    for (const ox of turretX) {
-      for (const oy of turretY) {
-        const x = ox * TANK_TURRET_FRAME.w;
-        const y = oy * TANK_TURRET_FRAME.h;
-        const rx = layout.turretX + x * cos - y * sin;
-        const ry = layout.turretY + x * sin + y * cos;
-        left = Math.min(left, rx);
-        right = Math.max(right, rx);
-        top = Math.min(top, ry);
-        bottom = Math.max(bottom, ry);
-      }
-    }
+    const box = { left, top, right, bottom };
+    includeMounted(box, layout, TANK_TURRET_FRAME, layout.turretX, layout.turretY, layout.turretOriginX, layout.turretOriginY, view.angle);
+    includeMounted(box, layout, TANK_GUN_FRAME, layout.gunX, layout.gunY, layout.gunOriginX, layout.gunOriginY, view.angle);
+    left = box.left;
+    right = box.right;
+    top = box.top;
+    bottom = box.bottom;
     if (view.muzzle) {
-      const x = layout.turretX + cos * layout.muzzleLength;
-      const y = layout.turretY + sin * layout.muzzleLength;
+      const muzzle = Tank.muzzleAt(view.angle);
+      const x = muzzle.x;
+      const y = muzzle.y;
       left = Math.min(left, x - 6);
       right = Math.max(right, x + 6);
       top = Math.min(top, y - 6);
@@ -836,6 +814,9 @@ export class StudioScene extends Phaser.Scene {
     if (this.rig?.pivot) {
       this.tweens.killTweensOf(this.rig.pivot);
     }
+    if (this.rig?.gun && this.entity.kind === 'tank') {
+      this.tweens.killTweensOf(this.rig.gun);
+    }
     this.rig?.sparks?.destroy();
     this.rig = undefined;
     this.flies = [];
@@ -846,19 +827,17 @@ export class StudioScene extends Phaser.Scene {
     if (!rig) {
       return;
     }
-    if (rig.pivot) {
+    if (this.entity.kind === 'tank' && rig.gun) {
       const layout = Tank.layout;
       const angle = readView().angle;
       rig.angle = angle;
-      rig.muzzle = {
-        x: layout.turretX + Math.cos(angle) * layout.muzzleLength,
-        y: layout.turretY + Math.sin(angle) * layout.muzzleLength,
-      };
-      this.tweens.killTweensOf(rig.pivot);
-      rig.pivot.x = layout.turretX;
+      const restX = layout.gunX - layout.seatX;
+      rig.muzzle = Tank.muzzleAt(angle);
+      this.tweens.killTweensOf(rig.gun);
+      rig.gun.setPosition(restX, layout.gunY - layout.seatY);
       this.tweens.add({
-        targets: rig.pivot,
-        x: Tank.recoilSlide.x,
+        targets: rig.gun,
+        x: restX - Tank.recoilSlide.kick,
         duration: Tank.recoilSlide.ms,
         yoyo: true,
       });
@@ -992,7 +971,7 @@ export class StudioScene extends Phaser.Scene {
 
   private keysFor(entity: PreviewEntity): string[] {
     if (entity.kind === 'tank') {
-      return ['studio-tank-hull', 'studio-tank-turret'];
+      return ['studio-tank-hull', 'studio-tank-turret', 'studio-tank-gun'];
     }
     if (entity.frameCount > 1) {
       return Array.from({ length: entity.frameCount }, (_, index) => `studio-${entity.id}-${index}`);
@@ -1014,25 +993,42 @@ export class StudioScene extends Phaser.Scene {
 // чтобы пиксель текстуры на холсте совпадал с пикселем танка при том же увеличении.
 function tankFrameSpan(): { w: number; h: number } {
   const layout = Tank.layout;
-  const cos = Math.cos(-0.3);
-  const sin = Math.sin(-0.3);
-  let left = layout.hullX - TANK_HULL_FRAME.w / 2;
-  let right = layout.hullX + TANK_HULL_FRAME.w / 2;
-  let top = layout.hullY - TANK_HULL_FRAME.h / 2;
-  let bottom = layout.hullY + TANK_HULL_FRAME.h / 2;
-  for (const ox of [-layout.turretOriginX, 1 - layout.turretOriginX]) {
-    for (const oy of [-layout.turretOriginY, 1 - layout.turretOriginY]) {
-      const x = ox * TANK_TURRET_FRAME.w;
-      const y = oy * TANK_TURRET_FRAME.h;
-      const rx = layout.turretX + x * cos - y * sin;
-      const ry = layout.turretY + x * sin + y * cos;
-      left = Math.min(left, rx);
-      right = Math.max(right, rx);
-      top = Math.min(top, ry);
-      bottom = Math.max(bottom, ry);
+  const box = {
+    left: layout.hullX - TANK_HULL_FRAME.w / 2,
+    right: layout.hullX + TANK_HULL_FRAME.w / 2,
+    top: layout.hullY - TANK_HULL_FRAME.h / 2,
+    bottom: layout.hullY + TANK_HULL_FRAME.h / 2,
+  };
+  includeMounted(box, layout, TANK_TURRET_FRAME, layout.turretX, layout.turretY, layout.turretOriginX, layout.turretOriginY, -0.3);
+  includeMounted(box, layout, TANK_GUN_FRAME, layout.gunX, layout.gunY, layout.gunOriginX, layout.gunOriginY, -0.3);
+  return { w: box.right - box.left, h: box.bottom - box.top };
+}
+
+// Углы картинки, повёрнутой вместе с башней вокруг сиденья на крыше.
+function includeMounted(
+  box: { left: number; top: number; right: number; bottom: number },
+  layout: typeof Tank.layout,
+  frame: { w: number; h: number },
+  imageX: number,
+  imageY: number,
+  originX: number,
+  originY: number,
+  angle: number,
+): void {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  for (const ox of [-originX, 1 - originX]) {
+    for (const oy of [-originY, 1 - originY]) {
+      const lx = imageX - layout.seatX + ox * frame.w;
+      const ly = imageY - layout.seatY + oy * frame.h;
+      const rx = layout.seatX + lx * cos - ly * sin;
+      const ry = layout.seatY + lx * sin + ly * cos;
+      box.left = Math.min(box.left, rx);
+      box.right = Math.max(box.right, rx);
+      box.top = Math.min(box.top, ry);
+      box.bottom = Math.max(box.bottom, ry);
     }
   }
-  return { w: right - left, h: bottom - top };
 }
 
 function paintCross(g: Phaser.GameObjects.Graphics): void {

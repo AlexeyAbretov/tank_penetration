@@ -20,6 +20,7 @@ import {
   SHELL_FRAME,
   SHELL_PAINT,
   SOLDIER_FRAME,
+  TANK_GUN_FRAME,
   TANK_HULL_FRAME,
   TANK_PAINT,
   TANK_TURRET_FRAME,
@@ -128,7 +129,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'tank',
     title: 'Танк',
-    hint: 'Корпус и башня собраны как в бою. Угол башни крутится отдельно и в текстуру не запекается.',
+    hint: 'Корпус и башня собраны как в бою. Башня и ствол крутятся вместе вокруг днища башни.',
     exportName: 'TANK_PAINT',
     kind: 'tank',
     frameCount: 1,
@@ -180,6 +181,7 @@ export const ENTITIES: PreviewEntity[] = [
       stamp(scene, keys[1], TANK_TURRET_FRAME.w, TANK_TURRET_FRAME.h, (g) =>
         Tank.renderTurret(g, colors),
       );
+      stamp(scene, keys[2], TANK_GUN_FRAME.w, TANK_GUN_FRAME.h, (g) => Tank.renderGun(g, colors));
     },
   },
   {
