@@ -156,6 +156,7 @@ export type PickupPaint = {
   glassShine: number;
   driver: number;
   driverShirt: number;
+  skin: number;
   mount: number;
   barrel: number;
   muzzleFace: number;
@@ -177,7 +178,8 @@ export const PICKUP_PAINT = {
   glassLight: 0x88c8e0,
   glassShine: 0xffffff,
   driver: 0x2a2218,
-  driverShirt: 0x3a4a28,
+  driverShirt: 0x6a5438,
+  skin: 0xe8c49a,
   mount: 0x2a2a26,
   barrel: 0x1a1a16,
   muzzleFace: 0x4a4a42,

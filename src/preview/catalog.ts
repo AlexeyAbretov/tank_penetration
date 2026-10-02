@@ -246,8 +246,9 @@ export const ENTITIES: PreviewEntity[] = [
         ['glassShine', 'Блик'],
       ]),
       ...colors('Экипаж', [
-        ['driver', 'Водитель'],
-        ['driverShirt', 'Плечи'],
+        ['driver', 'Каска'],
+        ['skin', 'Лицо'],
+        ['driverShirt', 'Форма'],
       ]),
       ...colors('Оружие', [
         ['mount', 'Станок'],

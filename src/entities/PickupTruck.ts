@@ -22,8 +22,8 @@ export class PickupTruck extends RangedEnemy {
     bodyX: 12,
     bodyY: 28,
   };
-  // Дуло в кабине, левее и выше точки опоры машины.
-  static readonly muzzleOffset = { x: -72, y: -54 };
+  // Дуло на высоте рук стрелка, выше крыши кабины.
+  static readonly muzzleOffset = { x: -80, y: -54 };
 
   readonly coinReward = 3;
   // Зона попадания шире солдатской (46): снаряд задевает машину с большего расстояния.
@@ -137,41 +137,48 @@ export class PickupTruck extends RangedEnemy {
     g.fillStyle(paint.bodyDark);
     g.fillRect(144, 34, 6, 26);
 
-    // Кабина по центру, выше капота.
+    // Кабина. Крыша на y = 26, чтобы ствол на уровне рук всё равно шёл выше неё.
     g.fillStyle(paint.cabin);
-    g.fillRoundedRect(50, 14, 42, 46, 5);
+    g.fillRoundedRect(50, 26, 42, 34, 5);
     g.fillStyle(paint.body);
-    g.fillRoundedRect(52, 16, 38, 42, 4);
+    g.fillRoundedRect(52, 28, 38, 30, 4);
     g.fillStyle(paint.bodyDark);
-    g.fillRect(54, 40, 34, 8);
+    g.fillRect(54, 46, 34, 8);
 
     // Лобовое стекло и блик. Второй аргумент цвета у fillStyle — прозрачность блика.
     g.fillStyle(paint.glass);
-    g.fillRoundedRect(54, 20, 22, 16, 3);
+    g.fillRoundedRect(54, 32, 22, 12, 3);
     g.fillStyle(paint.glassLight, 0.9);
-    g.fillRoundedRect(56, 22, 18, 12, 2);
+    g.fillRoundedRect(56, 34, 18, 8, 2);
     g.fillStyle(paint.glassShine, 0.35);
-    g.fillRect(58, 24, 6, 4);
+    g.fillRect(58, 36, 6, 3);
     // Боковое окошко.
     g.fillStyle(paint.glassLight, 0.7);
-    g.fillRoundedRect(78, 22, 10, 12, 2);
+    g.fillRoundedRect(78, 34, 10, 8, 2);
 
-    // Голова водителя над бортом и плечи.
-    g.fillStyle(paint.driver);
-    g.fillCircle(118, 26, 7);
+    // Стрелок в кузове. Плечи на y = 18 — туда же ляжет ствол. Пояс за бортом (борт с y = 32).
     g.fillStyle(paint.driverShirt);
-    g.fillRect(112, 30, 14, 14);
+    g.fillRoundedRect(112, 18, 16, 18, 3);
+    g.fillRoundedRect(96, 18, 18, 5, 2);
 
-    // Станок пулемёта у кабины и ствол вдоль крыши, носом влево.
+    // Упор в кузов. Ствол на высоте рук, выше крыши, носом влево.
     g.fillStyle(paint.mount);
-    g.fillRect(112, 16, 7, 16);
+    g.fillRect(100, 20, 6, 14);
     g.fillStyle(paint.barrel);
-    g.fillRoundedRect(20, 18, 98, 5, 2);
-    // Светлая полоска у дульного среза.
+    g.fillRoundedRect(86, 16, 22, 8, 2);
+    g.fillRoundedRect(10, 18, 80, 4, 1);
     g.fillStyle(paint.muzzleFace);
-    g.fillRect(20, 18, 10, 5);
+    g.fillRect(10, 18, 8, 4);
     g.fillStyle(paint.muzzleTip);
-    g.fillCircle(24, 20, 3);
+    g.fillCircle(12, 20, 3);
+
+    // Голова выше ствола, кисти лежат на нём.
+    g.fillStyle(paint.skin);
+    g.fillCircle(120, 13, 5);
+    g.fillRect(92, 18, 8, 4);
+    g.fillStyle(paint.driver);
+    g.fillRoundedRect(112, 2, 16, 9, 3);
+    g.fillRect(110, 9, 20, 3);
 
     // Линия через центр выглядит так же после поворота на 180° (π радиан).
     // Кадры делят эту половину оборота поровну, следующий после последнего совпадает с первым.
