@@ -14,8 +14,7 @@ export type { WorldPoint } from './WorldPoint';
 type EnemyKind = typeof AssaultInfantry | typeof GunnerInfantry | typeof PickupTruck | typeof RocketInfantry;
 
 export class EnemyFactory {
-  // Новые враги по порядку появления. Пикап — 20-я волна, ракетчик — 30-я.
-  // Следующий класс в этом списке выйдет на 40-й. Пустой слот ничего не добавляет.
+  // Техника с debutWave. Порядок в пуле шагов — по возрастанию debutWave.
   private static readonly vehicles: EnemyKind[] = [PickupTruck, RocketInfantry];
 
   static readonly wave = {
@@ -23,7 +22,6 @@ export class EnemyFactory {
     infantryRampUntil: GunnerInfantry.debutWave,
     stepEvery: 5,
     maxCount: 100,
-    vehicleEvery: 10,
   };
 
   static readonly timing = {
@@ -32,8 +30,6 @@ export class EnemyFactory {
     announceMs: 1300,
     startDelayMs: 700,
   };
-
-  private static readonly cache = new Map<number, EnemyKind[]>();
 
   static count(wave: number): number {
     return this.roster(wave).length;
@@ -45,8 +41,17 @@ export class EnemyFactory {
     return this.spawnUnit(kind, ctx);
   }
 
-  static vehicleDebutWave(index: number): number {
-    return EnemyFactory.wave.vehicleEvery * (index + 2);
+  private static debutWave(kind: EnemyKind): number {
+    if (kind === GunnerInfantry) {
+      return GunnerInfantry.debutWave;
+    }
+    if (kind === PickupTruck) {
+      return PickupTruck.debutWave;
+    }
+    if (kind === RocketInfantry) {
+      return RocketInfantry.debutWave;
+    }
+    return 1;
   }
 
   private static spawnUnit(kind: EnemyKind, ctx: SpawnContext): Infantry {
@@ -78,13 +83,10 @@ export class EnemyFactory {
     return unit;
   }
 
-  // До волны infantryRampUntil каждый раз +1 пехотинец, на ней — стрелок.
-  // Дальше +1 юнит раз в stepEvery волн. Пикап занимает такой шаг на 20-й.
-  // Между шагами список тот же. На maxCount рост списка останавливается.
+  // Симуляция волн 1..N: рост штурмовиков, дебют стрелка, debutWave техники, шаги после стрелка.
   private static roster(wave: number): EnemyKind[] {
-    const cached = this.cache.get(wave);
-    if (cached) {
-      return cached;
+    if (wave < 1) {
+      return [];
     }
 
     const { startCount, infantryRampUntil, stepEvery, maxCount } = EnemyFactory.wave;
@@ -95,35 +97,56 @@ export class EnemyFactory {
       }
     };
 
-    const seen = Math.min(Math.max(wave, 1), infantryRampUntil);
-    const foot = startCount + seen - 1;
-    const withGunner = wave >= infantryRampUntil;
-    const assaults = withGunner ? foot - 1 : foot;
-    for (let i = 0; i < assaults; i += 1) {
-      push(AssaultInfantry);
-    }
-    if (withGunner) {
-      push(GunnerInfantry);
-    }
-
-    for (let w = infantryRampUntil + 1; w <= wave; w += 1) {
+    for (let w = 1; w <= wave; w += 1) {
       if (units.length >= maxCount) {
         break;
       }
-      const since = w - infantryRampUntil;
-      if (since % stepEvery !== 0) {
+
+      if (w === 1) {
+        const gunnerFromStart = infantryRampUntil <= 1;
+        const assaults = gunnerFromStart ? Math.max(0, startCount - 1) : startCount;
+        for (let i = 0; i < assaults; i += 1) {
+          push(AssaultInfantry);
+        }
+        if (gunnerFromStart) {
+          push(GunnerInfantry);
+        }
+        this.pushVehicleDebut(w, push);
         continue;
       }
-      const vehicleIndex = this.vehicles.findIndex((_, index) => this.vehicleDebutWave(index) === w);
-      if (vehicleIndex >= 0) {
-        push(this.vehicles[vehicleIndex]);
-      } else {
+
+      if (w < infantryRampUntil) {
+        push(AssaultInfantry);
+        this.pushVehicleDebut(w, push);
+        continue;
+      }
+
+      if (w === infantryRampUntil) {
+        push(GunnerInfantry);
+        this.pushVehicleDebut(w, push);
+        continue;
+      }
+
+      const vehicleDebut = this.vehicles.find((kind) => this.debutWave(kind) === w);
+      if (vehicleDebut) {
+        push(vehicleDebut);
+        continue;
+      }
+
+      const since = w - infantryRampUntil;
+      if (since % stepEvery === 0) {
         push(this.stepKind(since / stepEvery, w));
       }
     }
 
-    this.cache.set(wave, units);
     return units;
+  }
+
+  private static pushVehicleDebut(w: number, push: (kind: EnemyKind) => void): void {
+    const kind = this.vehicles.find((k) => this.debutWave(k) === w);
+    if (kind) {
+      push(kind);
+    }
   }
 
   private static stepKind(step: number, wave: number): EnemyKind {
@@ -136,11 +159,10 @@ export class EnemyFactory {
     if (wave >= this.wave.infantryRampUntil) {
       pool.push(GunnerInfantry);
     }
-    this.vehicles.forEach((_, index) => {
-      if (this.vehicleDebutWave(index) < wave) {
-        pool.push(this.vehicles[index]);
-      }
-    });
+    const debuted = [...this.vehicles]
+      .filter((kind) => this.debutWave(kind) < wave)
+      .sort((a, b) => this.debutWave(a) - this.debutWave(b));
+    pool.push(...debuted);
     return pool;
   }
 }
