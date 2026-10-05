@@ -26,7 +26,7 @@ export const GAME = {
   barbedWireTop: 72,
   barbedWireBottom: 630,
   // Одна покупка на всю игру, не растёт как уровни взрыва и урона.
-  barbedWireCost: 1,
+  barbedWireCost: 50,
   // Урон пехоте при касании проволоки и дальше каждые barbedWireIntervalMs.
   barbedWireDamage: 1,
   // Пауза между ударами проволоки по одному и тому же солдату, миллисекунды.
