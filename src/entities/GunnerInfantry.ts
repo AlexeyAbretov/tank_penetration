@@ -1,7 +1,7 @@
 // Стрелок: доходит до середины поля, встаёт и редко, но больно стреляет по танку.
 // Винтовка — отдельная картинка поверх тела, чтобы при выстреле отъезжать и вспыхивать.
 
-import { Scene } from 'phaser';
+import Phaser, { Scene } from 'phaser';
 import {
   CORPSE_FRAME,
   GUNNER_FLASH_FRAME,

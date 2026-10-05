@@ -40,7 +40,7 @@ export class Rocket extends EnemyShot {
   constructor(scene: Phaser.Scene, x: number, y: number, damage: number) {
     super(scene, x, y, damage, 'enemy-rocket');
     this.setScale(1.8);
-    this.smoke = Rocket.trailAt(scene, x, y);
+    this.smoke = Rocket.trailAt(scene);
     const follow = () => {
       if (this.active) {
         this.driftSmoke();
@@ -108,9 +108,11 @@ export class Rocket extends EnemyShot {
     });
   }
 
-  static trailAt(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Particles.ParticleEmitter {
+  // Эмиттер в (0, 0): emitParticleAt прибавляет точку к позиции эмиттера.
+  // Если поставить его на ракету, клуб сложится с её координатой и уйдёт за край поля.
+  static trailAt(scene: Phaser.Scene): Phaser.GameObjects.Particles.ParticleEmitter {
     this.ensurePuff(scene);
-    const smoke = scene.add.particles(x, y, 'smoke-puff', {
+    const smoke = scene.add.particles(0, 0, 'smoke-puff', {
       lifespan: { min: 380, max: 720 },
       speed: { min: 8, max: 24 },
       angle: { min: 0, max: 360 },
