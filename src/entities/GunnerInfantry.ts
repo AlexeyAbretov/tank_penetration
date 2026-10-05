@@ -11,6 +11,7 @@ import {
   type SoldierLook,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
+import { Infantry } from './Infantry';
 import type { WorldPoint } from './WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
@@ -19,8 +20,11 @@ export class GunnerInfantry extends RangedEnemy {
   static readonly debutWave = 3;
   static readonly walkFps = 7;
   static readonly corpseKey = 'gunner-corpse';
-  // Дуло длинной винтовки левее и выше точки ног спрайта.
-  static readonly muzzleOffset = { x: -38, y: -42 };
+  // Середина среза относительно точки ног, ствол строго влево. Жёлтая метка и пуля в просмотре.
+  static get muzzleOffset(): { x: number; y: number } {
+    const point = GunnerInfantry.muzzleAt(0, 0, Infantry.placed.scale, 0);
+    return { x: point.x, y: point.y };
+  }
   // Левый верх винтовки внутри кадра солдата 64×80. Рисунок сидит на y = 34.
   static readonly rifleCut = { x: 0, y: 32 };
   // Приклад: ось, вокруг которой винтовка поворачивается к танку и отскакивает назад.
@@ -139,7 +143,7 @@ export class GunnerInfantry extends RangedEnemy {
     return dead;
   }
 
-  // Дуло уже повёрнуто к танку: пуля выходит из среза и летит вдоль винтовки.
+  // Пуля выходит из середины среза и летит в танк. Отдача уже в позе: срез не уезжает от пули.
   protected override shotPose(): { x: number; y: number; angle: number } {
     this.aim = GunnerInfantry.barrelAngle(
       this.x,
@@ -148,12 +152,12 @@ export class GunnerInfantry extends RangedEnemy {
       this.fireTarget.x,
       this.fireTarget.y,
     );
-    return GunnerInfantry.muzzleAt(this.x, this.y, this.scaleX, this.aim);
+    this.kickRifle();
+    return GunnerInfantry.muzzleAt(this.x, this.y, this.scaleX, this.aim, this.recoil);
   }
 
-  // Вспышка остаётся в точке дула, винтовка в этот момент отскакивает назад.
+  // Вспышка в той же точке, что и пуля. Отдача уже задана в shotPose.
   protected override onFire(x: number, y: number, angle: number): void {
-    this.kickRifle();
     const flash = this.scene.add.image(x, y, 'gunner-flash').setOrigin(0, 0.5).setDepth(16);
     flash.setRotation(angle);
     flash.setBlendMode(Phaser.BlendModes.ADD);
@@ -211,25 +215,39 @@ export class GunnerInfantry extends RangedEnemy {
     return Phaser.Math.Angle.Wrap(at + Math.PI);
   }
 
-  // Мировые координаты среза и направление пули. aim — поворот картинки без отдачи.
+  // Середина среза и направление пули к цели. aim — поворот без подъёма.
+  // Откат сдвигает срез назад вдоль выстрела и не опускает его относительно ствола.
   static muzzleAt(
     anchorX: number,
     anchorY: number,
     scale: number,
     aim: number,
+    recoil: { x: number; climb: number } = { x: 0, climb: 0 },
   ): { x: number; y: number; angle: number } {
+    const point = GunnerInfantry.muzzlePoint(anchorX, anchorY, scale, aim, recoil);
+    return {
+      x: point.x,
+      y: point.y,
+      angle: Phaser.Math.Angle.Wrap(aim - Math.PI),
+    };
+  }
+
+  // Срез на линии прицела. recoil.x — пиксели текстуры назад, к прикладу.
+  private static muzzlePoint(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): { x: number; y: number } {
     const mount = GunnerInfantry.mountPoint(anchorX, anchorY, scale);
     const tip = GunnerInfantry.turned(
       aim,
-      GunnerInfantry.muzzleTip.x - GunnerInfantry.breech.x,
+      GunnerInfantry.muzzleTip.x - GunnerInfantry.breech.x + recoil.x,
       GunnerInfantry.muzzleTip.y - GunnerInfantry.breech.y,
       scale,
     );
-    return {
-      x: mount.x + tip.x,
-      y: mount.y + tip.y,
-      angle: Phaser.Math.Angle.Wrap(aim - Math.PI),
-    };
+    return { x: mount.x + tip.x, y: mount.y + tip.y };
   }
 
   // Приклад на спрайте солдата. anchor — точка ног, scale — масштаб тела.
@@ -255,7 +273,7 @@ export class GunnerInfantry extends RangedEnemy {
     };
   }
 
-  // Ставит винтовку прикладом в руки. Отдача сдвигается назад вдоль уже повёрнутого ствола.
+  // Приклад в руках, срез на линии выстрела. Подъём крутит приклад вокруг среза, чтобы пуля осталась в середине ствола.
   static poseRifle(
     rifle: Phaser.GameObjects.Image,
     anchorX: number,
@@ -265,9 +283,14 @@ export class GunnerInfantry extends RangedEnemy {
     recoil: { x: number; climb: number },
   ): void {
     const rotation = aim + recoil.climb;
-    const mount = GunnerInfantry.mountPoint(anchorX, anchorY, scale);
-    const kick = GunnerInfantry.turned(rotation, recoil.x, 0, scale);
-    rifle.setPosition(mount.x + kick.x, mount.y + kick.y);
+    const muzzle = GunnerInfantry.muzzlePoint(anchorX, anchorY, scale, aim, recoil);
+    const tip = GunnerInfantry.turned(
+      rotation,
+      GunnerInfantry.muzzleTip.x - GunnerInfantry.breech.x,
+      GunnerInfantry.muzzleTip.y - GunnerInfantry.breech.y,
+      scale,
+    );
+    rifle.setPosition(muzzle.x - tip.x, muzzle.y - tip.y);
     rifle.setScale(scale);
     rifle.setRotation(rotation);
   }

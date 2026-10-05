@@ -1112,6 +1112,10 @@ export class StudioScene extends Phaser.Scene {
         duration: kick.ms,
         ease: 'Quad.Out',
       });
+      if (this.entity.id === 'gunner') {
+        const point = GunnerInfantry.muzzleAt(0, 0, readView().scale, 0, rig.recoil);
+        rig.muzzle = { x: point.x, y: point.y };
+      }
     }
     const shotKey =
       rig.projectile === 'shell'
