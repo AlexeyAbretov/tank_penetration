@@ -1,8 +1,7 @@
 // Стрелок: доходит до середины поля, встаёт и редко, но больно стреляет по танку.
 // Винтовка — отдельная картинка поверх тела, чтобы при выстреле отъезжать и вспыхивать.
 
-import Phaser from 'phaser';
-import { GAME, growthRank, gunnerDebutWave, waveHp } from '../gameConfig';
+import { Scene } from 'phaser';
 import {
   CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
@@ -12,11 +11,12 @@ import {
   type SoldierLook,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import type { SpawnContext } from './SpawnContext';
-import { Infantry } from './Infantry';
+import type { WorldPoint } from './WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
 export class GunnerInfantry extends RangedEnemy {
+  // Последняя волна рампы штурмовиков; на ней выходит стрелок.
+  static readonly debutWave = 3;
   static readonly walkFps = 7;
   static readonly corpseKey = 'gunner-corpse';
   // Дуло длинной винтовки левее и выше точки ног спрайта.
@@ -56,16 +56,8 @@ export class GunnerInfantry extends RangedEnemy {
   // Поворот картинки винтовки к танку, без отдачи. Ноль — строго влево.
   private aim = 0;
 
-  static spawn(ctx: SpawnContext): Infantry {
-    // На волне дебюта ранг 1: здоровье и шаг как у первой волны. Дальше ранг растёт.
-    const rank = growthRank(ctx.wave, gunnerDebutWave());
-    const unit = new GunnerInfantry(ctx.scene, ctx.x, ctx.y, waveHp(rank), ctx.shots);
-    unit.paceWave = rank;
-    return unit;
-  }
-
   // Кадры шага без винтовки: в бою её рисует отдельный спрайт и двигает при отдаче.
-  static ensureTextures(scene: Phaser.Scene): void {
+  static ensureTextures(scene: Scene): void {
     if (!scene.textures.exists('gunner-0')) {
       bake(scene, 'gunner-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
         this.drawSoldier(g, 0, GUNNER_LOOK, false),
@@ -101,9 +93,10 @@ export class GunnerInfantry extends RangedEnemy {
     y: number,
     hp: number,
     shots: Phaser.Physics.Arcade.Group,
+    fireTarget: WorldPoint,
   ) {
     // Синяя полоска отличает стрелка от красного штурмовика и жёлтого пикапа.
-    super(scene, x, y, hp, 'gunner-0', 'gunner-walk', 0x3a8ad4, shots);
+    super(scene, x, y, hp, 'gunner-0', 'gunner-walk', 0x3a8ad4, shots, fireTarget);
     this.rifle = scene.add.image(x, y, 'gunner-rifle');
     this.rifle.setOrigin(
       (GunnerInfantry.breech.x - GunnerInfantry.rifleCut.x) / GUNNER_RIFLE_FRAME.w,
@@ -148,7 +141,13 @@ export class GunnerInfantry extends RangedEnemy {
 
   // Дуло уже повёрнуто к танку: пуля выходит из среза и летит вдоль винтовки.
   protected override shotPose(): { x: number; y: number; angle: number } {
-    this.aim = GunnerInfantry.aimAt(this.x, this.y, this.scaleX);
+    this.aim = GunnerInfantry.barrelAngle(
+      this.x,
+      this.y,
+      this.scaleX,
+      this.fireTarget.x,
+      this.fireTarget.y,
+    );
     return GunnerInfantry.muzzleAt(this.x, this.y, this.scaleX, this.aim);
   }
 
@@ -187,16 +186,28 @@ export class GunnerInfantry extends RangedEnemy {
     if (!this.rifle.active) {
       return;
     }
-    this.aim = GunnerInfantry.aimAt(this.x, this.y, this.scaleX);
+    this.aim = GunnerInfantry.barrelAngle(
+      this.x,
+      this.y,
+      this.scaleX,
+      this.fireTarget.x,
+      this.fireTarget.y,
+    );
     GunnerInfantry.poseRifle(this.rifle, this.x, this.y, this.scaleX, this.aim, this.recoil);
     this.rifle.setAlpha(this.alpha);
   }
 
   // Угол картинки винтовки, чтобы срез смотрел в корпус танка.
   // Сама текстура при нуле уже смотрит влево, поэтому к углу на цель прибавляется разворот.
-  static aimAt(anchorX: number, anchorY: number, scale: number): number {
+  static barrelAngle(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    targetX: number,
+    targetY: number,
+  ): number {
     const mount = GunnerInfantry.mountPoint(anchorX, anchorY, scale);
-    const at = Phaser.Math.Angle.Between(mount.x, mount.y, GAME.tankX + 24, GAME.tankY);
+    const at = Phaser.Math.Angle.Between(mount.x, mount.y, targetX, targetY);
     return Phaser.Math.Angle.Wrap(at + Math.PI);
   }
 
@@ -224,8 +235,8 @@ export class GunnerInfantry extends RangedEnemy {
   // Приклад на спрайте солдата. anchor — точка ног, scale — масштаб тела.
   private static mountPoint(anchorX: number, anchorY: number, scale: number): { x: number; y: number } {
     return {
-      x: anchorX + (GunnerInfantry.breech.x - Infantry.placed.originX * SOLDIER_FRAME.w) * scale,
-      y: anchorY + (GunnerInfantry.breech.y - Infantry.placed.originY * SOLDIER_FRAME.h) * scale,
+      x: anchorX + (GunnerInfantry.breech.x - GunnerInfantry.placed.originX * SOLDIER_FRAME.w) * scale,
+      y: anchorY + (GunnerInfantry.breech.y - GunnerInfantry.placed.originY * SOLDIER_FRAME.h) * scale,
     };
   }
 

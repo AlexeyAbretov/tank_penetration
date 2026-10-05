@@ -2,13 +2,10 @@
 // С первой волны и до 10-й волна состоит из них. Дальше фабрика дописывает других.
 
 // Phaser нужен из-за типа Scene в конструкторе.
-import Phaser from 'phaser';
-import { waveHp } from '../gameConfig';
+import { Scene } from 'phaser';
 import { ASSAULT_LOOK, CORPSE_FRAME, SOLDIER_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { Infantry } from './Infantry';
-// Тип спавна в своём файле. Импорт из EnemyFactory замкнул бы круг: фабрика уже импортирует этот класс.
-import type { SpawnContext } from './SpawnContext';
 
 export class AssaultInfantry extends Infantry {
   static readonly walkFps = 7;
@@ -21,16 +18,8 @@ export class AssaultInfantry extends Infantry {
   // Столько здоровья базы снимает один дошедший солдат.
   readonly contactDamage = 12;
 
-  // Собирает солдата из данных, которые сцена передала фабрике.
-  // Штурмовик на поле с первой волны, поэтому ранг роста равен номеру волны.
-  static spawn(ctx: SpawnContext): Infantry {
-    const unit = new AssaultInfantry(ctx.scene, ctx.x, ctx.y, waveHp(ctx.wave));
-    unit.paceWave = ctx.wave;
-    return unit;
-  }
-
   // Два кадра шага и анимация, которая их чередует. Повторный вызов ничего не рисует заново.
-  static ensureTextures(scene: Phaser.Scene): void {
+  static ensureTextures(scene: Scene): void {
     if (!scene.textures.exists('infantry-0')) {
       bake(scene, 'infantry-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
         this.drawSoldier(g, 0, ASSAULT_LOOK),
@@ -56,7 +45,7 @@ export class AssaultInfantry extends Infantry {
     }
   }
 
-  constructor(scene: Phaser.Scene, x: number, y: number, hp: number) {
+  constructor(scene: Scene, x: number, y: number, hp: number) {
     // Картинки infantry-0 / infantry-1 и анимация infantry-walk, красная полоска HP.
     super(scene, x, y, hp, 'infantry-0', 'infantry-walk', 0xd42a2a);
   }

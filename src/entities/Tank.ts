@@ -1,8 +1,7 @@
 // Танк игрока. Это не один спрайт, а контейнер: корпус едет сам.
 // Башня и ствол крутятся вместе вокруг точки, где башня стоит на крыше.
 
-import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
+import Phaser, { GameObjects } from 'phaser';
 import {
   MUZZLE_FRAME,
   MUZZLE_PAINT,
@@ -19,7 +18,18 @@ import {
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 
-export class Tank extends Phaser.GameObjects.Container {
+export class Tank extends GameObjects.Container {
+  static readonly spawn = { x: 76, y: 360 };
+  static readonly fireDelay = 380;
+  static readonly shellSpeed = 740;
+  static readonly baseHp = 100;
+  static readonly blastRadiusPerLevel = 1;
+
+  // Точка прицеливания врагов: чуть правее носа танка.
+  static aimPoint(): { x: number; y: number } {
+    return { x: Tank.spawn.x + 24, y: Tank.spawn.y };
+  }
+
   // Сборка корпуса и башни. Просмотр спрайтов берёт те же числа, что и конструктор.
   static readonly layout = {
     hullX: 8,
@@ -206,7 +216,7 @@ export class Tank extends Phaser.GameObjects.Container {
       return null;
     }
     // Сразу занимаем кулдаун, чтобы зажатая кнопка мыши не выпускала снаряд каждый кадр.
-    this.cooldown = GAME.fireDelay;
+    this.cooldown = Tank.fireDelay;
     const shot = this.getMuzzle();
     // Откат в координатах башни: минус X — назад вдоль ствола, угол башни уже учтён.
     const layout = Tank.layout;

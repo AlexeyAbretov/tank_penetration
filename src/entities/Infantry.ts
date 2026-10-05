@@ -3,7 +3,6 @@
 // от него наследуют штурмовик, стрелок, ракетчик и пикап.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
 import type { SoldierLook } from '../gfx/looks';
 
 // Цвета лежат в gfx/looks.ts: один набор рисует и штурмовика, и стрелка.
@@ -11,6 +10,20 @@ export type { SoldierLook };
 
 // extends Sprite: враг — это картинка, у которой ещё есть физическое тело (скорость и хитбокс).
 export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
+  static readonly shellHitRadius = 46;
+  static readonly shellDamage = 1;
+  static readonly hpPerWave = 1;
+  // Если штурмовик дошёл до этой линии X — он бьёт базу.
+  static readonly baseReachX = 115;
+
+  static growthRank(wave: number, debutWave: number): number {
+    return Math.max(1, wave - debutWave + 1);
+  }
+
+  static waveHp(rank: number): number {
+    return Math.max(1, rank * Infantry.hpPerWave);
+  }
+
   // Как солдат стоит на поле. Пикап задаёт свой набор после вызова super.
   static readonly placed = {
     scale: 1.45,
@@ -38,11 +51,11 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   abstract readonly coinReward: number;
   // true — юнит идёт до стены и бьёт базу. false — останавливается и стреляет издалека.
   abstract readonly reachesBase: boolean;
-  // Урон базе, если юнит дошёл до линии reachX. У стрелков 0: они бьют пулями.
+  // Урон базе, если юнит дошёл до линии baseReachX. У стрелков 0: они бьют пулями.
   abstract readonly contactDamage: number;
   // Насколько близко снаряд должен подлететь к торсу, чтобы засчитать попадание.
   // У пикапа это поле переопределено и больше, потому что машина крупнее солдата.
-  readonly hitRadius: number = GAME.shellHitRadius;
+  readonly hitRadius: number = Infantry.shellHitRadius;
   // Ранг роста скорости. У штурмовика это номер волны.
   // У стрелка и пикапа на волне появления равен 1, дальше растёт по одной за волну.
   protected paceWave = 1;
@@ -127,6 +140,11 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Подчёркивание у _delta: аргумент обязателен по сигнатуре, но здесь не используется.
   protected act(_delta: number): void {}
 
+  // Ранг роста для march. Вызывает фабрика после создания юнита.
+  setPaceWave(wave: number): void {
+    this.paceWave = wave;
+  }
+
   // Даёт скорость влево. Чем выше ранг роста, тем быстрее шаг.
   march(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
@@ -137,8 +155,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Упирает юнита в правый край проволоки и гасит шаг.
-  // true, когда пора снять HP: в первое касание и потом каждые barbedWireIntervalMs.
-  snare(faceX: number, delta: number): boolean {
+  // true, когда пора снять HP: в первое касание и потом каждые hurtIntervalMs.
+  snare(faceX: number, delta: number, hurtIntervalMs: number): boolean {
     const body = this.body as Phaser.Physics.Arcade.Body | null;
     if (!body) {
       return false;
@@ -147,7 +165,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     // body.left — передний край хитбокса. Если кадр занёс его в проволоку, выталкиваем тело назад.
     // Спрайт не двигаем: postUpdate сам перенесёт этот сдвиг на картинку.
     // Иначе сдвиг сложится дважды, тело на следующем кадре окажется правее линии,
-    // и удары раз в barbedWireIntervalMs прекратятся.
+    // и периодические удары прекратятся.
     if (body.left < faceX) {
       body.x += faceX - body.left;
     }
@@ -158,13 +176,13 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     if (this.wireHurtMs > 0) {
       return false;
     }
-    this.wireHurtMs = GAME.barbedWireIntervalMs;
+    this.wireHurtMs = hurtIntervalMs;
     return true;
   }
 
   // Наносит урон. Возвращает true, если после удара здоровья не осталось — сцена тогда вызовет kill.
   // wire: удар колючки. У него своя красная вспышка, не бледный оттенок снаряда.
-  hit(damage: number = GAME.shellDamage, wire = false): boolean {
+  hit(damage: number = Infantry.shellDamage, wire = false): boolean {
     // Ниже нуля здоровье не опускаем.
     this.hp = Math.max(0, this.hp - damage);
     if (wire && this.hp > 0) {

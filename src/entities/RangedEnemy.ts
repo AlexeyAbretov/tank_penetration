@@ -2,9 +2,9 @@
 // Конкретные числа (где встать, как часто стрелять) задают стрелка, ракетчика и пикап.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
 import { EnemyShot } from './EnemyShot';
 import { Infantry } from './Infantry';
+import type { WorldPoint } from './WorldPoint';
 
 export abstract class RangedEnemy extends Infantry {
   // Координата X, до которой юнит идёт. Дальше останавливается и стреляет.
@@ -27,6 +27,7 @@ export abstract class RangedEnemy extends Infantry {
 
   // Общая группа пуль сцены. Сюда кладём каждый выстрел, чтобы сцена могла их обновлять.
   protected readonly shots: Phaser.Physics.Arcade.Group;
+  protected readonly fireTarget: WorldPoint;
   // false, пока юнит ещё идёт к рубежу.
   private shooting = false;
   // Сколько миллисекунд осталось до следующего выстрела. Стартовые 350 — короткая задержка после остановки.
@@ -41,10 +42,12 @@ export abstract class RangedEnemy extends Infantry {
     walkKey: string,
     barColor: number,
     shots: Phaser.Physics.Arcade.Group,
+    fireTarget: WorldPoint,
   ) {
     // Родитель создаёт спрайт, полоску HP и физическое тело.
     super(scene, x, y, hp, texture, walkKey, barColor);
     this.shots = shots;
+    this.fireTarget = fireTarget;
   }
 
   // override: заменяем kill родителя, но всё равно вызываем его через super.
@@ -82,8 +85,11 @@ export abstract class RangedEnemy extends Infantry {
   protected shotPose(): { x: number; y: number; angle: number } {
     const x = this.x + this.muzzle.x;
     const y = this.y + this.muzzle.y;
-    // Угол от дула к точке чуть правее центра танка, чтобы пуля целилась в корпус.
-    return { x, y, angle: Phaser.Math.Angle.Between(x, y, GAME.tankX + 24, GAME.tankY) };
+    return {
+      x,
+      y,
+      angle: Phaser.Math.Angle.Between(x, y, this.fireTarget.x, this.fireTarget.y),
+    };
   }
 
   // Создаёт одну пулю из точки дула в сторону танка.

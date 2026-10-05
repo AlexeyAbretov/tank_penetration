@@ -1,8 +1,8 @@
 // Ракетчик: доходит до трёх четвертей поля, садится на колено и редко пускает ракету.
 // Труба — отдельная картинка поверх тела, чтобы на рубеже лечь на плечо и отскакивать.
 
-import Phaser from 'phaser';
-import { GAME, growthRank, vehicleDebutWave, waveHp } from '../gameConfig';
+import Phaser, { GameObjects } from 'phaser';
+import { GAME } from '../gameConfig';
 import {
   CORPSE_FRAME,
   LAUNCHER_FRAME,
@@ -12,12 +12,12 @@ import {
   type SoldierLook,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import { Infantry } from './Infantry';
 import { RangedEnemy } from './RangedEnemy';
 import { Rocket } from './Rocket';
-import type { SpawnContext } from './SpawnContext';
+import type { WorldPoint } from './WorldPoint';
 
 export class RocketInfantry extends RangedEnemy {
+  static readonly debutWave = 30;
   static readonly walkFps = 7;
   static readonly corpseKey = 'rocketman-corpse';
   // Точка ног → дуло, когда он уже на колене и труба смотрит влево. Для жёлтой метки в просмотре.
@@ -51,14 +51,6 @@ export class RocketInfantry extends RangedEnemy {
   private aim = 0;
   // true после остановки: тело уже сидит, труба лежит на плече и целится.
   private posted = false;
-
-  static spawn(ctx: SpawnContext): Infantry {
-    // Второй слот дебюта фабрики — 30-я волна. На ней ранг 1, дальше растёт по одной за волну.
-    const rank = growthRank(ctx.wave, vehicleDebutWave(1));
-    const unit = new RocketInfantry(ctx.scene, ctx.x, ctx.y, waveHp(rank), ctx.shots);
-    unit.paceWave = rank;
-    return unit;
-  }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists('rocketman-0')) {
@@ -103,9 +95,10 @@ export class RocketInfantry extends RangedEnemy {
     y: number,
     hp: number,
     shots: Phaser.Physics.Arcade.Group,
+    fireTarget: WorldPoint,
   ) {
     // Оранжевая полоска: не красный штурмовик, не синий стрелок, не жёлтый пикап.
-    super(scene, x, y, hp, 'rocketman-0', 'rocketman-walk', 0xe07020, shots);
+    super(scene, x, y, hp, 'rocketman-0', 'rocketman-walk', 0xe07020, shots, fireTarget);
     this.launcher = scene.add.image(x, y, 'rocketman-launcher');
     this.launcher.setOrigin(
       RocketInfantry.breech.x / LAUNCHER_FRAME.w,
@@ -158,7 +151,15 @@ export class RocketInfantry extends RangedEnemy {
   }
 
   protected override shotPose(): { x: number; y: number; angle: number } {
-    this.aim = this.posted ? RocketInfantry.aimAt(this.x, this.y, this.scaleX) : 0;
+    this.aim = this.posted
+      ? RocketInfantry.barrelAngle(
+          this.x,
+          this.y,
+          this.scaleX,
+          this.fireTarget.x,
+          this.fireTarget.y,
+        )
+      : 0;
     return RocketInfantry.muzzleAt(this.x, this.y, this.scaleX, this.aim, this.posted);
   }
 
@@ -206,7 +207,15 @@ export class RocketInfantry extends RangedEnemy {
     if (!this.launcher.active) {
       return;
     }
-    this.aim = this.posted ? RocketInfantry.aimAt(this.x, this.y, this.scaleX) : 0;
+    this.aim = this.posted
+      ? RocketInfantry.barrelAngle(
+          this.x,
+          this.y,
+          this.scaleX,
+          this.fireTarget.x,
+          this.fireTarget.y,
+        )
+      : 0;
     RocketInfantry.poseLauncher(
       this.launcher,
       this.x,
@@ -220,9 +229,15 @@ export class RocketInfantry extends RangedEnemy {
   }
 
   // Угол картинки трубы. Текстура при нуле уже смотрит влево, поэтому к углу на цель прибавляется разворот.
-  static aimAt(anchorX: number, anchorY: number, scale: number): number {
+  static barrelAngle(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    targetX: number,
+    targetY: number,
+  ): number {
     const mount = RocketInfantry.mountPoint(anchorX, anchorY, scale, true);
-    const at = Phaser.Math.Angle.Between(mount.x, mount.y, GAME.tankX + 24, GAME.tankY);
+    const at = Phaser.Math.Angle.Between(mount.x, mount.y, targetX, targetY);
     return Phaser.Math.Angle.Wrap(at + Math.PI);
   }
 
@@ -255,8 +270,8 @@ export class RocketInfantry extends RangedEnemy {
   ): { x: number; y: number } {
     const mount = posted ? RocketInfantry.kneelMount : RocketInfantry.carryMount;
     return {
-      x: anchorX + (mount.x - Infantry.placed.originX * SOLDIER_FRAME.w) * scale,
-      y: anchorY + (mount.y - Infantry.placed.originY * SOLDIER_FRAME.h) * scale,
+      x: anchorX + (mount.x - RocketInfantry.placed.originX * SOLDIER_FRAME.w) * scale,
+      y: anchorY + (mount.y - RocketInfantry.placed.originY * SOLDIER_FRAME.h) * scale,
     };
   }
 
@@ -293,10 +308,10 @@ export class RocketInfantry extends RangedEnemy {
 
   // То же тело, что у остальных солдат, но рядом лежит труба, а не винтовка.
   static drawCorpse(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
-    Infantry.drawCorpse(g, look, (graphics, colors) => this.drawDroppedTube(graphics, colors));
+    super.drawCorpse(g, look, this.drawDroppedTube);
   }
 
-  private static drawDroppedTube(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
+  private static drawDroppedTube(g: GameObjects.Graphics, look: SoldierLook): void {
     g.fillStyle(look.rifle);
     g.fillRoundedRect(10, 64, 34, 8, 3);
     g.fillStyle(look.rifleWood);
@@ -314,7 +329,7 @@ export class RocketInfantry extends RangedEnemy {
     look: SoldierLook,
     armed = false,
   ): void {
-    Infantry.drawSoldier(g, legPhase, look, false);
+    RocketInfantry.drawSoldier(g, legPhase, look, false);
     if (armed) {
       this.paintLauncher(g, look, this.carryMount);
     }

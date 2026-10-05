@@ -12,7 +12,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { Rocket } from '../entities/Rocket';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { Tank } from '../entities/Tank';
-import { GAME, upgradeCost } from '../gameConfig';
+import { GAME } from '../gameConfig';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import { createTextures } from '../gfx/textures';
 import { ShopPanel } from '../ui/ShopPanel';
@@ -46,7 +46,7 @@ export class GameScene extends Phaser.Scene {
   private embers!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   // Текущее здоровье базы.
-  private hp: number = GAME.baseHp;
+  private hp: number = Tank.baseHp;
   private score = 0;
   private coins = 0;
   // Номер текущей волны. До первой равен 0, beginNextWave сразу делает 1.
@@ -58,7 +58,7 @@ export class GameScene extends Phaser.Scene {
   private shopOpen = false;
   // Сколько раз купили радиус взрыва. 0 — снаряд бьёт только прямую цель.
   private blastLevel = 0;
-  // Сколько раз купили урон. Прибавляется к GAME.shellDamage.
+  // Сколько раз купили урон. Прибавляется к Infantry.shellDamage.
   private damageLevel = 0;
   // Проволока одна на всю партию. После поражения create сбрасывает и флаг, и ссылку.
   private wireOwned = false;
@@ -87,7 +87,7 @@ export class GameScene extends Phaser.Scene {
     EnemyShot.ensureTextures(this);
 
     // Повторный заход в create (после поражения) обязан начать с чистого счёта.
-    this.hp = GAME.baseHp;
+    this.hp = Tank.baseHp;
     this.score = 0;
     this.coins = 0;
     this.wave = 0;
@@ -135,7 +135,7 @@ export class GameScene extends Phaser.Scene {
     // Танк на глубине 25. Искры поверх брони, иначе вспышка прячется под корпус.
     this.armorSparks = createArmorSparks(this);
 
-    this.tank = new Tank(this, GAME.tankX, GAME.tankY);
+    this.tank = new Tank(this, Tank.spawn.x, Tank.spawn.y);
     // Прячем меню браузера ещё и на объекте мыши Phaser, не только в HTML.
     this.input.mouse?.disableContextMenu();
 
@@ -165,7 +165,7 @@ export class GameScene extends Phaser.Scene {
     this.createUi();
     this.applyCameraFx();
     // Первая волна не сразу: игрок успевает увидеть поле.
-    this.time.delayedCall(GAME.waveStartDelayMs, () => this.beginNextWave());
+    this.time.delayedCall(EnemyFactory.timing.startDelayMs, () => this.beginNextWave());
 
     // Разовый клик. Зажатая кнопка обрабатывается отдельно в update.
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -225,7 +225,7 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       // Линия стены. Стрелки до неё не доходят: они встают на x = 640.
-      if (unit.x <= GAME.reachX) {
+      if (unit.x <= Infantry.baseReachX) {
         this.hitBase(unit);
       }
     });
@@ -286,7 +286,7 @@ export class GameScene extends Phaser.Scene {
       this.hurtInfantry(direct);
     }
 
-    const blastRadius = this.blastLevel * GAME.blastRadiusPerLevel;
+    const blastRadius = this.blastLevel * Tank.blastRadiusPerLevel;
     // Нулевой уровень — только прямое попадание, круг по соседям не считаем.
     if (blastRadius <= 0) {
       return;
@@ -307,7 +307,7 @@ export class GameScene extends Phaser.Scene {
   // Один удар по врагу. Если здоровья не осталось — очки, монеты и анимация смерти.
   // damage задаёт проволока: её удар всегда 1, без уровня урона снаряда.
   // wire включает красное мигание вместо вспышки снаряда.
-  private hurtInfantry(unit: Infantry, damage = GAME.shellDamage + this.damageLevel, wire = false): void {
+  private hurtInfantry(unit: Infantry, damage = Infantry.shellDamage + this.damageLevel, wire = false): void {
     if (unit.hit(damage, wire)) {
       this.score += 10;
       this.coins += unit.coinReward;
@@ -319,7 +319,7 @@ export class GameScene extends Phaser.Scene {
 
   // Искры и короткая вспышка muzzle в точке взрыва. На прокачанном радиусе вспышка крупнее.
   private playBlast(x: number, y: number): void {
-    const radius = this.blastLevel * GAME.blastRadiusPerLevel;
+    const radius = this.blastLevel * Tank.blastRadiusPerLevel;
     this.blast.emitParticleAt(x, y, radius > 0 ? 16 : 8);
     const flash = this.add.image(x, y, 'muzzle').setDepth(16).setBlendMode(Phaser.BlendModes.ADD);
     flash.setScale(radius > 0 ? 1 : 0.55);
@@ -378,7 +378,7 @@ export class GameScene extends Phaser.Scene {
     this.waveText.setText(`WAVE  ${this.wave}`);
     this.showWaveBanner();
 
-    this.time.delayedCall(GAME.waveAnnounceMs, () => {
+    this.time.delayedCall(EnemyFactory.timing.announceMs, () => {
       if (this.gameOver) {
         return;
       }
@@ -411,7 +411,10 @@ export class GameScene extends Phaser.Scene {
   private releaseWave(): void {
     const count = this.remainingToSpawn;
     // На каждой волне промежуток меньше на 28 мс, но не ниже waveMinGap.
-    const gap = Math.max(GAME.waveMinGap, GAME.waveSpawnGap - (this.wave - 1) * 28);
+    const gap = Math.max(
+      EnemyFactory.timing.minGap,
+      EnemyFactory.timing.spawnGap - (this.wave - 1) * 28,
+    );
 
     for (let i = 0; i < count; i += 1) {
       // i * gap: первый враг сразу (0 мс), второй через gap, третий через 2 * gap.
@@ -466,7 +469,7 @@ export class GameScene extends Phaser.Scene {
 
   // Покупка радиуса. Если монет мало, выходим: карточка всё равно присылает клик.
   private buyBlast(): void {
-    const cost = upgradeCost(this.blastLevel);
+    const cost = ShopPanel.upgradeCost(this.blastLevel);
     if (this.coins < cost) {
       return;
     }
@@ -477,7 +480,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buyDamage(): void {
-    const cost = upgradeCost(this.damageLevel);
+    const cost = ShopPanel.upgradeCost(this.damageLevel);
     if (this.coins < cost) {
       return;
     }
@@ -489,10 +492,10 @@ export class GameScene extends Phaser.Scene {
 
   // Одна полоса на всю высоту поля. Повторный клик по уже купленной карточке сюда не доходит.
   private buyWire(): void {
-    if (this.wireOwned || this.coins < GAME.barbedWireCost) {
+    if (this.wireOwned || this.coins < BarbedWire.shop.cost) {
       return;
     }
-    this.coins -= GAME.barbedWireCost;
+    this.coins -= BarbedWire.shop.cost;
     this.wireOwned = true;
     this.wire = new BarbedWire(this);
     this.coinsText.setText(`COINS  ${this.coins}`);
@@ -510,8 +513,8 @@ export class GameScene extends Phaser.Scene {
       if (!wire.blocks(unit)) {
         return;
       }
-      if (unit.snare(GAME.barbedWireFace, delta)) {
-        this.hurtInfantry(unit, GAME.barbedWireDamage, true);
+      if (unit.snare(BarbedWire.bounds.face, delta, BarbedWire.shop.hurtIntervalMs)) {
+        this.hurtInfantry(unit, BarbedWire.shop.damage, true);
       }
     });
   }
@@ -542,6 +545,7 @@ export class GameScene extends Phaser.Scene {
       y,
       wave: this.wave,
       shots: this.enemyShots,
+      fireTarget: Tank.aimPoint(),
     });
     this.infantry.add(unit);
     // Скорость берёт ранг роста, который спавн записал в юнита. Пикап подменяет формулу своей.
@@ -556,7 +560,10 @@ export class GameScene extends Phaser.Scene {
     shell.setBlendMode(Phaser.BlendModes.ADD);
     // Картинка снаряда — горизонтальная вспышка, её крутим по углу ствола.
     shell.setRotation(angle);
-    shell.setVelocity(Math.cos(angle) * GAME.shellSpeed, Math.sin(angle) * GAME.shellSpeed);
+    shell.setVelocity(
+      Math.cos(angle) * Tank.shellSpeed,
+      Math.sin(angle) * Tank.shellSpeed,
+    );
     const body = shell.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
     // Круглое тело радиуса 18 нужно overlap-проверке. Урон по дистанции использует hitRadius врага.
@@ -613,7 +620,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.hp = Math.max(0, this.hp - amount);
     // Полная полоска — 236 пикселей. Доля hp / baseHp умножает ширину.
-    this.hpFill.width = 236 * (this.hp / GAME.baseHp);
+    this.hpFill.width = 236 * (this.hp / Tank.baseHp);
     if (this.hp <= 0) {
       this.beginDefeat();
     }

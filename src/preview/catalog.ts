@@ -8,7 +8,6 @@ import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { Tank } from '../entities/Tank';
-import { GAME } from '../gameConfig';
 import {
   ASSAULT_LOOK,
   BULLET_FRAME,
@@ -176,8 +175,8 @@ export const ENTITIES: PreviewEntity[] = [
       ]),
     ],
     shot: {
-      delay: GAME.fireDelay,
-      speed: GAME.shellSpeed,
+      delay: Tank.fireDelay,
+      speed: Tank.shellSpeed,
       projectile: 'shell',
       flash: 'muzzle',
     },

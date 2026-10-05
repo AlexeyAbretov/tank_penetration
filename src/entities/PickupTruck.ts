@@ -2,7 +2,6 @@
 // Урон пули меньше, чем у стрелка, но здоровье выше и награда больше.
 
 import Phaser from 'phaser';
-import { GAME, growthRank, vehicleDebutWave, waveHp } from '../gameConfig';
 import {
   PICKUP_FLASH_FRAME,
   PICKUP_FRAME,
@@ -11,11 +10,11 @@ import {
   type PickupPaint,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import type { SpawnContext } from './SpawnContext';
-import { Infantry } from './Infantry';
+import type { WorldPoint } from './WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
 export class PickupTruck extends RangedEnemy {
+  static readonly debutWave = 20;
   // Крест через центр повторяется каждые 180°. Шесть кадров делят эту половину оборота.
   static readonly wheelFrames = 6;
   static readonly corpseKey = 'pickup-wreck';
@@ -66,26 +65,17 @@ export class PickupTruck extends RangedEnemy {
   // Поворот картинки ствола к танку, без отдачи. Ноль — строго влево.
   private aim = 0;
 
-  static spawn(ctx: SpawnContext): Infantry {
-    // На 20-й волне ранг 1: здоровье и скорость как у первой волны. Дальше ранг растёт.
-    // Возвращаемый тип — общий Infantry, чтобы фабрика не зависела от конкретного класса.
-    // Пикап — первая техника в списке фабрики, поэтому индекс дебюта 0.
-    const rank = growthRank(ctx.wave, vehicleDebutWave(0));
-    const unit = new PickupTruck(ctx.scene, ctx.x, ctx.y, waveHp(rank), ctx.shots);
-    unit.paceWave = rank;
-    return unit;
-  }
-
   constructor(
     scene: Phaser.Scene,
     x: number,
     y: number,
     hp: number,
     shots: Phaser.Physics.Arcade.Group,
+    fireTarget: WorldPoint,
   ) {
     // hp + 1: машина чуть живучее пехоты той же волны.
     // Жёлтая полоска HP, текстуры pickup-0 … pickup-5, анимация pickup-drive.
-    super(scene, x, y, hp + 1, 'pickup-0', 'pickup-drive', 0xe0a020, shots);
+    super(scene, x, y, hp + 1, 'pickup-0', 'pickup-drive', 0xe0a020, shots, fireTarget);
     const placed = PickupTruck.placed;
     // Машина нарисована крупнее солдата, дополнительный масштаб небольшой.
     this.setScale(placed.scale);
@@ -148,7 +138,13 @@ export class PickupTruck extends RangedEnemy {
 
   // Дуло уже повёрнуто к танку: пуля выходит из наконечника и летит вдоль ствола.
   protected override shotPose(): { x: number; y: number; angle: number } {
-    this.aim = PickupTruck.aimAt(this.x, this.y, this.scaleX);
+    this.aim = PickupTruck.barrelAngle(
+      this.x,
+      this.y,
+      this.scaleX,
+      this.fireTarget.x,
+      this.fireTarget.y,
+    );
     return PickupTruck.muzzleAt(this.x, this.y, this.scaleX, this.aim);
   }
 
@@ -188,16 +184,28 @@ export class PickupTruck extends RangedEnemy {
     if (!this.gun.active) {
       return;
     }
-    this.aim = PickupTruck.aimAt(this.x, this.y, this.scaleX);
+    this.aim = PickupTruck.barrelAngle(
+      this.x,
+      this.y,
+      this.scaleX,
+      this.fireTarget.x,
+      this.fireTarget.y,
+    );
     PickupTruck.poseGun(this.gun, this.x, this.y, this.scaleX, this.aim, this.recoil);
     this.gun.setAlpha(this.alpha);
   }
 
   // Угол картинки ствола, чтобы наконечник смотрел в корпус танка.
   // Сама текстура при нуле уже смотрит влево, поэтому к углу на цель прибавляется разворот.
-  static aimAt(anchorX: number, anchorY: number, scale: number): number {
+  static barrelAngle(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    targetX: number,
+    targetY: number,
+  ): number {
     const mount = PickupTruck.mountPoint(anchorX, anchorY, scale);
-    const at = Phaser.Math.Angle.Between(mount.x, mount.y, GAME.tankX + 24, GAME.tankY);
+    const at = Phaser.Math.Angle.Between(mount.x, mount.y, targetX, targetY);
     return Phaser.Math.Angle.Wrap(at + Math.PI);
   }
 

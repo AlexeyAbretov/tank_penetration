@@ -2,7 +2,9 @@
 // Панель сама ничего не покупает — она вызывает функции, которые передала сцена.
 
 import Phaser from 'phaser';
-import { GAME, upgradeCost } from '../gameConfig';
+import { GAME } from '../gameConfig';
+import { BarbedWire } from '../entities/BarbedWire';
+import { Tank } from '../entities/Tank';
 
 // Три действия, которые сцена вешает на кнопки.
 type ShopHandlers = {
@@ -13,6 +15,15 @@ type ShopHandlers = {
 };
 
 export class ShopPanel {
+  static readonly upgrades = {
+    baseCost: 3,
+    costStep: 2,
+  };
+
+  static upgradeCost(level: number): number {
+    return ShopPanel.upgrades.baseCost + level * ShopPanel.upgrades.costStep;
+  }
+
   // Все куски интерфейса лежат в одном контейнере: показать и спрятать можно одним вызовом.
   readonly container: Phaser.GameObjects.Container;
 
@@ -191,11 +202,11 @@ export class ShopPanel {
     this.coinsText.setText(`Монеты  ${coins}`);
 
     // Цена зависит от того, сколько раз ЭТО улучшение уже брали. Уровни копируются независимо.
-    const blastPrice = upgradeCost(blastLevel);
-    const damagePrice = upgradeCost(damageLevel);
+    const blastPrice = ShopPanel.upgradeCost(blastLevel);
+    const damagePrice = ShopPanel.upgradeCost(damageLevel);
     // Текущий радиус и радиус после следующей покупки. На нулевом уровне радиус 0 — взрыв только по прямой цели.
-    const radius = blastLevel * GAME.blastRadiusPerLevel;
-    const nextRadius = (blastLevel + 1) * GAME.blastRadiusPerLevel;
+    const radius = blastLevel * Tank.blastRadiusPerLevel;
+    const nextRadius = (blastLevel + 1) * Tank.blastRadiusPerLevel;
 
     // Стрелка в тексте показывает «сейчас → после покупки».
     this.blastInfo.setText(`ур. ${blastLevel}   радиус ${radius} → ${nextRadius}`);
@@ -220,11 +231,11 @@ export class ShopPanel {
       return;
     }
     this.wireInfo.setText('не пускает пехоту · 1 урона / 3 с');
-    this.wireCost.setText(`цена  ${GAME.barbedWireCost}`);
+    this.wireCost.setText(`цена  ${BarbedWire.shop.cost}`);
     if (!this.wireCard.input?.enabled) {
       this.wireCard.setInteractive({ useHandCursor: true });
     }
-    this.tintCard(this.wireCard, this.wireCost, coins >= GAME.barbedWireCost);
+    this.tintCard(this.wireCard, this.wireCost, coins >= BarbedWire.shop.cost);
   }
 
   // Если монет не хватает, карточка темнеет и цена становится тусклой. Клик при этом всё равно приходит в сцену.
