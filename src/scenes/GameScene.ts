@@ -100,18 +100,9 @@ export class GameScene extends Phaser.Scene {
     this.shop.syncTankStats();
     this.waves.scheduleFirstWave();
 
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.player.isGameOver) {
-        if (this.hud.defeatOverlayVisible) {
-          this.scene.restart();
-        }
-        return;
-      }
-      if (this.shop.shopOpen) {
-        return;
-      }
-      if (pointer.leftButtonDown()) {
-        this.combat.shoot();
+    this.input.on('pointerdown', () => {
+      if (this.player.isGameOver && this.hud.defeatOverlayVisible) {
+        this.scene.restart();
       }
     });
   }
@@ -123,10 +114,6 @@ export class GameScene extends Phaser.Scene {
 
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
-
-    if (pointer.leftButtonDown()) {
-      this.combat.shoot();
-    }
 
     this.combat.tick(delta);
     this.projectiles.tick();

@@ -126,10 +126,16 @@ export class GameHud {
     this.coinsText.setText(`COINS  ${coins}`);
   }
 
-  setTankStats(damage: number, blastRadius: number, fireDelayMs: number): void {
+  setTankStats(
+    damage: number,
+    blastRadius: number,
+    fireDelayMs: number,
+    autoFire = false,
+  ): void {
     const fireSec = (fireDelayMs / 1000).toFixed(2);
+    const mode = autoFire ? 'авто' : 'ЛКМ';
     this.tankStatsText.setText(
-      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с`,
+      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с   ${mode}`,
     );
   }
 

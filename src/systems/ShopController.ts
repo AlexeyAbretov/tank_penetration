@@ -37,6 +37,7 @@ export class ShopController {
     this.damageLevel = 0;
     this.fireRateLevel = 0;
     this.wireOwned = false;
+    this.tank.setAutoFire(false);
     this.wire = undefined;
     this.shopOpen = false;
   }
@@ -51,6 +52,7 @@ export class ShopController {
       this.damageLevel,
       this.fireRateLevel,
       this.wireOwned,
+      this.tank.hasAutoFire,
     );
   }
 
@@ -105,11 +107,23 @@ export class ShopController {
     this.refresh();
   }
 
+  buyAutoFire(): void {
+    if (this.tank.hasAutoFire || this.economy.getCoins() < Tank.shop.autoFireCost) {
+      return;
+    }
+    if (!this.economy.spendCoins(Tank.shop.autoFireCost)) {
+      return;
+    }
+    this.tank.setAutoFire(true);
+    this.refresh();
+  }
+
   syncTankStats(): void {
     this.hud.setTankStats(
       Infantry.shellDamage + this.damageLevel,
       this.blastLevel * Tank.blastRadiusPerLevel,
       Tank.fireDelayFor(this.fireRateLevel),
+      this.tank.hasAutoFire,
     );
   }
 
@@ -122,6 +136,7 @@ export class ShopController {
       this.damageLevel,
       this.fireRateLevel,
       this.wireOwned,
+      this.tank.hasAutoFire,
     );
   }
 }

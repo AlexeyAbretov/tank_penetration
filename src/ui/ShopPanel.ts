@@ -12,6 +12,7 @@ export type ShopDelegate = {
   buyDamage(): void;
   buyFireRate(): void;
   buyWire(): void;
+  buyAutoFire(): void;
   closeAndContinue(): void;
 };
 
@@ -37,11 +38,14 @@ export class ShopPanel {
   private readonly fireRateCost: Phaser.GameObjects.Text;
   private readonly wireInfo: Phaser.GameObjects.Text;
   private readonly wireCost: Phaser.GameObjects.Text;
+  private readonly autoFireInfo: Phaser.GameObjects.Text;
+  private readonly autoFireCost: Phaser.GameObjects.Text;
   // Карточки — невидимые для логики прямоугольники, но именно они ловят клик.
   private readonly blastCard: Phaser.GameObjects.Rectangle;
   private readonly damageCard: Phaser.GameObjects.Rectangle;
   private readonly fireRateCard: Phaser.GameObjects.Rectangle;
   private readonly wireCard: Phaser.GameObjects.Rectangle;
+  private readonly autoFireCard: Phaser.GameObjects.Rectangle;
 
   constructor(scene: Phaser.Scene, shop: ShopDelegate) {
     // Затемнение на весь экран. Координаты детей контейнера считаются от его центра,
@@ -74,17 +78,20 @@ export class ShopPanel {
     this.blastCard = scene.add.rectangle(-210, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
     this.damageCard = scene.add.rectangle(0, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
     this.fireRateCard = scene.add.rectangle(210, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.wireCard = scene.add.rectangle(0, 58, 640, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
+    this.wireCard = scene.add.rectangle(-165, 58, 310, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
+    this.autoFireCard = scene.add.rectangle(165, 58, 310, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
     // setInteractive включает попадание курсором. useHandCursor меняет стрелку на «руку».
     this.blastCard.setInteractive({ useHandCursor: true });
     this.damageCard.setInteractive({ useHandCursor: true });
     this.fireRateCard.setInteractive({ useHandCursor: true });
     this.wireCard.setInteractive({ useHandCursor: true });
+    this.autoFireCard.setInteractive({ useHandCursor: true });
     // pointerup — отпускание кнопки мыши над карточкой, чтобы клик не срабатывал при нажатии «проездом».
     this.blastCard.on('pointerup', () => shop.buyBlast());
     this.damageCard.on('pointerup', () => shop.buyDamage());
     this.fireRateCard.on('pointerup', () => shop.buyFireRate());
     this.wireCard.on('pointerup', () => shop.buyWire());
+    this.autoFireCard.on('pointerup', () => shop.buyAutoFire());
 
     // Заголовки карточек нарисованы один раз: их текст не меняется.
     const blastTitle = scene.add
@@ -159,14 +166,14 @@ export class ShopPanel {
       .setOrigin(0.5);
 
     const wireTitle = scene.add
-      .text(0, 22, 'Колючая проволока', {
+      .text(-165, 22, 'Колючая проволока', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
         color: '#f3d56a',
       })
       .setOrigin(0.5);
     this.wireInfo = scene.add
-      .text(0, 50, '', {
+      .text(-165, 50, '', {
         fontFamily: 'Georgia, serif',
         fontSize: '16px',
         color: '#f0dcc0',
@@ -174,7 +181,30 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
     this.wireCost = scene.add
-      .text(0, 90, '', {
+      .text(-165, 90, '', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '20px',
+        color: '#f3d56a',
+      })
+      .setOrigin(0.5);
+
+    const autoFireTitle = scene.add
+      .text(165, 22, 'Автострельба', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '18px',
+        color: '#f3d56a',
+      })
+      .setOrigin(0.5);
+    this.autoFireInfo = scene.add
+      .text(165, 50, '', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '16px',
+        color: '#f0dcc0',
+        align: 'center',
+      })
+      .setOrigin(0.5);
+    this.autoFireCost = scene.add
+      .text(165, 90, '', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
         color: '#f3d56a',
@@ -212,9 +242,13 @@ export class ShopPanel {
       this.fireRateInfo,
       this.fireRateCost,
       this.wireCard,
+      this.autoFireCard,
       wireTitle,
       this.wireInfo,
       this.wireCost,
+      autoFireTitle,
+      this.autoFireInfo,
+      this.autoFireCost,
       next,
       nextLabel,
     ]);
@@ -229,8 +263,9 @@ export class ShopPanel {
     damageLevel: number,
     fireRateLevel: number,
     wireOwned: boolean,
+    autoFireOwned: boolean,
   ): void {
-    this.refresh(coins, blastLevel, damageLevel, fireRateLevel, wireOwned);
+    this.refresh(coins, blastLevel, damageLevel, fireRateLevel, wireOwned, autoFireOwned);
     this.container.setVisible(true);
   }
 
@@ -245,6 +280,7 @@ export class ShopPanel {
     damageLevel: number,
     fireRateLevel: number,
     wireOwned: boolean,
+    autoFireOwned: boolean,
   ): void {
     this.coinsText.setText(`Монеты  ${coins}`);
 
@@ -267,6 +303,7 @@ export class ShopPanel {
     this.tintCard(this.damageCard, this.damageCost, coins >= damagePrice);
     this.showFireRate(coins, fireRateLevel, fireRatePrice);
     this.showWire(coins, wireOwned);
+    this.showAutoFire(coins, autoFireOwned);
   }
 
   private formatDelay(ms: number): string {
@@ -312,6 +349,23 @@ export class ShopPanel {
       this.wireCard.setInteractive({ useHandCursor: true });
     }
     this.tintCard(this.wireCard, this.wireCost, coins >= BarbedWire.shop.cost);
+  }
+
+  private showAutoFire(coins: number, owned: boolean): void {
+    if (owned) {
+      this.autoFireInfo.setText('танк стреляет сам по кулдауну');
+      this.autoFireCost.setText('куплено');
+      this.autoFireCard.setFillStyle(0x3d2a12);
+      this.autoFireCost.setColor('#f3d56a');
+      this.autoFireCard.disableInteractive();
+      return;
+    }
+    this.autoFireInfo.setText('не нужно держать ЛКМ');
+    this.autoFireCost.setText(`цена  ${Tank.shop.autoFireCost}`);
+    if (!this.autoFireCard.input?.enabled) {
+      this.autoFireCard.setInteractive({ useHandCursor: true });
+    }
+    this.tintCard(this.autoFireCard, this.autoFireCost, coins >= Tank.shop.autoFireCost);
   }
 
   // Если монет не хватает, карточка темнеет и цена становится тусклой. Клик при этом всё равно приходит в сцену.

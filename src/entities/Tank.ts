@@ -33,6 +33,9 @@ export class Tank extends GameObjects.Container {
   static readonly shellSpeed = 740;
   static readonly baseHp = 100;
   static readonly blastRadiusPerLevel = 1;
+  static readonly shop = {
+    autoFireCost: 100,
+  };
 
   // Точка прицеливания врагов: чуть правее носа танка.
   static aimPoint(): { x: number; y: number } {
@@ -113,6 +116,7 @@ export class Tank extends GameObjects.Container {
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
   private fireRateLevel = 0;
+  private autoFire = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     // Контейнер сам стоит в (x, y). Дети внутри задаются уже относительно этой точки.
@@ -217,6 +221,14 @@ export class Tank extends GameObjects.Container {
 
   setFireRateLevel(level: number): void {
     this.fireRateLevel = Math.min(level, Tank.maxFireRateLevel);
+  }
+
+  get hasAutoFire(): boolean {
+    return this.autoFire;
+  }
+
+  setAutoFire(enabled: boolean): void {
+    this.autoFire = enabled;
   }
 
   // Сцена зовёт это каждый кадр, чтобы кулдаун уменьшался даже без выстрела.

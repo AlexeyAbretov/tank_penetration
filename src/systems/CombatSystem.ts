@@ -52,7 +52,15 @@ export class CombatSystem {
     }
   }
 
+  // ЛКМ и автострельба — здесь, чтобы сцена не знала про покупки магазина.
+  handleFireInput(pointer: Phaser.Input.Pointer): void {
+    if (this.tank.hasAutoFire || pointer.leftButtonDown()) {
+      this.shoot();
+    }
+  }
+
   tick(delta: number): void {
+    this.handleFireInput(this.scene.input.activePointer);
     this.resolveShellHits();
     this.cleanupShells();
     this.snareOnWire(delta);
