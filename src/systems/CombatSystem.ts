@@ -1,6 +1,7 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, арт удар и контакт с базой.
 
 import Phaser from 'phaser';
+import { ArtilleryStrike, type ArtilleryFlight } from '../entities/ArtilleryStrike';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
@@ -19,6 +20,10 @@ export class CombatSystem {
   private readonly shells: Phaser.Physics.Arcade.Group;
   private readonly mgShots: Phaser.Physics.Arcade.Group;
   private mgCooldown = 0;
+  private artilleryCooldownMs = 0;
+  private readonly strikeKeys: Phaser.Input.Keyboard.Key[] = [];
+  private flights: ArtilleryFlight[] = [];
+  private salvoTimers: Phaser.Time.TimerEvent[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -30,11 +35,23 @@ export class CombatSystem {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
     this.mgShots = scene.physics.add.group();
+    const keyboard = scene.input.keyboard;
+    if (keyboard) {
+      this.strikeKeys.push(
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ONE),
+      );
+    }
+  }
+
+  get artilleryCooldown(): number {
+    return this.artilleryCooldownMs;
   }
 
   clearProjectiles(): void {
     this.shells.clear(true, true);
     this.mgShots.clear(true, true);
+    this.cancelArtillery();
   }
 
   setupOverlap(): void {
@@ -66,6 +83,63 @@ export class CombatSystem {
     if (this.tank.hasAutoFire || pointer.leftButtonDown()) {
       this.shoot();
     }
+  }
+
+  // Перезарядка идёт и в магазине. Выстрел — только в бою, по клавише 1.
+  tickArtillery(delta: number, canFire: boolean): void {
+    if (!this.shop.artilleryOwned) {
+      return;
+    }
+    this.artilleryCooldownMs = Math.max(0, this.artilleryCooldownMs - delta);
+    if (!canFire || this.artilleryCooldownMs > 0 || !this.strikePressed()) {
+      return;
+    }
+    this.artilleryCooldownMs = ArtilleryStrike.shop.cooldownMs;
+    this.launchArtillery();
+  }
+
+  private strikePressed(): boolean {
+    return this.strikeKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  private launchArtillery(): void {
+    const gap = ArtilleryStrike.shop.gapMs;
+    ArtilleryStrike.impacts().forEach((point, index) => {
+      const timer = this.scene.time.delayedCall(index * gap, () => {
+        this.salvoTimers = this.salvoTimers.filter((item) => item !== timer);
+        const flight = ArtilleryStrike.drop(this.scene, point.x, point.y, () => {
+          this.flights = this.flights.filter((item) => item !== flight);
+          this.detonateArtillery(point.x, point.y);
+        });
+        this.flights.push(flight);
+      });
+      this.salvoTimers.push(timer);
+    });
+  }
+
+  private detonateArtillery(x: number, y: number): void {
+    ArtilleryStrike.boom(this.scene, x, y);
+    const radius = ArtilleryStrike.shop.blastRadius;
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (!unit.active || unit.reachedWall) {
+        return;
+      }
+      const torso = this.torsoPoint(unit);
+      if (Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= radius) {
+        this.hurtInfantry(unit, ArtilleryStrike.shop.damage);
+      }
+    });
+  }
+
+  private cancelArtillery(): void {
+    for (const timer of this.salvoTimers) {
+      timer.remove(false);
+    }
+    this.salvoTimers = [];
+    for (const flight of this.flights) {
+      flight.cancel();
+    }
+    this.flights = [];
   }
 
   tick(delta: number): void {

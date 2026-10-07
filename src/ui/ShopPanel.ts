@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
+import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BarbedWire } from '../entities/BarbedWire';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
@@ -16,6 +17,7 @@ export type ShopDelegate = {
   buyWire(): void;
   buyAutoFire(): void;
   buyMachineGun(): void;
+  buyArtillery(): void;
   closeAndContinue(): void;
 };
 
@@ -34,7 +36,7 @@ const CARD_H = 112;
 const CARD_GAP = 12;
 const CARD_W = VIEW_W - 16;
 const CONTENT_PAD = 6;
-const OFFER_COUNT = 6;
+const OFFER_COUNT = 7;
 
 const TITLE_WRAP = CARD_W - 190;
 const INFO_WRAP = CARD_W - 44;
@@ -65,6 +67,7 @@ export class ShopPanel {
   private readonly wire: Offer;
   private readonly autoFire: Offer;
   private readonly machineGun: Offer;
+  private readonly artillery: Offer;
 
   // Камера с маленьким окном обрезает карточки, которые уехали за шапку или кнопку.
   private readonly listCam: Phaser.Cameras.Scene2D.Camera;
@@ -109,6 +112,7 @@ export class ShopPanel {
     this.wire = this.makeOffer(scene, 3, 'Колючая проволока', () => shop.buyWire());
     this.autoFire = this.makeOffer(scene, 4, 'Автострельба', () => shop.buyAutoFire());
     this.machineGun = this.makeOffer(scene, 5, 'Пулемёт', () => shop.buyMachineGun());
+    this.artillery = this.makeOffer(scene, 6, 'Артиллерийский удар', () => shop.buyArtillery());
 
     const dim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.62);
     const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
@@ -196,9 +200,19 @@ export class ShopPanel {
     wireOwned: boolean,
     autoFireOwned: boolean,
     machineGunOwned: boolean,
+    artilleryOwned: boolean,
   ): void {
     this.setScroll(0);
-    this.refresh(coins, blastLevel, damageLevel, fireRateLevel, wireOwned, autoFireOwned, machineGunOwned);
+    this.refresh(
+      coins,
+      blastLevel,
+      damageLevel,
+      fireRateLevel,
+      wireOwned,
+      autoFireOwned,
+      machineGunOwned,
+      artilleryOwned,
+    );
     this.syncListCamera();
     this.container.setVisible(true);
     this.listContent.setVisible(true);
@@ -221,6 +235,7 @@ export class ShopPanel {
     wireOwned: boolean,
     autoFireOwned: boolean,
     machineGunOwned: boolean,
+    artilleryOwned: boolean,
   ): void {
     this.coinsText.setText(`Монеты  ${coins}`);
 
@@ -241,6 +256,7 @@ export class ShopPanel {
     this.showWire(coins, wireOwned);
     this.showAutoFire(coins, autoFireOwned);
     this.showMachineGun(coins, machineGunOwned);
+    this.showArtillery(coins, artilleryOwned);
   }
 
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
@@ -420,6 +436,28 @@ export class ShopPanel {
       this.machineGun.card.setInteractive({ useHandCursor: true });
     }
     this.tintCard(this.machineGun.card, this.machineGun.cost, coins >= MachineGun.shop.cost);
+  }
+
+  private showArtillery(coins: number, owned: boolean): void {
+    const offer = ArtilleryStrike.shop;
+    const reload = offer.cooldownMs / 1000;
+    const crater = offer.craterMs / 1000;
+    if (owned) {
+      this.artillery.info.setText(`клавиша 1 · перезарядка ${reload} с`);
+      this.artillery.cost.setText('куплено');
+      this.artillery.card.setFillStyle(0x3d2a12);
+      this.artillery.cost.setColor('#f3d56a');
+      this.artillery.card.disableInteractive();
+      return;
+    }
+    this.artillery.info.setText(
+      `${offer.shells} снаряда в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 1 · перезарядка ${reload} с`,
+    );
+    this.artillery.cost.setText(`цена  ${offer.cost}`);
+    if (!this.artillery.card.input?.enabled) {
+      this.artillery.card.setInteractive({ useHandCursor: true });
+    }
+    this.tintCard(this.artillery.card, this.artillery.cost, coins >= offer.cost);
   }
 
   private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {

@@ -2,6 +2,7 @@
 // сущности сами вызывают bake() из textures.ts, цикл сломает studio.
 
 import Phaser from 'phaser';
+import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
@@ -16,6 +17,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
     createTextures(scene);
   }
   Tank.ensureTextures(scene);
+  ArtilleryStrike.ensureTextures(scene);
   AssaultInfantry.ensureTextures(scene);
   GunnerInfantry.ensureTextures(scene);
   RocketInfantry.ensureTextures(scene);

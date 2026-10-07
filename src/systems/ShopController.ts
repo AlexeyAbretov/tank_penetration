@@ -1,6 +1,7 @@
 // Покупки между волнами: прокачка, проволока и пауза боя.
 
 import Phaser from 'phaser';
+import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
@@ -23,6 +24,7 @@ export class ShopController {
   wire?: BarbedWire;
   machineGunOwned = false;
   machineGun?: MachineGun;
+  artilleryOwned = false;
   shopOpen = false;
 
   constructor(
@@ -41,6 +43,7 @@ export class ShopController {
     this.fireRateLevel = 0;
     this.wireOwned = false;
     this.machineGunOwned = false;
+    this.artilleryOwned = false;
     this.tank.setAutoFire(false);
     this.wire = undefined;
     this.machineGun = undefined;
@@ -59,6 +62,7 @@ export class ShopController {
       this.wireOwned,
       this.tank.hasAutoFire,
       this.machineGunOwned,
+      this.artilleryOwned,
     );
   }
 
@@ -136,6 +140,17 @@ export class ShopController {
     this.refresh();
   }
 
+  buyArtillery(): void {
+    if (this.artilleryOwned || this.economy.getCoins() < ArtilleryStrike.shop.cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(ArtilleryStrike.shop.cost)) {
+      return;
+    }
+    this.artilleryOwned = true;
+    this.refresh();
+  }
+
   syncTankStats(): void {
     this.hud.setTankStats(
       Infantry.shellDamage + this.damageLevel,
@@ -156,6 +171,7 @@ export class ShopController {
       this.wireOwned,
       this.tank.hasAutoFire,
       this.machineGunOwned,
+      this.artilleryOwned,
     );
   }
 }

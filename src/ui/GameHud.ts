@@ -1,6 +1,7 @@
 // Счёт, полоска HP, баннер волны и плашка поражения.
 
 import Phaser from 'phaser';
+import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 export class GameHud {
@@ -10,7 +11,12 @@ export class GameHud {
   private readonly tankStatsText: Phaser.GameObjects.Text;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
   private readonly waveBanner: Phaser.GameObjects.Text;
+  private readonly controls: Phaser.GameObjects.Text;
+  private readonly artillery: Phaser.GameObjects.Container;
+  private readonly artillerySweep: Phaser.GameObjects.Graphics;
+  private readonly artilleryTime: Phaser.GameObjects.Text;
   private readonly overlay: Phaser.GameObjects.Container;
+  private artilleryOwned = false;
 
   constructor(scene: Phaser.Scene) {
     scene.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
@@ -79,7 +85,7 @@ export class GameHud {
       .setDepth(60)
       .setAlpha(0);
 
-    scene.add
+    this.controls = scene.add
       .text(GAME.width / 2, 708, 'мышь — прицел   ЛКМ — огонь', {
         fontFamily: 'Georgia, serif',
         fontSize: '14px',
@@ -88,6 +94,32 @@ export class GameHud {
       .setOrigin(0.5)
       .setDepth(51)
       .setAlpha(0.8);
+
+    ArtilleryStrike.ensureTextures(scene);
+    const glyph = scene.add.image(0, 0, ArtilleryStrike.iconKey);
+    this.artillerySweep = scene.add.graphics();
+    this.artilleryTime = scene.add
+      .text(0, 2, '', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '22px',
+        color: '#f3d56a',
+        stroke: '#2a0a08',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5);
+    const badge = scene.add.circle(20, 20, 10, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const key = scene.add
+      .text(20, 20, '1', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '14px',
+        color: '#f3d56a',
+      })
+      .setOrigin(0.5);
+    // Над баннером, у левого края поля.
+    this.artillery = scene.add
+      .container(56, GAME.bannerY - 48, [glyph, this.artillerySweep, this.artilleryTime, badge, key])
+      .setDepth(53)
+      .setVisible(false);
 
     scene.add.image(1128, 28, 'hp-frame').setDepth(51);
     scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
@@ -137,6 +169,39 @@ export class GameHud {
     this.tankStatsText.setText(
       `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с   ${mode}`,
     );
+  }
+
+  setArtillery(owned: boolean, cooldownMs: number): void {
+    if (this.artilleryOwned !== owned) {
+      this.artilleryOwned = owned;
+      this.artillery.setVisible(owned);
+      this.controls.setText(
+        owned ? 'мышь — прицел   ЛКМ — огонь   1 — удар' : 'мышь — прицел   ЛКМ — огонь',
+      );
+    }
+    if (!owned) {
+      return;
+    }
+
+    const cooling = cooldownMs > 0;
+    const label = cooling ? `${Math.ceil(cooldownMs / 1000)}` : '';
+    if (this.artilleryTime.text !== label) {
+      this.artilleryTime.setText(label);
+    }
+
+    this.artillerySweep.clear();
+    if (!cooling) {
+      return;
+    }
+    const ratio = Math.min(1, cooldownMs / ArtilleryStrike.shop.cooldownMs);
+    const radius = ArtilleryStrike.iconRadius - 4;
+    this.artillerySweep.fillStyle(0x000000, 0.62);
+    if (ratio > 0.98) {
+      this.artillerySweep.fillCircle(0, 0, radius);
+      return;
+    }
+    this.artillerySweep.slice(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
+    this.artillerySweep.fillPath();
   }
 
   setHp(hp: number): void {

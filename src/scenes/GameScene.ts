@@ -104,7 +104,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.player.isGameOver || this.shop.shopOpen) {
+    if (this.player.isGameOver) {
+      return;
+    }
+
+    const fighting = !this.shop.shopOpen;
+    this.combat.tickArtillery(delta, fighting);
+    this.hud.setArtillery(this.shop.artilleryOwned, this.combat.artilleryCooldown);
+    if (!fighting) {
       return;
     }
 
