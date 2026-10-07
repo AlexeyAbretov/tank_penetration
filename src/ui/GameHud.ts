@@ -3,25 +3,16 @@
 import Phaser from 'phaser';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
-import { ShopPanel } from './ShopPanel';
-
-type ShopHandlers = {
-  onBuyBlast: () => void;
-  onBuyDamage: () => void;
-  onBuyWire: () => void;
-  onContinue: () => void;
-};
-
 export class GameHud {
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waveText: Phaser.GameObjects.Text;
   private readonly coinsText: Phaser.GameObjects.Text;
+  private readonly tankStatsText: Phaser.GameObjects.Text;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
   private readonly waveBanner: Phaser.GameObjects.Text;
   private readonly overlay: Phaser.GameObjects.Container;
-  readonly shop: ShopPanel;
 
-  constructor(scene: Phaser.Scene, shopHandlers: ShopHandlers) {
+  constructor(scene: Phaser.Scene) {
     scene.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
 
     scene.add
@@ -62,6 +53,17 @@ export class GameHud {
         color: '#f3d56a',
         stroke: '#2a0a08',
         strokeThickness: 4,
+      })
+      .setDepth(51);
+
+    this.tankStatsText = scene.add
+      .text(28, 104, '', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '16px',
+        color: '#e8c48a',
+        stroke: '#2a0a08',
+        strokeThickness: 3,
+        lineSpacing: 4,
       })
       .setDepth(51);
 
@@ -110,8 +112,6 @@ export class GameHud {
       })
       .setOrigin(0.5);
     this.overlay.add([dim, title, hint]);
-
-    this.shop = new ShopPanel(scene, shopHandlers);
   }
 
   setScore(score: number): void {
@@ -124,6 +124,13 @@ export class GameHud {
 
   setCoins(coins: number): void {
     this.coinsText.setText(`COINS  ${coins}`);
+  }
+
+  setTankStats(damage: number, blastRadius: number, fireDelayMs: number): void {
+    const fireSec = (fireDelayMs / 1000).toFixed(2);
+    this.tankStatsText.setText(
+      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с`,
+    );
   }
 
   setHp(hp: number): void {

@@ -1,17 +1,18 @@
 // Окно магазина между волнами: улучшения, колючая проволока и кнопка «дальше».
-// Панель сама ничего не покупает — она вызывает функции, которые передала сцена.
+// Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Tank } from '../entities/Tank';
 
-// Три действия, которые сцена вешает на кнопки.
-type ShopHandlers = {
-  onBuyBlast: () => void; // купить радиус взрыва
-  onBuyDamage: () => void; // купить урон снаряда
-  onBuyWire: () => void; // поставить колючую проволоку перед танком
-  onContinue: () => void; // закрыть магазин и начать следующую волну
+// Методы покупок, которые реализует ShopController.
+export type ShopDelegate = {
+  buyBlast(): void;
+  buyDamage(): void;
+  buyFireRate(): void;
+  buyWire(): void;
+  closeAndContinue(): void;
 };
 
 export class ShopPanel {
@@ -32,24 +33,27 @@ export class ShopPanel {
   private readonly damageInfo: Phaser.GameObjects.Text;
   private readonly blastCost: Phaser.GameObjects.Text;
   private readonly damageCost: Phaser.GameObjects.Text;
+  private readonly fireRateInfo: Phaser.GameObjects.Text;
+  private readonly fireRateCost: Phaser.GameObjects.Text;
   private readonly wireInfo: Phaser.GameObjects.Text;
   private readonly wireCost: Phaser.GameObjects.Text;
   // Карточки — невидимые для логики прямоугольники, но именно они ловят клик.
   private readonly blastCard: Phaser.GameObjects.Rectangle;
   private readonly damageCard: Phaser.GameObjects.Rectangle;
+  private readonly fireRateCard: Phaser.GameObjects.Rectangle;
   private readonly wireCard: Phaser.GameObjects.Rectangle;
 
-  constructor(scene: Phaser.Scene, handlers: ShopHandlers) {
+  constructor(scene: Phaser.Scene, shop: ShopDelegate) {
     // Затемнение на весь экран. Координаты детей контейнера считаются от его центра,
     // поэтому (0, 0) здесь — середина экрана, а не левый верхний угол.
     const dim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.62);
     // Тёмно-красная плашка окна. Последний аргумент 0.96 — почти непрозрачная заливка.
-    const panel = scene.add.rectangle(0, 16, 660, 560, 0x3a0c0c, 0.96);
+    const panel = scene.add.rectangle(0, 24, 700, 620, 0x3a0c0c, 0.96);
     // Золотая обводка толщиной 4 пикселя.
     panel.setStrokeStyle(4, 0xc9a227);
 
     const title = scene.add
-      .text(0, -228, 'МАГАЗИН', {
+      .text(0, -258, 'МАГАЗИН', {
         fontFamily: 'Cinzel, Georgia, serif', // если Cinzel не загрузился, берётся Georgia, затем любой serif
         fontSize: '40px',
         color: '#f3d56a',
@@ -59,29 +63,32 @@ export class ShopPanel {
       .setOrigin(0.5); // якорь текста в центре, а не в левом верхнем углу букв
 
     this.coinsText = scene.add
-      .text(0, -182, 'Монеты  0', {
+      .text(0, -212, 'Монеты  0', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '22px',
         color: '#f0dcc0',
       })
       .setOrigin(0.5);
 
-    // Две карточки рядом: взрыв слева, урон справа.
-    this.blastCard = scene.add.rectangle(-160, -48, 270, 150, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.damageCard = scene.add.rectangle(160, -48, 270, 150, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.wireCard = scene.add.rectangle(0, 108, 580, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
+    // Три карточки в ряд: взрыв, урон, скорострельность.
+    this.blastCard = scene.add.rectangle(-210, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
+    this.damageCard = scene.add.rectangle(0, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
+    this.fireRateCard = scene.add.rectangle(210, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
+    this.wireCard = scene.add.rectangle(0, 58, 640, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
     // setInteractive включает попадание курсором. useHandCursor меняет стрелку на «руку».
     this.blastCard.setInteractive({ useHandCursor: true });
     this.damageCard.setInteractive({ useHandCursor: true });
+    this.fireRateCard.setInteractive({ useHandCursor: true });
     this.wireCard.setInteractive({ useHandCursor: true });
     // pointerup — отпускание кнопки мыши над карточкой, чтобы клик не срабатывал при нажатии «проездом».
-    this.blastCard.on('pointerup', handlers.onBuyBlast);
-    this.damageCard.on('pointerup', handlers.onBuyDamage);
-    this.wireCard.on('pointerup', handlers.onBuyWire);
+    this.blastCard.on('pointerup', () => shop.buyBlast());
+    this.damageCard.on('pointerup', () => shop.buyDamage());
+    this.fireRateCard.on('pointerup', () => shop.buyFireRate());
+    this.wireCard.on('pointerup', () => shop.buyWire());
 
     // Заголовки карточек нарисованы один раз: их текст не меняется.
     const blastTitle = scene.add
-      .text(-160, -100, '+1 область взрыва', {
+      .text(-210, -132, '+1 область взрыва', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
         color: '#f3d56a',
@@ -89,7 +96,7 @@ export class ShopPanel {
       .setOrigin(0.5);
     // Уровень и радиус подставляются в refresh, поэтому стартовая строка пустая.
     this.blastInfo = scene.add
-      .text(-160, -60, '', {
+      .text(-210, -98, '', {
         fontFamily: 'Georgia, serif',
         fontSize: '16px',
         color: '#f0dcc0',
@@ -97,7 +104,7 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
     this.blastCost = scene.add
-      .text(-160, -10, '', {
+      .text(-210, -48, '', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
         color: '#f3d56a',
@@ -105,14 +112,14 @@ export class ShopPanel {
       .setOrigin(0.5);
 
     const damageTitle = scene.add
-      .text(160, -100, '+1 урон', {
+      .text(0, -132, '+1 урон', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
         color: '#f3d56a',
       })
       .setOrigin(0.5);
     this.damageInfo = scene.add
-      .text(160, -60, '', {
+      .text(0, -98, '', {
         fontFamily: 'Georgia, serif',
         fontSize: '16px',
         color: '#f0dcc0',
@@ -120,7 +127,31 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
     this.damageCost = scene.add
-      .text(160, -10, '', {
+      .text(0, -48, '', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '20px',
+        color: '#f3d56a',
+      })
+      .setOrigin(0.5);
+
+    const fireRateTitle = scene.add
+      .text(210, -132, '−0.02 с перезарядки', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '16px',
+        color: '#f3d56a',
+        align: 'center',
+      })
+      .setOrigin(0.5);
+    this.fireRateInfo = scene.add
+      .text(210, -98, '', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '15px',
+        color: '#f0dcc0',
+        align: 'center',
+      })
+      .setOrigin(0.5);
+    this.fireRateCost = scene.add
+      .text(210, -48, '', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
         color: '#f3d56a',
@@ -128,14 +159,14 @@ export class ShopPanel {
       .setOrigin(0.5);
 
     const wireTitle = scene.add
-      .text(0, 72, 'Колючая проволока', {
+      .text(0, 22, 'Колючая проволока', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
         color: '#f3d56a',
       })
       .setOrigin(0.5);
     this.wireInfo = scene.add
-      .text(0, 100, '', {
+      .text(0, 50, '', {
         fontFamily: 'Georgia, serif',
         fontSize: '16px',
         color: '#f0dcc0',
@@ -143,7 +174,7 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
     this.wireCost = scene.add
-      .text(0, 140, '', {
+      .text(0, 90, '', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
         color: '#f3d56a',
@@ -151,11 +182,11 @@ export class ShopPanel {
       .setOrigin(0.5);
 
     // Кнопка продолжения под карточками.
-    const next = scene.add.rectangle(0, 230, 280, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const next = scene.add.rectangle(0, 180, 280, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
     next.setInteractive({ useHandCursor: true });
-    next.on('pointerup', handlers.onContinue);
+    next.on('pointerup', () => shop.closeAndContinue());
     const nextLabel = scene.add
-      .text(0, 230, 'СЛЕДУЮЩАЯ ВОЛНА', {
+      .text(0, 180, 'СЛЕДУЮЩАЯ ВОЛНА', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
         color: '#f3d56a',
@@ -170,12 +201,16 @@ export class ShopPanel {
       this.coinsText,
       this.blastCard,
       this.damageCard,
+      this.fireRateCard,
       blastTitle,
       this.blastInfo,
       this.blastCost,
       damageTitle,
       this.damageInfo,
       this.damageCost,
+      fireRateTitle,
+      this.fireRateInfo,
+      this.fireRateCost,
       this.wireCard,
       wireTitle,
       this.wireInfo,
@@ -188,8 +223,14 @@ export class ShopPanel {
   }
 
   // Показывает магазин и сразу пишет актуальные цены.
-  show(coins: number, blastLevel: number, damageLevel: number, wireOwned: boolean): void {
-    this.refresh(coins, blastLevel, damageLevel, wireOwned);
+  show(
+    coins: number,
+    blastLevel: number,
+    damageLevel: number,
+    fireRateLevel: number,
+    wireOwned: boolean,
+  ): void {
+    this.refresh(coins, blastLevel, damageLevel, fireRateLevel, wireOwned);
     this.container.setVisible(true);
   }
 
@@ -198,12 +239,19 @@ export class ShopPanel {
   }
 
   // Перерисовывает цифры. Сцена зовёт это после каждой покупки, не закрывая окно.
-  refresh(coins: number, blastLevel: number, damageLevel: number, wireOwned: boolean): void {
+  refresh(
+    coins: number,
+    blastLevel: number,
+    damageLevel: number,
+    fireRateLevel: number,
+    wireOwned: boolean,
+  ): void {
     this.coinsText.setText(`Монеты  ${coins}`);
 
     // Цена зависит от того, сколько раз ЭТО улучшение уже брали. Уровни копируются независимо.
     const blastPrice = ShopPanel.upgradeCost(blastLevel);
     const damagePrice = ShopPanel.upgradeCost(damageLevel);
+    const fireRatePrice = ShopPanel.upgradeCost(fireRateLevel);
     // Текущий радиус и радиус после следующей покупки. На нулевом уровне радиус 0 — взрыв только по прямой цели.
     const radius = blastLevel * Tank.blastRadiusPerLevel;
     const nextRadius = (blastLevel + 1) * Tank.blastRadiusPerLevel;
@@ -217,7 +265,35 @@ export class ShopPanel {
 
     this.tintCard(this.blastCard, this.blastCost, coins >= blastPrice);
     this.tintCard(this.damageCard, this.damageCost, coins >= damagePrice);
+    this.showFireRate(coins, fireRateLevel, fireRatePrice);
     this.showWire(coins, wireOwned);
+  }
+
+  private formatDelay(ms: number): string {
+    return `${(ms / 1000).toFixed(2)} с`;
+  }
+
+  private showFireRate(coins: number, level: number, price: number): void {
+    const maxed = level >= Tank.maxFireRateLevel;
+    const delay = Tank.fireDelayFor(level);
+    const nextDelay = Tank.fireDelayFor(level + 1);
+    this.fireRateInfo.setText(
+      maxed
+        ? `ур. ${level}   ${this.formatDelay(delay)} (макс.)`
+        : `ур. ${level}   ${this.formatDelay(delay)} → ${this.formatDelay(nextDelay)}`,
+    );
+    if (maxed) {
+      this.fireRateCost.setText('максимум');
+      this.fireRateCard.setFillStyle(0x3d2a12);
+      this.fireRateCost.setColor('#f3d56a');
+      this.fireRateCard.disableInteractive();
+      return;
+    }
+    this.fireRateCost.setText(`цена  ${price}`);
+    if (!this.fireRateCard.input?.enabled) {
+      this.fireRateCard.setInteractive({ useHandCursor: true });
+    }
+    this.tintCard(this.fireRateCard, this.fireRateCost, coins >= price);
   }
 
   // Проволока покупается один раз. После установки карточка гаснет и больше не ловит клик.

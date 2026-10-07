@@ -45,12 +45,7 @@ export class GameScene extends Phaser.Scene {
     this.enemyShots = this.physics.add.group();
     this.infantry = this.physics.add.group();
 
-    this.hud = new GameHud(this, {
-      onBuyBlast: () => this.shop.buyBlast(),
-      onBuyDamage: () => this.shop.buyDamage(),
-      onBuyWire: () => this.shop.buyWire(),
-      onContinue: () => this.shop.closeAndContinue(),
-    });
+    this.hud = new GameHud(this);
 
     this.player = new PlayerController(this, this.hud, {
       shells: this.shells,
@@ -59,16 +54,22 @@ export class GameScene extends Phaser.Scene {
     });
     this.player.reset();
 
-    this.shop = new ShopController(this, this.hud, {
-      getCoins: () => this.coins,
-      spendCoins: (amount) => {
-        if (this.coins < amount) {
-          return false;
-        }
-        this.coins -= amount;
-        return true;
+    this.shop = new ShopController(
+      this,
+      this.hud,
+      this.player.tank,
+      {
+        getCoins: () => this.coins,
+        spendCoins: (amount) => {
+          if (this.coins < amount) {
+            return false;
+          }
+          this.coins -= amount;
+          return true;
+        },
       },
-    }, () => this.waves.beginNextWave());
+      () => this.waves.beginNextWave(),
+    );
 
     this.combat = new CombatSystem(this, this.player.tank, this.shells, this.infantry, {
       getBlastLevel: () => this.shop.blastLevel,
@@ -96,6 +97,7 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.applyCameraFx();
+    this.shop.syncTankStats();
     this.waves.scheduleFirstWave();
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {

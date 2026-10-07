@@ -175,7 +175,7 @@ export const ENTITIES: PreviewEntity[] = [
       ]),
     ],
     shot: {
-      delay: Tank.fireDelay,
+      delay: Tank.baseFireDelay,
       speed: Tank.shellSpeed,
       projectile: 'shell',
       flash: 'muzzle',

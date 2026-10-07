@@ -20,7 +20,16 @@ import { bake } from '../gfx/textures';
 
 export class Tank extends GameObjects.Container {
   static readonly spawn = { x: 76, y: 360 };
-  static readonly fireDelay = 380;
+  static readonly baseFireDelay = 1000;
+  static readonly minFireDelay = 200;
+  static readonly fireRateStep = 20;
+  static readonly maxFireRateLevel =
+    (Tank.baseFireDelay - Tank.minFireDelay) / Tank.fireRateStep;
+
+  static fireDelayFor(level: number): number {
+    const capped = Math.min(level, Tank.maxFireRateLevel);
+    return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep);
+  }
   static readonly shellSpeed = 740;
   static readonly baseHp = 100;
   static readonly blastRadiusPerLevel = 1;
@@ -103,6 +112,7 @@ export class Tank extends GameObjects.Container {
   private engineMs = 0;
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
+  private fireRateLevel = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     // Контейнер сам стоит в (x, y). Дети внутри задаются уже относительно этой точки.
@@ -205,6 +215,10 @@ export class Tank extends GameObjects.Container {
     this.aim.setRotation(Phaser.Math.Clamp(angle, -0.85, 0.85));
   }
 
+  setFireRateLevel(level: number): void {
+    this.fireRateLevel = Math.min(level, Tank.maxFireRateLevel);
+  }
+
   // Сцена зовёт это каждый кадр, чтобы кулдаун уменьшался даже без выстрела.
   tick(delta: number): void {
     this.cooldown = Math.max(0, this.cooldown - delta);
@@ -216,7 +230,7 @@ export class Tank extends GameObjects.Container {
       return null;
     }
     // Сразу занимаем кулдаун, чтобы зажатая кнопка мыши не выпускала снаряд каждый кадр.
-    this.cooldown = Tank.fireDelay;
+    this.cooldown = Tank.fireDelayFor(this.fireRateLevel);
     const shot = this.getMuzzle();
     // Откат в координатах башни: минус X — назад вдоль ствола, угол башни уже учтён.
     const layout = Tank.layout;
