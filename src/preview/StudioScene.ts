@@ -345,16 +345,11 @@ export class StudioScene extends Phaser.Scene {
     pivot.add([turret, gun]);
     if (view.machineGun) {
       const mgLayout = MachineGun.layout;
-      const mgRoot = this.add.container(mgLayout.x, mgLayout.y);
-      const mgBase = this.add.image(0, 0, 'studio-mg-mount');
-      mgBase.setOrigin(0.35, 0.5);
-      const mgBarrel = this.add.image(8, -2, 'studio-mg-mount');
-      mgBarrel.setOrigin(mgLayout.originX, mgLayout.originY);
-      mgBarrel.setScale(0.55, 0.42);
-      mgRoot.add([mgBase, mgBarrel]);
-      pivot.addAt(mgRoot, pivot.getIndex(gun));
+      const mg = this.add.image(mgLayout.x, mgLayout.y, 'studio-mg-mount');
+      mg.setOrigin(mgLayout.originX, mgLayout.originY);
+      pivot.addAt(mg, pivot.getIndex(gun));
       if (view.fire) {
-        this.armMachineGun(root, mgBarrel);
+        this.armMachineGun(root, mg);
       }
     }
     root.add(pivot);
@@ -673,6 +668,19 @@ export class StudioScene extends Phaser.Scene {
     const box = { left, top, right, bottom };
     includeMounted(box, layout, TANK_TURRET_FRAME, layout.turretX, layout.turretY, layout.turretOriginX, layout.turretOriginY, view.angle);
     includeMounted(box, layout, TANK_GUN_FRAME, layout.gunX, layout.gunY, layout.gunOriginX, layout.gunOriginY, view.angle);
+    if (view.machineGun) {
+      const mg = MachineGun.layout;
+      includeMounted(
+        box,
+        layout,
+        MG_MOUNT_FRAME,
+        layout.seatX + mg.x,
+        layout.seatY + mg.y,
+        mg.originX,
+        mg.originY,
+        view.angle,
+      );
+    }
     left = box.left;
     right = box.right;
     top = box.top;
@@ -1132,8 +1140,8 @@ export class StudioScene extends Phaser.Scene {
     const mgLayout = MachineGun.layout;
     const tankLayout = Tank.layout;
     const pivotAngle = view.angle;
-    const tipLocalX = mgLayout.x + 8 + mgLayout.barrelLength;
-    const tipLocalY = mgLayout.y - 2;
+    const tipLocalX = mgLayout.x + mgLayout.barrelLength;
+    const tipLocalY = mgLayout.y;
     const cos = Math.cos(pivotAngle);
     const sin = Math.sin(pivotAngle);
     return {

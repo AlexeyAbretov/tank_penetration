@@ -1,9 +1,10 @@
-// Пулемёт на крыше башни: покупается в магазине, стреляет вдоль прицела башни.
+// Пулемёт перед люком башни: одна вертикальная опора, стреляет вдоль прицела.
 
 import Phaser, { GameObjects } from 'phaser';
 import {
   BULLET_FRAME,
   MG_BULLET_PAINT,
+  MG_MOUNT_FRAME,
   MG_MOUNT_PAINT,
   type BulletPaint,
   type MgMountPaint,
@@ -22,13 +23,14 @@ export class MachineGun extends GameObjects.Container {
     bulletSpeed: 720,
   };
 
-  // Точка на крыше башни, в координатах контейнера aim.
+  // Цапфа в координатах контейнера aim. Пятка опоры стоит на крыше перед люком.
+  // Люк в этих координатах: x от -19 до 3, крыша перед ним на y = -24.
   static readonly layout = {
-    x: 10,
-    y: -34,
-    barrelLength: 28,
-    originX: 6 / 40,
-    originY: 0.5,
+    x: 7,
+    y: -40,
+    barrelLength: 30,
+    originX: 14 / MG_MOUNT_FRAME.w,
+    originY: 3 / MG_MOUNT_FRAME.h,
   };
 
   private readonly barrel: Phaser.GameObjects.Image;
@@ -39,12 +41,9 @@ export class MachineGun extends GameObjects.Container {
     super(scene, mount.x, mount.y);
     MachineGun.ensureTextures(scene);
 
-    const base = scene.add.image(0, 0, MachineGun.barrelKey);
-    base.setOrigin(0.35, 0.5);
-    this.barrel = scene.add.image(8, -2, MachineGun.barrelKey);
+    this.barrel = scene.add.image(0, 0, MachineGun.barrelKey);
     this.barrel.setOrigin(mount.originX, mount.originY);
-    this.barrel.setScale(0.55, 0.42);
-    this.add([base, this.barrel]);
+    this.add(this.barrel);
     tank.mountMachineGun(this);
   }
 
@@ -53,7 +52,7 @@ export class MachineGun extends GameObjects.Container {
       bake(scene, MachineGun.textureKey, BULLET_FRAME.w, BULLET_FRAME.h, (g) => this.renderBullet(g));
     }
     if (!scene.textures.exists(MachineGun.barrelKey)) {
-      bake(scene, MachineGun.barrelKey, 40, 16, (g) => this.renderMount(g));
+      bake(scene, MachineGun.barrelKey, MG_MOUNT_FRAME.w, MG_MOUNT_FRAME.h, (g) => this.renderMount(g));
     }
   }
 
@@ -65,12 +64,18 @@ export class MachineGun extends GameObjects.Container {
   }
 
   static renderMount(g: Phaser.GameObjects.Graphics, paint: MgMountPaint = MG_MOUNT_PAINT): void {
+    // Казённик сзади ствола, затыльник и рукоять. Цапфа текстуры — (14, 3).
     g.fillStyle(paint.base);
-    g.fillRoundedRect(0, 4, 14, 8, 2);
-    g.fillStyle(paint.barrel);
-    g.fillRoundedRect(12, 5, 26, 6, 2);
+    g.fillRoundedRect(3, 0, 16, 8, 2);
+    g.fillRect(6, 7, 3, 4);
     g.fillStyle(paint.tip);
-    g.fillRect(34, 4, 4, 8);
+    g.fillRect(3, 1, 3, 6);
+    g.fillStyle(paint.base);
+    g.fillRect(15, 6, 5, 13);
+    g.fillStyle(paint.barrel);
+    g.fillRoundedRect(14, 1, 26, 5, 2);
+    g.fillStyle(paint.tip);
+    g.fillRect(39, 0, 5, 7);
   }
 
   // Ствол смотрит вместе с башней; отдаёт мировые координаты дула и угол выстрела.

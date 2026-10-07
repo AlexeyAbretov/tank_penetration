@@ -407,7 +407,7 @@ export class ShopPanel {
 
   private showMachineGun(coins: number, owned: boolean): void {
     if (owned) {
-      this.machineGun.info.setText('на крыше башни · 1 урона / 3 с');
+      this.machineGun.info.setText('перед люком башни · 1 урона / 3 с');
       this.machineGun.cost.setText('установлен');
       this.machineGun.card.setFillStyle(0x3d2a12);
       this.machineGun.cost.setColor('#f3d56a');

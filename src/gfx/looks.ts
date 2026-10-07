@@ -237,7 +237,7 @@ export const BULLET_PAINT = {
   tip: 0xffffff,
 } satisfies BulletPaint;
 
-export const MG_MOUNT_FRAME = { w: 40, h: 16 };
+export const MG_MOUNT_FRAME = { w: 48, h: 20 };
 
 export type MgMountPaint = {
   base: number;

@@ -231,7 +231,7 @@ export class Tank extends GameObjects.Container {
     this.autoFire = enabled;
   }
 
-  // Пулемёт садится на крышу башни, между корпусом башни и основным стволом.
+  // Пулемёт перед люком, на одной опоре. Маска основного ствола рисуется поверх.
   mountMachineGun(mg: Phaser.GameObjects.Container): void {
     const gunIndex = this.aim.getIndex(this.gun);
     this.aim.addAt(mg, gunIndex);
