@@ -1,4 +1,5 @@
 // Окно магазина между волнами: улучшения, колючая проволока и кнопка «дальше».
+// Список карточек выше окна, поэтому он живёт в отдельной камере и скроллится.
 // Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
@@ -18,6 +19,32 @@ export type ShopDelegate = {
   closeAndContinue(): void;
 };
 
+// Рамка окна. Координаты детей контейнера считаются от центра экрана.
+const PANEL_W = 700;
+const PANEL_H = 640;
+
+// Полоса карточек: ниже заголовка, выше кнопки волны.
+const VIEW_W = 620;
+const VIEW_H = 400;
+const VIEW_TOP = -200;
+const SCROLL_W = 10;
+const SCROLL_GAP = 14;
+
+const CARD_H = 112;
+const CARD_GAP = 12;
+const CARD_W = VIEW_W - 16;
+const CONTENT_PAD = 6;
+const OFFER_COUNT = 6;
+
+const TITLE_WRAP = CARD_W - 190;
+const INFO_WRAP = CARD_W - 44;
+
+type Offer = {
+  card: Phaser.GameObjects.Rectangle;
+  info: Phaser.GameObjects.Text;
+  cost: Phaser.GameObjects.Text;
+};
+
 export class ShopPanel {
   static readonly upgrades = {
     baseCost: 3,
@@ -28,270 +55,139 @@ export class ShopPanel {
     return ShopPanel.upgrades.baseCost + level * ShopPanel.upgrades.costStep;
   }
 
-  // Все куски интерфейса лежат в одном контейнере: показать и спрятать можно одним вызовом.
+  // Шапка, рамка и кнопка. Список карточек сюда не входит: его рисует своя камера.
   readonly container: Phaser.GameObjects.Container;
 
   private readonly coinsText: Phaser.GameObjects.Text;
-  private readonly blastInfo: Phaser.GameObjects.Text;
-  private readonly damageInfo: Phaser.GameObjects.Text;
-  private readonly blastCost: Phaser.GameObjects.Text;
-  private readonly damageCost: Phaser.GameObjects.Text;
-  private readonly fireRateInfo: Phaser.GameObjects.Text;
-  private readonly fireRateCost: Phaser.GameObjects.Text;
-  private readonly wireInfo: Phaser.GameObjects.Text;
-  private readonly wireCost: Phaser.GameObjects.Text;
-  private readonly autoFireInfo: Phaser.GameObjects.Text;
-  private readonly autoFireCost: Phaser.GameObjects.Text;
-  private readonly machineGunInfo: Phaser.GameObjects.Text;
-  private readonly machineGunCost: Phaser.GameObjects.Text;
-  // Карточки — невидимые для логики прямоугольники, но именно они ловят клик.
-  private readonly blastCard: Phaser.GameObjects.Rectangle;
-  private readonly damageCard: Phaser.GameObjects.Rectangle;
-  private readonly fireRateCard: Phaser.GameObjects.Rectangle;
-  private readonly wireCard: Phaser.GameObjects.Rectangle;
-  private readonly autoFireCard: Phaser.GameObjects.Rectangle;
-  private readonly machineGunCard: Phaser.GameObjects.Rectangle;
+  private readonly blast: Offer;
+  private readonly damage: Offer;
+  private readonly fireRate: Offer;
+  private readonly wire: Offer;
+  private readonly autoFire: Offer;
+  private readonly machineGun: Offer;
+
+  // Камера с маленьким окном обрезает карточки, которые уехали за шапку или кнопку.
+  private readonly listCam: Phaser.Cameras.Scene2D.Camera;
+  private readonly listContent: Phaser.GameObjects.Container;
+  private readonly track: Phaser.GameObjects.Rectangle;
+  private readonly thumb: Phaser.GameObjects.Rectangle;
+
+  private readonly viewLeft: number;
+  private readonly viewTop: number;
+  private readonly contentHeight: number;
+  private readonly maxScroll: number;
+  private readonly thumbH: number;
+  private readonly trackTop: number;
+
+  private scroll = 0;
+  private drag: { y: number; scroll: number; moved: boolean } | null = null;
+  private pressedCard: Phaser.GameObjects.Rectangle | null = null;
 
   constructor(scene: Phaser.Scene, shop: ShopDelegate) {
-    // Затемнение на весь экран. Координаты детей контейнера считаются от его центра,
-    // поэтому (0, 0) здесь — середина экрана, а не левый верхний угол.
+    const groupW = VIEW_W + SCROLL_GAP + SCROLL_W;
+    this.viewLeft = GAME.width / 2 - groupW / 2;
+    this.viewTop = GAME.height / 2 + VIEW_TOP;
+    this.contentHeight = CONTENT_PAD * 2 + OFFER_COUNT * CARD_H + (OFFER_COUNT - 1) * CARD_GAP;
+    this.maxScroll = Math.max(0, this.contentHeight - VIEW_H);
+    this.thumbH = Math.max(36, Math.round((VIEW_H * VIEW_H) / this.contentHeight));
+    this.trackTop = VIEW_TOP;
+
+    // scrollX/scrollY — левый верх окна камеры в мире. Окно совпадает с полосой карточек.
+    this.listCam = scene.cameras.add(this.viewLeft, this.viewTop, VIEW_W, VIEW_H);
+    this.listCam.setScroll(this.viewLeft, this.viewTop);
+    this.listCam.roundPixels = true;
+    this.listCam.setVisible(false);
+
+    this.listContent = scene.add.container(this.viewLeft + VIEW_W / 2, this.viewTop);
+    // ignore() на контейнере помечает только уже существующих детей.
+    // Бит на самом контейнере прячет и текущие, и будущие карточки от основной камеры.
+    this.listContent.cameraFilter |= scene.cameras.main.id;
+
+    this.blast = this.makeOffer(scene, 0, '+1 область взрыва', () => shop.buyBlast());
+    this.damage = this.makeOffer(scene, 1, '+1 урон', () => shop.buyDamage());
+    this.fireRate = this.makeOffer(scene, 2, '−0.02 с перезарядки', () => shop.buyFireRate());
+    this.wire = this.makeOffer(scene, 3, 'Колючая проволока', () => shop.buyWire());
+    this.autoFire = this.makeOffer(scene, 4, 'Автострельба', () => shop.buyAutoFire());
+    this.machineGun = this.makeOffer(scene, 5, 'Пулемёт', () => shop.buyMachineGun());
+
     const dim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.62);
-    // Тёмно-красная плашка окна. Последний аргумент 0.96 — почти непрозрачная заливка.
-    const panel = scene.add.rectangle(0, 24, 700, 660, 0x3a0c0c, 0.96);
-    // Золотая обводка толщиной 4 пикселя.
+    const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
     panel.setStrokeStyle(4, 0xc9a227);
 
     const title = scene.add
-      .text(0, -258, 'МАГАЗИН', {
-        fontFamily: 'Cinzel, Georgia, serif', // если Cinzel не загрузился, берётся Georgia, затем любой serif
+      .text(0, -274, 'МАГАЗИН', {
+        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '40px',
         color: '#f3d56a',
-        stroke: '#4a1208', // тёмная обводка букв, чтобы текст читался на красном
+        stroke: '#4a1208',
         strokeThickness: 6,
       })
-      .setOrigin(0.5); // якорь текста в центре, а не в левом верхнем углу букв
+      .setOrigin(0.5);
 
     this.coinsText = scene.add
-      .text(0, -212, 'Монеты  0', {
+      .text(0, -230, 'Монеты  0', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '22px',
         color: '#f0dcc0',
       })
       .setOrigin(0.5);
 
-    // Три карточки в ряд: взрыв, урон, скорострельность.
-    this.blastCard = scene.add.rectangle(-210, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.damageCard = scene.add.rectangle(0, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.fireRateCard = scene.add.rectangle(210, -88, 210, 130, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.wireCard = scene.add.rectangle(-220, 58, 200, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.autoFireCard = scene.add.rectangle(0, 58, 200, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    this.machineGunCard = scene.add.rectangle(220, 58, 200, 118, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
-    // setInteractive включает попадание курсором. useHandCursor меняет стрелку на «руку».
-    this.blastCard.setInteractive({ useHandCursor: true });
-    this.damageCard.setInteractive({ useHandCursor: true });
-    this.fireRateCard.setInteractive({ useHandCursor: true });
-    this.wireCard.setInteractive({ useHandCursor: true });
-    this.autoFireCard.setInteractive({ useHandCursor: true });
-    this.machineGunCard.setInteractive({ useHandCursor: true });
-    // pointerup — отпускание кнопки мыши над карточкой, чтобы клик не срабатывал при нажатии «проездом».
-    this.blastCard.on('pointerup', () => shop.buyBlast());
-    this.damageCard.on('pointerup', () => shop.buyDamage());
-    this.fireRateCard.on('pointerup', () => shop.buyFireRate());
-    this.wireCard.on('pointerup', () => shop.buyWire());
-    this.autoFireCard.on('pointerup', () => shop.buyAutoFire());
-    this.machineGunCard.on('pointerup', () => shop.buyMachineGun());
+    const scrollX = -groupW / 2 + VIEW_W + SCROLL_GAP + SCROLL_W / 2;
+    this.track = scene.add.rectangle(scrollX, VIEW_TOP + VIEW_H / 2, SCROLL_W, VIEW_H, 0x2a1010);
+    this.thumb = scene.add
+      .rectangle(scrollX, VIEW_TOP + this.thumbH / 2, SCROLL_W, this.thumbH, 0xf0d56a)
+      .setInteractive({ useHandCursor: true, draggable: true });
+    scene.input.setDraggable(this.thumb);
+    this.thumb.on('drag', (pointer: Phaser.Input.Pointer) => this.dragThumb(pointer));
+    const canScroll = this.maxScroll > 0;
+    this.track.setVisible(canScroll);
+    this.thumb.setVisible(canScroll);
 
-    // Заголовки карточек нарисованы один раз: их текст не меняется.
-    const blastTitle = scene.add
-      .text(-210, -132, '+1 область взрыва', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '18px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-    // Уровень и радиус подставляются в refresh, поэтому стартовая строка пустая.
-    this.blastInfo = scene.add
-      .text(-210, -98, '', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '16px',
-        color: '#f0dcc0',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-    this.blastCost = scene.add
-      .text(-210, -48, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '20px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-
-    const damageTitle = scene.add
-      .text(0, -132, '+1 урон', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '18px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-    this.damageInfo = scene.add
-      .text(0, -98, '', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '16px',
-        color: '#f0dcc0',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-    this.damageCost = scene.add
-      .text(0, -48, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '20px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-
-    const fireRateTitle = scene.add
-      .text(210, -132, '−0.02 с перезарядки', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '16px',
-        color: '#f3d56a',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-    this.fireRateInfo = scene.add
-      .text(210, -98, '', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '15px',
-        color: '#f0dcc0',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-    this.fireRateCost = scene.add
-      .text(210, -48, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '20px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-
-    const wireTitle = scene.add
-      .text(-220, 22, 'Колючая проволока', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '18px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-    this.wireInfo = scene.add
-      .text(-220, 50, '', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '16px',
-        color: '#f0dcc0',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-    this.wireCost = scene.add
-      .text(-220, 90, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '20px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-
-    const autoFireTitle = scene.add
-      .text(0, 22, 'Автострельба', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '18px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-    this.autoFireInfo = scene.add
-      .text(0, 50, '', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '16px',
-        color: '#f0dcc0',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-    this.autoFireCost = scene.add
-      .text(0, 90, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '20px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-
-    const machineGunTitle = scene.add
-      .text(220, 22, 'Пулемёт', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '18px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-    this.machineGunInfo = scene.add
-      .text(220, 50, '', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '16px',
-        color: '#f0dcc0',
-        align: 'center',
-      })
-      .setOrigin(0.5);
-    this.machineGunCost = scene.add
-      .text(220, 90, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '20px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-
-    // Кнопка продолжения под карточками.
-    const next = scene.add.rectangle(0, 200, 280, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const next = scene.add.rectangle(0, 262, 280, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
     next.setInteractive({ useHandCursor: true });
     next.on('pointerup', () => shop.closeAndContinue());
     const nextLabel = scene.add
-      .text(0, 200, 'СЛЕДУЮЩАЯ ВОЛНА', {
+      .text(0, 262, 'СЛЕДУЮЩАЯ ВОЛНА', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
         color: '#f3d56a',
       })
       .setOrigin(0.5);
 
-    // Контейнер стоит в центре экрана. Список — порядок отрисовки: первый снизу, последний сверху.
     this.container = scene.add.container(GAME.width / 2, GAME.height / 2, [
       dim,
       panel,
       title,
       this.coinsText,
-      this.blastCard,
-      this.damageCard,
-      this.fireRateCard,
-      blastTitle,
-      this.blastInfo,
-      this.blastCost,
-      damageTitle,
-      this.damageInfo,
-      this.damageCost,
-      fireRateTitle,
-      this.fireRateInfo,
-      this.fireRateCost,
-      this.wireCard,
-      this.autoFireCard,
-      this.machineGunCard,
-      wireTitle,
-      this.wireInfo,
-      this.wireCost,
-      autoFireTitle,
-      this.autoFireInfo,
-      this.autoFireCost,
-      machineGunTitle,
-      this.machineGunInfo,
-      this.machineGunCost,
+      this.track,
+      this.thumb,
       next,
       nextLabel,
     ]);
     // Выше игрового UI (51–60), ниже плашки поражения (80).
     this.container.setDepth(70).setVisible(false);
+    this.listContent.setDepth(71).setVisible(false);
+
+    scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => this.dragList(pointer));
+    scene.input.on('pointerup', () => {
+      this.drag = null;
+      this.pressedCard = null;
+    });
+    scene.input.on(
+      'wheel',
+      (pointer: Phaser.Input.Pointer, _over: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
+        if (!this.container.visible || !this.overPanel(pointer)) {
+          return;
+        }
+        this.setScroll(this.scroll + dy * 0.55);
+      },
+    );
+
+    // Пока магазин открыт, новые объекты сцены (проволока, пулемёт) не должны попасть в окно списка.
+    scene.events.on('update', this.syncListCamera, this);
+    this.syncListCamera();
   }
 
-  // Показывает магазин и сразу пишет актуальные цены.
   show(
     coins: number,
     blastLevel: number,
@@ -301,15 +197,22 @@ export class ShopPanel {
     autoFireOwned: boolean,
     machineGunOwned: boolean,
   ): void {
+    this.setScroll(0);
     this.refresh(coins, blastLevel, damageLevel, fireRateLevel, wireOwned, autoFireOwned, machineGunOwned);
+    this.syncListCamera();
     this.container.setVisible(true);
+    this.listContent.setVisible(true);
+    this.listCam.setVisible(true);
   }
 
   hide(): void {
+    this.drag = null;
+    this.pressedCard = null;
     this.container.setVisible(false);
+    this.listContent.setVisible(false);
+    this.listCam.setVisible(false);
   }
 
-  // Перерисовывает цифры. Сцена зовёт это после каждой покупки, не закрывая окно.
   refresh(
     coins: number,
     blastLevel: number,
@@ -321,27 +224,124 @@ export class ShopPanel {
   ): void {
     this.coinsText.setText(`Монеты  ${coins}`);
 
-    // Цена зависит от того, сколько раз ЭТО улучшение уже брали. Уровни копируются независимо.
     const blastPrice = ShopPanel.upgradeCost(blastLevel);
     const damagePrice = ShopPanel.upgradeCost(damageLevel);
     const fireRatePrice = ShopPanel.upgradeCost(fireRateLevel);
-    // Текущий радиус и радиус после следующей покупки. На нулевом уровне радиус 0 — взрыв только по прямой цели.
     const radius = blastLevel * Tank.blastRadiusPerLevel;
     const nextRadius = (blastLevel + 1) * Tank.blastRadiusPerLevel;
 
-    // Стрелка в тексте показывает «сейчас → после покупки».
-    this.blastInfo.setText(`ур. ${blastLevel}   радиус ${radius} → ${nextRadius}`);
-    this.blastCost.setText(`цена  ${blastPrice}`);
-    // Базовый урон снаряда 1, каждый уровень damage прибавляет 1. Смотри hurtInfantry в сцене.
-    this.damageInfo.setText(`ур. ${damageLevel}   урон ${1 + damageLevel} → ${2 + damageLevel}`);
-    this.damageCost.setText(`цена  ${damagePrice}`);
+    this.blast.info.setText(`ур. ${blastLevel}   радиус ${radius} → ${nextRadius}`);
+    this.blast.cost.setText(`цена  ${blastPrice}`);
+    this.damage.info.setText(`ур. ${damageLevel}   урон ${1 + damageLevel} → ${2 + damageLevel}`);
+    this.damage.cost.setText(`цена  ${damagePrice}`);
 
-    this.tintCard(this.blastCard, this.blastCost, coins >= blastPrice);
-    this.tintCard(this.damageCard, this.damageCost, coins >= damagePrice);
+    this.tintCard(this.blast.card, this.blast.cost, coins >= blastPrice);
+    this.tintCard(this.damage.card, this.damage.cost, coins >= damagePrice);
     this.showFireRate(coins, fireRateLevel, fireRatePrice);
     this.showWire(coins, wireOwned);
     this.showAutoFire(coins, autoFireOwned);
     this.showMachineGun(coins, machineGunOwned);
+  }
+
+  private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
+    const top = CONTENT_PAD + index * (CARD_H + CARD_GAP);
+    const card = scene.add
+      .rectangle(0, top + CARD_H / 2, CARD_W, CARD_H, 0x5a1210)
+      .setStrokeStyle(2, 0xf0d56a);
+    card.setInteractive({ useHandCursor: true });
+    card.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.pressedCard = card;
+      this.beginDrag(pointer);
+    });
+    // Короткое нажатие покупает. Сдвиг списка — это уже скролл, не покупка.
+    card.on('pointerup', () => {
+      if (this.pressedCard !== card || this.drag?.moved) {
+        return;
+      }
+      buy();
+    });
+
+    const title = scene.add
+      .text(-CARD_W / 2 + 22, top + 16, label, {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '20px',
+        color: '#f3d56a',
+        wordWrap: { width: TITLE_WRAP, useAdvancedWrap: true },
+      })
+      .setOrigin(0, 0);
+    const info = scene.add
+      .text(-CARD_W / 2 + 22, top + 50, '', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '16px',
+        color: '#f0dcc0',
+        wordWrap: { width: INFO_WRAP, useAdvancedWrap: true },
+        lineSpacing: 4,
+      })
+      .setOrigin(0, 0);
+    const cost = scene.add
+      .text(CARD_W / 2 - 22, top + 16, '', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '20px',
+        color: '#f3d56a',
+        align: 'right',
+      })
+      .setOrigin(1, 0);
+
+    this.listContent.add([card, title, info, cost]);
+    return { card, info, cost };
+  }
+
+  private beginDrag(pointer: Phaser.Input.Pointer): void {
+    this.drag = { y: pointer.y, scroll: this.scroll, moved: false };
+  }
+
+  private dragList(pointer: Phaser.Input.Pointer): void {
+    if (!this.drag || !pointer.isDown) {
+      return;
+    }
+    const dy = pointer.y - this.drag.y;
+    if (Math.abs(dy) > 8) {
+      this.drag.moved = true;
+    }
+    if (this.drag.moved) {
+      this.setScroll(this.drag.scroll - dy);
+    }
+  }
+
+  private dragThumb(pointer: Phaser.Input.Pointer): void {
+    const screenTop = GAME.height / 2 + this.trackTop;
+    const travel = VIEW_H - this.thumbH;
+    const center = Phaser.Math.Clamp(pointer.y, screenTop + this.thumbH / 2, screenTop + travel + this.thumbH / 2);
+    const t = travel > 0 ? (center - (screenTop + this.thumbH / 2)) / travel : 0;
+    this.setScroll(t * this.maxScroll);
+  }
+
+  private setScroll(value: number): void {
+    this.scroll = Phaser.Math.Clamp(value, 0, this.maxScroll);
+    this.listContent.y = this.viewTop - this.scroll;
+    const travel = VIEW_H - this.thumbH;
+    const t = this.maxScroll > 0 ? this.scroll / this.maxScroll : 0;
+    this.thumb.y = this.trackTop + this.thumbH / 2 + travel * t;
+  }
+
+  private overPanel(pointer: Phaser.Input.Pointer): boolean {
+    const left = GAME.width / 2 - PANEL_W / 2;
+    const top = GAME.height / 2 - PANEL_H / 2;
+    return pointer.x >= left && pointer.x <= left + PANEL_W && pointer.y >= top && pointer.y <= top + PANEL_H;
+  }
+
+  // Камера списка рисует только карточки. Всё остальное на сцене для неё невидимо.
+  private syncListCamera(): void {
+    const listId = this.listCam.id;
+    const mainId = this.listContent.scene.cameras.main.id;
+    const children = this.listContent.scene.children.list;
+    for (const child of children) {
+      if (child === this.listContent) {
+        child.cameraFilter = (child.cameraFilter & ~listId) | mainId;
+      } else {
+        child.cameraFilter |= listId;
+      }
+    }
   }
 
   private formatDelay(ms: number): string {
@@ -352,83 +352,77 @@ export class ShopPanel {
     const maxed = level >= Tank.maxFireRateLevel;
     const delay = Tank.fireDelayFor(level);
     const nextDelay = Tank.fireDelayFor(level + 1);
-    this.fireRateInfo.setText(
+    this.fireRate.info.setText(
       maxed
         ? `ур. ${level}   ${this.formatDelay(delay)} (макс.)`
         : `ур. ${level}   ${this.formatDelay(delay)} → ${this.formatDelay(nextDelay)}`,
     );
     if (maxed) {
-      this.fireRateCost.setText('максимум');
-      this.fireRateCard.setFillStyle(0x3d2a12);
-      this.fireRateCost.setColor('#f3d56a');
-      this.fireRateCard.disableInteractive();
+      this.fireRate.cost.setText('максимум');
+      this.fireRate.card.setFillStyle(0x3d2a12);
+      this.fireRate.cost.setColor('#f3d56a');
+      this.fireRate.card.disableInteractive();
       return;
     }
-    this.fireRateCost.setText(`цена  ${price}`);
-    if (!this.fireRateCard.input?.enabled) {
-      this.fireRateCard.setInteractive({ useHandCursor: true });
+    this.fireRate.cost.setText(`цена  ${price}`);
+    if (!this.fireRate.card.input?.enabled) {
+      this.fireRate.card.setInteractive({ useHandCursor: true });
     }
-    this.tintCard(this.fireRateCard, this.fireRateCost, coins >= price);
+    this.tintCard(this.fireRate.card, this.fireRate.cost, coins >= price);
   }
 
-  // Проволока покупается один раз. После установки карточка гаснет и больше не ловит клик.
   private showWire(coins: number, owned: boolean): void {
     if (owned) {
-      this.wireInfo.setText('стоит перед танком, от верха до низа');
-      this.wireCost.setText('установлена');
-      this.wireCard.setFillStyle(0x3d2a12);
-      this.wireCost.setColor('#f3d56a');
-      this.wireCard.disableInteractive();
+      this.wire.info.setText('стоит перед танком, от верха до низа');
+      this.wire.cost.setText('установлена');
+      this.wire.card.setFillStyle(0x3d2a12);
+      this.wire.cost.setColor('#f3d56a');
+      this.wire.card.disableInteractive();
       return;
     }
-    this.wireInfo.setText('не пускает пехоту · 1 урона / 3 с');
-    this.wireCost.setText(`цена  ${BarbedWire.shop.cost}`);
-    if (!this.wireCard.input?.enabled) {
-      this.wireCard.setInteractive({ useHandCursor: true });
+    this.wire.info.setText('не пускает пехоту · 1 урона / 3 с');
+    this.wire.cost.setText(`цена  ${BarbedWire.shop.cost}`);
+    if (!this.wire.card.input?.enabled) {
+      this.wire.card.setInteractive({ useHandCursor: true });
     }
-    this.tintCard(this.wireCard, this.wireCost, coins >= BarbedWire.shop.cost);
+    this.tintCard(this.wire.card, this.wire.cost, coins >= BarbedWire.shop.cost);
   }
 
   private showAutoFire(coins: number, owned: boolean): void {
     if (owned) {
-      this.autoFireInfo.setText('танк стреляет сам по кулдауну');
-      this.autoFireCost.setText('куплено');
-      this.autoFireCard.setFillStyle(0x3d2a12);
-      this.autoFireCost.setColor('#f3d56a');
-      this.autoFireCard.disableInteractive();
+      this.autoFire.info.setText('танк стреляет сам по кулдауну');
+      this.autoFire.cost.setText('куплено');
+      this.autoFire.card.setFillStyle(0x3d2a12);
+      this.autoFire.cost.setColor('#f3d56a');
+      this.autoFire.card.disableInteractive();
       return;
     }
-    this.autoFireInfo.setText('не нужно держать ЛКМ');
-    this.autoFireCost.setText(`цена  ${Tank.shop.autoFireCost}`);
-    if (!this.autoFireCard.input?.enabled) {
-      this.autoFireCard.setInteractive({ useHandCursor: true });
+    this.autoFire.info.setText('не нужно держать ЛКМ');
+    this.autoFire.cost.setText(`цена  ${Tank.shop.autoFireCost}`);
+    if (!this.autoFire.card.input?.enabled) {
+      this.autoFire.card.setInteractive({ useHandCursor: true });
     }
-    this.tintCard(this.autoFireCard, this.autoFireCost, coins >= Tank.shop.autoFireCost);
+    this.tintCard(this.autoFire.card, this.autoFire.cost, coins >= Tank.shop.autoFireCost);
   }
 
   private showMachineGun(coins: number, owned: boolean): void {
     if (owned) {
-      this.machineGunInfo.setText('на крыше башни · 1 урона / 3 с');
-      this.machineGunCost.setText('установлен');
-      this.machineGunCard.setFillStyle(0x3d2a12);
-      this.machineGunCost.setColor('#f3d56a');
-      this.machineGunCard.disableInteractive();
+      this.machineGun.info.setText('на крыше башни · 1 урона / 3 с');
+      this.machineGun.cost.setText('установлен');
+      this.machineGun.card.setFillStyle(0x3d2a12);
+      this.machineGun.cost.setColor('#f3d56a');
+      this.machineGun.card.disableInteractive();
       return;
     }
-    this.machineGunInfo.setText('стреляет вдоль прицела башни');
-    this.machineGunCost.setText(`цена  ${MachineGun.shop.cost}`);
-    if (!this.machineGunCard.input?.enabled) {
-      this.machineGunCard.setInteractive({ useHandCursor: true });
+    this.machineGun.info.setText('стреляет вдоль прицела башни');
+    this.machineGun.cost.setText(`цена  ${MachineGun.shop.cost}`);
+    if (!this.machineGun.card.input?.enabled) {
+      this.machineGun.card.setInteractive({ useHandCursor: true });
     }
-    this.tintCard(this.machineGunCard, this.machineGunCost, coins >= MachineGun.shop.cost);
+    this.tintCard(this.machineGun.card, this.machineGun.cost, coins >= MachineGun.shop.cost);
   }
 
-  // Если монет не хватает, карточка темнеет и цена становится тусклой. Клик при этом всё равно приходит в сцену.
-  private tintCard(
-    card: Phaser.GameObjects.Rectangle,
-    cost: Phaser.GameObjects.Text,
-    canBuy: boolean,
-  ): void {
+  private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {
     card.setFillStyle(canBuy ? 0x5a1210 : 0x2a1010);
     cost.setColor(canBuy ? '#f3d56a' : '#8a6a4a');
   }
