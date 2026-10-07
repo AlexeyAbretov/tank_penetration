@@ -14,6 +14,7 @@ export type ViewState = {
   hp: boolean;
   muzzle: boolean;
   fire: boolean;
+  machineGun: boolean;
   death: boolean;
   addBlend: boolean;
   angle: number;
@@ -24,13 +25,16 @@ export type PanelHandlers = {
   select: (id: string) => void;
   paint: (key: string, value: number | boolean) => void;
   view: () => void;
+  layout: () => void;
   reset: () => void;
   copy: () => void;
 };
 
 let bound = false;
+let panelHandlers: PanelHandlers | undefined;
 
 export function bindPanel(handlers: PanelHandlers): void {
+  panelHandlers = handlers;
   if (bound) {
     return;
   }
@@ -45,19 +49,38 @@ export function bindPanel(handlers: PanelHandlers): void {
     button.type = 'button';
     button.dataset.id = entity.id;
     button.textContent = entity.title;
-    button.addEventListener('click', () => handlers.select(entity.id));
+    button.addEventListener('click', () => panelHandlers?.select(entity.id));
     list.append(button);
   }
 
-  for (const id of ['zoom', 'scale', 'animate', 'checker', 'bounds', 'hitbox', 'origin', 'hp', 'muzzle', 'fire', 'death', 'add', 'angle', 'spin']) {
+  const onZoom = () => {
+    writeReadouts();
+    panelHandlers?.layout();
+  };
+  document.getElementById('zoom')?.addEventListener('input', onZoom);
+  document.getElementById('zoom')?.addEventListener('change', onZoom);
+  for (const id of ['scale', 'animate', 'checker', 'bounds', 'hitbox', 'origin', 'hp', 'muzzle', 'fire', 'machinegun', 'death', 'add', 'angle', 'spin']) {
     document.getElementById(id)?.addEventListener('input', () => {
       writeReadouts();
-      handlers.view();
+      panelHandlers?.view();
     });
   }
 
-  document.getElementById('reset')?.addEventListener('click', () => handlers.reset());
-  document.getElementById('copy')?.addEventListener('click', () => handlers.copy());
+  document.getElementById('reset')?.addEventListener('click', () => panelHandlers?.reset());
+  document.getElementById('copy')?.addEventListener('click', () => panelHandlers?.copy());
+
+  const stage = document.getElementById('stage');
+  stage?.addEventListener(
+    'wheel',
+    (event) => {
+      if (!nudgeZoom(event.deltaY)) {
+        return;
+      }
+      event.preventDefault();
+      onZoom();
+    },
+    { passive: false },
+  );
 }
 
 export function markActive(id: string): void {
@@ -72,6 +95,7 @@ export function configureView(entity: PreviewEntity): void {
   show('hp-row', entity.hpColor !== undefined);
   show('muzzle-row', entity.kind === 'tank' || entity.muzzle !== undefined);
   show('fire-row', entity.shot !== undefined);
+  show('machinegun-row', entity.kind === 'tank');
   show('death-row', entity.death !== undefined);
   const death = document.getElementById('death') as HTMLInputElement | null;
   if (death) {
@@ -134,6 +158,7 @@ export function readView(): ViewState {
     hp: checked('hp'),
     muzzle: checked('muzzle'),
     fire: checked('fire'),
+    machineGun: checked('machinegun'),
     death: checked('death'),
     addBlend: checked('add'),
     angle: num('angle', -0.3),
@@ -257,7 +282,7 @@ function boolRow(
   return row;
 }
 
-function writeReadouts(): void {
+export function writeReadouts(): void {
   const zoom = document.getElementById('zoom') as HTMLInputElement | null;
   const zoomVal = document.getElementById('zoom-val');
   if (zoom && zoomVal) {
@@ -301,4 +326,22 @@ function num(id: string, fallback: number): number {
 function checked(id: string): boolean {
   const input = document.getElementById(id) as HTMLInputElement | null;
   return Boolean(input?.checked);
+}
+
+// Колёсико над холстом: вверх — ближе, вниз — дальше. Шаг как у ползунка.
+export function nudgeZoom(deltaY: number): boolean {
+  const zoom = document.getElementById('zoom') as HTMLInputElement | null;
+  if (!zoom || deltaY === 0) {
+    return false;
+  }
+  const step = Number(zoom.step) || 0.05;
+  const min = Number(zoom.min);
+  const max = Number(zoom.max);
+  const current = Number(zoom.value);
+  const next = Math.min(max, Math.max(min, current + (deltaY < 0 ? step : -step)));
+  if (next === current) {
+    return false;
+  }
+  zoom.value = String(next);
+  return true;
 }

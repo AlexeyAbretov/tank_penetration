@@ -3,29 +3,38 @@
 import Phaser from 'phaser';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
+import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
+import type { ShopController } from './ShopController';
 
-type CombatDeps = {
-  getBlastLevel: () => number;
-  getDamageLevel: () => number;
-  getWire: () => BarbedWire | undefined;
+type CombatCallbacks = {
   onKill: (coinReward: number) => void;
   onBaseHit: (amount: number) => void;
 };
 
 export class CombatSystem {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
+  private readonly shells: Phaser.Physics.Arcade.Group;
+  private readonly mgShots: Phaser.Physics.Arcade.Group;
+  private mgCooldown = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly tank: Tank,
-    private readonly shells: Phaser.Physics.Arcade.Group,
     private readonly infantry: Phaser.Physics.Arcade.Group,
-    private readonly deps: CombatDeps,
+    private readonly shop: ShopController,
+    private readonly callbacks: CombatCallbacks,
   ) {
     this.blast = createShellBlast(scene);
+    this.shells = scene.physics.add.group();
+    this.mgShots = scene.physics.add.group();
+  }
+
+  clearProjectiles(): void {
+    this.shells.clear(true, true);
+    this.mgShots.clear(true, true);
   }
 
   setupOverlap(): void {
@@ -63,6 +72,9 @@ export class CombatSystem {
     this.handleFireInput(this.scene.input.activePointer);
     this.resolveShellHits();
     this.cleanupShells();
+    this.tickMachineGun(delta);
+    this.resolveMgHits();
+    this.cleanupMgShots();
     this.snareOnWire(delta);
     this.checkBaseReach();
   }
@@ -81,7 +93,7 @@ export class CombatSystem {
       this.hurtInfantry(direct);
     }
 
-    const blastRadius = this.deps.getBlastLevel() * Tank.blastRadiusPerLevel;
+    const blastRadius = this.shop.blastLevel * Tank.blastRadiusPerLevel;
     if (blastRadius <= 0) {
       return;
     }
@@ -126,8 +138,67 @@ export class CombatSystem {
     });
   }
 
+  private tickMachineGun(delta: number): void {
+    const mg = this.shop.machineGun;
+    if (!mg) {
+      return;
+    }
+    this.mgCooldown = Math.max(0, this.mgCooldown - delta);
+    if (this.mgCooldown > 0) {
+      return;
+    }
+    const shot = mg.muzzle();
+    this.fireMgBullet(shot.x, shot.y, shot.angle);
+    this.mgCooldown = MachineGun.shop.fireIntervalMs;
+  }
+
+  private fireMgBullet(x: number, y: number, angle: number): void {
+    const bullet = this.scene.physics.add.image(x, y, MachineGun.textureKey);
+    this.mgShots.add(bullet);
+    bullet.setDepth(14);
+    bullet.setBlendMode(Phaser.BlendModes.ADD);
+    bullet.setRotation(angle);
+    bullet.setVelocity(
+      Math.cos(angle) * MachineGun.shop.bulletSpeed,
+      Math.sin(angle) * MachineGun.shop.bulletSpeed,
+    );
+    const body = bullet.body as Phaser.Physics.Arcade.Body;
+    body.setAllowGravity(false);
+    body.setCircle(6);
+  }
+
+  private resolveMgHits(): void {
+    const bullets = this.mgShots.getChildren() as Phaser.Physics.Arcade.Image[];
+    const units = this.infantry.getChildren() as Infantry[];
+    for (const bullet of bullets) {
+      if (!bullet.active) {
+        continue;
+      }
+      for (const unit of units) {
+        if (!unit.active || unit.reachedWall) {
+          continue;
+        }
+        const torso = this.torsoPoint(unit);
+        if (Phaser.Math.Distance.Between(bullet.x, bullet.y, torso.x, torso.y) <= unit.hitRadius * 0.55) {
+          bullet.destroy();
+          this.hurtInfantry(unit, MachineGun.shop.damage);
+          break;
+        }
+      }
+    }
+  }
+
+  private cleanupMgShots(): void {
+    this.mgShots.getChildren().forEach((obj) => {
+      const bullet = obj as Phaser.Physics.Arcade.Image;
+      if (bullet.x > GAME.width + 40 || bullet.x < 0 || bullet.y < 0 || bullet.y > GAME.bannerY) {
+        bullet.destroy();
+      }
+    });
+  }
+
   private snareOnWire(delta: number): void {
-    const wire = this.deps.getWire();
+    const wire = this.shop.wire;
     if (!wire) {
       return;
     }
@@ -167,11 +238,11 @@ export class CombatSystem {
 
   private hurtInfantry(
     unit: Infantry,
-    damage = Infantry.shellDamage + this.deps.getDamageLevel(),
+    damage = Infantry.shellDamage + this.shop.damageLevel,
     wire = false,
   ): void {
     if (unit.hit(damage, wire)) {
-      this.deps.onKill(unit.coinReward);
+      this.callbacks.onKill(unit.coinReward);
       unit.kill();
     }
   }
@@ -181,11 +252,11 @@ export class CombatSystem {
       return;
     }
     unit.kill();
-    this.deps.onBaseHit(unit.contactDamage);
+    this.callbacks.onBaseHit(unit.contactDamage);
   }
 
   private playBlast(x: number, y: number): void {
-    const radius = this.deps.getBlastLevel() * Tank.blastRadiusPerLevel;
+    const radius = this.shop.blastLevel * Tank.blastRadiusPerLevel;
     this.blast.emitParticleAt(x, y, radius > 0 ? 16 : 8);
     const flash = this.scene.add.image(x, y, 'muzzle').setDepth(16).setBlendMode(Phaser.BlendModes.ADD);
     flash.setScale(radius > 0 ? 1 : 0.55);

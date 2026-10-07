@@ -13,7 +13,6 @@ import { WaveManager } from '../systems/WaveManager';
 import { GameHud } from '../ui/GameHud';
 
 export class GameScene extends Phaser.Scene {
-  private shells!: Phaser.Physics.Arcade.Group;
   private enemyShots!: Phaser.Physics.Arcade.Group;
   private infantry!: Phaser.Physics.Arcade.Group;
 
@@ -41,16 +40,16 @@ export class GameScene extends Phaser.Scene {
     createAmbientEmbers(this);
     this.input.mouse?.disableContextMenu();
 
-    this.shells = this.physics.add.group();
     this.enemyShots = this.physics.add.group();
     this.infantry = this.physics.add.group();
 
     this.hud = new GameHud(this);
 
+    let combat: CombatSystem | undefined;
     this.player = new PlayerController(this, this.hud, {
-      shells: this.shells,
       enemyShots: this.enemyShots,
       infantry: this.infantry,
+      clearPlayerCombat: () => combat?.clearProjectiles(),
     });
     this.player.reset();
 
@@ -71,10 +70,7 @@ export class GameScene extends Phaser.Scene {
       () => this.waves.beginNextWave(),
     );
 
-    this.combat = new CombatSystem(this, this.player.tank, this.shells, this.infantry, {
-      getBlastLevel: () => this.shop.blastLevel,
-      getDamageLevel: () => this.shop.damageLevel,
-      getWire: () => this.shop.wire,
+    combat = this.combat = new CombatSystem(this, this.player.tank, this.infantry, this.shop, {
       onKill: (reward) => this.onEnemyKill(reward),
       onBaseHit: (amount) => this.player.damage(amount),
     });

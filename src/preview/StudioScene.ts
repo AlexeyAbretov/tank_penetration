@@ -7,6 +7,7 @@ import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { Rocket } from '../entities/Rocket';
+import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import {
   BULLET_FRAME,
@@ -14,6 +15,7 @@ import {
   GUNNER_FLASH_FRAME,
   GUNNER_RIFLE_FRAME,
   LAUNCHER_FRAME,
+  MG_MOUNT_FRAME,
   ROCKET_FLASH_FRAME,
   ROCKET_FRAME,
   MUZZLE_FRAME,
@@ -27,6 +29,7 @@ import {
   TANK_TURRET_FRAME,
   TANK_WRECK_FRAME,
   type BulletPaint,
+  type MgMountPaint,
   type MuzzlePaint,
   type PickupPaint,
   type ShellPaint,
@@ -67,6 +70,7 @@ export class StudioScene extends Phaser.Scene {
   private ground!: Phaser.GameObjects.Graphics;
   private bakeQueued = false;
   private rig?: ShotRig;
+  private mgRig?: MgRig;
   private flies: Fly[] = [];
   private readonly sparkPoint = new Phaser.Math.Vector2();
   private bodyKeys: string[] = [];
@@ -85,13 +89,15 @@ export class StudioScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.cameras.main.setZoom(1);
     this.backdrop = this.add.graphics();
     this.ground = this.add.graphics();
-    this.scale.on('resize', () => this.place());
+    this.scale.on('resize', () => this.refreshLayout());
     bindPanel({
       select: (id) => this.select(id),
       paint: (key, value) => this.setPaint(key, value),
       view: () => this.buildHolders(),
+      layout: () => this.refreshLayout(),
       reset: () => this.resetPaint(),
       copy: () => {
         void copySnippet().then((ok) => flashCopy(ok));
@@ -165,6 +171,11 @@ export class StudioScene extends Phaser.Scene {
       this.liveAnim = anim;
     }
     this.buildHolders();
+    this.publish();
+  }
+
+  private refreshLayout(): void {
+    this.place();
     this.publish();
   }
 
@@ -332,6 +343,20 @@ export class StudioScene extends Phaser.Scene {
     const gun = this.add.image(layout.gunX - layout.seatX, layout.gunY - layout.seatY, this.liveKeys[2]);
     gun.setOrigin(layout.gunOriginX, layout.gunOriginY);
     pivot.add([turret, gun]);
+    if (view.machineGun) {
+      const mgLayout = MachineGun.layout;
+      const mgRoot = this.add.container(mgLayout.x, mgLayout.y);
+      const mgBase = this.add.image(0, 0, 'studio-mg-mount');
+      mgBase.setOrigin(0.35, 0.5);
+      const mgBarrel = this.add.image(8, -2, 'studio-mg-mount');
+      mgBarrel.setOrigin(mgLayout.originX, mgLayout.originY);
+      mgBarrel.setScale(0.55, 0.42);
+      mgRoot.add([mgBase, mgBarrel]);
+      pivot.addAt(mgRoot, pivot.getIndex(gun));
+      if (view.fire) {
+        this.armMachineGun(root, mgBarrel);
+      }
+    }
     root.add(pivot);
 
     const guides = this.add.graphics();
@@ -361,9 +386,14 @@ export class StudioScene extends Phaser.Scene {
     if (view.muzzle) {
       guides.fillStyle(0xffee66, 1);
       guides.fillCircle(muzzle.x, muzzle.y, 4);
+      if (view.machineGun) {
+        const mgMuzzle = this.mgMuzzleAt(view);
+        guides.fillStyle(0xc9e86a, 1);
+        guides.fillCircle(mgMuzzle.x, mgMuzzle.y, 3);
+      }
     }
     if (view.fire && this.entity.shot) {
-      this.arm(root, muzzle, view.angle, 1, { gun });
+      this.arm(root, muzzle, view.angle, 1, { gun, pivot });
     }
     return root;
   }
@@ -655,6 +685,13 @@ export class StudioScene extends Phaser.Scene {
       right = Math.max(right, x + 6);
       top = Math.min(top, y - 6);
       bottom = Math.max(bottom, y + 6);
+      if (view.machineGun) {
+        const mgMuzzle = this.mgMuzzleAt(view);
+        left = Math.min(left, mgMuzzle.x - 6);
+        right = Math.max(right, mgMuzzle.x + 6);
+        top = Math.min(top, mgMuzzle.y - 6);
+        bottom = Math.max(bottom, mgMuzzle.y + 6);
+      }
     }
     if (view.hitbox) {
       left = Math.min(left, -layout.hitLeft);
@@ -687,7 +724,7 @@ export class StudioScene extends Phaser.Scene {
       return [`${motion}выстрел о стену · ${this.entity.shot.delay} мс`];
     }
     if (this.entity.kind === 'tank') {
-      return ['сборка'];
+      return view.machineGun ? ['сборка · пулемёт на башне'] : ['сборка'];
     }
     if (this.entity.frameCount > 1 && view.animate) {
       const motion = this.entity.motion ?? 'шаг';
@@ -700,8 +737,17 @@ export class StudioScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    const view = readView();
     const rig = this.rig;
-    if (rig && readView().fire) {
+    const mgRig = this.mgRig;
+    if (mgRig && view.fire && view.machineGun) {
+      mgRig.cooldown -= delta;
+      if (mgRig.cooldown <= 0) {
+        mgRig.cooldown = mgRig.delay;
+        this.emitMgShot();
+      }
+    }
+    if (rig && view.fire) {
       rig.cooldown -= delta;
       if (rig.cooldown <= 0) {
         rig.cooldown = rig.delay;
@@ -988,6 +1034,12 @@ export class StudioScene extends Phaser.Scene {
     this.restamp('studio-fx-bullet', BULLET_FRAME.w, BULLET_FRAME.h, (g) =>
       EnemyShot.render(g, paintOf('bullet') as BulletPaint),
     );
+    this.restamp('studio-fx-mg-bullet', BULLET_FRAME.w, BULLET_FRAME.h, (g) =>
+      MachineGun.renderBullet(g, paintOf('mg-bullet') as BulletPaint),
+    );
+    this.restamp('studio-mg-mount', MG_MOUNT_FRAME.w, MG_MOUNT_FRAME.h, (g) =>
+      MachineGun.renderMount(g, paintOf('machinegun') as MgMountPaint),
+    );
     this.restamp('studio-fx-pickup-flash', PICKUP_FLASH_FRAME.w, PICKUP_FLASH_FRAME.h, (g) =>
       PickupTruck.renderFlash(g),
     );
@@ -1072,7 +1124,54 @@ export class StudioScene extends Phaser.Scene {
     }
     this.rig?.sparks?.destroy();
     this.rig = undefined;
+    this.mgRig = undefined;
     this.flies = [];
+  }
+
+  private mgMuzzleAt(view: ViewState): { x: number; y: number; angle: number } {
+    const mgLayout = MachineGun.layout;
+    const tankLayout = Tank.layout;
+    const pivotAngle = view.angle;
+    const tipLocalX = mgLayout.x + 8 + mgLayout.barrelLength;
+    const tipLocalY = mgLayout.y - 2;
+    const cos = Math.cos(pivotAngle);
+    const sin = Math.sin(pivotAngle);
+    return {
+      x: tankLayout.seatX + tipLocalX * cos - tipLocalY * sin,
+      y: tankLayout.seatY + tipLocalX * sin + tipLocalY * cos,
+      angle: pivotAngle,
+    };
+  }
+
+  private armMachineGun(root: Phaser.GameObjects.Container, barrel: Phaser.GameObjects.Image): void {
+    this.mgRig = {
+      delay: MachineGun.shop.fireIntervalMs,
+      cooldown: 0,
+      root,
+      barrel,
+      pixel: 1,
+    };
+  }
+
+  private emitMgShot(): void {
+    const rig = this.mgRig;
+    if (!rig) {
+      return;
+    }
+    const view = readView();
+    rig.barrel.setRotation(0);
+    const muzzle = this.mgMuzzleAt(view);
+    const shot = this.add.image(muzzle.x, muzzle.y, 'studio-fx-mg-bullet');
+    shot.setRotation(muzzle.angle);
+    shot.setScale(rig.pixel);
+    shot.setBlendMode(Phaser.BlendModes.ADD);
+    rig.root.add(shot);
+    this.flies.push({
+      image: shot,
+      vx: Math.cos(muzzle.angle) * MachineGun.shop.bulletSpeed * rig.pixel,
+      vy: Math.sin(muzzle.angle) * MachineGun.shop.bulletSpeed * rig.pixel,
+      life: 900,
+    });
   }
 
   private emitShot(): void {
@@ -1122,11 +1221,13 @@ export class StudioScene extends Phaser.Scene {
         ? 'studio-fx-shell'
         : rig.projectile === 'rocket'
           ? 'studio-fx-rocket'
-          : 'studio-fx-bullet';
+          : rig.projectile === 'mg'
+            ? 'studio-fx-mg-bullet'
+            : 'studio-fx-bullet';
     const shot = this.add.image(rig.muzzle.x, rig.muzzle.y, shotKey);
     shot.setRotation(rig.angle);
     shot.setScale(rig.projectile === 'rocket' ? rig.pixel * 1.8 : rig.pixel);
-    if (rig.projectile === 'shell') {
+    if (rig.projectile === 'shell' || rig.projectile === 'mg') {
       shot.setBlendMode(Phaser.BlendModes.ADD);
     }
     rig.root.add(shot);
@@ -1380,7 +1481,7 @@ type ShotRig = {
   angle: number;
   muzzle: { x: number; y: number };
   speed: number;
-  projectile: 'shell' | 'bullet' | 'rocket';
+  projectile: 'shell' | 'bullet' | 'rocket' | 'mg';
   flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket';
   pixel: number;
   pivot?: Phaser.GameObjects.Container;
@@ -1405,4 +1506,12 @@ type Fly = {
   life: number;
   trail?: boolean;
   puffMs?: number;
+};
+
+type MgRig = {
+  delay: number;
+  cooldown: number;
+  root: Phaser.GameObjects.Container;
+  barrel: Phaser.GameObjects.Image;
+  pixel: number;
 };

@@ -231,6 +231,12 @@ export class Tank extends GameObjects.Container {
     this.autoFire = enabled;
   }
 
+  // Пулемёт садится на крышу башни, между корпусом башни и основным стволом.
+  mountMachineGun(mg: Phaser.GameObjects.Container): void {
+    const gunIndex = this.aim.getIndex(this.gun);
+    this.aim.addAt(mg, gunIndex);
+  }
+
   // Сцена зовёт это каждый кадр, чтобы кулдаун уменьшался даже без выстрела.
   tick(delta: number): void {
     this.cooldown = Math.max(0, this.cooldown - delta);

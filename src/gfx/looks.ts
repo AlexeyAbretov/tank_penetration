@@ -236,3 +236,22 @@ export const BULLET_PAINT = {
   body: 0xffee88,
   tip: 0xffffff,
 } satisfies BulletPaint;
+
+export const MG_MOUNT_FRAME = { w: 40, h: 16 };
+
+export type MgMountPaint = {
+  base: number;
+  barrel: number;
+  tip: number;
+};
+
+export const MG_MOUNT_PAINT = {
+  base: 0x3a3a32,
+  barrel: 0x2a2a24,
+  tip: 0x1a1a16,
+} satisfies MgMountPaint;
+
+export const MG_BULLET_PAINT = {
+  body: 0xc9e86a,
+  tip: 0xf8ffd0,
+} satisfies BulletPaint;

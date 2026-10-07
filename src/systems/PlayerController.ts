@@ -5,9 +5,9 @@ import { Tank } from '../entities/Tank';
 import type { GameHud } from '../ui/GameHud';
 
 type DefeatDeps = {
-  shells: Phaser.Physics.Arcade.Group;
   enemyShots: Phaser.Physics.Arcade.Group;
   infantry: Phaser.Physics.Arcade.Group;
+  clearPlayerCombat: () => void;
 };
 
 export class PlayerController {
@@ -53,7 +53,7 @@ export class PlayerController {
     this.gameOver = true;
     this.scene.registry.set('combat', false);
     this.scene.physics.world.pause();
-    this.defeatDeps.shells.clear(true, true);
+    this.defeatDeps.clearPlayerCombat();
     this.defeatDeps.enemyShots.clear(true, true);
     this.defeatDeps.infantry.getChildren().forEach((obj) => {
       (obj as Phaser.Physics.Arcade.Sprite).body?.stop();

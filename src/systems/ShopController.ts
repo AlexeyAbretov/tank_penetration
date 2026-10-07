@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
+import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import { ShopPanel } from '../ui/ShopPanel';
 import type { GameHud } from '../ui/GameHud';
@@ -20,6 +21,8 @@ export class ShopController {
   fireRateLevel = 0;
   wireOwned = false;
   wire?: BarbedWire;
+  machineGunOwned = false;
+  machineGun?: MachineGun;
   shopOpen = false;
 
   constructor(
@@ -37,8 +40,10 @@ export class ShopController {
     this.damageLevel = 0;
     this.fireRateLevel = 0;
     this.wireOwned = false;
+    this.machineGunOwned = false;
     this.tank.setAutoFire(false);
     this.wire = undefined;
+    this.machineGun = undefined;
     this.shopOpen = false;
   }
 
@@ -53,6 +58,7 @@ export class ShopController {
       this.fireRateLevel,
       this.wireOwned,
       this.tank.hasAutoFire,
+      this.machineGunOwned,
     );
   }
 
@@ -118,6 +124,18 @@ export class ShopController {
     this.refresh();
   }
 
+  buyMachineGun(): void {
+    if (this.machineGunOwned || this.economy.getCoins() < MachineGun.shop.cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(MachineGun.shop.cost)) {
+      return;
+    }
+    this.machineGunOwned = true;
+    this.machineGun = new MachineGun(this.scene, this.tank);
+    this.refresh();
+  }
+
   syncTankStats(): void {
     this.hud.setTankStats(
       Infantry.shellDamage + this.damageLevel,
@@ -137,6 +155,7 @@ export class ShopController {
       this.fireRateLevel,
       this.wireOwned,
       this.tank.hasAutoFire,
+      this.machineGunOwned,
     );
   }
 }

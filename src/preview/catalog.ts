@@ -7,11 +7,16 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
+import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import {
   ASSAULT_LOOK,
   BULLET_FRAME,
   BULLET_PAINT,
+  MG_BULLET_PAINT,
+  MG_MOUNT_FRAME,
+  MG_MOUNT_PAINT,
+  type MgMountPaint,
   GUNNER_LOOK,
   ROCKET_LOOK,
   MUZZLE_FRAME,
@@ -69,7 +74,7 @@ export type PreviewEntity = {
   shot?: {
     delay: number;
     speed: number;
-    projectile: 'shell' | 'bullet' | 'rocket';
+    projectile: 'shell' | 'bullet' | 'rocket' | 'mg';
     flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket';
   };
   bake: (scene: Phaser.Scene, paint: Paint, keys: string[]) => void;
@@ -134,7 +139,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'tank',
     title: 'Танк',
-    hint: 'Корпус и башня собраны как в бою. Башня и ствол крутятся вместе вокруг днища башни. «Смерть» поднимает ядерный гриб и оставляет обломки.',
+    hint: 'Корпус и башня собраны как в бою. Башня и ствол крутятся вместе вокруг днища башни. Галочка «Пулемёт» ставит крепление на крышу башни. «Смерть» поднимает ядерный гриб и оставляет обломки.',
     exportName: 'TANK_PAINT',
     kind: 'tank',
     frameCount: 1,
@@ -396,6 +401,60 @@ export const ENTITIES: PreviewEntity[] = [
     bake: (scene, paint, keys) => {
       stamp(scene, keys[0], MUZZLE_FRAME.w, MUZZLE_FRAME.h, (g) =>
         Tank.renderMuzzle(g, paint as MuzzlePaint),
+      );
+    },
+  },
+  {
+    id: 'machinegun',
+    title: 'Пулемёт',
+    hint: 'Крепление на крыше башни. Жёлтая точка — дуло. «Стрельба» пускает зелёную пулю раз в 3 с.',
+    exportName: 'MG_MOUNT_PAINT',
+    kind: 'frames',
+    frameCount: 1,
+    gameScale: 1,
+    originX: 0.35,
+    originY: 0.5,
+    texW: MG_MOUNT_FRAME.w,
+    texH: MG_MOUNT_FRAME.h,
+    defaults: asPaint(MG_MOUNT_PAINT),
+    fields: colors('Крепление', [
+      ['base', 'Основание'],
+      ['barrel', 'Ствол'],
+      ['tip', 'Дуло'],
+    ]),
+    muzzle: { x: 36, y: 8 },
+    shot: {
+      delay: MachineGun.shop.fireIntervalMs,
+      speed: MachineGun.shop.bulletSpeed,
+      projectile: 'mg',
+    },
+    bake: (scene, paint, keys) => {
+      stamp(scene, keys[0], MG_MOUNT_FRAME.w, MG_MOUNT_FRAME.h, (g) =>
+        MachineGun.renderMount(g, paint as MgMountPaint),
+      );
+    },
+  },
+  {
+    id: 'mg-bullet',
+    title: 'Пуля пулемёта',
+    hint: 'Зелёная пуля пулемёта танка. В бою светится режимом ADD.',
+    exportName: 'MG_BULLET_PAINT',
+    kind: 'shot',
+    frameCount: 1,
+    gameScale: 1,
+    originX: 0.5,
+    originY: 0.5,
+    texW: BULLET_FRAME.w,
+    texH: BULLET_FRAME.h,
+    defaults: asPaint(MG_BULLET_PAINT),
+    fields: colors('Пуля', [
+      ['body', 'Тело'],
+      ['tip', 'Носик'],
+    ]),
+    addBlend: true,
+    bake: (scene, paint, keys) => {
+      stamp(scene, keys[0], BULLET_FRAME.w, BULLET_FRAME.h, (g) =>
+        MachineGun.renderBullet(g, paint as BulletPaint),
       );
     },
   },
