@@ -48,6 +48,10 @@ export class CombatSystem {
     return this.artilleryCooldownMs;
   }
 
+  setArtilleryCooldown(ms: number): void {
+    this.artilleryCooldownMs = Math.max(0, ms);
+  }
+
   clearProjectiles(): void {
     this.shells.clear(true, true);
     this.mgShots.clear(true, true);

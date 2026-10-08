@@ -9,6 +9,7 @@ import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import { ShopPanel } from '../ui/ShopPanel';
 import type { GameHud } from '../ui/GameHud';
+import type { ShopSave } from './RunSave';
 
 type Economy = {
   getCoins: () => number;
@@ -34,8 +35,39 @@ export class ShopController {
     private readonly tank: Tank,
     private readonly economy: Economy,
     private readonly onContinue: () => void,
+    private readonly onChanged: () => void,
   ) {
     this.panel = new ShopPanel(scene, this);
+  }
+
+  capture(): ShopSave {
+    return {
+      blast: this.blastLevel,
+      damage: this.damageLevel,
+      fireRate: this.fireRateLevel,
+      wire: this.wireOwned,
+      machineGun: this.machineGunOwned,
+      artillery: this.artilleryOwned,
+      autoFire: this.tank.hasAutoFire,
+    };
+  }
+
+  // Покупки уже оплачены в прошлой сессии: монеты не списываем, вещи сразу ставим на поле.
+  restore(saved: ShopSave): void {
+    this.blastLevel = saved.blast;
+    this.damageLevel = saved.damage;
+    this.fireRateLevel = Math.min(saved.fireRate, Tank.maxFireRateLevel);
+    this.tank.setFireRateLevel(this.fireRateLevel);
+    this.tank.setAutoFire(saved.autoFire);
+    this.wireOwned = saved.wire;
+    if (saved.wire) {
+      this.wire = new BarbedWire(this.scene);
+    }
+    this.machineGunOwned = saved.machineGun;
+    if (saved.machineGun) {
+      this.machineGun = new MachineGun(this.scene, this.tank);
+    }
+    this.artilleryOwned = saved.artillery;
   }
 
   reset(): void {
@@ -187,5 +219,6 @@ export class ShopController {
       this.machineGunOwned,
       this.artilleryOwned,
     );
+    this.onChanged();
   }
 }

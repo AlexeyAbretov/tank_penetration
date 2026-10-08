@@ -11,6 +11,10 @@ import type { SpawnContext } from './SpawnContext';
 export type { SpawnContext } from './SpawnContext';
 export type { WorldPoint } from './WorldPoint';
 
+// Короткое имя вида для сохранения. Имя класса после сборки может измениться.
+export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket'] as const;
+export type EnemySaveKind = (typeof ENEMY_KINDS)[number];
+
 type EnemyKind = typeof AssaultInfantry | typeof GunnerInfantry | typeof PickupTruck | typeof RocketInfantry;
 
 export class EnemyFactory {
@@ -39,6 +43,46 @@ export class EnemyFactory {
   static create(index: number, ctx: SpawnContext): Infantry {
     const kind = this.roster(ctx.wave)[index] ?? AssaultInfantry;
     return this.spawnUnit(kind, ctx);
+  }
+
+  static kindOf(unit: Infantry): EnemySaveKind | null {
+    if (unit instanceof PickupTruck) {
+      return 'truck';
+    }
+    if (unit instanceof RocketInfantry) {
+      return 'rocket';
+    }
+    if (unit instanceof GunnerInfantry) {
+      return 'gunner';
+    }
+    if (unit instanceof AssaultInfantry) {
+      return 'assault';
+    }
+    return null;
+  }
+
+  // Собирает уже вышедшего врага на сохранённом месте. Запас здоровья берётся из ранга,
+  // как при обычном спавне, а полоска ставится на оставшиеся hp.
+  static restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, pace: number): Infantry {
+    const rankHp = Infantry.waveHp(pace);
+    const unit = this.spawnSaved(kind, ctx, rankHp);
+    unit.setPaceWave(pace);
+    unit.setHealth(hp);
+    return unit;
+  }
+
+  private static spawnSaved(kind: EnemySaveKind, ctx: SpawnContext, rankHp: number): Infantry {
+    const { scene, x, y, shots, fireTarget } = ctx;
+    if (kind === 'assault') {
+      return new AssaultInfantry(scene, x, y, rankHp);
+    }
+    if (kind === 'gunner') {
+      return new GunnerInfantry(scene, x, y, rankHp, shots, fireTarget);
+    }
+    if (kind === 'truck') {
+      return new PickupTruck(scene, x, y, rankHp, shots, fireTarget);
+    }
+    return new RocketInfantry(scene, x, y, rankHp, shots, fireTarget);
   }
 
   private static debutWave(kind: EnemyKind): number {

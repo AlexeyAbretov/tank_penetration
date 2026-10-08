@@ -6,6 +6,7 @@ import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import type { GameHud } from '../ui/GameHud';
+import type { EnemySave, WavePhase } from './RunSave';
 
 export class WaveManager {
   wave = 0;
@@ -19,7 +20,73 @@ export class WaveManager {
     private readonly hud: GameHud,
     private readonly isGameOver: () => boolean,
     private readonly onWaveCleared: () => void,
+    private readonly onProgress: () => void,
   ) {}
+
+  capture(): { wave: number; phase: WavePhase; spawned: number; enemies: EnemySave[] } | null {
+    if (this.wave < 1) {
+      return null;
+    }
+    if (this.awaitingClear) {
+      return { wave: this.wave, phase: 'shop', spawned: 0, enemies: [] };
+    }
+    const total = EnemyFactory.count(this.wave);
+    const enemies: EnemySave[] = [];
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (!unit.active || unit.reachedWall) {
+        continue;
+      }
+      const kind = EnemyFactory.kindOf(unit);
+      if (!kind) {
+        continue;
+      }
+      enemies.push({
+        kind,
+        x: unit.x,
+        y: unit.y,
+        hp: unit.hp,
+        pace: unit.paceRank,
+      });
+    }
+    return {
+      wave: this.wave,
+      phase: 'combat',
+      spawned: Math.max(0, total - this.remainingToSpawn),
+      enemies,
+    };
+  }
+
+  // Волна уже зачищена, магазин ещё открыт. Номер не увеличиваем: «дальше» само вызовет следующую.
+  resumeShop(wave: number): void {
+    this.wave = wave;
+    this.remainingToSpawn = 0;
+    this.awaitingClear = true;
+    this.hud.setWave(wave);
+  }
+
+  // Середина волны: живые враги встают на сохранённые места, ещё не вышедшие доспавниваются.
+  resumeCombat(wave: number, spawned: number, enemies: EnemySave[]): void {
+    this.wave = wave;
+    this.awaitingClear = false;
+    this.hud.setWave(wave);
+    for (const enemy of enemies) {
+      this.restoreEnemy(enemy);
+    }
+    const total = EnemyFactory.count(wave);
+    const already = Math.min(total, Math.max(spawned, enemies.length));
+    this.remainingToSpawn = total - already;
+    if (already === 0) {
+      this.hud.showWaveBanner(wave);
+      this.scene.time.delayedCall(EnemyFactory.timing.announceMs, () => {
+        if (this.isGameOver()) {
+          return;
+        }
+        this.releaseFrom(0);
+      });
+      return;
+    }
+    this.releaseFrom(already);
+  }
 
   reset(): void {
     this.wave = 0;
@@ -42,6 +109,7 @@ export class WaveManager {
     this.hud.setWave(this.wave);
     this.hud.showWaveBanner(this.wave);
 
+    this.onProgress();
     this.scene.time.delayedCall(EnemyFactory.timing.announceMs, () => {
       if (this.isGameOver()) {
         return;
@@ -59,17 +127,22 @@ export class WaveManager {
     }
     this.awaitingClear = true;
     this.onWaveCleared();
+    this.onProgress();
   }
 
   private releaseWave(): void {
-    const count = this.remainingToSpawn;
+    this.releaseFrom(0);
+  }
+
+  private releaseFrom(startIndex: number): void {
+    const total = EnemyFactory.count(this.wave);
     const gap = Math.max(
       EnemyFactory.timing.minGap,
       EnemyFactory.timing.spawnGap - (this.wave - 1) * 28,
     );
 
-    for (let i = 0; i < count; i += 1) {
-      this.scene.time.delayedCall(i * gap, () => {
+    for (let i = startIndex; i < total; i += 1) {
+      this.scene.time.delayedCall((i - startIndex) * gap, () => {
         if (this.isGameOver()) {
           return;
         }
@@ -77,6 +150,24 @@ export class WaveManager {
         this.remainingToSpawn = Math.max(0, this.remainingToSpawn - 1);
       });
     }
+  }
+
+  private restoreEnemy(enemy: EnemySave): void {
+    const unit = EnemyFactory.restore(
+      enemy.kind,
+      {
+        scene: this.scene,
+        x: enemy.x,
+        y: enemy.y,
+        wave: this.wave,
+        shots: this.enemyShots,
+        fireTarget: Tank.aimPoint(),
+      },
+      enemy.hp,
+      enemy.pace,
+    );
+    this.infantry.add(unit);
+    unit.march();
   }
 
   private spawnInfantry(index = 0): void {

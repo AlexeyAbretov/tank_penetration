@@ -27,8 +27,18 @@ export class PlayerController {
     return this.gameOver;
   }
 
+  get health(): number {
+    return this.hp;
+  }
+
   reset(): void {
     this.hp = Tank.baseHp;
+    this.gameOver = false;
+    this.hud.setHp(this.hp);
+  }
+
+  restoreHealth(hp: number): void {
+    this.hp = Math.min(Tank.baseHp, Math.max(1, Math.round(hp)));
     this.gameOver = false;
     this.hud.setHp(this.hp);
   }
