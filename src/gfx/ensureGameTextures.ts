@@ -9,6 +9,7 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Rocket } from '../entities/Rocket';
 import { RocketInfantry } from '../entities/RocketInfantry';
+import { SuperSoldier } from '../entities/SuperSoldier';
 import { Tank } from '../entities/Tank';
 import { createTextures } from './textures';
 
@@ -21,6 +22,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   AssaultInfantry.ensureTextures(scene);
   GunnerInfantry.ensureTextures(scene);
   RocketInfantry.ensureTextures(scene);
+  SuperSoldier.ensureTextures(scene);
   Rocket.ensureTextures(scene);
   PickupTruck.ensureTextures(scene);
   EnemyShot.ensureTextures(scene);

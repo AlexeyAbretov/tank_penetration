@@ -38,6 +38,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   };
   // Сколько убитый солдат лежит в луже, прежде чем спрайт удалится.
   private static readonly corpseMs = 5000;
+  // Ширина полоски HP. Суперсолдат ставит свою после вызова super: у него запас больше.
+  protected hpBarWidth = 30;
   // Текущее здоровье. Уменьшается, когда попадает снаряд танка.
   hp: number;
   // Здоровье в момент появления. Полоска HP считается как hp / maxHp.
@@ -326,18 +328,20 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Кладёт полоску над макушкой и обрезает цветную часть по доле здоровья.
-  private syncBar(): void {
+  protected syncBar(): void {
     // Полоску уже уничтожили — трогать её нельзя.
     if (!this.barBg.active) {
       return;
     }
     // displayHeight учитывает scale. 0.95 высоты вверх от точки ног — примерно над шлемом.
     const top = this.y - this.displayHeight * 0.95;
+    const width = this.hpBarWidth;
     this.barBg.setPosition(this.x, top);
-    // Цветная полоска шириной 30, origin слева, поэтому левый край на 15 пикселей левее центра.
-    this.barFill.setPosition(this.x - 15, top);
-    // При полном HP ширина 30, при половине — 15, при нуле — 0.
-    this.barFill.width = 30 * (this.hp / this.maxHp);
+    this.barBg.width = width;
+    // Цветная полоска растёт вправо от левого края, поэтому левый край — на половине ширины левее центра.
+    this.barFill.setPosition(this.x - width / 2, top);
+    // При полном HP ширина полоски целиком, при половине — половина, при нуле — 0.
+    this.barFill.width = width * (this.hp / this.maxHp);
   }
 
   // Один кадр солдата. legPhase 0 и 1 меняют местами ноги, из двух кадров получается шаг.

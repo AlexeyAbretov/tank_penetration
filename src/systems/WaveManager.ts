@@ -76,7 +76,7 @@ export class WaveManager {
     const already = Math.min(total, Math.max(spawned, enemies.length));
     this.remainingToSpawn = total - already;
     if (already === 0) {
-      this.hud.showWaveBanner(wave);
+      this.hud.showWaveBanner(wave, EnemyFactory.isBossWave(wave));
       this.scene.time.delayedCall(EnemyFactory.timing.announceMs, () => {
         if (this.isGameOver()) {
           return;
@@ -107,7 +107,7 @@ export class WaveManager {
     this.awaitingClear = false;
     this.remainingToSpawn = EnemyFactory.count(this.wave);
     this.hud.setWave(this.wave);
-    this.hud.showWaveBanner(this.wave);
+    this.hud.showWaveBanner(this.wave, EnemyFactory.isBossWave(this.wave));
 
     this.onProgress();
     this.scene.time.delayedCall(EnemyFactory.timing.announceMs, () => {

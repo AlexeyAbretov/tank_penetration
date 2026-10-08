@@ -12,6 +12,8 @@ export const CORPSE_FRAME = { w: 96, h: 80 };
 export const GUNNER_RIFLE_FRAME = { w: 50, h: 12 };
 // Короткая вспышка у среза. Уже и ниже веера пикапа.
 export const GUNNER_FLASH_FRAME = { w: 26, h: 18 };
+// Пулемёт суперсолдата. Нос слева, приклад справа: в покое смотрит к танку.
+export const SUPER_MG_FRAME = { w: 58, h: 18 };
 // Труба гранатомёта. Нос слева, казённик справа: в покое смотрит к танку.
 export const LAUNCHER_FRAME = { w: 58, h: 20 };
 // Вспышка у среза трубы. Левый край — дуло, язычок растёт вправо.
@@ -87,6 +89,23 @@ export const GUNNER_LOOK = {
   helmet: 0x2a3a28,
   helmetLight: 0x8ab0c8,
   longRifle: true,
+} satisfies SoldierLook;
+
+// Суперсолдат: тёмная броня, красное забрало и жёлтый знак. Крупнее обычной пехоты.
+export const SUPER_LOOK = {
+  ...soldierBase,
+  pants: 0x241c22,
+  tunic: 0x3a3036,
+  vest: 0x4a1820,
+  helmet: 0x221c24,
+  helmetLight: 0xff5a58,
+  longRifle: true,
+  visor: 0xff2430,
+  emblem: 0xffd060,
+  rifle: 0x12110e,
+  rifleWood: 0x2c2824,
+  rifleWoodLight: 0x5a564c,
+  rifleMetal: 0x8a9084,
 } satisfies SoldierLook;
 
 // Ракетчик: оливковая форма и медный блик каски, чтобы не слиться со стрелком.

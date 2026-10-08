@@ -333,9 +333,10 @@ export class GameHud {
     this.hpFill.width = 236 * (hp / Tank.baseHp);
   }
 
-  showWaveBanner(wave: number): void {
+  showWaveBanner(wave: number, boss = false): void {
     const scene = this.waveBanner.scene;
-    this.waveBanner.setText(`ВОЛНА ${wave}`);
+    this.waveBanner.setText(boss ? 'БОСС' : `ВОЛНА ${wave}`);
+    this.waveBanner.setColor(boss ? '#ff5a48' : '#f3d56a');
     this.waveBanner.setAlpha(1);
     this.waveBanner.setScale(0.86);
     scene.tweens.killTweensOf(this.waveBanner);

@@ -6,6 +6,7 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
+import { SuperSoldier } from '../entities/SuperSoldier';
 import { Rocket } from '../entities/Rocket';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
@@ -24,6 +25,7 @@ import {
   PICKUP_GUN_FRAME,
   SHELL_FRAME,
   SOLDIER_FRAME,
+  SUPER_MG_FRAME,
   TANK_GUN_FRAME,
   TANK_HULL_FRAME,
   TANK_TURRET_FRAME,
@@ -74,6 +76,7 @@ export class StudioScene extends Phaser.Scene {
   private readonly sparkPoint = new Phaser.Math.Vector2();
   private bodyKeys: string[] = [];
   private gunnerBodyKeys: string[] = [];
+  private superBodyKeys: string[] = [];
   private rocketBodyKeys: string[] = [];
   // true, пока галочка «Смерть» включена. Взрыв пикапа играем один раз при включении, не на каждый ползунок.
   private deathOn = false;
@@ -177,6 +180,9 @@ export class StudioScene extends Phaser.Scene {
     if (this.entity.id === 'rocketman') {
       this.bakeRocketBody();
     }
+    if (this.entity.id === 'super') {
+      this.bakeSuperBody();
+    }
     this.refreshFx();
     if (this.entity.frameCount > 1) {
       const anim = `studio-${this.entity.id}`;
@@ -225,6 +231,8 @@ export class StudioScene extends Phaser.Scene {
       this.holders.push(this.makeGunner(view));
     } else if (firing && this.entity.id === 'rocketman') {
       this.holders.push(this.makeRocket(view));
+    } else if (firing && this.entity.id === 'super') {
+      this.holders.push(this.makeSuper(view));
     } else if (firing || (this.entity.frameCount > 1 && view.animate && this.liveAnim)) {
       const holder = this.makeSprite(this.liveKeys[0], view, view.animate && Boolean(this.liveAnim));
       this.holders.push(holder);
@@ -764,7 +772,10 @@ export class StudioScene extends Phaser.Scene {
     if (view.fire && this.entity.shot) {
       const motion =
         this.entity.frameCount > 1 && view.animate ? `${this.entity.motion ?? 'шаг'} · ` : '';
-      return [`${motion}выстрел о стену · ${this.entity.shot.delay} мс`];
+      const cadence = this.entity.shot.burst
+        ? `очередь ${this.entity.shot.burst} · пауза ${this.entity.shot.delay} мс`
+        : `выстрел о стену · ${this.entity.shot.delay} мс`;
+      return [`${motion}${cadence}`];
     }
     if (this.entity.kind === 'tank') {
       return view.machineGun ? ['сборка · пулемёт на башне'] : ['сборка'];
@@ -798,8 +809,20 @@ export class StudioScene extends Phaser.Scene {
     if (rig && view.fire) {
       rig.cooldown -= delta;
       if (rig.cooldown <= 0) {
-        rig.cooldown = rig.delay;
         this.emitShot();
+        const burst = rig.burstSize ?? 1;
+        if (burst > 1) {
+          const left = (rig.burstLeft ?? burst) - 1;
+          if (left > 0) {
+            rig.burstLeft = left;
+            rig.cooldown = rig.burstGap ?? rig.delay;
+          } else {
+            rig.burstLeft = burst;
+            rig.cooldown = rig.delay;
+          }
+        } else {
+          rig.cooldown = rig.delay;
+        }
       }
       if (rig.gun && rig.recoil) {
         const scale = readView().scale;
@@ -807,6 +830,8 @@ export class StudioScene extends Phaser.Scene {
           this.placeGunnerRifle(scale, rig);
         } else if (this.entity.id === 'rocketman') {
           this.placeRocketLauncher(scale, rig);
+        } else if (this.entity.id === 'super') {
+          this.placeSuperGun(scale, rig);
         } else {
           this.placePickupGun(scale, rig);
         }
@@ -1070,6 +1095,78 @@ export class StudioScene extends Phaser.Scene {
     GunnerInfantry.poseRifle(rig.gun, 0, 0, scale, 0, rig.recoil);
   }
 
+  private placeSuperGun(scale: number, rig: ShotRig): void {
+    if (!rig.gun || !rig.recoil) {
+      return;
+    }
+    SuperSoldier.poseGun(rig.gun, 0, 0, scale, 0, rig.recoil);
+  }
+
+  private bakeSuperBody(): void {
+    this.dropSuperBody();
+    const look = this.paint as SoldierLook;
+    this.superBodyKeys = ([0, 1] as const).map((phase) => {
+      const key = `studio-super-body-${phase}`;
+      this.restamp(key, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        SuperSoldier.drawMarch(g, phase, look, false),
+      );
+      return key;
+    });
+    this.restamp('studio-super-gun', SUPER_MG_FRAME.w, SUPER_MG_FRAME.h, (g) =>
+      SuperSoldier.renderGun(g, look),
+    );
+    this.anims.create({
+      key: 'studio-super-body',
+      frames: this.superBodyKeys.map((key) => ({ key })),
+      frameRate: SuperSoldier.walkFps,
+      repeat: -1,
+    });
+  }
+
+  private dropSuperBody(): void {
+    if (this.anims.exists('studio-super-body')) {
+      this.anims.remove('studio-super-body');
+    }
+    for (const key of [...this.superBodyKeys, 'studio-super-gun']) {
+      if (this.textures.exists(key)) {
+        this.textures.remove(key);
+      }
+    }
+    this.superBodyKeys = [];
+  }
+
+  private makeSuper(view: ViewState): Phaser.GameObjects.Container {
+    const root = this.add.container(0, 0);
+    const sprite = this.add.sprite(0, 0, this.superBodyKeys[0]);
+    sprite.setOrigin(this.entity.originX, this.entity.originY);
+    sprite.setScale(view.scale);
+    if (view.animate) {
+      sprite.play('studio-super-body');
+    }
+    root.add(sprite);
+    const gun = this.add.image(0, 0, 'studio-super-gun');
+    gun.setOrigin(
+      (SuperSoldier.breech.x - SuperSoldier.gunCut.x) / SUPER_MG_FRAME.w,
+      (SuperSoldier.breech.y - SuperSoldier.gunCut.y) / SUPER_MG_FRAME.h,
+    );
+    gun.setScale(view.scale);
+    root.add(gun);
+    const guides = this.add.graphics();
+    root.add(guides);
+    this.paintSpriteGuides(guides, view);
+    const recoil = { x: 0, climb: 0 };
+    const pixel = this.pixel(view);
+    this.arm(
+      root,
+      { x: this.entity.muzzle!.x * pixel, y: this.entity.muzzle!.y * pixel },
+      Math.PI,
+      pixel,
+      { gun, recoil },
+    );
+    this.placeSuperGun(view.scale, this.rig!);
+    return root;
+  }
+
   // Снаряд, пуля и вспышки. Цвета снаряда берутся из сохранённого просмотра этих картинок.
   private refreshFx(): void {
     const paintOf = (id: string) => loadPaint(ENTITIES.find((entry) => entry.id === id) ?? ENTITIES[0]);
@@ -1091,6 +1188,9 @@ export class StudioScene extends Phaser.Scene {
     );
     this.restamp('studio-fx-gunner-flash', GUNNER_FLASH_FRAME.w, GUNNER_FLASH_FRAME.h, (g) =>
       GunnerInfantry.renderFlash(g),
+    );
+    this.restamp('studio-fx-super-flash', GUNNER_FLASH_FRAME.w, GUNNER_FLASH_FRAME.h, (g) =>
+      SuperSoldier.renderFlash(g),
     );
     this.restamp('studio-fx-rocket', ROCKET_FRAME.w, ROCKET_FRAME.h, (g) => Rocket.render(g));
     this.restamp('studio-fx-rocket-flash', ROCKET_FLASH_FRAME.w, ROCKET_FLASH_FRAME.h, (g) =>
@@ -1135,6 +1235,9 @@ export class StudioScene extends Phaser.Scene {
       speed: shot.speed,
       projectile: shot.projectile,
       flash: shot.flash,
+      burstSize: shot.burst,
+      burstGap: shot.burstGap,
+      burstLeft: shot.burst,
       pixel,
       ...extra,
     };
@@ -1246,7 +1349,9 @@ export class StudioScene extends Phaser.Scene {
           ? GunnerInfantry.recoilKick
           : this.entity.id === 'rocketman'
             ? RocketInfantry.recoilKick
-            : PickupTruck.recoilKick;
+            : this.entity.id === 'super'
+              ? SuperSoldier.recoilKick
+              : PickupTruck.recoilKick;
       this.tweens.killTweensOf(rig.recoil);
       rig.recoil.x = kick.x;
       rig.recoil.climb = kick.climb;
@@ -1259,6 +1364,10 @@ export class StudioScene extends Phaser.Scene {
       });
       if (this.entity.id === 'gunner') {
         const point = GunnerInfantry.muzzleAt(0, 0, readView().scale, 0, rig.recoil);
+        rig.muzzle = { x: point.x, y: point.y };
+      }
+      if (this.entity.id === 'super') {
+        const point = SuperSoldier.muzzleAt(0, 0, readView().scale, 0, rig.recoil);
         rig.muzzle = { x: point.x, y: point.y };
       }
     }
@@ -1323,6 +1432,23 @@ export class StudioScene extends Phaser.Scene {
     if (rig.flash === 'gunner') {
       const pop = GunnerInfantry.flashPop;
       const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-gunner-flash');
+      flash.setOrigin(0, 0.5);
+      flash.setBlendMode(Phaser.BlendModes.ADD);
+      flash.setRotation(rig.angle);
+      flash.setScale(pop.x * rig.pixel, pop.y * rig.pixel);
+      rig.root.add(flash);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: pop.ms,
+        ease: 'Quad.In',
+        onComplete: () => flash.destroy(),
+      });
+      return;
+    }
+    if (rig.flash === 'super') {
+      const pop = SuperSoldier.flashPop;
+      const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-super-flash');
       flash.setOrigin(0, 0.5);
       flash.setBlendMode(Phaser.BlendModes.ADD);
       flash.setRotation(rig.angle);
@@ -1415,6 +1541,7 @@ export class StudioScene extends Phaser.Scene {
     this.liveAnim = undefined;
     this.dropPickupBody();
     this.dropGunnerBody();
+    this.dropSuperBody();
     this.dropRocketBody();
     for (const key of this.liveKeys) {
       if (this.textures.exists(key)) {
@@ -1530,7 +1657,10 @@ type ShotRig = {
   muzzle: { x: number; y: number };
   speed: number;
   projectile: 'shell' | 'bullet' | 'rocket' | 'mg';
-  flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket';
+  flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket' | 'super';
+  burstSize?: number;
+  burstGap?: number;
+  burstLeft?: number;
   pixel: number;
   pivot?: Phaser.GameObjects.Container;
   gun?: Phaser.GameObjects.Image;

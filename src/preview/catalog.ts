@@ -7,6 +7,7 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
+import { SuperSoldier } from '../entities/SuperSoldier';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import {
@@ -17,6 +18,7 @@ import {
   MG_MOUNT_FRAME,
   GUNNER_LOOK,
   ROCKET_LOOK,
+  SUPER_LOOK,
   MUZZLE_FRAME,
   MUZZLE_PAINT,
   PICKUP_FRAME,
@@ -70,7 +72,10 @@ export type PreviewEntity = {
     delay: number;
     speed: number;
     projectile: 'shell' | 'bullet' | 'rocket' | 'mg';
-    flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket';
+    flash?: 'muzzle' | 'pickup' | 'gunner' | 'rocket' | 'super';
+    // Если задано, просмотр выпускает очередь, а delay — пауза после неё.
+    burst?: number;
+    burstGap?: number;
   };
   bake: (scene: Phaser.Scene, paint: Paint, keys: string[]) => void;
   // Труп, если он не общая винтовка пехоты. Ракетчик кладёт рядом трубу.
@@ -275,6 +280,44 @@ export const ENTITIES: PreviewEntity[] = [
       );
       stamp(scene, keys[1], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
         RocketInfantry.drawMarch(g, 1, look, true),
+      );
+    },
+  },
+  {
+    id: 'super',
+    title: 'Суперсолдат',
+    hint: 'Босс 10-й, 20-й и 30-й волны. Крупнее пехоты, тёмная броня и пулемёт. «Стрельба» даёт очередь из 5 пуль, затем пауза 5 с — так же, как на поле.',
+    exportName: 'SUPER_LOOK',
+    kind: 'frames',
+    frameCount: 2,
+    animFps: SuperSoldier.walkFps,
+    gameScale: SuperSoldier.scale,
+    originX: Infantry.placed.originX,
+    originY: Infantry.placed.originY,
+    texW: SOLDIER_FRAME.w,
+    texH: SOLDIER_FRAME.h,
+    defaults: asPaint(SUPER_LOOK),
+    fields: soldierFields(),
+    hitbox: soldierHit,
+    muzzle: SuperSoldier.muzzleOffset,
+    hpColor: 0xff3348,
+    death: 'corpse',
+    paintCorpse: (g, paint) => SuperSoldier.drawCorpse(g, paint as SoldierLook),
+    shot: {
+      delay: SuperSoldier.relocateMs,
+      speed: SuperSoldier.shotSpeed,
+      projectile: 'bullet',
+      flash: 'super',
+      burst: SuperSoldier.burstCount,
+      burstGap: SuperSoldier.burstGap,
+    },
+    bake: (scene, paint, keys) => {
+      const look = paint as SoldierLook;
+      stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        SuperSoldier.drawMarch(g, 0, look, true),
+      );
+      stamp(scene, keys[1], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+        SuperSoldier.drawMarch(g, 1, look, true),
       );
     },
   },

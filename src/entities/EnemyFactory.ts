@@ -6,16 +6,22 @@ import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
 import { PickupTruck } from './PickupTruck';
 import { RocketInfantry } from './RocketInfantry';
+import { SuperSoldier } from './SuperSoldier';
 import type { SpawnContext } from './SpawnContext';
 
 export type { SpawnContext } from './SpawnContext';
 export type { WorldPoint } from './WorldPoint';
 
 // Короткое имя вида для сохранения. Имя класса после сборки может измениться.
-export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket'] as const;
+export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket', 'super'] as const;
 export type EnemySaveKind = (typeof ENEMY_KINDS)[number];
 
-type EnemyKind = typeof AssaultInfantry | typeof GunnerInfantry | typeof PickupTruck | typeof RocketInfantry;
+type EnemyKind =
+  | typeof AssaultInfantry
+  | typeof GunnerInfantry
+  | typeof PickupTruck
+  | typeof RocketInfantry
+  | typeof SuperSoldier;
 
 export class EnemyFactory {
   // Техника с debutWave. Порядок в пуле шагов — по возрастанию debutWave.
@@ -34,6 +40,11 @@ export class EnemyFactory {
     announceMs: 1300,
     startDelayMs: 700,
   };
+
+  // 10, 20, 30… — волна босса. Обычный состав на этот номер не выходит.
+  static isBossWave(wave: number): boolean {
+    return wave > 0 && wave % 10 === 0;
+  }
 
   static count(wave: number): number {
     return this.roster(wave).length;
@@ -55,6 +66,9 @@ export class EnemyFactory {
     if (unit instanceof GunnerInfantry) {
       return 'gunner';
     }
+    if (unit instanceof SuperSoldier) {
+      return 'super';
+    }
     if (unit instanceof AssaultInfantry) {
       return 'assault';
     }
@@ -73,6 +87,9 @@ export class EnemyFactory {
 
   private static spawnSaved(kind: EnemySaveKind, ctx: SpawnContext, rankHp: number): Infantry {
     const { scene, x, y, shots, fireTarget } = ctx;
+    if (kind === 'super') {
+      return new SuperSoldier(scene, x, y, SuperSoldier.baseHp, shots, fireTarget);
+    }
     if (kind === 'assault') {
       return new AssaultInfantry(scene, x, y, rankHp);
     }
@@ -100,6 +117,12 @@ export class EnemyFactory {
 
   private static spawnUnit(kind: EnemyKind, ctx: SpawnContext): Infantry {
     const { scene, x, y, wave, shots, fireTarget } = ctx;
+
+    if (kind === SuperSoldier) {
+      const unit = new SuperSoldier(scene, x, y, SuperSoldier.baseHp, shots, fireTarget);
+      unit.setPaceWave(1);
+      return unit;
+    }
 
     if (kind === AssaultInfantry) {
       const unit = new AssaultInfantry(scene, x, y, Infantry.waveHp(wave));
@@ -131,6 +154,11 @@ export class EnemyFactory {
   private static roster(wave: number): EnemyKind[] {
     if (wave < 1) {
       return [];
+    }
+    // На поле выходит только босс. Расчёт более поздних волн этот номер всё равно
+    // проигрывает ниже, поэтому дебют ракетчика и пикапа не теряется.
+    if (this.isBossWave(wave)) {
+      return [SuperSoldier];
     }
 
     const { startCount, infantryRampUntil, stepEvery, maxCount } = EnemyFactory.wave;
