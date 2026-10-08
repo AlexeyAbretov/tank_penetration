@@ -159,8 +159,10 @@ export class Tank extends GameObjects.Container {
     }
     this.engineMs += delta;
     const wobble = this.engineMs * 0.028;
-    const dx = Math.sin(wobble) * 0.45 + Math.sin(wobble * 2.17) * 0.28;
-    const dy = Math.cos(wobble * 1.31) * 0.35 + Math.sin(wobble * 2.63) * 0.18;
+    // Башня повёрнута. Дробный сдвиг перерисовывает её каждый кадр и выглядит как сильная тряска,
+    // хотя корпус при том же сдвиге стоит на месте. Оба двигаются на одно и то же целое число пикселей.
+    const dx = Math.round(Math.sin(wobble) * 0.4 + Math.sin(wobble * 2.17) * 0.25);
+    const dy = Math.round(Math.cos(wobble * 1.31) * 0.4 + Math.sin(wobble * 2.63) * 0.15);
     const layout = Tank.layout;
     this.hull.setPosition(layout.hullX + dx, layout.hullY + dy);
     this.aim.setPosition(layout.seatX + dx, layout.seatY + dy);
