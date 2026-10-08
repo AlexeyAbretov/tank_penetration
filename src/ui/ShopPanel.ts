@@ -188,7 +188,12 @@ export class ShopPanel {
     );
 
     // Пока магазин открыт, новые объекты сцены (проволока, пулемёт) не должны попасть в окно списка.
+    // Сцена при перезапуске та же, поэтому подписку снимаем на shutdown, иначе старый обработчик
+    // трогает уже уничтоженный список карточек и обрывает игровой цикл.
     scene.events.on('update', this.syncListCamera, this);
+    scene.events.once('shutdown', () => {
+      scene.events.off('update', this.syncListCamera, this);
+    });
     this.syncListCamera();
   }
 
