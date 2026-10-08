@@ -4,10 +4,13 @@
 import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
+import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { CombatSystem } from '../systems/CombatSystem';
+import { loadMeta, resetMeta } from '../systems/MetaSave';
+import { MetaShopController } from '../systems/MetaShopController';
 import { PlayerController } from '../systems/PlayerController';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { clearRun, loadRun, saveRun } from '../systems/RunSave';
@@ -24,7 +27,9 @@ export class GameScene extends Phaser.Scene {
   private combat!: CombatSystem;
   private waves!: WaveManager;
   private shop!: ShopController;
+  private metaShop!: MetaShopController;
   private projectiles!: ProjectileSystem;
+  private defeatShop = false;
 
   private score = 0;
   private coins = 0;
@@ -68,6 +73,8 @@ export class GameScene extends Phaser.Scene {
     this.time.paused = false;
     this.persistEnabled = false;
     this.autosaveMs = 0;
+    this.defeatShop = false;
+    Tank.setMetaSpeedLevel(loadMeta().speed);
 
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
     createAmbientEmbers(this);
@@ -79,7 +86,7 @@ export class GameScene extends Phaser.Scene {
     this.hud = new GameHud(this);
     this.hud.setHaste(1);
     this.hud.onHasteCycle(() => {
-      if (!this.paused) {
+      if (!this.paused && !this.defeatShop) {
         this.cycleEnemyHaste();
       }
     });
@@ -87,6 +94,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.onResume(() => {
       this.resumeRequested = true;
     });
+    this.hud.onNewGame(() => this.restartRun());
     const keyboard = this.input.keyboard;
     if (keyboard) {
       this.hasteKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
@@ -96,11 +104,16 @@ export class GameScene extends Phaser.Scene {
     this.events.once('shutdown', this.onShutdown, this);
 
     let combat: CombatSystem | undefined;
-    this.player = new PlayerController(this, this.hud, {
-      enemyShots: this.enemyShots,
-      infantry: this.infantry,
-      clearPlayerCombat: () => combat?.clearProjectiles(),
-    });
+    this.player = new PlayerController(
+      this,
+      this.hud,
+      {
+        enemyShots: this.enemyShots,
+        infantry: this.infantry,
+        clearPlayerCombat: () => combat?.clearProjectiles(),
+      },
+      () => this.openDefeatShop(),
+    );
     this.player.reset();
 
     this.shop = new ShopController(
@@ -121,9 +134,22 @@ export class GameScene extends Phaser.Scene {
       () => this.writeSave(),
     );
 
-    combat = this.combat = new CombatSystem(this, this.player.tank, this.infantry, this.shop, {
-      onKill: (reward) => this.onEnemyKill(reward),
-      onBaseHit: (amount) => this.onBaseHit(amount),
+    const meta = loadMeta();
+    combat = this.combat = new CombatSystem(
+      this,
+      this.player.tank,
+      this.infantry,
+      this.shop,
+      {
+        onKill: (reward) => this.onEnemyKill(reward),
+        onBaseHit: (amount) => this.onBaseHit(amount),
+      },
+      meta.damage,
+      meta.blast,
+    );
+    this.metaShop = new MetaShopController(this, () => {
+      this.persistEnabled = false;
+      this.scene.restart();
     });
     this.combat.setupOverlap();
 
@@ -146,15 +172,9 @@ export class GameScene extends Phaser.Scene {
 
     this.applyCameraFx();
     this.continueRun(loadRun());
-    this.persistEnabled = true;
-
-    this.input.on('pointerdown', () => {
-      if (this.player.isGameOver && this.hud.defeatOverlayVisible) {
-        this.persistEnabled = false;
-        clearRun();
-        this.scene.restart();
-      }
-    });
+    if (!this.defeatShop) {
+      this.persistEnabled = true;
+    }
 
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.addEventListener('pagehide', this.onPageHide);
@@ -165,7 +185,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.player.isGameOver) {
+    if (this.player.isGameOver || this.defeatShop) {
       return;
     }
 
@@ -208,7 +228,7 @@ export class GameScene extends Phaser.Scene {
   // Ранний выход из update не останавливает физику, таймеры, твины и анимации.
   // Магазин уже держит физику на паузе — тогда мир не трогаем, чтобы не отпустить врагов.
   private setPaused(paused: boolean): void {
-    if (this.paused === paused || (paused && this.player.isGameOver)) {
+    if (this.paused === paused || (paused && (this.player.isGameOver || this.defeatShop))) {
       return;
     }
     this.paused = paused;
@@ -241,7 +261,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onTabHidden(): void {
-    if (this.player.isGameOver) {
+    if (this.player.isGameOver || this.defeatShop) {
       return;
     }
     this.writeSave();
@@ -291,7 +311,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cycleEnemyHaste(): void {
-    if (this.player.isGameOver) {
+    if (this.player.isGameOver || this.defeatShop) {
       return;
     }
     const current = enemyHasteOf(this.registry);
@@ -313,7 +333,7 @@ export class GameScene extends Phaser.Scene {
 
   private onEnemyKill(coinReward: number): void {
     this.score += 10;
-    this.coins += coinReward;
+    this.coins += coinReward + loadMeta().coins;
     this.hud.setScore(this.score);
     this.hud.setCoins(this.coins);
     this.writeSave();
@@ -323,13 +343,45 @@ export class GameScene extends Phaser.Scene {
     this.player.damage(amount);
     if (this.player.isGameOver) {
       this.persistEnabled = false;
+      this.metaShop.bank(this.score);
       clearRun();
       return;
     }
     this.writeSave();
   }
 
+  // Новая игра: партия, score и все купленные уровни стираются.
+  private restartRun(): void {
+    if (this.player.isGameOver || this.defeatShop) {
+      return;
+    }
+    this.persistEnabled = false;
+    resetMeta();
+    clearRun();
+    this.scene.restart();
+  }
+
+  private openDefeatShop(): void {
+    this.defeatShop = true;
+    this.persistEnabled = false;
+    if (this.shop.shopOpen) {
+      this.shop.panel.hide();
+      this.shop.shopOpen = false;
+    }
+    this.registry.set('combat', false);
+    if (!this.physics.world.isPaused) {
+      this.physics.world.pause();
+    }
+    this.metaShop.open();
+  }
+
   private continueRun(saved: ReturnType<typeof loadRun>): void {
+    if (loadMeta().awaitingShop) {
+      clearRun();
+      this.shop.syncTankStats();
+      this.openDefeatShop();
+      return;
+    }
     if (!saved) {
       this.shop.syncTankStats();
       this.waves.scheduleFirstWave();

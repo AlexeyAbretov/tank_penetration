@@ -1,4 +1,4 @@
-// Счёт, полоска HP, баннер волны и плашка поражения.
+// Счёт, полоска HP и баннер волны. Плашка поражения — магазин между проигрышами.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
@@ -15,7 +15,6 @@ export class GameHud {
   private readonly artillery: Phaser.GameObjects.Container;
   private readonly artillerySweep: Phaser.GameObjects.Graphics;
   private readonly artilleryTime: Phaser.GameObjects.Text;
-  private readonly overlay: Phaser.GameObjects.Container;
   private readonly hastePlate: Phaser.GameObjects.Rectangle;
   private readonly hasteIcon: Phaser.GameObjects.Graphics;
   private readonly pausePlate: Phaser.GameObjects.Rectangle;
@@ -24,6 +23,7 @@ export class GameHud {
   private hasteCycle?: () => void;
   private pauseRequest?: () => void;
   private resumeRequest?: () => void;
+  private newGameRequest?: () => void;
 
   constructor(scene: Phaser.Scene) {
     scene.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
@@ -150,31 +150,11 @@ export class GameHud {
     scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
     this.hpFill = scene.add.rectangle(1018, 28, 236, 10, 0xd42a2a).setOrigin(0, 0.5).setDepth(52);
 
-    this.overlay = scene.add.container(GAME.width / 2, GAME.height / 2).setDepth(80).setVisible(false);
-    const dim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.55);
-    const title = scene.add
-      .text(0, -24, 'БАЗА РАЗБИТА', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '48px',
-        color: '#f3d56a',
-        stroke: '#4a1208',
-        strokeThickness: 6,
-      })
-      .setOrigin(0.5);
-    const hint = scene.add
-      .text(0, 36, 'Кликните, чтобы начать снова', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '20px',
-        color: '#f0dcc0',
-      })
-      .setOrigin(0.5);
-    this.overlay.add([dim, title, hint]);
-
     this.pauseOverlay = scene.add.container(GAME.width / 2, GAME.height / 2).setDepth(90).setVisible(false);
     const pauseDim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.45).setInteractive();
     pauseDim.on('pointerup', () => this.resumeRequest?.());
     const pauseTitle = scene.add
-      .text(0, -24, 'ПАУЗА', {
+      .text(0, -70, 'ПАУЗА', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '48px',
         color: '#f3d56a',
@@ -183,13 +163,29 @@ export class GameHud {
       })
       .setOrigin(0.5);
     const pauseHint = scene.add
-      .text(0, 36, 'Кликните или Esc, чтобы продолжить', {
+      .text(0, -8, 'Кликните или Esc, чтобы продолжить', {
         fontFamily: 'Georgia, serif',
         fontSize: '20px',
         color: '#f0dcc0',
       })
       .setOrigin(0.5);
-    this.pauseOverlay.add([pauseDim, pauseTitle, pauseHint]);
+    const fresh = scene.add.container(0, 78);
+    const freshBg = scene.add.rectangle(0, 0, 300, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const freshLabel = scene.add
+      .text(0, 0, 'НОВАЯ ИГРА', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '18px',
+        color: '#f3d56a',
+      })
+      .setOrigin(0.5);
+    fresh.add([freshBg, freshLabel]);
+    fresh.setInteractive({
+      hitArea: new Phaser.Geom.Rectangle(-150, -26, 300, 52),
+      hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      useHandCursor: true,
+    });
+    fresh.on('pointerup', () => this.newGameRequest?.());
+    this.pauseOverlay.add([pauseDim, pauseTitle, pauseHint, fresh]);
   }
 
   setScore(score: number): void {
@@ -218,11 +214,13 @@ export class GameHud {
     blastRadius: number,
     fireDelayMs: number,
     autoFire = false,
+    coinBonus = 0,
   ): void {
     const fireSec = (fireDelayMs / 1000).toFixed(2);
     const mode = autoFire ? 'авто' : 'ЛКМ';
+    const coins = coinBonus > 0 ? `   МОНЕТЫ +${coinBonus}` : '';
     this.tankStatsText.setText(
-      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с   ${mode}`,
+      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с${coins}   ${mode}`,
     );
   }
 
@@ -236,6 +234,10 @@ export class GameHud {
 
   onResume(request: () => void): void {
     this.resumeRequest = request;
+  }
+
+  onNewGame(request: () => void): void {
+    this.newGameRequest = request;
   }
 
   setPaused(paused: boolean): void {
@@ -349,14 +351,6 @@ export class GameHud {
       duration: 500,
       delay: 900,
     });
-  }
-
-  showDefeatOverlay(): void {
-    this.overlay.setVisible(true);
-  }
-
-  get defeatOverlayVisible(): boolean {
-    return this.overlay.visible;
   }
 
   private controlsLine(artillery: boolean): string {

@@ -9,6 +9,7 @@ import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import { ShopPanel } from '../ui/ShopPanel';
 import type { GameHud } from '../ui/GameHud';
+import { loadMeta } from './MetaSave';
 import type { ShopSave } from './RunSave';
 
 type Economy = {
@@ -194,11 +195,13 @@ export class ShopController {
   }
 
   syncTankStats(): void {
+    const meta = loadMeta();
     this.hud.setTankStats(
-      Infantry.shellDamage + this.damageLevel,
-      this.blastLevel * Tank.blastRadiusPerLevel,
+      Infantry.shellDamage + this.damageLevel + meta.damage,
+      (this.blastLevel + meta.blast) * Tank.blastRadiusPerLevel,
       Tank.fireDelayFor(this.fireRateLevel),
       this.tank.hasAutoFire,
+      meta.coins,
     );
   }
 

@@ -6,8 +6,10 @@ import Phaser from 'phaser';
 import { GAME, PAUSED } from '../gameConfig';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BarbedWire } from '../entities/BarbedWire';
+import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
+import { loadMeta } from '../systems/MetaSave';
 
 // Методы покупок, которые реализует ShopController.
 export type ShopDelegate = {
@@ -269,12 +271,14 @@ export class ShopPanel {
     const blastPrice = ShopPanel.upgradeCost(blastLevel);
     const damagePrice = ShopPanel.upgradeCost(damageLevel);
     const fireRatePrice = ShopPanel.upgradeCost(fireRateLevel);
-    const radius = blastLevel * Tank.blastRadiusPerLevel;
-    const nextRadius = (blastLevel + 1) * Tank.blastRadiusPerLevel;
+    const meta = loadMeta();
+    const radius = (blastLevel + meta.blast) * Tank.blastRadiusPerLevel;
+    const nextRadius = (blastLevel + 1 + meta.blast) * Tank.blastRadiusPerLevel;
+    const damageNow = Infantry.shellDamage + damageLevel + meta.damage;
 
     this.blast.info.setText(`ур. ${blastLevel}   радиус ${radius} → ${nextRadius}`);
     this.blast.cost.setText(`цена  ${blastPrice}`);
-    this.damage.info.setText(`ур. ${damageLevel}   урон ${1 + damageLevel} → ${2 + damageLevel}`);
+    this.damage.info.setText(`ур. ${damageLevel}   урон ${damageNow} → ${damageNow + 1}`);
     this.damage.cost.setText(`цена  ${damagePrice}`);
 
     this.tintCard(this.blast.card, this.blast.cost, coins >= blastPrice);

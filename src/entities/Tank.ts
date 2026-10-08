@@ -26,12 +26,30 @@ export class Tank extends GameObjects.Container {
   static readonly baseFireDelay = 1000;
   static readonly minFireDelay = 200;
   static readonly fireRateStep = 20;
-  static readonly maxFireRateLevel =
-    (Tank.baseFireDelay - Tank.minFireDelay) / Tank.fireRateStep;
+  // Постоянная скорость из магазина между проигрышами: −0.01 с за уровень.
+  static readonly metaSpeedStepMs = 10;
+  static metaSpeedLevel = 0;
 
-  static fireDelayFor(level: number): number {
-    const capped = Math.min(level, Tank.maxFireRateLevel);
-    return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep);
+  static get maxMetaSpeedLevel(): number {
+    return (Tank.baseFireDelay - Tank.minFireDelay) / Tank.metaSpeedStepMs;
+  }
+
+  static setMetaSpeedLevel(level: number): void {
+    Tank.metaSpeedLevel = Math.min(Tank.maxMetaSpeedLevel, Math.max(0, Math.round(level)));
+  }
+
+  // Магазин между волнами упирается в тот же пол 0.20 с, что и постоянная скорость.
+  static get maxFireRateLevel(): number {
+    const room = Tank.baseFireDelay - Tank.metaSpeedLevel * Tank.metaSpeedStepMs - Tank.minFireDelay;
+    return Math.max(0, Math.floor(room / Tank.fireRateStep));
+  }
+
+  static fireDelayFor(level: number, metaSpeed = Tank.metaSpeedLevel): number {
+    const metaCut = Math.max(0, Math.round(metaSpeed)) * Tank.metaSpeedStepMs;
+    const room = Tank.baseFireDelay - metaCut - Tank.minFireDelay;
+    const maxShop = Math.max(0, Math.floor(room / Tank.fireRateStep));
+    const capped = Math.min(Math.max(0, Math.round(level)), maxShop);
+    return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep - metaCut);
   }
   static readonly shellSpeed = 740;
   static readonly baseHp = 100;

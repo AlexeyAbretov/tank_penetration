@@ -19,6 +19,7 @@ export class PlayerController {
     private readonly scene: Phaser.Scene,
     private readonly hud: GameHud,
     private readonly defeatDeps: DefeatDeps,
+    private readonly onDefeated: () => void,
   ) {
     this.tank = new Tank(scene, Tank.spawn.x, Tank.spawn.y);
   }
@@ -71,7 +72,7 @@ export class PlayerController {
     this.tank.die();
     this.scene.cameras.main.shake(680, 0.014);
     this.scene.time.delayedCall(1300, () => {
-      this.hud.showDefeatOverlay();
+      this.onDefeated();
     });
   }
 }

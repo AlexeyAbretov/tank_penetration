@@ -31,6 +31,8 @@ export class CombatSystem {
     private readonly infantry: Phaser.Physics.Arcade.Group,
     private readonly shop: ShopController,
     private readonly callbacks: CombatCallbacks,
+    private readonly metaDamage: number,
+    private readonly metaBlast: number,
   ) {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
@@ -173,7 +175,7 @@ export class CombatSystem {
       this.hurtInfantry(direct);
     }
 
-    const blastRadius = this.shop.blastLevel * Tank.blastRadiusPerLevel;
+    const blastRadius = this.blastRadius();
     if (blastRadius <= 0) {
       return;
     }
@@ -318,7 +320,7 @@ export class CombatSystem {
 
   private hurtInfantry(
     unit: Infantry,
-    damage = Infantry.shellDamage + this.shop.damageLevel,
+    damage = this.shellDamage(),
     wire = false,
   ): void {
     if (unit.hit(damage, wire)) {
@@ -335,8 +337,16 @@ export class CombatSystem {
     this.callbacks.onBaseHit(unit.contactDamage);
   }
 
+  private shellDamage(): number {
+    return Infantry.shellDamage + this.shop.damageLevel + this.metaDamage;
+  }
+
+  private blastRadius(): number {
+    return (this.shop.blastLevel + this.metaBlast) * Tank.blastRadiusPerLevel;
+  }
+
   private playBlast(x: number, y: number): void {
-    const radius = this.shop.blastLevel * Tank.blastRadiusPerLevel;
+    const radius = this.blastRadius();
     this.blast.emitParticleAt(x, y, radius > 0 ? 16 : 8);
     const flash = this.scene.add.image(x, y, 'muzzle').setDepth(16).setBlendMode(Phaser.BlendModes.ADD);
     flash.setScale(radius > 0 ? 1 : 0.55);
