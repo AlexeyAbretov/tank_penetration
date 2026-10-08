@@ -3,7 +3,7 @@
 // Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
+import { GAME, PAUSED } from '../gameConfig';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BarbedWire } from '../entities/BarbedWire';
 import { MachineGun } from '../entities/MachineGun';
@@ -149,7 +149,11 @@ export class ShopPanel {
 
     const next = scene.add.rectangle(0, 262, 280, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
     next.setInteractive({ useHandCursor: true });
-    next.on('pointerup', () => shop.closeAndContinue());
+    next.on('pointerup', () => {
+      if (!this.blocked()) {
+        shop.closeAndContinue();
+      }
+    });
     const nextLabel = scene.add
       .text(0, 262, 'СЛЕДУЮЩАЯ ВОЛНА', {
         fontFamily: 'Cinzel, Georgia, serif',
@@ -172,7 +176,11 @@ export class ShopPanel {
     this.container.setDepth(70).setVisible(false);
     this.listContent.setDepth(71).setVisible(false);
 
-    scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => this.dragList(pointer));
+    scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.blocked()) {
+        this.dragList(pointer);
+      }
+    });
     scene.input.on('pointerup', () => {
       this.drag = null;
       this.pressedCard = null;
@@ -180,7 +188,7 @@ export class ShopPanel {
     scene.input.on(
       'wheel',
       (pointer: Phaser.Input.Pointer, _over: Phaser.GameObjects.GameObject[], _dx: number, dy: number) => {
-        if (!this.container.visible || !this.overPanel(pointer)) {
+        if (this.blocked() || !this.container.visible || !this.overPanel(pointer)) {
           return;
         }
         this.setScroll(this.scroll + dy * 0.55);
@@ -232,6 +240,20 @@ export class ShopPanel {
     this.listCam.setVisible(false);
   }
 
+  // Камера списка рисуется поверх основной и стирает центр экрана.
+  // Пока игра на паузе, прячем её, иначе плашка «ПАУЗА» пропадает над карточками.
+  coverForPause(paused: boolean): void {
+    if (!this.container.visible) {
+      return;
+    }
+    const showList = !paused;
+    this.listCam.setVisible(showList);
+    this.listContent.setVisible(showList);
+    const scroll = showList && this.maxScroll > 0;
+    this.track.setVisible(scroll);
+    this.thumb.setVisible(scroll);
+  }
+
   refresh(
     coins: number,
     blastLevel: number,
@@ -271,12 +293,15 @@ export class ShopPanel {
       .setStrokeStyle(2, 0xf0d56a);
     card.setInteractive({ useHandCursor: true });
     card.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.blocked()) {
+        return;
+      }
       this.pressedCard = card;
       this.beginDrag(pointer);
     });
     // Короткое нажатие покупает. Сдвиг списка — это уже скролл, не покупка.
     card.on('pointerup', () => {
-      if (this.pressedCard !== card || this.drag?.moved) {
+      if (this.blocked() || this.pressedCard !== card || this.drag?.moved) {
         return;
       }
       buy();
@@ -312,6 +337,10 @@ export class ShopPanel {
     return { card, info, cost };
   }
 
+  private blocked(): boolean {
+    return this.listContent.scene.registry.get(PAUSED) === true;
+  }
+
   private beginDrag(pointer: Phaser.Input.Pointer): void {
     this.drag = { y: pointer.y, scroll: this.scroll, moved: false };
   }
@@ -330,6 +359,9 @@ export class ShopPanel {
   }
 
   private dragThumb(pointer: Phaser.Input.Pointer): void {
+    if (this.blocked()) {
+      return;
+    }
     const screenTop = GAME.height / 2 + this.trackTop;
     const travel = VIEW_H - this.thumbH;
     const center = Phaser.Math.Clamp(pointer.y, screenTop + this.thumbH / 2, screenTop + travel + this.thumbH / 2);

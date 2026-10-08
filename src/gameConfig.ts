@@ -14,6 +14,9 @@ export const ENEMY_HASTE = {
   max: 3,
 } as const;
 
+// Игра на паузе: бой, магазин и таймеры стоят, пока игрок сам не продолжит.
+export const PAUSED = 'paused';
+
 export function enemyHasteOf(registry: { get(key: string): unknown }): number {
   const raw = registry.get(ENEMY_HASTE.key);
   const value = typeof raw === 'number' ? raw : 1;

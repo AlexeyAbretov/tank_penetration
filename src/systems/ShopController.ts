@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { PAUSED } from '../gameConfig';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
@@ -67,6 +68,9 @@ export class ShopController {
   }
 
   closeAndContinue(): void {
+    if (this.isPaused()) {
+      return;
+    }
     this.panel.hide();
     this.shopOpen = false;
     this.scene.registry.set('combat', true);
@@ -75,6 +79,9 @@ export class ShopController {
   }
 
   buyBlast(): void {
+    if (this.isPaused()) {
+      return;
+    }
     const cost = ShopPanel.upgradeCost(this.blastLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
@@ -84,6 +91,9 @@ export class ShopController {
   }
 
   buyDamage(): void {
+    if (this.isPaused()) {
+      return;
+    }
     const cost = ShopPanel.upgradeCost(this.damageLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
@@ -93,7 +103,7 @@ export class ShopController {
   }
 
   buyFireRate(): void {
-    if (this.fireRateLevel >= Tank.maxFireRateLevel) {
+    if (this.isPaused() || this.fireRateLevel >= Tank.maxFireRateLevel) {
       return;
     }
     const cost = ShopPanel.upgradeCost(this.fireRateLevel);
@@ -106,7 +116,7 @@ export class ShopController {
   }
 
   buyWire(): void {
-    if (this.wireOwned || this.economy.getCoins() < BarbedWire.shop.cost) {
+    if (this.isPaused() || this.wireOwned || this.economy.getCoins() < BarbedWire.shop.cost) {
       return;
     }
     if (!this.economy.spendCoins(BarbedWire.shop.cost)) {
@@ -118,7 +128,7 @@ export class ShopController {
   }
 
   buyAutoFire(): void {
-    if (this.tank.hasAutoFire || this.economy.getCoins() < Tank.shop.autoFireCost) {
+    if (this.isPaused() || this.tank.hasAutoFire || this.economy.getCoins() < Tank.shop.autoFireCost) {
       return;
     }
     if (!this.economy.spendCoins(Tank.shop.autoFireCost)) {
@@ -129,7 +139,7 @@ export class ShopController {
   }
 
   buyMachineGun(): void {
-    if (this.machineGunOwned || this.economy.getCoins() < MachineGun.shop.cost) {
+    if (this.isPaused() || this.machineGunOwned || this.economy.getCoins() < MachineGun.shop.cost) {
       return;
     }
     if (!this.economy.spendCoins(MachineGun.shop.cost)) {
@@ -141,7 +151,7 @@ export class ShopController {
   }
 
   buyArtillery(): void {
-    if (this.artilleryOwned || this.economy.getCoins() < ArtilleryStrike.shop.cost) {
+    if (this.isPaused() || this.artilleryOwned || this.economy.getCoins() < ArtilleryStrike.shop.cost) {
       return;
     }
     if (!this.economy.spendCoins(ArtilleryStrike.shop.cost)) {
@@ -158,6 +168,10 @@ export class ShopController {
       Tank.fireDelayFor(this.fireRateLevel),
       this.tank.hasAutoFire,
     );
+  }
+
+  private isPaused(): boolean {
+    return this.scene.registry.get(PAUSED) === true;
   }
 
   private refresh(): void {

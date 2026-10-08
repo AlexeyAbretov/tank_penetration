@@ -17,9 +17,13 @@ export class GameHud {
   private readonly artilleryTime: Phaser.GameObjects.Text;
   private readonly overlay: Phaser.GameObjects.Container;
   private readonly hastePlate: Phaser.GameObjects.Rectangle;
-  private readonly hasteLabel: Phaser.GameObjects.Text;
+  private readonly hasteIcon: Phaser.GameObjects.Graphics;
+  private readonly pausePlate: Phaser.GameObjects.Rectangle;
+  private readonly pauseOverlay: Phaser.GameObjects.Container;
   private artilleryOwned = false;
   private hasteCycle?: () => void;
+  private pauseRequest?: () => void;
+  private resumeRequest?: () => void;
 
   constructor(scene: Phaser.Scene) {
     scene.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
@@ -35,38 +39,29 @@ export class GameHud {
       .setOrigin(0.5)
       .setDepth(51);
 
+    const statusY = 28;
+    const statusStyle = {
+      fontFamily: 'Cinzel, Georgia, serif',
+      fontSize: '18px',
+      stroke: '#2a0a08',
+      strokeThickness: 4,
+    };
     this.scoreText = scene.add
-      .text(28, 18, 'SCORE  0', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '22px',
-        color: '#f3d56a',
-        stroke: '#2a0a08',
-        strokeThickness: 4,
-      })
+      .text(28, statusY, 'SCORE  0', { ...statusStyle, color: '#f3d56a' })
+      .setOrigin(0, 0.5)
       .setDepth(51);
-
     this.waveText = scene.add
-      .text(28, 48, 'WAVE  0', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '18px',
-        color: '#e8c48a',
-        stroke: '#2a0a08',
-        strokeThickness: 4,
-      })
+      .text(0, statusY, 'WAVE  0', { ...statusStyle, color: '#e8c48a' })
+      .setOrigin(0, 0.5)
       .setDepth(51);
-
     this.coinsText = scene.add
-      .text(28, 74, 'COINS  0', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '18px',
-        color: '#f3d56a',
-        stroke: '#2a0a08',
-        strokeThickness: 4,
-      })
+      .text(0, statusY, 'COINS  0', { ...statusStyle, color: '#f3d56a' })
+      .setOrigin(0, 0.5)
       .setDepth(51);
+    this.layoutStatus();
 
     this.tankStatsText = scene.add
-      .text(28, 104, '', {
+      .text(28, 56, '', {
         fontFamily: 'Georgia, serif',
         fontSize: '16px',
         color: '#e8c48a',
@@ -88,22 +83,32 @@ export class GameHud {
       .setDepth(60)
       .setAlpha(0);
 
+    // Рамка HP: центр 1128, ширина 280. Иконки стоят сразу слева от неё.
+    const icon = 40;
+    const hpLeft = 1128 - 140;
+    const hasteX = hpLeft - 8 - icon / 2;
+    const pauseX = hasteX - 6 - icon;
+    const iconY = 28;
+
     this.hastePlate = scene.add
-      .rectangle(102, 150, 148, 34, 0x3a0c0c)
+      .rectangle(hasteX, iconY, icon, icon, 0x3a0c0c)
       .setStrokeStyle(2, 0xc9a227)
       .setDepth(53)
       .setInteractive({ useHandCursor: true });
-    this.hasteLabel = scene.add
-      .text(102, 150, 'ТЕМП  ×1', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '16px',
-        color: '#f3d56a',
-        stroke: '#2a0a08',
-        strokeThickness: 3,
-      })
-      .setOrigin(0.5)
-      .setDepth(54);
+    this.hasteIcon = scene.add.graphics().setPosition(hasteX, iconY).setDepth(54);
+    this.drawSpeedometer(1);
     this.hastePlate.on('pointerup', () => this.hasteCycle?.());
+
+    this.pausePlate = scene.add
+      .rectangle(pauseX, iconY, icon, icon, 0x3a0c0c)
+      .setStrokeStyle(2, 0xc9a227)
+      .setDepth(53)
+      .setInteractive({ useHandCursor: true });
+    // Обычные прямоугольники, не Graphics: скруглённая заливка узкой полоски
+    // сдвигает её низ в сторону.
+    scene.add.rectangle(pauseX - 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
+    scene.add.rectangle(pauseX + 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
+    this.pausePlate.on('pointerup', () => this.pauseRequest?.());
 
     this.controls = scene.add
       .text(GAME.width / 2, 708, this.controlsLine(false), {
@@ -164,18 +169,48 @@ export class GameHud {
       })
       .setOrigin(0.5);
     this.overlay.add([dim, title, hint]);
+
+    this.pauseOverlay = scene.add.container(GAME.width / 2, GAME.height / 2).setDepth(90).setVisible(false);
+    const pauseDim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.45).setInteractive();
+    pauseDim.on('pointerup', () => this.resumeRequest?.());
+    const pauseTitle = scene.add
+      .text(0, -24, 'ПАУЗА', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '48px',
+        color: '#f3d56a',
+        stroke: '#4a1208',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5);
+    const pauseHint = scene.add
+      .text(0, 36, 'Кликните или Esc, чтобы продолжить', {
+        fontFamily: 'Georgia, serif',
+        fontSize: '20px',
+        color: '#f0dcc0',
+      })
+      .setOrigin(0.5);
+    this.pauseOverlay.add([pauseDim, pauseTitle, pauseHint]);
   }
 
   setScore(score: number): void {
     this.scoreText.setText(`SCORE  ${score}`);
+    this.layoutStatus();
   }
 
   setWave(wave: number): void {
     this.waveText.setText(`WAVE  ${wave}`);
+    this.layoutStatus();
   }
 
   setCoins(coins: number): void {
     this.coinsText.setText(`COINS  ${coins}`);
+    this.layoutStatus();
+  }
+
+  private layoutStatus(): void {
+    const gap = 32;
+    this.waveText.setX(this.scoreText.x + this.scoreText.width + gap);
+    this.coinsText.setX(this.waveText.x + this.waveText.width + gap);
   }
 
   setTankStats(
@@ -195,14 +230,70 @@ export class GameHud {
     this.hasteCycle = cycle;
   }
 
+  onPause(request: () => void): void {
+    this.pauseRequest = request;
+  }
+
+  onResume(request: () => void): void {
+    this.resumeRequest = request;
+  }
+
+  setPaused(paused: boolean): void {
+    this.pauseOverlay.setVisible(paused);
+  }
+
   setHaste(multiplier: number): void {
-    this.hasteLabel.setText(`ТЕМП  ×${multiplier}`);
     this.hastePlate.setFillStyle(multiplier > 1 ? 0x8a1810 : 0x3a0c0c);
+    this.drawSpeedometer(multiplier);
+  }
+
+  // Три дуги разного цвета. Короткая светлая стрелка не сливается со средней в букву Т.
+  private drawSpeedometer(level: number): void {
+    const g = this.hasteIcon;
+    g.clear();
+    const cy = 5;
+    const radius = 12;
+    const gap = 0.22;
+    const span = Math.PI;
+    const seg = (span - gap * 2) / 3;
+    const start = Math.PI;
+    const step = Phaser.Math.Clamp(Math.round(level), 1, 3);
+    const colors = [0x6ecf4a, 0xf0c14a, 0xe24a3a];
+    const dim = [0x2c4a1c, 0x5a4320, 0x5a221c];
+
+    g.lineStyle(1.5, 0x4a3018, 1);
+    g.beginPath();
+    g.arc(0, cy, radius + 3, start, start + span, false);
+    g.strokePath();
+
+    for (let i = 0; i < 3; i += 1) {
+      const a0 = start + i * (seg + gap);
+      const a1 = a0 + seg;
+      g.lineStyle(4, i < step ? colors[i] : dim[i], 1);
+      g.beginPath();
+      g.arc(0, cy, radius, a0, a1, false);
+      g.strokePath();
+    }
+
+    const mid = start + (step - 1) * (seg + gap) + seg / 2;
+    const tip = 8;
+    const ux = Math.cos(mid);
+    const uy = Math.sin(mid);
+    g.lineStyle(2, 0xfff8ee, 1);
+    g.beginPath();
+    g.moveTo(ux * 1.5, cy + uy * 1.5);
+    g.lineTo(ux * tip, cy + uy * tip);
+    g.strokePath();
   }
 
   // Клик по плашке темпа не должен быть выстрелом танка.
   coversHaste(pointer: Phaser.Input.Pointer): boolean {
     return this.hastePlate.getBounds().contains(pointer.worldX, pointer.worldY);
+  }
+
+  // Клик по кнопке паузы не должен быть выстрелом танка.
+  coversPause(pointer: Phaser.Input.Pointer): boolean {
+    return this.pausePlate.getBounds().contains(pointer.worldX, pointer.worldY);
   }
 
   setArtillery(owned: boolean, cooldownMs: number): void {
@@ -269,7 +360,7 @@ export class GameHud {
   }
 
   private controlsLine(artillery: boolean): string {
-    const tempo = 'мышь — прицел   ЛКМ — огонь   2 — темп';
+    const tempo = 'мышь — прицел   ЛКМ — огонь   2 — темп   Esc — пауза';
     return artillery ? `${tempo}   1 — удар` : tempo;
   }
 }

@@ -4,7 +4,7 @@
 import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
-import { ENEMY_HASTE, GAME, enemyHasteOf } from '../gameConfig';
+import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { CombatSystem } from '../systems/CombatSystem';
@@ -27,8 +27,14 @@ export class GameScene extends Phaser.Scene {
 
   private score = 0;
   private coins = 0;
+  private paused = false;
+  private pausedPhysics = false;
+  private resumeRequested = false;
+  private resumeArmed = false;
+  private pausedEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private hasteKey?: Phaser.Input.Keyboard.Key;
   private hasteNumpad?: Phaser.Input.Keyboard.Key;
+  private pauseKey?: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('game');
@@ -47,6 +53,13 @@ export class GameScene extends Phaser.Scene {
     this.coins = 0;
     this.registry.set('combat', true);
     this.registry.set(ENEMY_HASTE.key, 1);
+    this.registry.set(PAUSED, false);
+    this.paused = false;
+    this.pausedPhysics = false;
+    this.resumeRequested = false;
+    this.resumeArmed = false;
+    this.pausedEmitters = [];
+    this.time.paused = false;
 
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
     createAmbientEmbers(this);
@@ -57,12 +70,22 @@ export class GameScene extends Phaser.Scene {
 
     this.hud = new GameHud(this);
     this.hud.setHaste(1);
-    this.hud.onHasteCycle(() => this.cycleEnemyHaste());
+    this.hud.onHasteCycle(() => {
+      if (!this.paused) {
+        this.cycleEnemyHaste();
+      }
+    });
+    this.hud.onPause(() => this.setPaused(true));
+    this.hud.onResume(() => {
+      this.resumeRequested = true;
+    });
     const keyboard = this.input.keyboard;
     if (keyboard) {
       this.hasteKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
       this.hasteNumpad = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_TWO);
+      this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     }
+    this.events.once('shutdown', this.onShutdown, this);
 
     let combat: CombatSystem | undefined;
     this.player = new PlayerController(this, this.hud, {
@@ -120,10 +143,31 @@ export class GameScene extends Phaser.Scene {
         this.scene.restart();
       }
     });
+
+    this.game.events.on(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
+    if (document.hidden) {
+      this.setPaused(true);
+    }
   }
 
   update(_time: number, delta: number): void {
     if (this.player.isGameOver) {
+      return;
+    }
+
+    if (this.paused) {
+      const resume = this.resumeArmed && (this.resumeRequested || this.pausePressed());
+      this.resumeRequested = false;
+      if (resume) {
+        this.setPaused(false);
+      } else {
+        this.resumeArmed = true;
+      }
+      return;
+    }
+
+    if (this.pausePressed()) {
+      this.setPaused(true);
       return;
     }
 
@@ -141,15 +185,85 @@ export class GameScene extends Phaser.Scene {
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
-    this.combat.tick(delta, !this.hud.coversHaste(pointer));
+    this.combat.tick(delta, !this.hud.coversHaste(pointer) && !this.hud.coversPause(pointer));
     this.projectiles.tick();
     this.waves.tick();
+  }
+
+  // Ранний выход из update не останавливает физику, таймеры, твины и анимации.
+  // Магазин уже держит физику на паузе — тогда мир не трогаем, чтобы не отпустить врагов.
+  private setPaused(paused: boolean): void {
+    if (this.paused === paused || (paused && this.player.isGameOver)) {
+      return;
+    }
+    this.paused = paused;
+    this.registry.set(PAUSED, paused);
+    this.time.paused = paused;
+    if (paused) {
+      this.resumeRequested = false;
+      this.resumeArmed = false;
+      this.tweens.pauseAll();
+      this.anims.pauseAll();
+      this.freezeEmitters();
+      if (!this.physics.world.isPaused) {
+        this.physics.world.pause();
+        this.pausedPhysics = true;
+      }
+    } else {
+      this.tweens.resumeAll();
+      this.anims.resumeAll();
+      this.thawEmitters();
+      if (this.pausedPhysics) {
+        this.physics.world.resume();
+        this.pausedPhysics = false;
+      }
+    }
+    this.hud.setPaused(paused);
+    this.shop.panel.coverForPause(paused);
+  }
+
+  private onTabHidden(): void {
+    if (this.player.isGameOver || this.paused) {
+      return;
+    }
+    this.setPaused(true);
+  }
+
+  private onShutdown(): void {
+    this.game.events.off(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
+    if (this.paused) {
+      this.anims.resumeAll();
+    }
+  }
+
+  private freezeEmitters(): void {
+    const held: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+    this.children.each((child) => {
+      if (child instanceof Phaser.GameObjects.Particles.ParticleEmitter && child.active) {
+        child.pause();
+        held.push(child);
+      }
+    });
+    this.pausedEmitters = held;
+  }
+
+  private thawEmitters(): void {
+    for (const emitter of this.pausedEmitters) {
+      if (emitter.scene) {
+        emitter.resume();
+      }
+    }
+    this.pausedEmitters = [];
   }
 
   private hastePressed(): boolean {
     const keyDown = (key?: Phaser.Input.Keyboard.Key) =>
       key !== undefined && Phaser.Input.Keyboard.JustDown(key);
     return keyDown(this.hasteKey) || keyDown(this.hasteNumpad);
+  }
+
+  private pausePressed(): boolean {
+    return this.pauseKey !== undefined && Phaser.Input.Keyboard.JustDown(this.pauseKey);
   }
 
   private cycleEnemyHaste(): void {
