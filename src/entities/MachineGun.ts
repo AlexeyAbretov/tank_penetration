@@ -5,16 +5,14 @@ import {
   BULLET_FRAME,
   MG_BULLET_PAINT,
   MG_MOUNT_FRAME,
-  MG_MOUNT_PAINT,
   type BulletPaint,
-  type MgMountPaint,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { Tank } from './Tank';
 
 export class MachineGun extends GameObjects.Container {
   static readonly textureKey = 'mg-bullet';
-  static readonly barrelKey = 'mg-mount';
+  static readonly barrelKey = 'tank-mg';
 
   static readonly shop = {
     cost: 100,
@@ -23,13 +21,13 @@ export class MachineGun extends GameObjects.Container {
     bulletSpeed: 720,
   };
 
-  // Цапфа в координатах контейнера aim. Пятка опоры стоит на крыше башни, ближе к стволу.
+  // Цапфа на оси ствола. Пятка опоры стоит на крыше башни, ближе к пушке.
   static readonly layout = {
-    x: 16,
-    y: -22,
-    barrelLength: 30,
-    originX: 14 / MG_MOUNT_FRAME.w,
-    originY: 3 / MG_MOUNT_FRAME.h,
+    x: 26,
+    y: -36,
+    barrelLength: 44,
+    originX: 27.5 / MG_MOUNT_FRAME.w,
+    originY: 5.5 / MG_MOUNT_FRAME.h,
   };
 
   private readonly barrel: Phaser.GameObjects.Image;
@@ -61,8 +59,8 @@ export class MachineGun extends GameObjects.Container {
     if (!scene.textures.exists(MachineGun.textureKey)) {
       bake(scene, MachineGun.textureKey, BULLET_FRAME.w, BULLET_FRAME.h, (g) => this.renderBullet(g));
     }
-    if (!scene.textures.exists(MachineGun.barrelKey)) {
-      bake(scene, MachineGun.barrelKey, MG_MOUNT_FRAME.w, MG_MOUNT_FRAME.h, (g) => this.renderMount(g));
+    if (scene.textures.exists(MachineGun.barrelKey)) {
+      scene.textures.get(MachineGun.barrelKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
   }
 
@@ -71,21 +69,6 @@ export class MachineGun extends GameObjects.Container {
     g.fillRoundedRect(0, 1, 18, 6, 2);
     g.fillStyle(paint.tip);
     g.fillRect(12, 2, 5, 4);
-  }
-
-  static renderMount(g: Phaser.GameObjects.Graphics, paint: MgMountPaint = MG_MOUNT_PAINT): void {
-    // Казённик сзади ствола, затыльник и рукоять. Цапфа текстуры — (14, 3).
-    g.fillStyle(paint.base);
-    g.fillRoundedRect(3, 0, 16, 8, 2);
-    g.fillRect(6, 7, 3, 4);
-    g.fillStyle(paint.tip);
-    g.fillRect(3, 1, 3, 6);
-    g.fillStyle(paint.base);
-    g.fillRect(15, 6, 5, 13);
-    g.fillStyle(paint.barrel);
-    g.fillRoundedRect(14, 1, 26, 5, 2);
-    g.fillStyle(paint.tip);
-    g.fillRect(39, 0, 5, 7);
   }
 
   // Ствол смотрит вместе с башней; отдаёт мировые координаты дула и угол выстрела.

@@ -29,7 +29,6 @@ import {
   TANK_TURRET_FRAME,
   TANK_WRECK_FRAME,
   type BulletPaint,
-  type MgMountPaint,
   type MuzzlePaint,
   type PickupPaint,
   type ShellPaint,
@@ -37,7 +36,7 @@ import {
   type TankPaint,
 } from '../gfx/looks';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
-import { bake } from '../gfx/textures';
+import { bake, copyImage } from '../gfx/textures';
 import { ENTITIES, type PreviewEntity } from './catalog';
 import { formatLook, type Paint } from './format';
 import {
@@ -97,6 +96,7 @@ export class StudioScene extends Phaser.Scene {
     this.load.image('tank-hull', 'assets/tank-hull.png');
     this.load.image('tank-turret', 'assets/tank-turret.png');
     this.load.image('tank-gun', 'assets/tank-gun.png');
+    this.load.image('tank-mg', 'assets/tank-mg.png');
   }
 
   create(): void {
@@ -1085,9 +1085,7 @@ export class StudioScene extends Phaser.Scene {
     this.restamp('studio-fx-mg-bullet', BULLET_FRAME.w, BULLET_FRAME.h, (g) =>
       MachineGun.renderBullet(g, paintOf('mg-bullet') as BulletPaint),
     );
-    this.restamp('studio-mg-mount', MG_MOUNT_FRAME.w, MG_MOUNT_FRAME.h, (g) =>
-      MachineGun.renderMount(g, paintOf('machinegun') as MgMountPaint),
-    );
+    copyImage(this, MachineGun.barrelKey, 'studio-mg-mount');
     this.restamp('studio-fx-pickup-flash', PICKUP_FLASH_FRAME.w, PICKUP_FLASH_FRAME.h, (g) =>
       PickupTruck.renderFlash(g),
     );

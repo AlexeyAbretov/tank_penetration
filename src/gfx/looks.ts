@@ -237,19 +237,8 @@ export const BULLET_PAINT = {
   tip: 0xffffff,
 } satisfies BulletPaint;
 
-export const MG_MOUNT_FRAME = { w: 48, h: 20 };
-
-export type MgMountPaint = {
-  base: number;
-  barrel: number;
-  tip: number;
-};
-
-export const MG_MOUNT_PAINT = {
-  base: 0x3a3a32,
-  barrel: 0x2a2a24,
-  tip: 0x1a1a16,
-} satisfies MgMountPaint;
+// Пулемёт на опоре: ствол вправо, цапфа на оси ствола.
+export const MG_MOUNT_FRAME = { w: 72, h: 25 };
 
 export const MG_BULLET_PAINT = {
   body: 0xc9e86a,

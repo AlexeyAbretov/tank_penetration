@@ -15,8 +15,6 @@ import {
   BULLET_PAINT,
   MG_BULLET_PAINT,
   MG_MOUNT_FRAME,
-  MG_MOUNT_PAINT,
-  type MgMountPaint,
   GUNNER_LOOK,
   ROCKET_LOOK,
   MUZZLE_FRAME,
@@ -401,8 +399,8 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'machinegun',
     title: 'Пулемёт',
-    hint: 'Пулемёт на одной опоре перед люком. Жёлтая точка — дуло. «Стрельба» пускает зелёную пулю раз в 3 с.',
-    exportName: 'MG_MOUNT_PAINT',
+    hint: 'Готовая картинка: олива как у танка, одна опора. Жёлтая точка — дуло. «Стрельба» пускает зелёную пулю раз в 3 с.',
+    exportName: 'TANK_MG',
     kind: 'frames',
     frameCount: 1,
     gameScale: 1,
@@ -410,22 +408,16 @@ export const ENTITIES: PreviewEntity[] = [
     originY: MachineGun.layout.originY,
     texW: MG_MOUNT_FRAME.w,
     texH: MG_MOUNT_FRAME.h,
-    defaults: asPaint(MG_MOUNT_PAINT),
-    fields: colors('Крепление', [
-      ['base', 'Основание'],
-      ['barrel', 'Ствол'],
-      ['tip', 'Дуло'],
-    ]),
+    defaults: {},
+    fields: [],
     muzzle: { x: MachineGun.layout.barrelLength, y: 0 },
     shot: {
       delay: MachineGun.shop.fireIntervalMs,
       speed: MachineGun.shop.bulletSpeed,
       projectile: 'mg',
     },
-    bake: (scene, paint, keys) => {
-      stamp(scene, keys[0], MG_MOUNT_FRAME.w, MG_MOUNT_FRAME.h, (g) =>
-        MachineGun.renderMount(g, paint as MgMountPaint),
-      );
+    bake: (scene, _paint, keys) => {
+      copyImage(scene, MachineGun.barrelKey, keys[0]);
     },
   },
   {

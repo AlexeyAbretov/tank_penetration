@@ -34,6 +34,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image('tank-hull', 'assets/tank-hull.png');
     this.load.image('tank-turret', 'assets/tank-turret.png');
     this.load.image('tank-gun', 'assets/tank-gun.png');
+    this.load.image('tank-mg', 'assets/tank-mg.png');
   }
 
   create(): void {
