@@ -297,13 +297,26 @@ export class CombatSystem {
   private checkBaseReach(): void {
     this.infantry.getChildren().forEach((obj) => {
       const unit = obj as Infantry;
-      if (!unit.active || unit.reachedWall) {
+      if (!unit.active || unit.reachedWall || !unit.reachesBase) {
         return;
       }
-      if (unit.x <= Infantry.baseReachX) {
+      if (this.meetsTank(unit) || unit.x <= Infantry.baseReachX) {
         this.hitBase(unit);
       }
     });
+  }
+
+  // Нос спрайта смотрит к танку. Взрыв в момент, когда он входит в хитбокс,
+  // а не когда центр солдата доходит до середины корпуса.
+  private meetsTank(unit: Infantry): boolean {
+    const nose = unit.x - unit.displayWidth * unit.originX;
+    const top = unit.y - unit.displayHeight * unit.originY;
+    const chest = unit.y - unit.displayHeight * 0.45;
+    return (
+      this.tank.containsPoint(nose, top) ||
+      this.tank.containsPoint(nose, chest) ||
+      this.tank.containsPoint(nose, unit.y)
+    );
   }
 
   private shellHitsUnit(shell: Phaser.Physics.Arcade.Image, unit: Infantry): boolean {

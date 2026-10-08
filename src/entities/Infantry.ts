@@ -14,7 +14,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   static readonly shellHitRadius = 46;
   static readonly shellDamage = 1;
   static readonly hpPerWave = 1;
-  // Если штурмовик дошёл до этой линии X — он бьёт базу.
+  // Запасная линия удара, если юнит прошёл выше или ниже танка и хитбокс не задел.
+  // В корпус, башню и ствол он взрывается раньше: это проверяет бой, не эта координата.
   static readonly baseReachX = 115;
 
   static growthRank(wave: number, debutWave: number): number {
@@ -52,7 +53,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   abstract readonly coinReward: number;
   // true — юнит идёт до стены и бьёт базу. false — останавливается и стреляет издалека.
   abstract readonly reachesBase: boolean;
-  // Урон базе, если юнит дошёл до линии baseReachX. У стрелков 0: они бьют пулями.
+  // Урон базе при контакте с танком или с линией baseReachX. У стрелков 0: они бьют пулями.
   abstract readonly contactDamage: number;
   // Насколько близко снаряд должен подлететь к торсу, чтобы засчитать попадание.
   // У пикапа это поле переопределено и больше, потому что машина крупнее солдата.
@@ -308,13 +309,18 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
-    // Tween — плавное изменение свойств за duration миллисекунд.
+    // У кого картинки останков нет, спрайт сжимается и тает.
+    // Штурмовик у стены этот шаг заменяет взрывом.
+    this.vanish();
+  }
+
+  // Короткое исчезновение, если трупа нет. Наследник может взорваться вместо таяния.
+  protected vanish(): void {
     this.scene.tweens.add({
       targets: this,
-      alpha: 0, // полностью прозрачный
-      scale: 0.6, // чуть меньше
+      alpha: 0,
+      scale: 0.6,
       duration: 180,
-      // В конце удаляем спрайт. Событие destroy уберёт полоски, если они ещё живы.
       onComplete: () => this.destroy(),
     });
   }
