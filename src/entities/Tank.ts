@@ -18,6 +18,9 @@ import {
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 
+// Прямоугольник части в координатах её родителя, до поворота башни.
+type PartBox = { x: number; y: number; w: number; h: number };
+
 export class Tank extends GameObjects.Container {
   static readonly spawn = { x: 76, y: 360 };
   static readonly baseFireDelay = 1000;
@@ -60,11 +63,65 @@ export class Tank extends GameObjects.Container {
     seatX: -7,
     seatY: 14,
     muzzleLength: 54,
-    hitLeft: 82,
-    hitRight: 100,
-    hitUp: 28,
-    hitDown: 64,
   };
+
+  // Картинка с origin занимает прямоугольник (x, y, w, h) в системе своего родителя.
+  private static boxAround(
+    x: number,
+    y: number,
+    originX: number,
+    originY: number,
+    frame: { w: number; h: number },
+  ): PartBox {
+    return {
+      x: x - originX * frame.w,
+      y: y - originY * frame.h,
+      w: frame.w,
+      h: frame.h,
+    };
+  }
+
+  // Корпус в координатах танка. Тряску сюда не кладём: её вычитает containsPoint.
+  static hullBox(): PartBox {
+    const layout = Tank.layout;
+    return Tank.boxAround(layout.hullX, layout.hullY, 0.5, 0.5, TANK_HULL_FRAME);
+  }
+
+  // Башня в координатах контейнера прицеливания, ещё без поворота.
+  static turretBox(): PartBox {
+    const layout = Tank.layout;
+    return Tank.boxAround(
+      layout.turretX - layout.seatX,
+      layout.turretY - layout.seatY,
+      layout.turretOriginX,
+      layout.turretOriginY,
+      TANK_TURRET_FRAME,
+    );
+  }
+
+  // Ствол в координатах контейнера прицеливания. imageX/imageY — где сейчас стоит картинка,
+  // вместе с откатом.
+  static gunBox(imageX: number, imageY: number): PartBox {
+    const layout = Tank.layout;
+    return Tank.boxAround(imageX, imageY, layout.gunOriginX, layout.gunOriginY, TANK_GUN_FRAME);
+  }
+
+  private static inBox(x: number, y: number, box: PartBox): boolean {
+    return x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h;
+  }
+
+  // Точка танка → точка в контейнере прицеливания, обратный поворот башни.
+  private static intoAim(x: number, y: number, angle: number): { x: number; y: number } {
+    const seat = Tank.layout;
+    const dx = x - seat.seatX;
+    const dy = y - seat.seatY;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return {
+      x: dx * cos + dy * sin,
+      y: -dx * sin + dy * cos,
+    };
+  }
 
   // Откат ствола назад по его картинке, в пикселях. Башня при выстреле не сдвигается.
   static readonly recoilSlide = { kick: 8, ms: 40 };
@@ -113,6 +170,8 @@ export class Tank extends GameObjects.Container {
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
   // Сколько миллисекунд танк уже тарахтит. Из этого времени считается тряска.
   private engineMs = 0;
+  // Прямоугольник пулемёта в координатах башни. Есть, только пока пулемёт стоит на крыше.
+  private machineGunBox?: PartBox;
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
   private fireRateLevel = 0;
@@ -138,7 +197,7 @@ export class Tank extends GameObjects.Container {
     scene.add.existing(this);
     // Танк рисуется поверх солдат, снарядов и вспышек выстрела врага.
     this.setDepth(25);
-    // Размер контейнера. Попадания пуль проверяются своим прямоугольником в containsPoint.
+    // Размер контейнера для вёрстки. Попадания пуль смотрят части в containsPoint, не этот прямоугольник.
     this.setSize(160, 96);
     const exhaust = Tank.exhaustAnchor();
     this.engine = Tank.engineAt(scene, x + exhaust.x, y + exhaust.y);
@@ -182,20 +241,27 @@ export class Tank extends GameObjects.Container {
     this.engine = undefined;
   }
 
-  // Попала ли точка (пуля) в прямоугольник вокруг танка.
-  // Границы подогнаны под картинку: влево 82, вправо 100, вверх 28, вниз 64.
+  // Попала ли точка (пуля) в корпус, башню или ствол. Пустота между ними не считается.
+  // Башня и ствол крутятся вместе с прицелом, ствол ещё отъезжает при откате.
   // Мёртвый танк пуль уже не ловит: на его месте только обломки.
   containsPoint(x: number, y: number): boolean {
     if (this.dead) {
       return false;
     }
-    const hit = Tank.layout;
-    return (
-      x > this.x - hit.hitLeft &&
-      x < this.x + hit.hitRight &&
-      y > this.y - hit.hitUp &&
-      y < this.y + hit.hitDown
-    );
+    const shift = Tank.idleShift(this.engineMs);
+    const localX = x - this.x - shift.x;
+    const localY = y - this.y - shift.y;
+    if (Tank.inBox(localX, localY, Tank.hullBox())) {
+      return true;
+    }
+    const aim = Tank.intoAim(localX, localY, this.aim.rotation);
+    if (Tank.inBox(aim.x, aim.y, Tank.turretBox())) {
+      return true;
+    }
+    if (Tank.inBox(aim.x, aim.y, Tank.gunBox(this.gun.x, this.gun.y))) {
+      return true;
+    }
+    return this.machineGunBox !== undefined && Tank.inBox(aim.x, aim.y, this.machineGunBox);
   }
 
   // Наводит башню и ствол на точку, обычно на курсор.
@@ -241,9 +307,11 @@ export class Tank extends GameObjects.Container {
   }
 
   // Пулемёт перед люком, на одной опоре. Маска основного ствола рисуется поверх.
-  mountMachineGun(mg: Phaser.GameObjects.Container): void {
+  // hit — его прямоугольник в координатах башни, чтобы пуля в пулемёт тоже била по танку.
+  mountMachineGun(mg: Phaser.GameObjects.Container, hit: PartBox): void {
     const gunIndex = this.aim.getIndex(this.gun);
     this.aim.addAt(mg, gunIndex);
+    this.machineGunBox = hit;
   }
 
   // Сцена зовёт это каждый кадр, чтобы кулдаун уменьшался даже без выстрела.

@@ -86,6 +86,8 @@ export class StudioScene extends Phaser.Scene {
   // Корпус и башня превью. update сдвигает контейнер той же формулой, что и бой.
   private tankShake?: Phaser.GameObjects.Container;
   private shakeMs = 0;
+  // Рамка ствола. Стоит в контейнере башни и едет за откатом картинки.
+  private gunHit?: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('studio');
@@ -102,6 +104,13 @@ export class StudioScene extends Phaser.Scene {
     this.backdrop = this.add.graphics();
     this.ground = this.add.graphics();
     this.scale.on('resize', () => this.refreshLayout());
+    // Твины отката идут после update. Рамку ствола двигаем уже после них.
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, () => {
+      const gun = this.rig?.gun;
+      if (this.gunHit?.active && gun && this.entity.kind === 'tank') {
+        this.gunHit.setPosition(gun.x, gun.y);
+      }
+    });
     bindPanel({
       select: (id) => this.select(id),
       paint: (key, value) => this.setPaint(key, value),
@@ -191,6 +200,7 @@ export class StudioScene extends Phaser.Scene {
   private buildHolders(): void {
     this.disarm();
     this.clearDeathFx();
+    this.gunHit = undefined;
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
     this.tankShake = undefined;
@@ -379,15 +389,29 @@ export class StudioScene extends Phaser.Scene {
       pivot.add(frame);
     }
     if (view.hitbox) {
-      const fixed = this.add.graphics();
-      root.add(fixed);
-      fixed.lineStyle(2, 0x66e080, 0.95);
-      fixed.strokeRect(
-        -layout.hitLeft,
-        -layout.hitUp,
-        layout.hitLeft + layout.hitRight,
-        layout.hitUp + layout.hitDown,
-      );
+      const hullHit = this.add.graphics();
+      shake.add(hullHit);
+      hullHit.lineStyle(2, 0x66e080, 0.95);
+      const hull = Tank.hullBox();
+      hullHit.strokeRect(hull.x, hull.y, hull.w, hull.h);
+
+      const aimHit = this.add.graphics();
+      pivot.add(aimHit);
+      aimHit.lineStyle(2, 0x66e080, 0.95);
+      const turret = Tank.turretBox();
+      aimHit.strokeRect(turret.x, turret.y, turret.w, turret.h);
+      if (view.machineGun) {
+        const mg = MachineGun.aimBox();
+        aimHit.strokeRect(mg.x, mg.y, mg.w, mg.h);
+      }
+
+      const gunHit = this.add.graphics();
+      const gunBox = Tank.gunBox(0, 0);
+      gunHit.lineStyle(2, 0x66e080, 0.95);
+      gunHit.strokeRect(gunBox.x, gunBox.y, gunBox.w, gunBox.h);
+      gunHit.setPosition(gun.x, gun.y);
+      pivot.add(gunHit);
+      this.gunHit = gunHit;
     }
     if (view.origin) {
       const fixed = this.add.graphics();
@@ -717,12 +741,6 @@ export class StudioScene extends Phaser.Scene {
         top = Math.min(top, mgMuzzle.y - 6);
         bottom = Math.max(bottom, mgMuzzle.y + 6);
       }
-    }
-    if (view.hitbox) {
-      left = Math.min(left, -layout.hitLeft);
-      right = Math.max(right, layout.hitRight);
-      top = Math.min(top, -layout.hitUp);
-      bottom = Math.max(bottom, layout.hitDown);
     }
     if (view.origin) {
       left = Math.min(left, -16);
@@ -1387,6 +1405,7 @@ export class StudioScene extends Phaser.Scene {
   private dropArt(): void {
     this.disarm();
     this.clearDeathFx();
+    this.gunHit = undefined;
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
     this.tankShake = undefined;

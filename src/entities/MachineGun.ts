@@ -43,7 +43,18 @@ export class MachineGun extends GameObjects.Container {
     this.barrel = scene.add.image(0, 0, MachineGun.barrelKey);
     this.barrel.setOrigin(mount.originX, mount.originY);
     this.add(this.barrel);
-    tank.mountMachineGun(this);
+    tank.mountMachineGun(this, MachineGun.aimBox());
+  }
+
+  // Прямоугольник картинки в координатах башни. Просмотр и попадания берут одно и то же.
+  static aimBox(): { x: number; y: number; w: number; h: number } {
+    const mount = MachineGun.layout;
+    return {
+      x: mount.x - mount.originX * MG_MOUNT_FRAME.w,
+      y: mount.y - mount.originY * MG_MOUNT_FRAME.h,
+      w: MG_MOUNT_FRAME.w,
+      h: MG_MOUNT_FRAME.h,
+    };
   }
 
   static ensureTextures(scene: Phaser.Scene): void {
