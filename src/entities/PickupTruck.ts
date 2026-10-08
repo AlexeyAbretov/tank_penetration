@@ -272,9 +272,8 @@ export class PickupTruck extends RangedEnemy {
 
   // Своя скорость: родительский march для пехоты слишком медленный.
   override march(): void {
-    const body = this.body as Phaser.Physics.Arcade.Body;
     const speed = 78 + this.paceWave * 6 + Phaser.Math.Between(0, 8);
-    body.setVelocityX(-speed);
+    this.marchAt(speed);
   }
 
   // Кадры колёс. Анимация pickup-drive проигрывает их по порядку и замыкает круг.

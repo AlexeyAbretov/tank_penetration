@@ -3,6 +3,7 @@
 // от него наследуют штурмовик, стрелок, ракетчик и пикап.
 
 import Phaser from 'phaser';
+import { enemyHasteOf } from '../gameConfig';
 import type { SoldierLook } from '../gfx/looks';
 
 // Цвета лежат в gfx/looks.ts: один набор рисует и штурмовика, и стрелка.
@@ -59,6 +60,10 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Ранг роста скорости. У штурмовика это номер волны.
   // У стрелка и пикапа на волне появления равен 1, дальше растёт по одной за волну.
   protected paceWave = 1;
+  // Скорость шага без темпа игрока. march считает её один раз, темп только умножает.
+  private baseSpeed = 0;
+  // true после первого шага. Пока юнит стоит (стрельба или проволока), темп скорость не возвращает.
+  private paceLatched = false;
 
   // Тёмный фон полоски здоровья над головой.
   private readonly barBg: Phaser.GameObjects.Rectangle;
@@ -125,6 +130,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   preUpdate(time: number, delta: number): void {
     // Родитель двигает анимацию и применяет скорость тела к координатам.
     super.preUpdate(time, delta);
+    if (this.anims.isPlaying) {
+      this.anims.timeScale = enemyHasteOf(this.scene.registry);
+    }
     // Пока юнит жив и едет, полоска едет вместе с ним.
     this.syncBar();
     // Мёртвый юнит или открытый магазин (combat === false) — поведение замирает.
@@ -147,11 +155,35 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
 
   // Даёт скорость влево. Чем выше ранг роста, тем быстрее шаг.
   march(): void {
-    const body = this.body as Phaser.Physics.Arcade.Body;
     // База 36 + 4 за ранг + случайные 0..10, чтобы юниты одной волны не шли строем с одной скоростью.
     const speed = 36 + this.paceWave * 4 + Phaser.Math.Between(0, 10);
+    this.marchAt(speed);
+  }
+
+  // Запоминает шаг без темпа и сразу применяет текущий множитель.
+  protected marchAt(speed: number): void {
+    this.baseSpeed = speed;
+    this.paceLatched = false;
+    this.syncPace();
+  }
+
+  // Умножает шаг на темп. Стоящего юнита не сдвигает: иначе проволока и рубеж стрельбы отпустятся.
+  syncPace(): void {
+    if (this.reachedWall || this.baseSpeed <= 0) {
+      return;
+    }
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    if (!body?.enable) {
+      return;
+    }
+    if (this.paceLatched && body.velocity.x > -1) {
+      return;
+    }
+    const haste = enemyHasteOf(this.scene.registry);
     // Отрицательный X — движение влево, к танку. Y не трогаем: дорожка не меняется.
-    body.setVelocityX(-speed);
+    body.setVelocityX(-this.baseSpeed * haste);
+    this.paceLatched = true;
+    this.anims.timeScale = haste;
   }
 
   // Упирает юнита в правый край проволоки и гасит шаг.

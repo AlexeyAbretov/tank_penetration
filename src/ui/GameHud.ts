@@ -16,7 +16,10 @@ export class GameHud {
   private readonly artillerySweep: Phaser.GameObjects.Graphics;
   private readonly artilleryTime: Phaser.GameObjects.Text;
   private readonly overlay: Phaser.GameObjects.Container;
+  private readonly hastePlate: Phaser.GameObjects.Rectangle;
+  private readonly hasteLabel: Phaser.GameObjects.Text;
   private artilleryOwned = false;
+  private hasteCycle?: () => void;
 
   constructor(scene: Phaser.Scene) {
     scene.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
@@ -85,8 +88,25 @@ export class GameHud {
       .setDepth(60)
       .setAlpha(0);
 
+    this.hastePlate = scene.add
+      .rectangle(102, 150, 148, 34, 0x3a0c0c)
+      .setStrokeStyle(2, 0xc9a227)
+      .setDepth(53)
+      .setInteractive({ useHandCursor: true });
+    this.hasteLabel = scene.add
+      .text(102, 150, 'ТЕМП  ×1', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '16px',
+        color: '#f3d56a',
+        stroke: '#2a0a08',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(54);
+    this.hastePlate.on('pointerup', () => this.hasteCycle?.());
+
     this.controls = scene.add
-      .text(GAME.width / 2, 708, 'мышь — прицел   ЛКМ — огонь', {
+      .text(GAME.width / 2, 708, this.controlsLine(false), {
         fontFamily: 'Georgia, serif',
         fontSize: '14px',
         color: '#e8c48a',
@@ -171,13 +191,25 @@ export class GameHud {
     );
   }
 
+  onHasteCycle(cycle: () => void): void {
+    this.hasteCycle = cycle;
+  }
+
+  setHaste(multiplier: number): void {
+    this.hasteLabel.setText(`ТЕМП  ×${multiplier}`);
+    this.hastePlate.setFillStyle(multiplier > 1 ? 0x8a1810 : 0x3a0c0c);
+  }
+
+  // Клик по плашке темпа не должен быть выстрелом танка.
+  coversHaste(pointer: Phaser.Input.Pointer): boolean {
+    return this.hastePlate.getBounds().contains(pointer.worldX, pointer.worldY);
+  }
+
   setArtillery(owned: boolean, cooldownMs: number): void {
     if (this.artilleryOwned !== owned) {
       this.artilleryOwned = owned;
       this.artillery.setVisible(owned);
-      this.controls.setText(
-        owned ? 'мышь — прицел   ЛКМ — огонь   1 — удар' : 'мышь — прицел   ЛКМ — огонь',
-      );
+      this.controls.setText(this.controlsLine(owned));
     }
     if (!owned) {
       return;
@@ -234,5 +266,10 @@ export class GameHud {
 
   get defeatOverlayVisible(): boolean {
     return this.overlay.visible;
+  }
+
+  private controlsLine(artillery: boolean): string {
+    const tempo = 'мышь — прицел   ЛКМ — огонь   2 — темп';
+    return artillery ? `${tempo}   1 — удар` : tempo;
   }
 }

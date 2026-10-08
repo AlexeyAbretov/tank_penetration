@@ -142,8 +142,10 @@ export class CombatSystem {
     this.flights = [];
   }
 
-  tick(delta: number): void {
-    this.handleFireInput(this.scene.input.activePointer);
+  tick(delta: number, allowFire = true): void {
+    if (allowFire) {
+      this.handleFireInput(this.scene.input.activePointer);
+    }
     this.resolveShellHits();
     this.cleanupShells();
     this.tickMachineGun(delta);

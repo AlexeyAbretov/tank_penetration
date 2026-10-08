@@ -2,6 +2,7 @@
 // Конкретные числа (где встать, как часто стрелять) задают стрелка, ракетчика и пикап.
 
 import Phaser from 'phaser';
+import { enemyHasteOf } from '../gameConfig';
 import { EnemyShot } from './EnemyShot';
 import { Infantry } from './Infantry';
 import type { WorldPoint } from './WorldPoint';
@@ -72,7 +73,8 @@ export abstract class RangedEnemy extends Infantry {
     }
 
     // Кулдаун тикает только в бою: act не вызывается, когда магазин на паузе.
-    this.fireCooldown -= delta;
+    // Темп тратит паузу быстрее, поэтому на ×3 очередь втрое чаще. Урон пули тот же.
+    this.fireCooldown -= delta * enemyHasteOf(this.scene.registry);
     if (this.fireCooldown > 0) {
       return;
     }

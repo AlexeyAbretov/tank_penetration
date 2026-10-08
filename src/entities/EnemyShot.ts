@@ -1,6 +1,7 @@
 // Пуля врага: маленькая картинка с физическим телом и своим уроном.
 
 import { GameObjects, Physics, Scene } from 'phaser';
+import { enemyHasteOf } from '../gameConfig';
 import { BULLET_FRAME, BULLET_PAINT, type BulletPaint } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 
@@ -8,6 +9,8 @@ import { bake } from '../gfx/textures';
 export class EnemyShot extends Physics.Arcade.Image {
   // Урон этой пули. Стрелок и пикап задают разное число при создании.
   readonly damage: number;
+  // Скорость без темпа. launch запоминает её, syncPace умножает на текущий множитель.
+  private flightSpeed = 0;
   // Узкий хитбокс по форме пули. Попадание в танк сцена проверяет отдельно, по координате.
   static readonly bodySize = { w: 14, h: 8 };
 
@@ -42,10 +45,21 @@ export class EnemyShot extends Physics.Arcade.Image {
   // Запускает пулю под углом angle (радианы) со скоростью speed (пиксели в секунду).
   // Возвращает this, чтобы при желании писать цепочкой: new EnemyShot(...).launch(...).
   launch(angle: number, speed: number): this {
+    this.flightSpeed = speed;
     // Картинка поворачивается носом по направлению полёта.
     this.setRotation(angle);
-    // cos даёт долю скорости по X, sin — по Y. Угол 0 — строго вправо, Math.PI — строго влево.
-    this.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+    this.syncPace();
     return this;
+  }
+
+  // Та же траектория, другая скорость. Смена темпа догоняет уже летящие пули.
+  syncPace(): void {
+    if (this.flightSpeed <= 0) {
+      return;
+    }
+    const haste = enemyHasteOf(this.scene.registry);
+    const angle = this.rotation;
+    // cos даёт долю скорости по X, sin — по Y. Угол 0 — строго вправо, Math.PI — строго влево.
+    this.setVelocity(Math.cos(angle) * this.flightSpeed * haste, Math.sin(angle) * this.flightSpeed * haste);
   }
 }

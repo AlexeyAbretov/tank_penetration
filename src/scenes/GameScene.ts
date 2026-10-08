@@ -2,7 +2,9 @@
 // Сцена собирает системы и держит общее состояние партии.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
+import { EnemyShot } from '../entities/EnemyShot';
+import { Infantry } from '../entities/Infantry';
+import { ENEMY_HASTE, GAME, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { CombatSystem } from '../systems/CombatSystem';
@@ -25,6 +27,8 @@ export class GameScene extends Phaser.Scene {
 
   private score = 0;
   private coins = 0;
+  private hasteKey?: Phaser.Input.Keyboard.Key;
+  private hasteNumpad?: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super('game');
@@ -42,6 +46,7 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     this.coins = 0;
     this.registry.set('combat', true);
+    this.registry.set(ENEMY_HASTE.key, 1);
 
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
     createAmbientEmbers(this);
@@ -51,6 +56,13 @@ export class GameScene extends Phaser.Scene {
     this.infantry = this.physics.add.group();
 
     this.hud = new GameHud(this);
+    this.hud.setHaste(1);
+    this.hud.onHasteCycle(() => this.cycleEnemyHaste());
+    const keyboard = this.input.keyboard;
+    if (keyboard) {
+      this.hasteKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
+      this.hasteNumpad = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_TWO);
+    }
 
     let combat: CombatSystem | undefined;
     this.player = new PlayerController(this, this.hud, {
@@ -115,6 +127,10 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.hastePressed()) {
+      this.cycleEnemyHaste();
+    }
+
     const fighting = !this.shop.shopOpen;
     this.combat.tickArtillery(delta, fighting);
     this.hud.setArtillery(this.shop.artilleryOwned, this.combat.artilleryCooldown);
@@ -125,9 +141,35 @@ export class GameScene extends Phaser.Scene {
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
-    this.combat.tick(delta);
+    this.combat.tick(delta, !this.hud.coversHaste(pointer));
     this.projectiles.tick();
     this.waves.tick();
+  }
+
+  private hastePressed(): boolean {
+    const keyDown = (key?: Phaser.Input.Keyboard.Key) =>
+      key !== undefined && Phaser.Input.Keyboard.JustDown(key);
+    return keyDown(this.hasteKey) || keyDown(this.hasteNumpad);
+  }
+
+  private cycleEnemyHaste(): void {
+    if (this.player.isGameOver) {
+      return;
+    }
+    const current = enemyHasteOf(this.registry);
+    const next = current >= ENEMY_HASTE.max ? 1 : current + 1;
+    this.registry.set(ENEMY_HASTE.key, next);
+    this.hud.setHaste(next);
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (unit.active) {
+        unit.syncPace();
+      }
+    });
+    (this.enemyShots.getChildren() as EnemyShot[]).forEach((shot) => {
+      if (shot.active) {
+        shot.syncPace();
+      }
+    });
   }
 
   private onEnemyKill(coinReward: number): void {
