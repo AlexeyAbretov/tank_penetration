@@ -88,6 +88,12 @@ export class StudioScene extends Phaser.Scene {
     super('studio');
   }
 
+  preload(): void {
+    this.load.image('tank-hull', 'assets/tank-hull.png');
+    this.load.image('tank-turret', 'assets/tank-turret.png');
+    this.load.image('tank-gun', 'assets/tank-gun.png');
+  }
+
   create(): void {
     this.cameras.main.setZoom(1);
     this.backdrop = this.add.graphics();

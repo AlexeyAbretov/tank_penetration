@@ -5,6 +5,17 @@
 import Phaser from 'phaser';
 import { ensureArmorSpark } from './sparks';
 
+// Кладёт уже загруженную картинку под другим именем. Просмотр так показывает
+// готовые PNG танка, не затирая их фигурным рисунком.
+export function copyImage(scene: Phaser.Scene, from: string, to: string): void {
+  if (scene.textures.exists(to)) {
+    scene.textures.remove(to);
+  }
+  const source = scene.textures.get(from).getSourceImage() as HTMLImageElement;
+  scene.textures.addImage(to, source);
+  scene.textures.get(to).setFilter(Phaser.Textures.FilterMode.NEAREST);
+}
+
 // Рисует одноразовый холст и превращает его в текстуру с именем key.
 // После этого холст удаляется: на сцене остаётся только сохранённая картинка.
 export function bake(

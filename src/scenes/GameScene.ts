@@ -30,6 +30,12 @@ export class GameScene extends Phaser.Scene {
     super('game');
   }
 
+  preload(): void {
+    this.load.image('tank-hull', 'assets/tank-hull.png');
+    this.load.image('tank-turret', 'assets/tank-turret.png');
+    this.load.image('tank-gun', 'assets/tank-gun.png');
+  }
+
   create(): void {
     ensureGameTextures(this);
     this.score = 0;

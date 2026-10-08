@@ -16,7 +16,7 @@ export class ArtilleryStrike {
   static readonly iconRadius = 30;
 
   static readonly shop = {
-    cost: 1,
+    cost: 100,
     shells: 3,
     damage: 20,
     cooldownMs: 20_000,

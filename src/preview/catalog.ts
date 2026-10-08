@@ -26,18 +26,15 @@ import {
   SHELL_FRAME,
   SHELL_PAINT,
   SOLDIER_FRAME,
-  TANK_GUN_FRAME,
   TANK_HULL_FRAME,
   TANK_PAINT,
-  TANK_TURRET_FRAME,
   type BulletPaint,
   type MuzzlePaint,
   type PickupPaint,
   type ShellPaint,
   type SoldierLook,
-  type TankPaint,
 } from '../gfx/looks';
-import { bake } from '../gfx/textures';
+import { bake, copyImage } from '../gfx/textures';
 import type { Paint } from './format';
 
 export type Field = {
@@ -139,7 +136,7 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'tank',
     title: 'Танк',
-    hint: 'Корпус и башня собраны как в бою. Башня и ствол крутятся вместе вокруг днища башни. Галочка «Пулемёт» ставит пулемёт перед люком на одной опоре. «Смерть» поднимает ядерный гриб и оставляет обломки.',
+    hint: 'Корпус, башня и ствол — готовые картинки. Башня и ствол крутятся вместе вокруг днища башни. Галочка «Пулемёт» ставит пулемёт на крыше. «Смерть» поднимает ядерный гриб и оставляет обломки.',
     exportName: 'TANK_PAINT',
     kind: 'tank',
     frameCount: 1,
@@ -186,13 +183,10 @@ export const ENTITIES: PreviewEntity[] = [
       flash: 'muzzle',
     },
     death: 'nuke',
-    bake: (scene, paint, keys) => {
-      const colors = paint as TankPaint;
-      stamp(scene, keys[0], TANK_HULL_FRAME.w, TANK_HULL_FRAME.h, (g) => Tank.renderHull(g, colors));
-      stamp(scene, keys[1], TANK_TURRET_FRAME.w, TANK_TURRET_FRAME.h, (g) =>
-        Tank.renderTurret(g, colors),
-      );
-      stamp(scene, keys[2], TANK_GUN_FRAME.w, TANK_GUN_FRAME.h, (g) => Tank.renderGun(g, colors));
+    bake: (scene, _paint, keys) => {
+      copyImage(scene, 'tank-hull', keys[0]);
+      copyImage(scene, 'tank-turret', keys[1]);
+      copyImage(scene, 'tank-gun', keys[2]);
     },
   },
   {

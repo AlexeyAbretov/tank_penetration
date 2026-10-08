@@ -23,11 +23,10 @@ export class MachineGun extends GameObjects.Container {
     bulletSpeed: 720,
   };
 
-  // Цапфа в координатах контейнера aim. Пятка опоры стоит на крыше перед люком.
-  // Люк в этих координатах: x от -19 до 3, крыша перед ним на y = -24.
+  // Цапфа в координатах контейнера aim. Пятка опоры стоит на крыше башни, ближе к стволу.
   static readonly layout = {
-    x: 7,
-    y: -40,
+    x: 16,
+    y: -22,
     barrelLength: 30,
     originX: 14 / MG_MOUNT_FRAME.w,
     originY: 3 / MG_MOUNT_FRAME.h,

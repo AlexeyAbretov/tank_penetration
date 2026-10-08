@@ -45,25 +45,25 @@ export class Tank extends GameObjects.Container {
   // Сборка корпуса и башни. Просмотр спрайтов берёт те же числа, что и конструктор.
   static readonly layout = {
     hullX: 8,
-    hullY: 16,
-    turretX: 18,
-    turretY: -20,
-    // 37 пикселей от левого края кадра: башня сидит там же, где сидела до отделения ствола.
-    turretOriginX: 37 / 88,
-    turretOriginY: 0.5,
-    // Цапфа — центр маски, она утоплена в лоб башни.
-    gunX: 58,
-    gunY: -20,
-    gunOriginX: 9 / 100,
-    gunOriginY: 0.5,
+    hullY: 34,
+    turretX: -7,
+    turretY: 14,
+    // Днище башни в её кадре. Вокруг этой точки крутится вся башня.
+    turretOriginX: 48 / TANK_TURRET_FRAME.w,
+    turretOriginY: 30 / TANK_TURRET_FRAME.h,
+    // Корень ствола, где труба выходит из лба башни.
+    gunX: 39,
+    gunY: 7,
+    gunOriginX: 1 / TANK_GUN_FRAME.w,
+    gunOriginY: 6 / TANK_GUN_FRAME.h,
     // Середина днища башни. Вокруг неё крутится вся башня, поэтому низ не сходит с крыши.
-    seatX: 20,
-    seatY: -4,
-    muzzleLength: 76,
-    hitLeft: 72,
-    hitRight: 96,
-    hitUp: 48,
-    hitDown: 52,
+    seatX: -7,
+    seatY: 14,
+    muzzleLength: 54,
+    hitLeft: 82,
+    hitRight: 100,
+    hitUp: 28,
+    hitDown: 64,
   };
 
   // Откат ствола назад по его картинке, в пикселях. Башня при выстреле не сдвигается.
@@ -174,7 +174,7 @@ export class Tank extends GameObjects.Container {
   }
 
   // Попала ли точка (пуля) в прямоугольник вокруг танка.
-  // Границы подогнаны вручную под рисунок: влево 72, вправо 96, вверх 48, вниз 52.
+  // Границы подогнаны под картинку: влево 82, вправо 100, вверх 28, вниз 64.
   // Мёртвый танк пуль уже не ловит: на его месте только обломки.
   containsPoint(x: number, y: number): boolean {
     if (this.dead) {
@@ -312,6 +312,9 @@ export class Tank extends GameObjects.Container {
     }
     if (!scene.textures.exists('tank-gun')) {
       this.createGun(scene);
+    }
+    for (const key of ['tank-hull', 'tank-turret', 'tank-gun']) {
+      scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
     if (!scene.textures.exists('shell')) {
       this.createShell(scene);
@@ -484,8 +487,8 @@ export class Tank extends GameObjects.Container {
   }
 
   static renderWreck(g: Phaser.GameObjects.Graphics, paint: TankPaint = TANK_PAINT): void {
-    // Центр кадра совпадает с центром живого корпуса. Земля — на 41 пиксель ниже, как тень гусеницы.
-    const ground = TANK_WRECK_FRAME.h / 2 + 41;
+    // Центр кадра совпадает с центром живого корпуса. Земля — на линии низа гусеницы.
+    const ground = TANK_WRECK_FRAME.h / 2 + 24;
 
     g.fillStyle(0x120806, 0.9);
     g.fillEllipse(118, ground + 2, 210, 30);
@@ -550,8 +553,8 @@ export class Tank extends GameObjects.Container {
 
   // Решётка моторного отсека на корме крыши, в координатах контейнера танка.
   static exhaustAnchor(): { x: number; y: number } {
-    const deckX = 36;
-    const deckY = 30;
+    const deckX = 18;
+    const deckY = 8;
     return {
       x: Tank.layout.hullX + (deckX - TANK_HULL_FRAME.w / 2),
       y: Tank.layout.hullY + (deckY - TANK_HULL_FRAME.h / 2),
@@ -582,7 +585,7 @@ export class Tank extends GameObjects.Container {
 
   // Точка над проломом корпуса в координатах контейнера танка. От неё поднимается дым.
   static smokeAnchor(): { x: number; y: number } {
-    const ground = TANK_WRECK_FRAME.h / 2 + 41;
+    const ground = TANK_WRECK_FRAME.h / 2 + 24;
     const tx = 108;
     const ty = ground - 44;
     return {
