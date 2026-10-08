@@ -19,6 +19,8 @@ export type ViewState = {
   addBlend: boolean;
   angle: number;
   rotation: number;
+  // 1 — тряска как в бою, 0 — танк стоит.
+  shake: number;
 };
 
 export type PanelHandlers = {
@@ -59,6 +61,7 @@ export function bindPanel(handlers: PanelHandlers): void {
   };
   document.getElementById('zoom')?.addEventListener('input', onZoom);
   document.getElementById('zoom')?.addEventListener('change', onZoom);
+  document.getElementById('shake')?.addEventListener('input', () => writeReadouts());
   for (const id of ['scale', 'animate', 'checker', 'bounds', 'hitbox', 'origin', 'hp', 'muzzle', 'fire', 'machinegun', 'death', 'add', 'angle', 'spin']) {
     document.getElementById(id)?.addEventListener('input', () => {
       writeReadouts();
@@ -103,6 +106,7 @@ export function configureView(entity: PreviewEntity): void {
   }
   show('add-row', Boolean(entity.addBlend));
   show('angle-row', entity.kind === 'tank');
+  show('shake-row', entity.kind === 'tank');
   show('spin-row', entity.kind === 'shot');
 
   const scale = document.getElementById('scale') as HTMLInputElement | null;
@@ -116,6 +120,10 @@ export function configureView(entity: PreviewEntity): void {
   const angle = document.getElementById('angle') as HTMLInputElement | null;
   if (angle) {
     angle.value = '-0.3';
+  }
+  const shake = document.getElementById('shake') as HTMLInputElement | null;
+  if (shake) {
+    shake.value = '1';
   }
   const spin = document.getElementById('spin') as HTMLInputElement | null;
   if (spin) {
@@ -163,6 +171,7 @@ export function readView(): ViewState {
     addBlend: checked('add'),
     angle: num('angle', -0.3),
     rotation: num('spin', 0),
+    shake: num('shake', 1),
   };
 }
 
@@ -302,6 +311,11 @@ export function writeReadouts(): void {
   const spinVal = document.getElementById('spin-val');
   if (spin && spinVal) {
     spinVal.textContent = angleText(Number(spin.value));
+  }
+  const shake = document.getElementById('shake') as HTMLInputElement | null;
+  const shakeVal = document.getElementById('shake-val');
+  if (shake && shakeVal) {
+    shakeVal.textContent = `×${Number(shake.value).toFixed(1)}`;
   }
 }
 

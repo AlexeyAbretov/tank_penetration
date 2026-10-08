@@ -158,16 +158,23 @@ export class Tank extends GameObjects.Container {
       return;
     }
     this.engineMs += delta;
-    const wobble = this.engineMs * 0.028;
-    // Башня повёрнута. Дробный сдвиг перерисовывает её каждый кадр и выглядит как сильная тряска,
-    // хотя корпус при том же сдвиге стоит на месте. Оба двигаются на одно и то же целое число пикселей.
-    const dx = Math.round(Math.sin(wobble) * 0.4 + Math.sin(wobble * 2.17) * 0.25);
-    const dy = Math.round(Math.cos(wobble * 1.31) * 0.4 + Math.sin(wobble * 2.63) * 0.15);
+    const shift = Tank.idleShift(this.engineMs);
     const layout = Tank.layout;
-    this.hull.setPosition(layout.hullX + dx, layout.hullY + dy);
-    this.aim.setPosition(layout.seatX + dx, layout.seatY + dy);
+    this.hull.setPosition(layout.hullX + shift.x, layout.hullY + shift.y);
+    this.aim.setPosition(layout.seatX + shift.x, layout.seatY + shift.y);
     const exhaust = Tank.exhaustAnchor();
-    this.engine.setPosition(this.x + exhaust.x + dx, this.y + exhaust.y + dy);
+    this.engine.setPosition(this.x + exhaust.x + shift.x, this.y + exhaust.y + shift.y);
+  }
+
+  // Сдвиг корпуса и башни от мотора. gain 1 — сила в бою.
+  // Только целые пиксели: дробный сдвиг перерисовывает повёрнутую башню и она дрожит отдельно от корпуса.
+  static idleShift(ms: number, gain = 1): { x: number; y: number } {
+    const wobble = ms * 0.028;
+    const amount = Math.max(0, gain);
+    return {
+      x: Math.round((Math.sin(wobble) * 0.4 + Math.sin(wobble * 2.17) * 0.25) * amount),
+      y: Math.round((Math.cos(wobble * 1.31) * 0.4 + Math.sin(wobble * 2.63) * 0.15) * amount),
+    };
   }
 
   private stopEngine(): void {

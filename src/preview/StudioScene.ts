@@ -83,6 +83,9 @@ export class StudioScene extends Phaser.Scene {
   private deathFx: Phaser.GameObjects.GameObject[] = [];
   private wreckSmoke?: Phaser.GameObjects.Particles.ParticleEmitter;
   private wreckSmokeScale = 0;
+  // Корпус и башня превью. update сдвигает контейнер той же формулой, что и бой.
+  private tankShake?: Phaser.GameObjects.Container;
+  private shakeMs = 0;
 
   constructor() {
     super('studio');
@@ -190,6 +193,7 @@ export class StudioScene extends Phaser.Scene {
     this.clearDeathFx();
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
+    this.tankShake = undefined;
     this.captions.forEach((caption) => caption.destroy());
     this.captions = [];
     if (this.liveKeys.length === 0) {
@@ -339,8 +343,10 @@ export class StudioScene extends Phaser.Scene {
     const layout = Tank.layout;
     const root = this.add.container(0, 0);
     root.setScale(view.scale);
+    const shake = this.add.container(0, 0);
+    this.tankShake = shake;
     const hull = this.add.image(layout.hullX, layout.hullY, this.liveKeys[0]);
-    root.add(hull);
+    shake.add(hull);
     // Башня и ствол крутятся вокруг днища башни, как в бою.
     const pivot = this.add.container(layout.seatX, layout.seatY);
     pivot.setRotation(view.angle);
@@ -358,10 +364,11 @@ export class StudioScene extends Phaser.Scene {
         this.armMachineGun(root, mg);
       }
     }
-    root.add(pivot);
+    shake.add(pivot);
+    root.add(shake);
 
     const guides = this.add.graphics();
-    root.add(guides);
+    shake.add(guides);
     if (view.bounds) {
       guides.lineStyle(1, 0xf0d56a, 0.9);
       strokeImage(guides, hull);
@@ -372,8 +379,10 @@ export class StudioScene extends Phaser.Scene {
       pivot.add(frame);
     }
     if (view.hitbox) {
-      guides.lineStyle(2, 0x66e080, 0.95);
-      guides.strokeRect(
+      const fixed = this.add.graphics();
+      root.add(fixed);
+      fixed.lineStyle(2, 0x66e080, 0.95);
+      fixed.strokeRect(
         -layout.hitLeft,
         -layout.hitUp,
         layout.hitLeft + layout.hitRight,
@@ -381,7 +390,9 @@ export class StudioScene extends Phaser.Scene {
       );
     }
     if (view.origin) {
-      paintCross(guides);
+      const fixed = this.add.graphics();
+      root.add(fixed);
+      paintCross(fixed);
     }
     const muzzle = Tank.muzzleAt(view.angle);
     if (view.muzzle) {
@@ -752,6 +763,11 @@ export class StudioScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     const view = readView();
+    if (this.tankShake?.active && this.entity.kind === 'tank' && !view.death) {
+      this.shakeMs += delta;
+      const shift = Tank.idleShift(this.shakeMs, view.shake);
+      this.tankShake.setPosition(shift.x, shift.y);
+    }
     const rig = this.rig;
     const mgRig = this.mgRig;
     if (mgRig && view.fire && view.machineGun) {
@@ -1373,6 +1389,7 @@ export class StudioScene extends Phaser.Scene {
     this.clearDeathFx();
     this.holders.forEach((holder) => holder.destroy());
     this.holders = [];
+    this.tankShake = undefined;
     this.captions.forEach((caption) => caption.destroy());
     this.captions = [];
     if (this.liveAnim && this.anims.exists(this.liveAnim)) {
