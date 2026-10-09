@@ -17,7 +17,7 @@ import { Rocket } from './Rocket';
 import type { WorldPoint } from './WorldPoint';
 
 export class RocketInfantry extends RangedEnemy {
-  static readonly debutWave = 10;
+  static readonly debutWave = 20;
   static readonly walkFps = 7;
   static readonly corpseKey = 'rocketman-corpse';
   // Точка ног → дуло, когда он уже на колене и труба смотрит влево. Для жёлтой метки в просмотре.

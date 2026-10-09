@@ -14,7 +14,7 @@ import type { WorldPoint } from './WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
 export class PickupTruck extends RangedEnemy {
-  static readonly debutWave = 20;
+  static readonly debutWave = 10;
   // Крест через центр повторяется каждые 180°. Шесть кадров делят эту половину оборота.
   static readonly wheelFrames = 6;
   static readonly corpseKey = 'pickup-wreck';
