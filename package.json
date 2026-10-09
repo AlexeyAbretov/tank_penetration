@@ -7,6 +7,7 @@
     "dev": "vite",
     "studio": "vite --open /preview.html",
     "build": "tsc --noEmit && vite build",
+    "build:html": "tsc --noEmit && vite build --config vite.singlefile.config.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "typescript": "^5.8.3",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }

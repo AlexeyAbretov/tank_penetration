@@ -1,0 +1,31 @@
+# Публикация релиза собирает один HTML и прикрепляет его к этому же релизу.
+# Черновик сборку не запускает: событие published приходит, когда релиз уже открыт для скачивания.
+
+name: Release HTML
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  page:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build:html
+
+      - name: Attach tank-defense.html
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" release/tank-defense.html --clobber
