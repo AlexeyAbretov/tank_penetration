@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import { bake } from '../gfx/textures';
+import { playArtilleryBoom } from '../systems/ArtillerySounds';
 
 export type ArtilleryFlight = {
   cancel(): void;
@@ -16,7 +17,7 @@ export class ArtilleryStrike {
   static readonly iconRadius = 30;
 
   static readonly shop = {
-    cost: 100,
+    cost: 1,
     shells: 3,
     damage: 20,
     cooldownMs: 20_000,
@@ -24,6 +25,8 @@ export class ArtilleryStrike {
     blastRadius: 74,
     gapMs: 180,
     fallMs: 480,
+    // Пауза после конца хлопка, потом снаряды начинают падать.
+    afterShotMs: 0,
   };
 
   // Прямоугольник, куда можно положить воронку, не наезжая на танк и баннер.
@@ -67,6 +70,7 @@ export class ArtilleryStrike {
   }
 
   // Светящийся снаряд падает сверху. onImpact — взрыв в точке, куда сел носик.
+  // Хлопок батареи к этому моменту уже отзвучал: его играет нажатие клавиши.
   static drop(scene: Phaser.Scene, x: number, y: number, onImpact: () => void): ArtilleryFlight {
     ArtilleryStrike.ensureTextures(scene);
     const drift = Phaser.Math.Between(-28, 28);
@@ -105,8 +109,10 @@ export class ArtilleryStrike {
   }
 
   // Вспышка, искры и тёмная яма. Яма гаснет сама через craterMs.
+  // Разрыв — artillery_explosion.mp3, свой звук на каждый снаряд.
   static boom(scene: Phaser.Scene, x: number, y: number): void {
     ArtilleryStrike.ensureTextures(scene);
+    playArtilleryBoom(scene);
 
     const flash = scene.add
       .circle(x, y, 16, 0xfff6d0, 1)

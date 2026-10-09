@@ -10,6 +10,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
+import { playArtilleryShot } from './ArtillerySounds';
 import type { AssaultExplosion } from './AssaultExplosion';
 import type { InfantryDeath } from './InfantryDeath';
 import type { PickupExplosion } from './PickupExplosion';
@@ -32,6 +33,8 @@ export class CombatSystem {
   private readonly strikeKeys: Phaser.Input.Keyboard.Key[] = [];
   private flights: ArtilleryFlight[] = [];
   private salvoTimers: Phaser.Time.TimerEvent[] = [];
+  // Сброс отменяет залп, который ещё ждёт конца хлопка.
+  private artilleryToken = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -123,7 +126,30 @@ export class CombatSystem {
     return this.strikeKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
   }
 
+  // Сразу хлопок. Снаряды — через секунду после того, как он доиграл.
   private launchArtillery(): void {
+    const token = this.artilleryToken;
+    const armed = playArtilleryShot(this.scene, () => this.queueShells(token));
+    if (!armed) {
+      this.queueShells(token);
+    }
+  }
+
+  private queueShells(token: number): void {
+    if (token !== this.artilleryToken) {
+      return;
+    }
+    const timer = this.scene.time.delayedCall(ArtilleryStrike.shop.afterShotMs, () => {
+      this.salvoTimers = this.salvoTimers.filter((item) => item !== timer);
+      if (token !== this.artilleryToken) {
+        return;
+      }
+      this.releaseShells();
+    });
+    this.salvoTimers.push(timer);
+  }
+
+  private releaseShells(): void {
     const gap = ArtilleryStrike.shop.gapMs;
     ArtilleryStrike.impacts().forEach((point, index) => {
       const timer = this.scene.time.delayedCall(index * gap, () => {
@@ -153,6 +179,7 @@ export class CombatSystem {
   }
 
   private cancelArtillery(): void {
+    this.artilleryToken += 1;
     for (const timer of this.salvoTimers) {
       timer.remove(false);
     }

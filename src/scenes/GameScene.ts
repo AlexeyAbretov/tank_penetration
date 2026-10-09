@@ -9,6 +9,7 @@ import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
+import { ArtillerySounds } from '../systems/ArtillerySounds';
 import { AssaultExplosion } from '../systems/AssaultExplosion';
 import { BattleMusic } from '../systems/BattleMusic';
 import { BulletHitTank } from '../systems/BulletHitTank';
@@ -57,6 +58,8 @@ export class GameScene extends Phaser.Scene {
   private bulletHit?: BulletHitTank;
   // Пуск ракеты и её взрыв о броню. Два файла. Тот же ползунок эффектов.
   private rocketSounds?: RocketSounds;
+  // Залп батареи и разрыв каждого снаряда. Тот же ползунок эффектов.
+  private artillerySounds?: ArtillerySounds;
   // Взрыв, когда здоровье базы доходит до нуля. Тот же ползунок эффектов.
   private tankDeath?: TankDeath;
   // Удар снаряда по врагу. Три коротких варианта, чтобы не повторялся один и тот же.
@@ -130,6 +133,7 @@ export class GameScene extends Phaser.Scene {
     // infantry_dead0..1 — крик пехоты, убитой танком. impact0..2 — удар снаряда по врагу.
     // pickup_exposion — гибель пикапа.
     // rocket_shot — пуск ракеты. rocket_hit_tank — её взрыв о броню.
+    // artillery_shot — хлопок батареи. artillery_explosion — разрыв снаряда.
     this.load.audio('music-wave', 'audio/TRACK_01.mp3');
     this.load.audio('music-boss', 'audio/boss.mp3');
     this.load.audio('tank-shot', 'audio/tank_shot.mp3');
@@ -146,6 +150,8 @@ export class GameScene extends Phaser.Scene {
     this.load.audio('impact-2', 'audio/impact2.mp3');
     this.load.audio('rocket-shot', 'audio/rocket_shot.mp3');
     this.load.audio('rocket-hit-tank', 'audio/rocket_hit_tank.mp3');
+    this.load.audio('artillery-shot', 'audio/artillery_shot.mp3');
+    this.load.audio('artillery-explosion', 'audio/artillery_explosion.mp3');
   }
 
   create(): void {
@@ -250,6 +256,8 @@ export class GameScene extends Phaser.Scene {
     this.bulletHit = bulletHit;
     const rocketSounds = new RocketSounds(this, effects);
     this.rocketSounds = rocketSounds;
+    const artillerySounds = new ArtillerySounds(this, effects);
+    this.artillerySounds = artillerySounds;
     const impacts = new ImpactSounds(this, effects);
     this.impacts = impacts;
     const assaultExplosion = new AssaultExplosion(this, effects);
@@ -430,6 +438,7 @@ export class GameScene extends Phaser.Scene {
     this.gunnerShot?.setPaused(paused);
     this.bulletHit?.setPaused(paused);
     this.rocketSounds?.setPaused(paused);
+    this.artillerySounds?.setPaused(paused);
     this.impacts?.setPaused(paused);
     this.assaultExplosion?.setPaused(paused);
     this.pickupExplosion?.setPaused(paused);
@@ -514,6 +523,7 @@ export class GameScene extends Phaser.Scene {
     this.gunnerShot?.destroy();
     this.bulletHit?.destroy();
     this.rocketSounds?.destroy();
+    this.artillerySounds?.destroy();
     this.tankDeath?.destroy();
     this.impacts?.destroy();
     this.assaultExplosion?.destroy();
@@ -614,6 +624,7 @@ export class GameScene extends Phaser.Scene {
     this.gunnerShot?.stop();
     this.bulletHit?.stop();
     this.rocketSounds?.stop();
+    this.artillerySounds?.stop();
     this.impacts?.stop();
     this.assaultExplosion?.stop();
     this.pickupExplosion?.stop();
