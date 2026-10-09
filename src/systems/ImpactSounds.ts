@@ -5,21 +5,30 @@
 // Рестарт сцены звуки общего менеджера не удаляет, поэтому нужен destroy.
 
 import Phaser from 'phaser';
+import type { EffectsVolume } from './EffectsVolume';
 
 const KEYS = ['impact-0', 'impact-1', 'impact-2'] as const;
 
 // Файлы почти на полной громкости. Тише выстрела (0.65), чтобы удар подтверждал попадание, а не перекрывал пушку.
-const VOLUME = 0.5;
+// Ползунок эффектов умножает это число вместе с выстрелом.
+const GAIN = 0.5;
+
+type Clip = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
 
 export class ImpactSounds {
-  private readonly active: Phaser.Sound.BaseSound[] = [];
+  private readonly active: Clip[] = [];
   private last = -1;
 
-  constructor(private readonly scene: Phaser.Scene) {}
+  constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly effects: EffectsVolume,
+  ) {
+    effects.follow(() => this.applyGain());
+  }
 
   play(): void {
     const index = this.pick();
-    const hit = this.scene.sound.add(KEYS[index], { volume: VOLUME });
+    const hit = this.scene.sound.add(KEYS[index], { volume: this.loudness() }) as Clip;
     this.active.push(hit);
     hit.once('complete', () => this.release(hit));
     hit.play();
@@ -51,6 +60,17 @@ export class ImpactSounds {
     this.stop();
   }
 
+  private loudness(): number {
+    return GAIN * this.effects.volume;
+  }
+
+  private applyGain(): void {
+    const volume = this.loudness();
+    for (const hit of this.active) {
+      hit.volume = volume;
+    }
+  }
+
   private pick(): number {
     let index = Phaser.Math.Between(0, KEYS.length - 1);
     if (index === this.last) {
@@ -60,7 +80,7 @@ export class ImpactSounds {
     return index;
   }
 
-  private release(hit: Phaser.Sound.BaseSound): void {
+  private release(hit: Clip): void {
     const index = this.active.indexOf(hit);
     if (index < 0) {
       return;

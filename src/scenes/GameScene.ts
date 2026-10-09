@@ -10,6 +10,7 @@ import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleMusic } from '../systems/BattleMusic';
+import { EffectsVolume } from '../systems/EffectsVolume';
 import { ImpactSounds } from '../systems/ImpactSounds';
 import { TankShot } from '../systems/TankShot';
 import { CombatSystem } from '../systems/CombatSystem';
@@ -38,12 +39,14 @@ export class GameScene extends Phaser.Scene {
   private waves!: WaveManager;
   // Луп волны или босса. На паузе и после гибели базы молчит.
   private music?: BattleMusic;
-  // Хлопок пушки. Живёт отдельно от музыки: ползунок в настройках крутит только луп.
+  // Хлопок пушки. Громкость — ползунок эффектов, не музыки.
   private tankShot?: TankShot;
   // Удар снаряда по врагу. Три коротких варианта, чтобы не повторялся один и тот же.
   private impacts?: ImpactSounds;
-  // Окно громкости. Бой замирает, музыка нет: иначе ползунок нечего слушать.
+  // Окно громкости. Бой замирает, музыка нет: иначе ползунок музыки нечего слушать.
   private settings!: SettingsPanel;
+  // Когда в последний раз проиграли пример эффекта. Бой на паузе, this.time.now стоит.
+  private effectsPreviewAt = 0;
   private settingsOpen = false;
   // true, если окно само остановило физику. Магазин мог остановить её раньше.
   private settingsPausedPhysics = false;
@@ -193,9 +196,10 @@ export class GameScene extends Phaser.Scene {
     );
 
     const meta = loadMeta();
-    const tankShot = new TankShot(this);
+    const effects = new EffectsVolume();
+    const tankShot = new TankShot(this, effects);
     this.tankShot = tankShot;
-    const impacts = new ImpactSounds(this);
+    const impacts = new ImpactSounds(this, effects);
     this.impacts = impacts;
     combat = this.combat = new CombatSystem(
       this,
@@ -225,9 +229,14 @@ export class GameScene extends Phaser.Scene {
     this.settings = new SettingsPanel(
       this,
       (level) => music.setVolume(level),
+      (level) => {
+        effects.setVolume(level);
+        this.previewEffect(impacts);
+      },
       () => this.closeSettings(),
     );
-    this.settings.setVolume(music.volume);
+    this.settings.setMusic(music.volume);
+    this.settings.setEffects(effects.volume);
 
     this.waves = new WaveManager(
       this,
@@ -360,12 +369,23 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Ползунок эффектов. Бой стоит, поэтому без примера новую громкость не услышать.
+  // Реже 180 мс, иначе перетаскивание сыплет ударами пачкой.
+  private previewEffect(impacts: ImpactSounds): void {
+    const now = performance.now();
+    if (now - this.effectsPreviewAt < 180) {
+      return;
+    }
+    this.effectsPreviewAt = now;
+    impacts.play();
+  }
+
   private openSettings(): void {
     if (this.settingsOpen || this.paused || this.player.isGameOver || this.defeatShop) {
       return;
     }
     this.settingsOpen = true;
-    // Таймеры и враги стоят. Музыку не трогаем: пауза игры её глушит, а здесь ползунок должен быть слышен.
+    // Таймеры и враги стоят. Музыку не трогаем: пауза игры её глушит, а здесь ползунок музыки должен быть слышен.
     this.tweens.pauseAll();
     this.anims.pauseAll();
     this.freezeEmitters();

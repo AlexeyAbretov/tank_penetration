@@ -4,17 +4,26 @@
 // Рестарт сцены звуки общего менеджера не удаляет, поэтому нужен destroy.
 
 import Phaser from 'phaser';
+import type { EffectsVolume } from './EffectsVolume';
 
 // Файл записан почти на полную громкость. 0.65 — чуть громче лупа волны (0.45), без крика в уши.
-const VOLUME = 0.65;
+// Ползунок эффектов умножает это число: 1 оставляет сводку, 0 глушит выстрел.
+const GAIN = 0.65;
+
+type Clip = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
 
 export class TankShot {
-  private readonly active: Phaser.Sound.BaseSound[] = [];
+  private readonly active: Clip[] = [];
 
-  constructor(private readonly scene: Phaser.Scene) {}
+  constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly effects: EffectsVolume,
+  ) {
+    effects.follow(() => this.applyGain());
+  }
 
   play(): void {
-    const shot = this.scene.sound.add('tank-shot', { volume: VOLUME });
+    const shot = this.scene.sound.add('tank-shot', { volume: this.loudness() }) as Clip;
     this.active.push(shot);
     shot.once('complete', () => this.release(shot));
     shot.play();
@@ -47,7 +56,18 @@ export class TankShot {
     this.stop();
   }
 
-  private release(shot: Phaser.Sound.BaseSound): void {
+  private loudness(): number {
+    return GAIN * this.effects.volume;
+  }
+
+  private applyGain(): void {
+    const volume = this.loudness();
+    for (const shot of this.active) {
+      shot.volume = volume;
+    }
+  }
+
+  private release(shot: Clip): void {
     const index = this.active.indexOf(shot);
     if (index < 0) {
       return;
