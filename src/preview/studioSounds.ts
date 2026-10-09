@@ -1,6 +1,7 @@
 // Прослушивание файлов из public/audio без запуска боя.
 // Громкость читается из тех же ползунков, что и в игре.
-// Выстрел пушки, пулемёт, пуля врага, удар о броню, удар о стену, крик, взрыв пикапа и гибель базы
+// Выстрел пушки, пулемёт, пуля врага, удар о броню, пуск ракеты, взрыв ракеты,
+// удар о стену, крик, взрыв пикапа и гибель базы
 // сцена вызывает сама, когда в просмотре включены «Стрельба» и «Смерть».
 
 import Phaser from 'phaser';
@@ -12,6 +13,7 @@ import { GunnerShot } from '../systems/GunnerShot';
 import { ImpactSounds } from '../systems/ImpactSounds';
 import { InfantryDeath } from '../systems/InfantryDeath';
 import { PickupExplosion } from '../systems/PickupExplosion';
+import { RocketSounds } from '../systems/RocketSounds';
 import { TankDeath } from '../systems/TankDeath';
 import { TankMgShot } from '../systems/TankMgShot';
 import { TankShot } from '../systems/TankShot';
@@ -23,6 +25,8 @@ export const SOUND_CLIPS = [
   { id: 'mg', label: 'Пулемёт', title: 'tank_mg_shot.mp3' },
   { id: 'bullet', label: 'Пуля', title: 'gunner_shot.mp3' },
   { id: 'armor', label: 'Броня', title: 'bullet_hit_tank.mp3' },
+  { id: 'rocket', label: 'Ракета', title: 'rocket_shot.mp3' },
+  { id: 'burst', label: 'Разрыв', title: 'rocket_hit_tank.mp3' },
   { id: 'impact', label: 'Удар', title: 'impact0.mp3, impact1.mp3, impact2.mp3' },
   { id: 'cry', label: 'Крик', title: 'infantry_dead0.mp3, infantry_dead1.mp3' },
   { id: 'assault', label: 'Штурм', title: 'assault_explosion.mp3' },
@@ -38,6 +42,7 @@ export class StudioSounds {
   private readonly mgFx: TankMgShot;
   private readonly bulletFx: GunnerShot;
   private readonly armorFx: BulletHitTank;
+  private readonly rocketFx: RocketSounds;
   private readonly impacts: ImpactSounds;
   private readonly cryFx: InfantryDeath;
   private readonly assaultFx: AssaultExplosion;
@@ -53,6 +58,7 @@ export class StudioSounds {
     this.mgFx = new TankMgShot(scene, effects);
     this.bulletFx = new GunnerShot(scene, effects);
     this.armorFx = new BulletHitTank(scene, effects);
+    this.rocketFx = new RocketSounds(scene, effects);
     this.impacts = new ImpactSounds(scene, effects);
     this.cryFx = new InfantryDeath(scene, effects);
     this.assaultFx = new AssaultExplosion(scene, effects);
@@ -75,6 +81,8 @@ export class StudioSounds {
     scene.load.audio('impact-0', 'audio/impact0.mp3');
     scene.load.audio('impact-1', 'audio/impact1.mp3');
     scene.load.audio('impact-2', 'audio/impact2.mp3');
+    scene.load.audio('rocket-shot', 'audio/rocket_shot.mp3');
+    scene.load.audio('rocket-hit-tank', 'audio/rocket_hit_tank.mp3');
   }
 
   // Кнопка на панели. Луп включается и выключается, короткий звук играет с начала.
@@ -90,6 +98,10 @@ export class StudioSounds {
       this.bullet();
     } else if (id === 'armor') {
       this.armor();
+    } else if (id === 'rocket') {
+      this.rocket();
+    } else if (id === 'burst') {
+      this.burst();
     } else if (id === 'impact') {
       this.impact();
     } else if (id === 'cry') {
@@ -120,6 +132,14 @@ export class StudioSounds {
     this.armorFx.play();
   }
 
+  rocket(): void {
+    this.rocketFx.playLaunch();
+  }
+
+  burst(): void {
+    this.rocketFx.playHit();
+  }
+
   impact(): void {
     this.impacts.play();
   }
@@ -143,6 +163,7 @@ export class StudioSounds {
     this.mgFx.stop();
     this.bulletFx.stop();
     this.armorFx.stop();
+    this.rocketFx.stop();
     this.impacts.stop();
     this.cryFx.stop();
     this.assaultFx.stop();
@@ -157,6 +178,7 @@ export class StudioSounds {
     this.mgFx.destroy();
     this.bulletFx.destroy();
     this.armorFx.destroy();
+    this.rocketFx.destroy();
     this.impacts.destroy();
     this.cryFx.destroy();
     this.assaultFx.destroy();

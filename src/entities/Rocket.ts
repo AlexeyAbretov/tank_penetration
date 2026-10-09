@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { ROCKET_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
+import { playRocketLaunch } from '../systems/RocketSounds';
 import { EnemyShot } from './EnemyShot';
 
 export class Rocket extends EnemyShot {
@@ -53,8 +54,10 @@ export class Rocket extends EnemyShot {
     });
   }
 
-  // Ракета не пуля: хлопок винтовки ей не нужен.
-  protected override reportShot(): void {}
+  // Свой хлопок из rocket_shot.mp3. Винтовочный выстрел ракете не подходит.
+  protected override reportShot(): void {
+    playRocketLaunch(this.scene);
+  }
 
   // Клубы остаются там, где ракета уже пролетела, и гаснут сами.
   private driftSmoke(): void {

@@ -7,6 +7,7 @@ import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import type { BulletHitTank } from './BulletHitTank';
+import type { RocketSounds } from './RocketSounds';
 
 export class ProjectileSystem {
   private readonly armorSparks: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -17,6 +18,7 @@ export class ProjectileSystem {
     private readonly enemyShots: Phaser.Physics.Arcade.Group,
     private readonly onTankDamage: (amount: number) => void,
     private readonly bulletHit: BulletHitTank,
+    private readonly rocketSounds: RocketSounds,
   ) {
     this.armorSparks = createArmorSparks(scene);
   }
@@ -44,6 +46,7 @@ export class ProjectileSystem {
 
       if (isRocket) {
         Rocket.burstAt(this.scene, x, y);
+        this.rocketSounds.playHit();
       } else {
         emitArmorSparks(this.armorSparks, x, y, travel);
         this.bulletHit.play();
