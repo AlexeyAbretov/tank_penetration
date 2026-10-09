@@ -17,6 +17,8 @@ export const ENEMY_HASTE = {
 // Игра на паузе: бой, магазин и таймеры стоят, пока игрок сам не продолжит.
 export const PAUSED = 'paused';
 
+// Текущий темп врагов. Registry — общая полка сцены: туда GameScene кладёт число по ключу.
+// Если ключа ещё нет или там не число, темп равен 1. Выше max и ниже 1 значение не уходит.
 export function enemyHasteOf(registry: { get(key: string): unknown }): number {
   const raw = registry.get(ENEMY_HASTE.key);
   const value = typeof raw === 'number' ? raw : 1;

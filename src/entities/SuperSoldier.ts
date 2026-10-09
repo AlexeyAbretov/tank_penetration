@@ -1,5 +1,6 @@
-// Суперсолдат: босс каждой 10-й волны.
-// Каждые 5 секунд срывается в случайную точку поля, останавливается и даёт очередь из пулемёта.
+// Суперсолдат: босс каждой 10-й волны. На поле выходит один.
+// Цикл такой: бежит в случайную точку, останавливается, даёт очередь из пулемёта, снова бежит.
+// До танка не идёт и базу контактом не бьёт. Пули летят в точку прицеливания танка.
 
 import Phaser, { Scene } from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
@@ -16,14 +17,18 @@ import { EnemyShot } from './EnemyShot';
 import { Infantry } from './Infantry';
 import type { WorldPoint } from './WorldPoint';
 
+// Три фазы одного цикла.
+// run — бежит к точке. burst — стоит и стреляет. idle — очередь кончилась, ждёт таймер до следующего рывка.
 type Dash = 'run' | 'burst' | 'idle';
 
 export class SuperSoldier extends Infantry {
+  // Здоровье не растёт с номером волны: фабрика всегда передаёт это число.
   static readonly baseHp = 100;
+  // Вдвое крупнее обычного солдата. Координаты пулемёта ниже умножаются на этот масштаб.
   static readonly scale = 2;
   static readonly walkFps = 8;
   static readonly corpseKey = 'super-corpse';
-  // Новый рывок не чаще чем раз в 5 секунд.
+  // Новый рывок не чаще чем раз в 5 секунд. Таймер тикает и на беге, и на стрельбе.
   static readonly relocateMs = 5000;
   static readonly burstCount = 5;
   // Пауза между патронами очереди. Пять выстрелов укладываются в полсекунды.
@@ -49,21 +54,30 @@ export class SuperSoldier extends Infantry {
   }
 
   readonly coinReward = 10;
+  // false: WaveManager и проволока не ждут, что он дойдёт до стены.
   readonly reachesBase = false;
   readonly contactDamage = 0;
+  // Снаряд танка попадает в крупный торс с большего расстояния, чем в обычного солдата.
   readonly hitRadius = 64;
 
+  // Пулемёт — отдельная картинка. Так отдача двигает ствол, а тело остаётся на месте.
   private gun!: Phaser.GameObjects.Image;
+  // Насколько ствол сейчас отъехал назад и задрался. Твин возвращает оба числа к нулю.
   private readonly recoil = { x: 0, climb: 0 };
+  // Угол ствола в радианах. 0 смотрит вправо, к правому краю поля. В танк ствол смотрит около Math.PI.
   private aim = 0;
   private readonly shots: Phaser.Physics.Arcade.Group;
+  // Точка на танке. Её отдаёт Tank.aimPoint, босс сам танк не ищет.
   private readonly fireTarget: WorldPoint;
   private phase: Dash = 'idle';
+  // Миллисекунды до следующего рывка. enemyHaste ускоряет и этот таймер.
   private clock = 0;
   private destX = 0;
   private destY = 0;
+  // Скорость текущего рывка. Каждый beginRun слегка её меняет, чтобы бег не был метрономом.
   private dashSpeed = SuperSoldier.moveSpeed;
   private shotsLeft = 0;
+  // Пауза до следующего патрона очереди.
   private shotWait = 0;
 
   static ensureTextures(scene: Scene): void {
@@ -100,16 +114,21 @@ export class SuperSoldier extends Infantry {
   ) {
     super(scene, x, y, hp, 'super-0', 'super-walk', 0xff3348);
     this.setScale(SuperSoldier.scale);
+    // Полоска HP у предка узкая. После super её можно расширить и сразу перерисовать.
     this.hpBarWidth = 54;
     this.syncBar();
     this.shots = shots;
     this.fireTarget = fireTarget;
     this.gun = scene.add.image(x, y, 'super-gun');
+    // Origin — точка картинки, которая стоит на координате спрайта.
+    // Ставим её в приклад, чтобы поворот и отдача крутились вокруг плеча, а не вокруг центра текстуры.
     this.gun.setOrigin(
       (SuperSoldier.breech.x - SuperSoldier.gunCut.x) / SUPER_MG_FRAME.w,
       (SuperSoldier.breech.y - SuperSoldier.gunCut.y) / SUPER_MG_FRAME.h,
     );
     this.gun.setDepth(this.depth);
+    // destroy приходит и при смерти, и при зачистке сцены. Гасим твин отдачи и убираем ствол,
+    // иначе картинка пулемёта останется на поле после трупа.
     this.once('destroy', () => {
       this.scene.tweens.killTweensOf(this.recoil);
       this.gun.destroy();
@@ -117,15 +136,18 @@ export class SuperSoldier extends Infantry {
     this.syncGun();
   }
 
+  // preUpdate Phaser зовёт каждый кадр до физики. Ствол догоняет тело, даже если act в этот кадр молчит.
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     this.syncGun();
   }
 
+  // Волна только что выпустила босса. Сразу выбирает точку и бежит, стойки на месте нет.
   override march(): void {
     this.beginRun();
   }
 
+  // Игрок переключил темп. На беге скорость пересчитывается сразу. В очереди и на месте тело стоит.
   override syncPace(): void {
     if (this.reachedWall || this.phase !== 'run') {
       return;
@@ -135,6 +157,7 @@ export class SuperSoldier extends Infantry {
 
   override hit(damage?: number): boolean {
     const dead = damage === undefined ? super.hit() : super.hit(damage);
+    // Короткий светлый тинт ствола: попадание видно и по пулемёту, не только по полоске HP.
     this.gun.setTint(0xffccaa);
     this.scene.time.delayedCall(70, () => {
       if (this.gun.active) {
@@ -149,18 +172,21 @@ export class SuperSoldier extends Infantry {
   }
 
   protected override onDie(slain: boolean): void {
+    // slain — убит выстрелом, труп остаётся. До базы босс не доходит, но ветка всё равно проверяет флаг.
     if (!slain || !this.gun.active) {
       return;
     }
     this.gun.setVisible(false);
   }
 
+  // delta — миллисекунды с прошлого кадра. Темп игрока умножает и шаг, и таймеры босса.
   protected override act(delta: number): void {
     const step = delta * enemyHasteOf(this.scene.registry);
     this.clock -= step;
 
     if (this.phase === 'burst') {
       const done = this.tickBurst(step);
+      // Очередь кончилась и пять секунд уже вышли — сразу новый рывок, без стояния.
       if (done && this.clock <= 0) {
         this.beginRun();
       }
@@ -170,9 +196,11 @@ export class SuperSoldier extends Infantry {
     if (this.phase === 'run') {
       if (this.closeEnough(delta)) {
         this.openBurst();
+        // Первый патрон в тот же кадр, иначе очередь начнётся только со следующего.
         this.tickBurst(step);
         return;
       }
+      // Пять секунд вышли раньше, чем он добежал: точка сменяется, очередь пропускается.
       if (this.clock <= 0) {
         this.beginRun();
         return;
@@ -181,6 +209,7 @@ export class SuperSoldier extends Infantry {
       return;
     }
 
+    // idle: очередь уже кончилась, тело стоит, пока clock не дойдёт до нуля.
     this.plant();
     if (this.clock <= 0) {
       this.beginRun();
@@ -189,6 +218,7 @@ export class SuperSoldier extends Infantry {
 
   private beginRun(): void {
     this.pickDest();
+    // Небольшой разброс, чтобы одинаковые 220 px/с не читались как конвейер.
     this.dashSpeed = SuperSoldier.moveSpeed + Phaser.Math.Between(-30, 40);
     this.phase = 'run';
     this.clock = SuperSoldier.relocateMs;
@@ -197,6 +227,7 @@ export class SuperSoldier extends Infantry {
 
   private pickDest(): void {
     const box = SuperSoldier.roam;
+    // До восьми попыток найти точку хотя бы в 180 px от текущей. Иначе рывок выглядит как шаг на месте.
     for (let i = 0; i < 8; i += 1) {
       const x = Phaser.Math.Between(box.left, box.right);
       const y = Phaser.Math.Between(box.top, box.bottom);
@@ -208,10 +239,12 @@ export class SuperSoldier extends Infantry {
     }
     const midX = (box.left + box.right) / 2;
     const midY = (box.top + box.bottom) / 2;
+    // Все восемь точек оказались рядом. Тогда бежим в противоположный угол прямоугольника.
     this.destX = this.x < midX ? box.right : box.left;
     this.destY = this.y < midY ? box.bottom : box.top;
   }
 
+  // Считаем «добежал», когда до точки ближе, чем он пройдёт за этот кадр. Иначе скорость пронесёт его мимо.
   private closeEnough(delta: number): boolean {
     const dist = Phaser.Math.Distance.Between(this.x, this.y, this.destX, this.destY);
     const step = this.dashSpeed * enemyHasteOf(this.scene.registry) * (delta / 1000);
@@ -220,6 +253,7 @@ export class SuperSoldier extends Infantry {
 
   private walk(): void {
     const haste = enemyHasteOf(this.scene.registry);
+    // Angle.Between даёт направление на точку. cos/sin раскладывают его на скорость по X и Y.
     const angle = Phaser.Math.Angle.Between(this.x, this.y, this.destX, this.destY);
     const speed = this.dashSpeed * haste;
     const body = this.body as Phaser.Physics.Arcade.Body;
@@ -227,9 +261,11 @@ export class SuperSoldier extends Infantry {
     if (!this.anims.isPlaying) {
       this.play('super-walk');
     }
+    // timeScale ускоряет смену кадров шага вместе с бегом. Иначе ноги отстают от спрайта.
     this.anims.timeScale = haste;
   }
 
+  // Стоит на месте: скорость обнулена, анимация снята, на теле первый кадр шага.
   private plant(): void {
     this.body?.stop();
     if (this.anims.isPlaying) {
@@ -243,10 +279,12 @@ export class SuperSoldier extends Infantry {
   private openBurst(): void {
     this.phase = 'burst';
     this.shotsLeft = SuperSoldier.burstCount;
+    // 0 — первый выстрел в ближайшем tickBurst, без стартовой паузы.
     this.shotWait = 0;
     this.plant();
   }
 
+  // true — очередь закончилась. false — ещё есть патроны или идёт пауза между ними.
   private tickBurst(step: number): boolean {
     this.plant();
     if (this.shotsLeft <= 0) {
@@ -277,6 +315,7 @@ export class SuperSoldier extends Infantry {
     );
     this.kickGun();
     const shot = SuperSoldier.muzzleAt(this.x, this.y, this.scaleX, this.aim, this.recoil);
+    // Пуля — отдельный спрайт в общей группе сцены. Урон зашит в неё, а не в босса.
     const bullet = new EnemyShot(this.scene, shot.x, shot.y, SuperSoldier.shotDamage);
     this.shots.add(bullet);
     bullet.launch(shot.angle, SuperSoldier.shotSpeed);
@@ -324,6 +363,8 @@ export class SuperSoldier extends Infantry {
   static barrelAngle(anchorX: number, anchorY: number, scale: number, targetX: number, targetY: number): number {
     const mount = SuperSoldier.mountPoint(anchorX, anchorY, scale);
     const at = Phaser.Math.Angle.Between(mount.x, mount.y, targetX, targetY);
+    // Картинка пулемёта нарисована носом влево. Угол Phaser «в цель» смотрит носом вправо,
+    // поэтому к нему прибавляется половина оборота, и ствол на текстуре совпадает с полётом пули.
     return Phaser.Math.Angle.Wrap(at + Math.PI);
   }
 
@@ -401,6 +442,7 @@ export class SuperSoldier extends Infantry {
     gun.setRotation(rotation);
   }
 
+  // Кадр марша для текстуры. withGun = false — тело без пулемёта: в бою ствол рисуется отдельной картинкой.
   static drawMarch(
     g: Phaser.GameObjects.Graphics,
     legPhase: 0 | 1,

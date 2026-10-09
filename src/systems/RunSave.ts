@@ -45,6 +45,7 @@ export type RunSave = {
 export function loadRun(): RunSave | null {
   let raw: string | null = null;
   try {
+    // getItem бросает, если браузер запретил хранилище. Для игры это просто «сохранения нет».
     raw = localStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
@@ -55,6 +56,7 @@ export function loadRun(): RunSave | null {
   try {
     const parsed = parseRun(JSON.parse(raw));
     if (!parsed) {
+      // Битая или старая запись. Стираем, чтобы следующий заход начал чистую партию.
       clearRun();
     }
     return parsed;
@@ -81,6 +83,7 @@ export function clearRun(): void {
 }
 
 function parseRun(value: unknown): RunSave | null {
+  // version отсекает старый формат. Поле из будущего файла тоже не подойдёт: игра его не понимает.
   if (!isRecord(value) || value.version !== 1) {
     return null;
   }
@@ -98,6 +101,7 @@ function parseRun(value: unknown): RunSave | null {
   const haste = requiredInt(value.haste, 1, ENEMY_HASTE.max) ?? 1;
   const artilleryCooldownMs =
     requiredInt(value.artilleryCooldownMs, 0, ArtilleryStrike.shop.cooldownMs) ?? 0;
+  // В магазине список врагов пустой по смыслу фазы, даже если в JSON они остались.
   const enemies = phase === 'shop' ? [] : parseEnemies(value.enemies);
   const spawned =
     phase === 'shop'

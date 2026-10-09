@@ -1,4 +1,6 @@
-// Покупки между волнами: прокачка, проволока и пауза боя.
+// Покупки между волнами. Окно ShopPanel только рисует кнопки и зовёт методы ниже.
+// Уровни живут здесь, пока жива партия. В localStorage их кладёт RunSave через capture().
+// Постоянные улучшения после поражения сюда не входят: их держит MetaSave.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
@@ -41,6 +43,7 @@ export class ShopController {
     this.panel = new ShopPanel(scene, this);
   }
 
+  // Снимок покупок для сохранения партии. Монеты и номер волны пишет сцена, не этот метод.
   capture(): ShopSave {
     return {
       blast: this.blastLevel,
@@ -71,6 +74,7 @@ export class ShopController {
     this.artilleryOwned = saved.artillery;
   }
 
+  // Чистая партия: уровни и постройки обнуляются. Предметы на поле убирает перезапуск сцены.
   reset(): void {
     this.blastLevel = 0;
     this.damageLevel = 0;
@@ -86,7 +90,9 @@ export class ShopController {
 
   open(): void {
     this.shopOpen = true;
+    // combat читает стрельба танка: в магазине ствол молчит.
     this.scene.registry.set('combat', false);
+    // pause замораживает скорости. Враги остаются на тех же координатах.
     this.scene.physics.world.pause();
     this.panel.show(
       this.economy.getCoins(),
@@ -100,6 +106,7 @@ export class ShopController {
     );
   }
 
+  // «Следующая волна». На паузе кнопка молчит: иначе бой стартовал бы под плашкой «ПАУЗА».
   closeAndContinue(): void {
     if (this.isPaused()) {
       return;
@@ -111,6 +118,7 @@ export class ShopController {
     this.onContinue();
   }
 
+  // +1 к радиусу взрыва. Цена растёт от текущего уровня, см. ShopPanel.upgradeCost.
   buyBlast(): void {
     if (this.isPaused()) {
       return;
@@ -123,6 +131,7 @@ export class ShopController {
     this.refresh();
   }
 
+  // +1 к урону снаряда танка. Складывается с постоянным уроном из MetaSave.
   buyDamage(): void {
     if (this.isPaused()) {
       return;
@@ -135,6 +144,7 @@ export class ShopController {
     this.refresh();
   }
 
+  // Короче пауза между выстрелами. Выше Tank.maxFireRateLevel уровень не поднимается.
   buyFireRate(): void {
     if (this.isPaused() || this.fireRateLevel >= Tank.maxFireRateLevel) {
       return;
@@ -148,6 +158,7 @@ export class ShopController {
     this.refresh();
   }
 
+  // Одна полоса проволоки на партию. Повторный вызов ничего не ставит.
   buyWire(): void {
     if (this.isPaused() || this.wireOwned || this.economy.getCoins() < BarbedWire.shop.cost) {
       return;
@@ -160,6 +171,7 @@ export class ShopController {
     this.refresh();
   }
 
+  // Танк стреляет сам, пока курсор на поле. Покупка одна на партию.
   buyAutoFire(): void {
     if (this.isPaused() || this.tank.hasAutoFire || this.economy.getCoins() < Tank.shop.autoFireCost) {
       return;
@@ -171,6 +183,7 @@ export class ShopController {
     this.refresh();
   }
 
+  // Ствол на башне. Стрельбу по таймеру считает CombatSystem, здесь только факт покупки.
   buyMachineGun(): void {
     if (this.isPaused() || this.machineGunOwned || this.economy.getCoins() < MachineGun.shop.cost) {
       return;
@@ -183,6 +196,7 @@ export class ShopController {
     this.refresh();
   }
 
+  // Открывает клавишу 1. Залп и перезарядку считает CombatSystem.
   buyArtillery(): void {
     if (this.isPaused() || this.artilleryOwned || this.economy.getCoins() < ArtilleryStrike.shop.cost) {
       return;
@@ -194,6 +208,7 @@ export class ShopController {
     this.refresh();
   }
 
+  // Строка характеристик над полем: урон и взрыв партии плюс постоянные уровни.
   syncTankStats(): void {
     const meta = loadMeta();
     this.hud.setTankStats(

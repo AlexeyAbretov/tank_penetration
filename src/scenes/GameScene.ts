@@ -1,5 +1,6 @@
-// Главная сцена. Phaser один раз вызывает create(), потом каждый кадр — update().
-// Сцена собирает системы и держит общее состояние партии.
+// Главная сцена. Phaser один раз вызывает preload() и create(), потом каждый кадр — update().
+// Сцена почти не считает бой сама. Она создаёт системы и по очереди зовёт их методы.
+// Порядок чтения: поля — кто участвует в партии, create() их собирает, update() крутит кадр.
 
 import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
@@ -19,38 +20,61 @@ import { WaveManager } from '../systems/WaveManager';
 import { GameHud } from '../ui/GameHud';
 
 export class GameScene extends Phaser.Scene {
+  // Группа пуль врагов. Group — список спрайтов с физикой, по которому системы ходят циклом.
   private enemyShots!: Phaser.Physics.Arcade.Group;
+  // Все враги на поле: солдаты, пикап и босс.
   private infantry!: Phaser.Physics.Arcade.Group;
 
   private hud!: GameHud;
+  // Танк и число здоровья базы.
   private player!: PlayerController;
+  // Снаряды танка, попадания, проволока, пулемёт и артиллерия.
   private combat!: CombatSystem;
+  // Когда выпускать волну и когда считать её зачищенной.
   private waves!: WaveManager;
+  // Магазин между волнами.
   private shop!: ShopController;
+  // Магазин очков после гибели базы.
   private metaShop!: MetaShopController;
+  // Пули и ракеты, которые летят в танк.
   private projectiles!: ProjectileSystem;
+  // true, пока на экране «БАЗА РАЗБИТА». Обычный update в этом состоянии не идёт.
   private defeatShop = false;
 
+  // Очки этой партии. После гибели прибавляются к запасу в MetaSave.
   private score = 0;
+  // Монеты этой партии. Тратятся между волнами и пропадают вместе с партией.
   private coins = 0;
+  // Игрок нажал паузу или вкладка ушла в фон.
   private paused = false;
+  // true, если пауза сама остановила физику. Магазин останавливает её раньше,
+  // и тогда снятие паузы физику не отпускает: магазин всё ещё открыт.
   private pausedPhysics = false;
+  // Клик по плашке только поднимает флаг. Снятие паузы делает следующий кадр update.
   private resumeRequested = false;
+  // Первый кадр паузы игнорирует Esc и клик. Та же кнопка, которой паузу включили, не снимает её сразу.
   private resumeArmed = false;
   private pausedEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  // Клавиша 2 и та же клавиша на цифровом блоке. Обе крутят темп врагов.
   private hasteKey?: Phaser.Input.Keyboard.Key;
   private hasteNumpad?: Phaser.Input.Keyboard.Key;
   private pauseKey?: Phaser.Input.Keyboard.Key;
+  // false до конца create() и в момент гибели, чтобы оборванная партия не записалась поверх стирания.
   private persistEnabled = false;
+  // Сколько миллисекунд прошло с прошлой автозаписи. Порог — в touchAutosave.
   private autosaveMs = 0;
+  // Одна функция на pagehide и beforeunload, чтобы снять оба слушателя одним и тем же объектом.
   private readonly onPageHide = (): void => {
     this.writeSave();
   };
 
   constructor() {
+    // Ключ сцены. restart() ищет её по этой строке.
     super('game');
   }
 
+  // Phaser вызывает это до create. Картинки танка лежат в assets/.
+  // Солдат, пули и поле рисует ensureGameTextures уже внутри create.
   preload(): void {
     this.load.image('tank-hull', 'assets/tank-hull.png');
     this.load.image('tank-turret', 'assets/tank-turret.png');
@@ -62,7 +86,9 @@ export class GameScene extends Phaser.Scene {
     ensureGameTextures(this);
     this.score = 0;
     this.coins = 0;
+    // combat — можно ли стрелять из танка. Магазин ставит false.
     this.registry.set('combat', true);
+    // Темп врагов. Читают пехота и пули через enemyHasteOf.
     this.registry.set(ENEMY_HASTE.key, 1);
     this.registry.set(PAUSED, false);
     this.paused = false;
@@ -76,10 +102,12 @@ export class GameScene extends Phaser.Scene {
     this.defeatShop = false;
     Tank.setMetaSpeedLevel(loadMeta().speed);
 
+    // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
     createAmbientEmbers(this);
     this.input.mouse?.disableContextMenu();
 
+    // Пустые группы. Волна и выстрелы будут add() в них по ходу боя.
     this.enemyShots = this.physics.add.group();
     this.infantry = this.physics.add.group();
 
@@ -94,6 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.onResume(() => {
       this.resumeRequested = true;
     });
+    // Стирает и партию, и постоянные улучшения. Кнопка живёт на плашке паузы.
     this.hud.onNewGame(() => this.restartRun());
     const keyboard = this.input.keyboard;
     if (keyboard) {
@@ -103,6 +132,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.events.once('shutdown', this.onShutdown, this);
 
+    // combat объявлен заранее: колбэк поражения зовёт его, а сам объект создаётся строками ниже.
     let combat: CombatSystem | undefined;
     this.player = new PlayerController(
       this,
@@ -122,6 +152,7 @@ export class GameScene extends Phaser.Scene {
       this.player.tank,
       {
         getCoins: () => this.coins,
+        // false — монет не хватило, уровень не растёт.
         spendCoins: (amount) => {
           if (this.coins < amount) {
             return false;
@@ -131,6 +162,7 @@ export class GameScene extends Phaser.Scene {
         },
       },
       () => this.waves.beginNextWave(),
+      // Любая покупка сразу пишет партию, не дожидаясь автозаписи раз в 400 мс.
       () => this.writeSave(),
     );
 
@@ -148,9 +180,11 @@ export class GameScene extends Phaser.Scene {
       meta.blast,
     );
     this.metaShop = new MetaShopController(this, () => {
+      // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
       this.persistEnabled = false;
       this.scene.restart();
     });
+    // Пересечения снарядов танка с пехотой. Без этого выстрел пролетает сквозь спрайт.
     this.combat.setupOverlap();
 
     this.waves = new WaveManager(
@@ -171,11 +205,14 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.applyCameraFx();
+    // loadRun читает localStorage. Пустое сохранение начинает волну 1.
+    // Если игрок закрыл вкладку на «БАЗА РАЗБИТА», continueRun откроет магазин очков.
     this.continueRun(loadRun());
     if (!this.defeatShop) {
       this.persistEnabled = true;
     }
 
+    // HIDDEN — вкладка спряталась. pagehide и beforeunload — страницу закрывают или обновляют.
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.addEventListener('pagehide', this.onPageHide);
     window.addEventListener('beforeunload', this.onPageHide);
@@ -184,12 +221,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // Кадр боя. delta — миллисекунды с прошлого кадра, его забирают системы.
   update(_time: number, delta: number): void {
+    // Поражение и магазин очков живут своими кнопками. Кадр боя им не нужен.
     if (this.player.isGameOver || this.defeatShop) {
       return;
     }
 
     if (this.paused) {
+      // resumeArmed становится true только со второго захода. Первый кадр паузы клик проглатывает.
       const resume = this.resumeArmed && (this.resumeRequested || this.pausePressed());
       this.resumeRequested = false;
       if (resume) {
@@ -210,15 +250,18 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fighting = !this.shop.shopOpen;
+    // Перезарядка артиллерии идёт и в магазине. Выстрел — только когда fighting.
     this.combat.tickArtillery(delta, fighting);
     this.hud.setArtillery(this.shop.artilleryOwned, this.combat.artilleryCooldown);
     if (!fighting) {
       return;
     }
 
+    // worldX/worldY — курсор в координатах поля, а не окна браузера.
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
+    // Клик по кнопкам темпа и паузы не считается выстрелом: они лежат поверх поля.
     this.combat.tick(delta, !this.hud.coversHaste(pointer) && !this.hud.coversPause(pointer));
     this.projectiles.tick();
     this.waves.tick();
@@ -333,6 +376,7 @@ export class GameScene extends Phaser.Scene {
 
   private onEnemyKill(coinReward: number): void {
     this.score += 10;
+    // coinReward — монеты вида врага. loadMeta().coins — постоянная прибавка за каждое убийство.
     this.coins += coinReward + loadMeta().coins;
     this.hud.setScore(this.score);
     this.hud.setCoins(this.coins);
@@ -342,6 +386,7 @@ export class GameScene extends Phaser.Scene {
   private onBaseHit(amount: number): void {
     this.player.damage(amount);
     if (this.player.isGameOver) {
+      // Сначала запрещаем запись, потом стираем партию. Иначе writeSave успеет положить труп боя обратно.
       this.persistEnabled = false;
       this.metaShop.bank(this.score);
       clearRun();
@@ -361,6 +406,7 @@ export class GameScene extends Phaser.Scene {
     this.scene.restart();
   }
 
+  // Экран после гибели. Партия к этому моменту уже стёрта, здесь только окно очков.
   private openDefeatShop(): void {
     this.defeatShop = true;
     this.persistEnabled = false;
@@ -376,6 +422,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private continueRun(saved: ReturnType<typeof loadRun>): void {
+    // Гибель уже случилась, а «В бой» игрок не нажал. Магазин очков открывается снова.
     if (loadMeta().awaitingShop) {
       clearRun();
       this.shop.syncTankStats();
@@ -388,6 +435,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Числа партии. Врагов и покупки поднимают свои системы, сцена только раздаёт поля.
     this.score = saved.score;
     this.coins = saved.coins;
     this.hud.setScore(this.score);
@@ -408,6 +456,7 @@ export class GameScene extends Phaser.Scene {
 
   private touchAutosave(delta: number): void {
     this.autosaveMs += delta;
+    // Реже, чем каждый кадр: localStorage на частом JSON.stringify заметно тормозит.
     if (this.autosaveMs < 400) {
       return;
     }
@@ -420,6 +469,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const wave = this.waves.capture();
+    // Волна ещё не началась — писать нечего, иначе загрузка восстановит пустой бой как магазин.
     if (!wave) {
       return;
     }
