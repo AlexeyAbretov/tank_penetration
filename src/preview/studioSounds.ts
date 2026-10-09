@@ -1,6 +1,6 @@
 // Прослушивание файлов из public/audio без запуска боя.
 // Громкость читается из тех же ползунков, что и в игре.
-// Выстрел, удар о стену, крик и гибель базы сцена вызывает сама,
+// Выстрел пушки, пулемёт, удар о стену, крик и гибель базы сцена вызывает сама,
 // когда в просмотре включены «Стрельба» и «Смерть».
 
 import Phaser from 'phaser';
@@ -10,12 +10,14 @@ import { EffectsVolume } from '../systems/EffectsVolume';
 import { ImpactSounds } from '../systems/ImpactSounds';
 import { InfantryDeath } from '../systems/InfantryDeath';
 import { TankDeath } from '../systems/TankDeath';
+import { TankMgShot } from '../systems/TankMgShot';
 import { TankShot } from '../systems/TankShot';
 
 export const SOUND_CLIPS = [
   { id: 'wave', label: 'Волна', title: 'TRACK_01.mp3', loop: true },
   { id: 'boss', label: 'Босс', title: 'boss.mp3', loop: true },
   { id: 'shot', label: 'Выстрел', title: 'tank_shot.mp3' },
+  { id: 'mg', label: 'Пулемёт', title: 'tank_mg_shot.mp3' },
   { id: 'impact', label: 'Удар', title: 'impact0.mp3, impact1.mp3, impact2.mp3' },
   { id: 'cry', label: 'Крик', title: 'infantry_dead0.mp3, infantry_dead1.mp3' },
   { id: 'assault', label: 'Штурм', title: 'assault_explosion.mp3' },
@@ -27,6 +29,7 @@ export type StudioSoundId = (typeof SOUND_CLIPS)[number]['id'];
 export class StudioSounds {
   private readonly music: BattleMusic;
   private readonly shotFx: TankShot;
+  private readonly mgFx: TankMgShot;
   private readonly impacts: ImpactSounds;
   private readonly cryFx: InfantryDeath;
   private readonly assaultFx: AssaultExplosion;
@@ -38,6 +41,7 @@ export class StudioSounds {
     this.music = new BattleMusic(scene);
     this.music.create();
     this.shotFx = new TankShot(scene, effects);
+    this.mgFx = new TankMgShot(scene, effects);
     this.impacts = new ImpactSounds(scene, effects);
     this.cryFx = new InfantryDeath(scene, effects);
     this.assaultFx = new AssaultExplosion(scene, effects);
@@ -48,6 +52,7 @@ export class StudioSounds {
     scene.load.audio('music-wave', 'audio/TRACK_01.mp3');
     scene.load.audio('music-boss', 'audio/boss.mp3');
     scene.load.audio('tank-shot', 'audio/tank_shot.mp3');
+    scene.load.audio('tank-mg-shot', 'audio/tank_mg_shot.mp3');
     scene.load.audio('tank-dead', 'audio/tank_dead.mp3');
     scene.load.audio('assault-explosion', 'audio/assault_explosion.mp3');
     scene.load.audio('infantry-dead-0', 'audio/infantry_dead0.mp3');
@@ -64,6 +69,8 @@ export class StudioSounds {
     }
     if (id === 'shot') {
       this.shot();
+    } else if (id === 'mg') {
+      this.mg();
     } else if (id === 'impact') {
       this.impact();
     } else if (id === 'cry') {
@@ -78,6 +85,10 @@ export class StudioSounds {
 
   shot(): void {
     this.shotFx.play();
+  }
+
+  mg(): void {
+    this.mgFx.play();
   }
 
   impact(): void {
@@ -96,6 +107,7 @@ export class StudioSounds {
   // Музыка остаётся: её выключают своей кнопкой.
   stopEffects(): void {
     this.shotFx.stop();
+    this.mgFx.stop();
     this.impacts.stop();
     this.cryFx.stop();
     this.assaultFx.stop();
@@ -106,6 +118,7 @@ export class StudioSounds {
     this.stopEffects();
     this.music.destroy();
     this.shotFx.destroy();
+    this.mgFx.destroy();
     this.impacts.destroy();
     this.cryFx.destroy();
     this.assaultFx.destroy();

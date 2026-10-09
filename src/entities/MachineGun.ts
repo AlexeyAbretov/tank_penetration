@@ -15,7 +15,7 @@ export class MachineGun extends GameObjects.Container {
   static readonly barrelKey = 'tank-mg';
 
   static readonly shop = {
-    cost: 100,
+    cost: 1,
     fireIntervalMs: 3000,
     damage: 1,
     bulletSpeed: 720,

@@ -892,7 +892,7 @@ export class StudioScene extends Phaser.Scene {
       } else {
         this.sparkOnPlate(x, y, rig.angle);
       }
-      // Удар снаряда о стену. Пули и ракеты в бою этот звук не берут.
+      // Удар о стену. В бою его берут снаряд танка и пуля пулемёта.
       if (fly.bang) {
         this.audio?.impact();
       }
@@ -1338,7 +1338,9 @@ export class StudioScene extends Phaser.Scene {
       vx: Math.cos(muzzle.angle) * MachineGun.shop.bulletSpeed * rig.pixel,
       vy: Math.sin(muzzle.angle) * MachineGun.shop.bulletSpeed * rig.pixel,
       life: 900,
+      bang: true,
     });
+    this.audio?.mg();
   }
 
   private emitShot(): void {
@@ -1706,7 +1708,7 @@ type Fly = {
   life: number;
   trail?: boolean;
   puffMs?: number;
-  // Снаряд танка: по прилёте в стену играет удар, как попадание в бою.
+  // Снаряд танка и пуля пулемёта: по прилёте в стену играет удар, как попадание в бою.
   bang?: boolean;
 };
 

@@ -14,6 +14,7 @@ import type { AssaultExplosion } from './AssaultExplosion';
 import type { InfantryDeath } from './InfantryDeath';
 import type { ShopController } from './ShopController';
 import type { ImpactSounds } from './ImpactSounds';
+import type { TankMgShot } from './TankMgShot';
 import type { TankShot } from './TankShot';
 
 type CombatCallbacks = {
@@ -43,6 +44,7 @@ export class CombatSystem {
     private readonly impacts: ImpactSounds,
     private readonly assaultExplosion: AssaultExplosion,
     private readonly infantryDeath: InfantryDeath,
+    private readonly tankMgShot: TankMgShot,
   ) {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
@@ -244,6 +246,7 @@ export class CombatSystem {
     }
     const shot = mg.muzzle();
     this.fireMgBullet(shot.x, shot.y, shot.angle);
+    this.tankMgShot.play();
     this.mgCooldown = MachineGun.shop.fireIntervalMs;
   }
 
@@ -276,6 +279,8 @@ export class CombatSystem {
         const torso = this.torsoPoint(unit);
         if (Phaser.Math.Distance.Between(bullet.x, bullet.y, torso.x, torso.y) <= unit.hitRadius * 0.55) {
           bullet.destroy();
+          // Тот же удар, что у снаряда: пуля долетела до солдата.
+          this.impacts.play();
           this.hurtInfantry(unit, MachineGun.shop.damage);
           break;
         }
