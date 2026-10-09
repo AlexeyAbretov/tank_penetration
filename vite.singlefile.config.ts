@@ -1,5 +1,5 @@
 // Отдельная сборка одного HTML. Обычный vite.config.ts и команды dev, build, preview её не читают.
-// Готовый файл лежит в release/tank-defense.html и открывается двойным кликом:
+// Готовый файл лежит в release/tank-penetration.html и открывается двойным кликом:
 // браузер не ходит за скриптом, картинками танка и музыкой, потому что они уже внутри страницы.
 
 import fs from 'node:fs';
@@ -97,7 +97,7 @@ function nameReleaseHtml(): Plugin {
         return;
       }
 
-      const to = path.join(directory, 'tank-defense.html');
+      const to = path.join(directory, 'tank-penetration.html');
       fs.renameSync(from, to);
 
       const html = fs.readFileSync(to, 'utf8');
@@ -118,7 +118,7 @@ function nameReleaseHtml(): Plugin {
 
       if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 16) {
         throw new Error(
-          'release/tank-defense.html всё ещё зависит от внешнего скрипта, картинок танка или музыки',
+          'release/tank-penetration.html всё ещё зависит от внешнего скрипта, картинок танка или музыки',
         );
       }
 

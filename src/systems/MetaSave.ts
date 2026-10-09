@@ -3,7 +3,7 @@
 
 import { Tank } from '../entities/Tank';
 
-const STORAGE_KEY = 'tank-defense-meta:v1';
+const STORAGE_KEY = 'tank-penetration-meta:v1';
 const SCORE_MAX = 100_000_000;
 const LEVEL_MAX = 500;
 

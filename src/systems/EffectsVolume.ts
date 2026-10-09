@@ -1,7 +1,7 @@
 // Громкость всего, кроме музыки: выстрел, попадания и следующие эффекты.
 // 1 — как сведены файлы. 0 — эффектов нет, луп волны остаётся.
 
-const STORAGE_KEY = 'tank-defense-effects:v1';
+const STORAGE_KEY = 'tank-penetration-effects:v1';
 const DEFAULT_LEVEL = 1;
 
 export class EffectsVolume {

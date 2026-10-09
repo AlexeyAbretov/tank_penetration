@@ -7,7 +7,7 @@ import { EnemyFactory } from '../entities/EnemyFactory';
 
 // Громкость по умолчанию, если игрок ещё не двигал ползунок.
 const DEFAULT_VOLUME = 0.45;
-const VOLUME_KEY = 'tank-defense-music:v1';
+const VOLUME_KEY = 'tank-penetration-music:v1';
 // Миллисекунды стыка. Короче — щелчок, длиннее — две темы звучат вместе.
 const FADE_MS = 600;
 

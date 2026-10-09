@@ -25,7 +25,7 @@ jobs:
 
       - run: npm run build:html
 
-      - name: Attach tank-defense.html
+      - name: Attach tank-penetration.html
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" release/tank-defense.html --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" release/tank-penetration.html --clobber

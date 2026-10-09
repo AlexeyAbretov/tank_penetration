@@ -58,7 +58,7 @@ import {
 } from './panel';
 import { StudioSounds } from './studioSounds';
 
-const STORAGE = 'tank-defense-studio:v1:';
+const STORAGE = 'tank-penetration-studio:v1:';
 // Сколько секунд снаряд летит от дула до плиты. Одинаково для танка, стрелка и пикапа.
 const PLATE_FLIGHT_S = 0.36;
 

@@ -6,7 +6,7 @@ import { ENEMY_KINDS, EnemyFactory, type EnemySaveKind } from '../entities/Enemy
 import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME } from '../gameConfig';
 
-const STORAGE_KEY = 'tank-defense-run:v1';
+const STORAGE_KEY = 'tank-penetration-run:v1';
 
 export type WavePhase = 'combat' | 'shop';
 
