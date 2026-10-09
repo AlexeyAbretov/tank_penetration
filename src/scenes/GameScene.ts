@@ -12,6 +12,7 @@ import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleMusic } from '../systems/BattleMusic';
 import { EffectsVolume } from '../systems/EffectsVolume';
 import { ImpactSounds } from '../systems/ImpactSounds';
+import { TankDeath } from '../systems/TankDeath';
 import { TankShot } from '../systems/TankShot';
 import { CombatSystem } from '../systems/CombatSystem';
 import { loadMeta, resetMeta } from '../systems/MetaSave';
@@ -41,6 +42,8 @@ export class GameScene extends Phaser.Scene {
   private music?: BattleMusic;
   // Хлопок пушки. Громкость — ползунок эффектов, не музыки.
   private tankShot?: TankShot;
+  // Взрыв, когда здоровье базы доходит до нуля. Тот же ползунок эффектов.
+  private tankDeath?: TankDeath;
   // Удар снаряда по врагу. Три коротких варианта, чтобы не повторялся один и тот же.
   private impacts?: ImpactSounds;
   // Окно громкости. Бой замирает, музыка нет: иначе ползунок музыки нечего слушать.
@@ -99,10 +102,11 @@ export class GameScene extends Phaser.Scene {
     this.load.image('tank-gun', 'assets/tank-gun.png');
     this.load.image('tank-mg', 'assets/tank-mg.png');
     // TRACK_01 — обычные волны. boss — каждая 10-я.
-    // tank_shot — хлопок пушки. impact0..2 — удар снаряда по врагу.
+    // tank_shot — хлопок пушки. tank_dead — гибель базы. impact0..2 — удар снаряда по врагу.
     this.load.audio('music-wave', 'audio/TRACK_01.mp3');
     this.load.audio('music-boss', 'audio/boss.mp3');
     this.load.audio('tank-shot', 'audio/tank_shot.mp3');
+    this.load.audio('tank-dead', 'audio/tank_dead.mp3');
     this.load.audio('impact-0', 'audio/impact0.mp3');
     this.load.audio('impact-1', 'audio/impact1.mp3');
     this.load.audio('impact-2', 'audio/impact2.mp3');
@@ -163,6 +167,9 @@ export class GameScene extends Phaser.Scene {
 
     // combat объявлен заранее: колбэк поражения зовёт его, а сам объект создаётся строками ниже.
     let combat: CombatSystem | undefined;
+    const effects = new EffectsVolume();
+    const tankDeath = new TankDeath(this, effects);
+    this.tankDeath = tankDeath;
     this.player = new PlayerController(
       this,
       this.hud,
@@ -172,6 +179,7 @@ export class GameScene extends Phaser.Scene {
         clearPlayerCombat: () => combat?.clearProjectiles(),
       },
       () => this.openDefeatShop(),
+      tankDeath,
     );
     this.player.reset();
 
@@ -196,7 +204,6 @@ export class GameScene extends Phaser.Scene {
     );
 
     const meta = loadMeta();
-    const effects = new EffectsVolume();
     const tankShot = new TankShot(this, effects);
     this.tankShot = tankShot;
     const impacts = new ImpactSounds(this, effects);
@@ -440,6 +447,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.music?.destroy();
     this.tankShot?.destroy();
+    this.tankDeath?.destroy();
     this.impacts?.destroy();
   }
 
@@ -533,6 +541,7 @@ export class GameScene extends Phaser.Scene {
     this.music?.stop();
     this.tankShot?.stop();
     this.impacts?.stop();
+    // Взрыв базы доигрывает сам: к этому моменту от файла остаётся короткий хвост.
     this.persistEnabled = false;
     if (this.shop.shopOpen) {
       this.shop.panel.hide();

@@ -16,6 +16,7 @@ const packedFiles = [
   ['audio/TRACK_01.mp3', 'audio/mpeg'],
   ['audio/boss.mp3', 'audio/mpeg'],
   ['audio/tank_shot.mp3', 'audio/mpeg'],
+  ['audio/tank_dead.mp3', 'audio/mpeg'],
   ['audio/impact0.mp3', 'audio/mpeg'],
   ['audio/impact1.mp3', 'audio/mpeg'],
   ['audio/impact2.mp3', 'audio/mpeg'],
@@ -106,7 +107,7 @@ function nameReleaseHtml(): Plugin {
       const imageCount = classic.split('data:image/png;base64,').length - 1;
       const audioCount = classic.split('data:audio/mpeg;base64,').length - 1;
 
-      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 6) {
+      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 7) {
         throw new Error(
           'release/tank-defense.html всё ещё зависит от внешнего скрипта, картинок танка или музыки',
         );

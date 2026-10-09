@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { Tank } from '../entities/Tank';
 import type { GameHud } from '../ui/GameHud';
+import type { TankDeath } from './TankDeath';
 
 type DefeatDeps = {
   enemyShots: Phaser.Physics.Arcade.Group;
@@ -20,6 +21,7 @@ export class PlayerController {
     private readonly hud: GameHud,
     private readonly defeatDeps: DefeatDeps,
     private readonly onDefeated: () => void,
+    private readonly deathSound: TankDeath,
   ) {
     this.tank = new Tank(scene, Tank.spawn.x, Tank.spawn.y);
   }
@@ -69,6 +71,7 @@ export class PlayerController {
     this.defeatDeps.infantry.getChildren().forEach((obj) => {
       (obj as Phaser.Physics.Arcade.Sprite).body?.stop();
     });
+    this.deathSound.play();
     this.tank.die();
     this.scene.cameras.main.shake(680, 0.014);
     this.scene.time.delayedCall(1300, () => {
