@@ -2,12 +2,14 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight } from '../entities/ArtilleryStrike';
+import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
+import type { AssaultExplosion } from './AssaultExplosion';
 import type { ShopController } from './ShopController';
 import type { ImpactSounds } from './ImpactSounds';
 import type { TankShot } from './TankShot';
@@ -37,6 +39,7 @@ export class CombatSystem {
     private readonly metaBlast: number,
     private readonly tankShot: TankShot,
     private readonly impacts: ImpactSounds,
+    private readonly assaultExplosion: AssaultExplosion,
   ) {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
@@ -352,6 +355,9 @@ export class CombatSystem {
   private hitBase(unit: Infantry): void {
     if (!unit.reachesBase) {
       return;
+    }
+    if (unit instanceof AssaultInfantry) {
+      this.assaultExplosion.play();
     }
     unit.kill();
     this.callbacks.onBaseHit(unit.contactDamage);
