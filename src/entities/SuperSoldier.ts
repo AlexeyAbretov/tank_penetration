@@ -22,8 +22,21 @@ import type { WorldPoint } from './WorldPoint';
 type Dash = 'run' | 'burst' | 'idle';
 
 export class SuperSoldier extends Infantry {
-  // Здоровье не растёт с номером волны: фабрика всегда передаёт это число.
+  // База формулы запаса. Полное здоровье считает hpForAppearance.
   static readonly baseHp = 100;
+  // Прибавка за каждый выход после первого. 10-я волна — первое появление, 20-я — второе.
+  static readonly hpPerAppearance = 500;
+
+  // 10-я волна даёт 1, 20-я — 2. На обычной волне босс не выходит, но номер всё равно не ниже 1.
+  static appearanceOn(wave: number): number {
+    return Math.max(1, Math.floor(wave / 10));
+  }
+
+  // Первый выход всегда baseHp. Со второго: 100 + (номер − 1) × 500. Второй босс — 600, третий — 1100.
+  static hpForAppearance(appearance: number): number {
+    const extra = Math.max(0, appearance - 1);
+    return this.baseHp + extra * this.hpPerAppearance;
+  }
   // Вдвое крупнее обычного солдата. Координаты пулемёта ниже умножаются на этот масштаб.
   static readonly scale = 2;
   static readonly walkFps = 8;

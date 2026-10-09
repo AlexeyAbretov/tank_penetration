@@ -95,6 +95,7 @@ export class EnemyFactory {
 
   // Собирает уже вышедшего врага на сохранённом месте. Запас здоровья берётся из ранга,
   // как при обычном спавне, а полоска ставится на оставшиеся hp.
+  // У суперсолдата ранг скорости всегда 1, запас считает номер появления на текущей волне.
   static restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, pace: number): Infantry {
     const rankHp = Infantry.waveHp(pace);
     const unit = this.spawnSaved(kind, ctx, rankHp);
@@ -106,7 +107,8 @@ export class EnemyFactory {
   private static spawnSaved(kind: EnemySaveKind, ctx: SpawnContext, rankHp: number): Infantry {
     const { scene, x, y, shots, fireTarget } = ctx;
     if (kind === 'super') {
-      return new SuperSoldier(scene, x, y, SuperSoldier.baseHp, shots, fireTarget);
+      const hp = SuperSoldier.hpForAppearance(SuperSoldier.appearanceOn(ctx.wave));
+      return new SuperSoldier(scene, x, y, hp, shots, fireTarget);
     }
     if (kind === 'assault') {
       return new AssaultInfantry(scene, x, y, rankHp);
@@ -135,12 +137,13 @@ export class EnemyFactory {
 
   // Здоровье и ранг скорости. Штурмовик растёт от номера волны.
   // Остальные на своей первой волне получают ранг 1, дальше +1 за волну.
-  // Суперсолдат всегда входит с baseHp и рангом 1: от номера босс-волны он не толстеет.
+  // Суперсолдат: первый выход всегда 100, дальше +500 за каждое следующее появление. Скорость остаётся на ранге 1.
   private static spawnUnit(kind: EnemyKind, ctx: SpawnContext): Infantry {
     const { scene, x, y, wave, shots, fireTarget } = ctx;
 
     if (kind === SuperSoldier) {
-      const unit = new SuperSoldier(scene, x, y, SuperSoldier.baseHp, shots, fireTarget);
+      const hp = SuperSoldier.hpForAppearance(SuperSoldier.appearanceOn(wave));
+      const unit = new SuperSoldier(scene, x, y, hp, shots, fireTarget);
       unit.setPaceWave(1);
       return unit;
     }
