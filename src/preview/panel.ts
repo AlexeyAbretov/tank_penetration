@@ -2,6 +2,7 @@
 
 import { ENTITIES, type PreviewEntity } from './catalog';
 import { cssHex, parseHex, type Paint } from './format';
+import { SOUND_CLIPS, type StudioSoundId } from './studioSounds';
 
 export type ViewState = {
   zoom: number;
@@ -30,6 +31,7 @@ export type PanelHandlers = {
   layout: () => void;
   reset: () => void;
   copy: () => void;
+  sound: (id: StudioSoundId) => void;
 };
 
 let bound = false;
@@ -72,6 +74,19 @@ export function bindPanel(handlers: PanelHandlers): void {
   document.getElementById('reset')?.addEventListener('click', () => panelHandlers?.reset());
   document.getElementById('copy')?.addEventListener('click', () => panelHandlers?.copy());
 
+  const sounds = document.getElementById('sound-list');
+  if (sounds) {
+    for (const clip of SOUND_CLIPS) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.sound = clip.id;
+      button.title = clip.title;
+      button.textContent = clip.label;
+      button.addEventListener('click', () => panelHandlers?.sound(clip.id));
+      sounds.append(button);
+    }
+  }
+
   const stage = document.getElementById('stage');
   stage?.addEventListener(
     'wheel',
@@ -84,6 +99,12 @@ export function bindPanel(handlers: PanelHandlers): void {
     },
     { passive: false },
   );
+}
+
+export function markSound(id: string | null): void {
+  document.querySelectorAll<HTMLButtonElement>('#sound-list button').forEach((button) => {
+    button.classList.toggle('active', button.dataset.sound === id);
+  });
 }
 
 export function markActive(id: string): void {

@@ -136,7 +136,7 @@ npm run dev
    - `BarbedWire`, `MachineGun`, `ArtilleryStrike` — покупки.
 5. `src/ui/GameHud.ts` — счёт, волна, монеты, полоска HP, баннер, шестерёнка и экран паузы. `SettingsPanel.ts` — окно громкости музыки и эффектов.
 6. `src/gfx/` — цвета, рисование спрайтов и искры. `ensureGameTextures.ts` запекает картинки перед боем.
-7. `preview.html` и `src/preview/` — отдельная страница: те же спрайты крутятся и перекрашиваются без боя. Запуск — `npm run studio`.
+7. `preview.html` и `src/preview/` — отдельная страница: те же спрайты крутятся и перекрашиваются без боя. Блок «Звуки» играет те же файлы, что и бой. Выстрел танка, удар о стену, крик пехоты и гибель базы звучат сами, когда включены «Стрельба» и «Смерть». Запуск — `npm run studio`.
 
 Числа баланса лежат рядом с тем, кто их использует. Состав волны — `EnemyFactory.wave` и поле `debutWave` у врага. Выстрел танка — класс `Tank`. Цены — `ShopPanel`, `BarbedWire.shop`, `MachineGun.shop`, `ArtilleryStrike.shop` и `Tank.shop`.
 

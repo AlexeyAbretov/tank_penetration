@@ -47,6 +47,7 @@ import {
   copySnippet,
   flashCopy,
   markActive,
+  markSound,
   readView,
   renderFields,
   setHint,
@@ -55,6 +56,7 @@ import {
   setStoredNote,
   type ViewState,
 } from './panel';
+import { StudioSounds } from './studioSounds';
 
 const STORAGE = 'tank-defense-studio:v1:';
 // Сколько секунд снаряд летит от дула до плиты. Одинаково для танка, стрелка и пикапа.
@@ -90,6 +92,7 @@ export class StudioScene extends Phaser.Scene {
   private shakeMs = 0;
   // Рамка ствола. Стоит в контейнере башни и едет за откатом картинки.
   private gunHit?: Phaser.GameObjects.Graphics;
+  private audio?: StudioSounds;
 
   constructor() {
     super('studio');
@@ -100,6 +103,7 @@ export class StudioScene extends Phaser.Scene {
     this.load.image('tank-turret', 'assets/tank-turret.png');
     this.load.image('tank-gun', 'assets/tank-gun.png');
     this.load.image('tank-mg', 'assets/tank-mg.png');
+    StudioSounds.preload(this);
   }
 
   create(): void {
@@ -123,11 +127,15 @@ export class StudioScene extends Phaser.Scene {
       copy: () => {
         void copySnippet().then((ok) => flashCopy(ok));
       },
+      sound: (id) => markSound(this.audio?.press(id) ?? null),
     });
+    this.audio = new StudioSounds(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio?.destroy());
     this.select(ENTITIES[0].id);
   }
 
   private select(id: string): void {
+    this.audio?.stopEffects();
     const entity = ENTITIES.find((entry) => entry.id === id) ?? ENTITIES[0];
     this.entity = entity;
     this.paint = loadPaint(entity);
@@ -219,7 +227,12 @@ export class StudioScene extends Phaser.Scene {
     const dying = view.death && this.entity.death !== undefined;
     this.blastPending =
       dying && (this.entity.death === 'wreck' || this.entity.death === 'nuke') && !this.deathOn;
+    // Крик один раз при включении «Смерть», не на каждый ползунок цвета.
+    const cryPending = dying && this.entity.death === 'corpse' && !this.deathOn;
     this.deathOn = dying;
+    if (cryPending) {
+      this.audio?.cry();
+    }
     const firing = !dying && view.fire && this.entity.shot !== undefined;
     if (dying) {
       this.holders.push(this.makeDeath(view));
@@ -343,6 +356,7 @@ export class StudioScene extends Phaser.Scene {
     const x = holder.x + layout.hullX * holder.scaleX;
     const y = holder.y + (layout.hullY - 12) * holder.scaleY;
     this.deathFx.push(...Tank.nukeAt(this, x, y, Math.abs(holder.scaleX)));
+    this.audio?.base();
   }
 
   private clearDeathFx(): void {
@@ -878,6 +892,10 @@ export class StudioScene extends Phaser.Scene {
       } else {
         this.sparkOnPlate(x, y, rig.angle);
       }
+      // Удар снаряда о стену. Пули и ракеты в бою этот звук не берут.
+      if (fly.bang) {
+        this.audio?.impact();
+      }
     }
     this.flies = this.flies.filter((fly) => {
       if (fly.life > 0 && fly.image.active) {
@@ -1393,7 +1411,11 @@ export class StudioScene extends Phaser.Scene {
       life: 900,
       trail: rig.projectile === 'rocket',
       puffMs: 0,
+      bang: rig.projectile === 'shell',
     });
+    if (rig.projectile === 'shell') {
+      this.audio?.shot();
+    }
     this.spawnFlash(rig);
   }
 
@@ -1684,6 +1706,8 @@ type Fly = {
   life: number;
   trail?: boolean;
   puffMs?: number;
+  // Снаряд танка: по прилёте в стену играет удар, как попадание в бою.
+  bang?: boolean;
 };
 
 type MgRig = {

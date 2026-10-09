@@ -223,6 +223,36 @@
         background: #ffee66;
       }
 
+      #sounds {
+        border-top: 1px solid #3a2418;
+        padding: 4px 12px 10px;
+      }
+
+      #sounds h2 {
+        margin-top: 8px;
+      }
+
+      #sound-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      #sound-list button {
+        font: inherit;
+        color: #f3e6d0;
+        background: #2a1812;
+        border: 1px solid #4a3024;
+        border-radius: 6px;
+        padding: 6px 8px;
+        cursor: pointer;
+      }
+
+      #sound-list button.active {
+        background: #5a2414;
+        border-color: #c9a227;
+      }
+
       #actions {
         display: flex;
         gap: 8px;
@@ -359,6 +389,11 @@
             </p>
           </div>
           <div id="fields"></div>
+          <div id="sounds">
+            <h2>Звуки</h2>
+            <div id="sound-list"></div>
+            <p class="legend">Громкость как в игре. Стрельба танка и «Смерть» пехоты или базы звучат сами.</p>
+          </div>
           <div id="actions">
             <button id="reset" type="button">Сбросить к коду</button>
             <button id="copy" type="button">Копировать</button>
