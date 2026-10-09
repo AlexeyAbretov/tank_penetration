@@ -32,6 +32,8 @@ export class WaveManager {
     private readonly onWaveCleared: () => void,
     // Запись партии: после старта волны, после зачистки и по ходу спавна её зовёт сцена отдельно.
     private readonly onProgress: () => void,
+    // Сцена включает луп этой волны. Менеджер звук не хранит.
+    private readonly onWaveBegan: (wave: number) => void,
   ) {}
 
   // Снимок для RunSave. null — волна ещё не началась.
@@ -77,6 +79,7 @@ export class WaveManager {
     this.remainingToSpawn = 0;
     this.awaitingClear = true;
     this.hud.setWave(wave);
+    this.onWaveBegan(wave);
   }
 
   // Середина волны: живые враги встают на сохранённые места, ещё не вышедшие доспавниваются.
@@ -84,6 +87,7 @@ export class WaveManager {
     this.wave = wave;
     this.awaitingClear = false;
     this.hud.setWave(wave);
+    this.onWaveBegan(wave);
     for (const enemy of enemies) {
       this.restoreEnemy(enemy);
     }
@@ -130,6 +134,7 @@ export class WaveManager {
     this.remainingToSpawn = EnemyFactory.count(this.wave);
     this.hud.setWave(this.wave);
     this.hud.showWaveBanner(this.wave, EnemyFactory.isBossWave(this.wave));
+    this.onWaveBegan(this.wave);
 
     // Пишем волну сразу, до выхода врагов. Закрытие вкладки на баннере не откатит номер.
     this.onProgress();

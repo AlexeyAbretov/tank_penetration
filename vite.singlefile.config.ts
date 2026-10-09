@@ -1,37 +1,39 @@
 // Отдельная сборка одного HTML. Обычный vite.config.ts и команды dev, build, preview её не читают.
 // Готовый файл лежит в release/tank-defense.html и открывается двойным кликом:
-// браузер не ходит за скриптом и картинками танка, потому что они уже внутри страницы.
+// браузер не ходит за скриптом, картинками танка и музыкой, потому что они уже внутри страницы.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
-// Те же пути, что GameScene.load.image берёт из public/. Студия в эту сборку не входит.
-const tankImages = [
-  'assets/tank-hull.png',
-  'assets/tank-turret.png',
-  'assets/tank-gun.png',
-  'assets/tank-mg.png',
+// Те же пути, что GameScene.load берёт из public/. Студия в эту сборку не входит.
+const packedFiles = [
+  ['assets/tank-hull.png', 'image/png'],
+  ['assets/tank-turret.png', 'image/png'],
+  ['assets/tank-gun.png', 'image/png'],
+  ['assets/tank-mg.png', 'image/png'],
+  ['audio/TRACK_01.mp3', 'audio/mpeg'],
+  ['audio/boss.mp3', 'audio/mpeg'],
 ] as const;
 
-// Phaser сам понимает адрес data:image и рисует картинку без запроса к диску.
-// Подмена только в этой сборке: исходники и обычный npm run build по-прежнему грузят png из public/.
-function inlineTankImages(): Plugin {
+// Phaser сам понимает адрес data: и не ходит за файлом.
+// Подмена только в этой сборке: исходники и обычный npm run build по-прежнему грузят public/.
+function inlinePackedFiles(): Plugin {
   const dataUrls = new Map<string, string>();
   let replaced = 0;
 
   return {
-    name: 'inline-tank-images',
+    name: 'inline-packed-files',
     apply: 'build',
     // До транспиляции TypeScript: иначе кавычки вокруг пути уже другие, и строка не находится.
     enforce: 'pre',
     buildStart() {
       replaced = 0;
-      for (const relativePath of tankImages) {
+      for (const [relativePath, mime] of packedFiles) {
         const filePath = path.resolve('public', relativePath);
         const base64 = fs.readFileSync(filePath).toString('base64');
-        dataUrls.set(relativePath, `data:image/png;base64,${base64}`);
+        dataUrls.set(relativePath, `data:${mime};base64,${base64}`);
       }
     },
     transform(code, id) {
@@ -59,9 +61,9 @@ function inlineTankImages(): Plugin {
       return next;
     },
     generateBundle() {
-      if (replaced !== tankImages.length) {
+      if (replaced !== packedFiles.length) {
         throw new Error(
-          `В сборку попало ${replaced} картинок танка, ожидалось ${tankImages.length}`,
+          `В сборку попало ${replaced} файлов из public/, ожидалось ${packedFiles.length}`,
         );
       }
     },
@@ -96,12 +98,13 @@ function nameReleaseHtml(): Plugin {
           : html.slice(0, moduleAt) + '<script>' + html.slice(moduleAt + moduleTag.length);
       const externalScript = /<script\b[^>]*\bsrc=/i.test(classic);
       const stillModule = classic.includes(moduleTag);
-      const inlinedImages = tankImages.every((relativePath) => !classic.includes(relativePath));
+      const looseFiles = packedFiles.some(([relativePath]) => classic.includes(relativePath));
       const imageCount = classic.split('data:image/png;base64,').length - 1;
+      const audioCount = classic.split('data:audio/mpeg;base64,').length - 1;
 
-      if (moduleAt === -1 || externalScript || stillModule || !inlinedImages || imageCount < tankImages.length) {
+      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 2) {
         throw new Error(
-          'release/tank-defense.html всё ещё зависит от внешнего скрипта или картинок танка',
+          'release/tank-defense.html всё ещё зависит от внешнего скрипта, картинок танка или музыки',
         );
       }
 
@@ -111,7 +114,7 @@ function nameReleaseHtml(): Plugin {
 }
 
 export default defineConfig({
-  // Картинки читает плагин выше. Копировать public/ рядом с HTML не нужно:
+  // Картинки и музыку читает плагин выше. Копировать public/ рядом с HTML не нужно:
   // иначе релиз был бы папкой, а не одним файлом.
   publicDir: false,
   base: './',
@@ -121,7 +124,7 @@ export default defineConfig({
     target: 'es2022',
   },
   plugins: [
-    inlineTankImages(),
+    inlinePackedFiles(),
     // Скрипт страницы вшивается в сам HTML. Загрузчик модулей Vite после этого не нужен:
     // ему нечего догружать, а с диска лишний запрос всё равно бы не прошёл.
     viteSingleFile({ removeViteModuleLoader: true }),

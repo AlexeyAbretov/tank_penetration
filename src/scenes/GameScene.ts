@@ -9,6 +9,7 @@ import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
+import { BattleMusic } from '../systems/BattleMusic';
 import { CombatSystem } from '../systems/CombatSystem';
 import { loadMeta, resetMeta } from '../systems/MetaSave';
 import { MetaShopController } from '../systems/MetaShopController';
@@ -32,6 +33,8 @@ export class GameScene extends Phaser.Scene {
   private combat!: CombatSystem;
   // Когда выпускать волну и когда считать её зачищенной.
   private waves!: WaveManager;
+  // Луп волны или босса. На паузе и после гибели базы молчит.
+  private music?: BattleMusic;
   // Магазин между волнами.
   private shop!: ShopController;
   // Магазин очков после гибели базы.
@@ -73,13 +76,16 @@ export class GameScene extends Phaser.Scene {
     super('game');
   }
 
-  // Phaser вызывает это до create. Картинки танка лежат в assets/.
+  // Phaser вызывает это до create. Картинки танка лежат в assets/, музыка — в audio/.
   // Солдат, пули и поле рисует ensureGameTextures уже внутри create.
   preload(): void {
     this.load.image('tank-hull', 'assets/tank-hull.png');
     this.load.image('tank-turret', 'assets/tank-turret.png');
     this.load.image('tank-gun', 'assets/tank-gun.png');
     this.load.image('tank-mg', 'assets/tank-mg.png');
+    // TRACK_01 — обычные волны. boss — каждая 10-я.
+    this.load.audio('music-wave', 'audio/TRACK_01.mp3');
+    this.load.audio('music-boss', 'audio/boss.mp3');
   }
 
   create(): void {
@@ -187,6 +193,10 @@ export class GameScene extends Phaser.Scene {
     // Пересечения снарядов танка с пехотой. Без этого выстрел пролетает сквозь спрайт.
     this.combat.setupOverlap();
 
+    const music = new BattleMusic(this);
+    music.create();
+    this.music = music;
+
     this.waves = new WaveManager(
       this,
       this.infantry,
@@ -195,6 +205,7 @@ export class GameScene extends Phaser.Scene {
       () => this.player.isGameOver,
       () => this.shop.open(),
       () => this.writeSave(),
+      (wave) => music.playForWave(wave),
     );
 
     this.projectiles = new ProjectileSystem(
@@ -298,6 +309,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.hud.setPaused(paused);
     this.shop.panel.coverForPause(paused);
+    this.music?.setPaused(paused);
     if (paused) {
       this.writeSave();
     }
@@ -321,6 +333,7 @@ export class GameScene extends Phaser.Scene {
     if (this.paused) {
       this.anims.resumeAll();
     }
+    this.music?.destroy();
   }
 
   private freezeEmitters(): void {
@@ -409,6 +422,7 @@ export class GameScene extends Phaser.Scene {
   // Экран после гибели. Партия к этому моменту уже стёрта, здесь только окно очков.
   private openDefeatShop(): void {
     this.defeatShop = true;
+    this.music?.stop();
     this.persistEnabled = false;
     if (this.shop.shopOpen) {
       this.shop.panel.hide();
