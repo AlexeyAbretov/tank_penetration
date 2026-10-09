@@ -117,6 +117,7 @@ npm run dev
    - `ProjectileSystem` — пули и ракеты, которые летят в танк.
    - `WaveManager` — надпись волны, выход врагов и магазин после зачистки.
    - `BattleMusic` — луп обычной волны (`public/audio/TRACK_01.mp3`) и луп босса (`public/audio/boss.mp3`). На паузе и после гибели базы музыка останавливается.
+   - `TankShot` — хлопок пушки (`public/audio/tank_shot.mp3`). Ползунок громкости его не трогает. На паузе и после гибели базы звук тоже останавливается.
    - `ShopController` и `src/ui/ShopPanel.ts` — магазин между волнами.
    - `MetaShopController`, `MetaSave` и `src/ui/MetaShopPanel.ts` — магазин после поражения.
    - `RunSave` — запись партии в `localStorage`.

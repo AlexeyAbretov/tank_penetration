@@ -15,6 +15,7 @@ const packedFiles = [
   ['assets/tank-mg.png', 'image/png'],
   ['audio/TRACK_01.mp3', 'audio/mpeg'],
   ['audio/boss.mp3', 'audio/mpeg'],
+  ['audio/tank_shot.mp3', 'audio/mpeg'],
 ] as const;
 
 // Phaser сам понимает адрес data: и не ходит за файлом.
@@ -102,7 +103,7 @@ function nameReleaseHtml(): Plugin {
       const imageCount = classic.split('data:image/png;base64,').length - 1;
       const audioCount = classic.split('data:audio/mpeg;base64,').length - 1;
 
-      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 2) {
+      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 3) {
         throw new Error(
           'release/tank-defense.html всё ещё зависит от внешнего скрипта, картинок танка или музыки',
         );

@@ -10,6 +10,7 @@ import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleMusic } from '../systems/BattleMusic';
+import { TankShot } from '../systems/TankShot';
 import { CombatSystem } from '../systems/CombatSystem';
 import { loadMeta, resetMeta } from '../systems/MetaSave';
 import { MetaShopController } from '../systems/MetaShopController';
@@ -36,6 +37,8 @@ export class GameScene extends Phaser.Scene {
   private waves!: WaveManager;
   // Луп волны или босса. На паузе и после гибели базы молчит.
   private music?: BattleMusic;
+  // Хлопок пушки. Живёт отдельно от музыки: ползунок в настройках крутит только луп.
+  private tankShot?: TankShot;
   // Окно громкости. Бой замирает, музыка нет: иначе ползунок нечего слушать.
   private settings!: SettingsPanel;
   private settingsOpen = false;
@@ -89,9 +92,10 @@ export class GameScene extends Phaser.Scene {
     this.load.image('tank-turret', 'assets/tank-turret.png');
     this.load.image('tank-gun', 'assets/tank-gun.png');
     this.load.image('tank-mg', 'assets/tank-mg.png');
-    // TRACK_01 — обычные волны. boss — каждая 10-я.
+    // TRACK_01 — обычные волны. boss — каждая 10-я. tank_shot — хлопок пушки.
     this.load.audio('music-wave', 'audio/TRACK_01.mp3');
     this.load.audio('music-boss', 'audio/boss.mp3');
+    this.load.audio('tank-shot', 'audio/tank_shot.mp3');
   }
 
   create(): void {
@@ -182,6 +186,8 @@ export class GameScene extends Phaser.Scene {
     );
 
     const meta = loadMeta();
+    const tankShot = new TankShot(this);
+    this.tankShot = tankShot;
     combat = this.combat = new CombatSystem(
       this,
       this.player.tank,
@@ -193,6 +199,7 @@ export class GameScene extends Phaser.Scene {
       },
       meta.damage,
       meta.blast,
+      tankShot,
     );
     this.metaShop = new MetaShopController(this, () => {
       // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
@@ -336,6 +343,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.setPaused(paused);
     this.shop.panel.coverForPause(paused);
     this.music?.setPaused(paused);
+    this.tankShot?.setPaused(paused);
     if (paused) {
       this.writeSave();
     }
@@ -400,6 +408,7 @@ export class GameScene extends Phaser.Scene {
       this.anims.resumeAll();
     }
     this.music?.destroy();
+    this.tankShot?.destroy();
   }
 
   private freezeEmitters(): void {
@@ -490,6 +499,7 @@ export class GameScene extends Phaser.Scene {
     this.defeatShop = true;
     this.closeSettings();
     this.music?.stop();
+    this.tankShot?.stop();
     this.persistEnabled = false;
     if (this.shop.shopOpen) {
       this.shop.panel.hide();

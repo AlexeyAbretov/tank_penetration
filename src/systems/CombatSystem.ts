@@ -9,6 +9,7 @@ import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
 import type { ShopController } from './ShopController';
+import type { TankShot } from './TankShot';
 
 type CombatCallbacks = {
   onKill: (coinReward: number) => void;
@@ -33,6 +34,7 @@ export class CombatSystem {
     private readonly callbacks: CombatCallbacks,
     private readonly metaDamage: number,
     private readonly metaBlast: number,
+    private readonly tankShot: TankShot,
   ) {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
@@ -81,6 +83,7 @@ export class CombatSystem {
     const shot = this.tank.tryFire();
     if (shot) {
       this.fireShell(shot.x, shot.y, shot.angle);
+      this.tankShot.play();
     }
   }
 
