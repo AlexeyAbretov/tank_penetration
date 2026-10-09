@@ -4,6 +4,7 @@ import { GameObjects, Physics, Scene } from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
 import { BULLET_FRAME, BULLET_PAINT, type BulletPaint } from '../gfx/looks';
 import { bake } from '../gfx/textures';
+import { playGunnerShot } from '../systems/GunnerShot';
 
 // Image, не Sprite: у пули нет покадровой анимации, только одна текстура enemy-bullet.
 export class EnemyShot extends Physics.Arcade.Image {
@@ -49,7 +50,13 @@ export class EnemyShot extends Physics.Arcade.Image {
     // Картинка поворачивается носом по направлению полёта.
     this.setRotation(angle);
     this.syncPace();
+    this.reportShot();
     return this;
+  }
+
+  // Хлопок на каждую пулю. Ракета подменяет метод и молчит: у неё другой снаряд.
+  protected reportShot(): void {
+    playGunnerShot(this.scene);
   }
 
   // Та же траектория, другая скорость. Смена темпа догоняет уже летящие пули.

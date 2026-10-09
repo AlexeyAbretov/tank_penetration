@@ -53,6 +53,9 @@ export class Rocket extends EnemyShot {
     });
   }
 
+  // Ракета не пуля: хлопок винтовки ей не нужен.
+  protected override reportShot(): void {}
+
   // Клубы остаются там, где ракета уже пролетела, и гаснут сами.
   private driftSmoke(): void {
     const smoke = this.smoke;

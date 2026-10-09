@@ -1417,6 +1417,8 @@ export class StudioScene extends Phaser.Scene {
     });
     if (rig.projectile === 'shell') {
       this.audio?.shot();
+    } else if (rig.projectile === 'bullet') {
+      this.audio?.bullet();
     }
     this.spawnFlash(rig);
   }
