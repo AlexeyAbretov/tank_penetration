@@ -892,9 +892,11 @@ export class StudioScene extends Phaser.Scene {
       } else {
         this.sparkOnPlate(x, y, rig.angle);
       }
-      // Удар о стену. В бою его берут снаряд танка и пуля пулемёта.
+      // Удар о стену — снаряд танка и пуля пулемёта. Удар о броню — пуля врага.
       if (fly.bang) {
         this.audio?.impact();
+      } else if (fly.armor) {
+        this.audio?.armor();
       }
     }
     this.flies = this.flies.filter((fly) => {
@@ -1414,6 +1416,7 @@ export class StudioScene extends Phaser.Scene {
       trail: rig.projectile === 'rocket',
       puffMs: 0,
       bang: rig.projectile === 'shell',
+      armor: rig.projectile === 'bullet',
     });
     if (rig.projectile === 'shell') {
       this.audio?.shot();
@@ -1712,6 +1715,8 @@ type Fly = {
   puffMs?: number;
   // Снаряд танка и пуля пулемёта: по прилёте в стену играет удар, как попадание в бою.
   bang?: boolean;
+  // Пуля врага: по прилёте в плиту играет удар о броню.
+  armor?: boolean;
 };
 
 type MgRig = {
