@@ -19,6 +19,7 @@ import { clearRun, loadRun, saveRun } from '../systems/RunSave';
 import { ShopController } from '../systems/ShopController';
 import { WaveManager } from '../systems/WaveManager';
 import { GameHud } from '../ui/GameHud';
+import { SettingsPanel } from '../ui/SettingsPanel';
 
 export class GameScene extends Phaser.Scene {
   // Группа пуль врагов. Group — список спрайтов с физикой, по которому системы ходят циклом.
@@ -35,6 +36,11 @@ export class GameScene extends Phaser.Scene {
   private waves!: WaveManager;
   // Луп волны или босса. На паузе и после гибели базы молчит.
   private music?: BattleMusic;
+  // Окно громкости. Бой замирает, музыка нет: иначе ползунок нечего слушать.
+  private settings!: SettingsPanel;
+  private settingsOpen = false;
+  // true, если окно само остановило физику. Магазин мог остановить её раньше.
+  private settingsPausedPhysics = false;
   // Магазин между волнами.
   private shop!: ShopController;
   // Магазин очков после гибели базы.
@@ -99,6 +105,8 @@ export class GameScene extends Phaser.Scene {
     this.registry.set(PAUSED, false);
     this.paused = false;
     this.pausedPhysics = false;
+    this.settingsOpen = false;
+    this.settingsPausedPhysics = false;
     this.resumeRequested = false;
     this.resumeArmed = false;
     this.pausedEmitters = [];
@@ -125,6 +133,7 @@ export class GameScene extends Phaser.Scene {
       }
     });
     this.hud.onPause(() => this.setPaused(true));
+    this.hud.onSettings(() => this.openSettings());
     this.hud.onResume(() => {
       this.resumeRequested = true;
     });
@@ -196,6 +205,12 @@ export class GameScene extends Phaser.Scene {
     const music = new BattleMusic(this);
     music.create();
     this.music = music;
+    this.settings = new SettingsPanel(
+      this,
+      (level) => music.setVolume(level),
+      () => this.closeSettings(),
+    );
+    this.settings.setVolume(music.volume);
 
     this.waves = new WaveManager(
       this,
@@ -251,6 +266,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Esc закрывает настройки и не ставит паузу тем же нажатием.
+    if (this.settingsOpen) {
+      if (this.pausePressed()) {
+        this.closeSettings();
+      }
+      return;
+    }
+
     if (this.pausePressed()) {
       this.setPaused(true);
       return;
@@ -273,7 +296,10 @@ export class GameScene extends Phaser.Scene {
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
     // Клик по кнопкам темпа и паузы не считается выстрелом: они лежат поверх поля.
-    this.combat.tick(delta, !this.hud.coversHaste(pointer) && !this.hud.coversPause(pointer));
+    this.combat.tick(
+      delta,
+      !this.hud.coversHaste(pointer) && !this.hud.coversPause(pointer) && !this.hud.coversSettings(pointer),
+    );
     this.projectiles.tick();
     this.waves.tick();
     this.touchAutosave(delta);
@@ -315,11 +341,51 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private openSettings(): void {
+    if (this.settingsOpen || this.paused || this.player.isGameOver || this.defeatShop) {
+      return;
+    }
+    this.settingsOpen = true;
+    // Таймеры и враги стоят. Музыку не трогаем: пауза игры её глушит, а здесь ползунок должен быть слышен.
+    this.tweens.pauseAll();
+    this.anims.pauseAll();
+    this.freezeEmitters();
+    this.time.paused = true;
+    if (!this.physics.world.isPaused) {
+      this.physics.world.pause();
+      this.settingsPausedPhysics = true;
+    }
+    // Камера списка магазина рисуется поверх основного холста и закрыла бы окно.
+    this.shop.panel.coverForPause(true);
+    this.music?.applyVolume();
+    this.settings.setOpen(true);
+  }
+
+  private closeSettings(): void {
+    if (!this.settingsOpen) {
+      return;
+    }
+    this.settingsOpen = false;
+    this.settings.setOpen(false);
+    this.tweens.resumeAll();
+    this.anims.resumeAll();
+    this.thawEmitters();
+    this.time.paused = false;
+    if (this.settingsPausedPhysics) {
+      this.physics.world.resume();
+      this.settingsPausedPhysics = false;
+    }
+    this.shop.panel.coverForPause(this.paused);
+  }
+
   private onTabHidden(): void {
     if (this.player.isGameOver || this.defeatShop) {
       return;
     }
     this.writeSave();
+    if (this.settingsOpen) {
+      this.closeSettings();
+    }
     if (this.paused) {
       return;
     }
@@ -422,6 +488,7 @@ export class GameScene extends Phaser.Scene {
   // Экран после гибели. Партия к этому моменту уже стёрта, здесь только окно очков.
   private openDefeatShop(): void {
     this.defeatShop = true;
+    this.closeSettings();
     this.music?.stop();
     this.persistEnabled = false;
     if (this.shop.shopOpen) {

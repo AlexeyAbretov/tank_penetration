@@ -18,10 +18,12 @@ export class GameHud {
   private readonly hastePlate: Phaser.GameObjects.Rectangle;
   private readonly hasteIcon: Phaser.GameObjects.Graphics;
   private readonly pausePlate: Phaser.GameObjects.Rectangle;
+  private readonly settingsPlate: Phaser.GameObjects.Rectangle;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
   private artilleryOwned = false;
   private hasteCycle?: () => void;
   private pauseRequest?: () => void;
+  private settingsRequest?: () => void;
   private resumeRequest?: () => void;
   private newGameRequest?: () => void;
 
@@ -88,6 +90,7 @@ export class GameHud {
     const hpLeft = 1128 - 140;
     const hasteX = hpLeft - 8 - icon / 2;
     const pauseX = hasteX - 6 - icon;
+    const settingsX = pauseX - 6 - icon;
     const iconY = 28;
 
     this.hastePlate = scene.add
@@ -109,6 +112,17 @@ export class GameHud {
     scene.add.rectangle(pauseX - 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
     scene.add.rectangle(pauseX + 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
     this.pausePlate.on('pointerup', () => this.pauseRequest?.());
+
+    // Выше магазина (глубина 70), но ниже окна настроек (88), паузы (90) и экрана поражения (85).
+    // Иначе шестерёнка пропадает под затемнением между волнами.
+    this.settingsPlate = scene.add
+      .rectangle(settingsX, iconY, icon, icon, 0x3a0c0c)
+      .setStrokeStyle(2, 0xc9a227)
+      .setDepth(80)
+      .setInteractive({ useHandCursor: true });
+    const gear = scene.add.graphics().setPosition(settingsX, iconY).setDepth(81);
+    this.drawGear(gear);
+    this.settingsPlate.on('pointerup', () => this.settingsRequest?.());
 
     this.controls = scene.add
       .text(GAME.width / 2, 708, this.controlsLine(false), {
@@ -232,6 +246,10 @@ export class GameHud {
     this.pauseRequest = request;
   }
 
+  onSettings(request: () => void): void {
+    this.settingsRequest = request;
+  }
+
   onResume(request: () => void): void {
     this.resumeRequest = request;
   }
@@ -298,6 +316,11 @@ export class GameHud {
     return this.pausePlate.getBounds().contains(pointer.worldX, pointer.worldY);
   }
 
+  // Клик по шестерёнке не должен быть выстрелом танка.
+  coversSettings(pointer: Phaser.Input.Pointer): boolean {
+    return this.settingsPlate.getBounds().contains(pointer.worldX, pointer.worldY);
+  }
+
   setArtillery(owned: boolean, cooldownMs: number): void {
     if (this.artilleryOwned !== owned) {
       this.artilleryOwned = owned;
@@ -355,7 +378,44 @@ export class GameHud {
   }
 
   private controlsLine(artillery: boolean): string {
-    const tempo = 'мышь — прицел   ЛКМ — огонь   2 — темп   Esc — пауза';
+    const tempo = 'мышь — прицел   ЛКМ — огонь   2 — темп   Esc — пауза   шестерёнка — звук';
     return artillery ? `${tempo}   1 — удар` : tempo;
+  }
+
+  // Сплошной обод и короткие зубцы. Лучи из центра читались как штурвал.
+  // Дырку заливаем цветом плашки: у Graphics нет выреза в контуре.
+  private drawGear(g: Phaser.GameObjects.Graphics): void {
+    const teeth = 8;
+    const outer = 13;
+    const root = 9.2;
+    const step = (Math.PI * 2) / teeth;
+    g.fillStyle(0xf0d56a, 1);
+    g.beginPath();
+    let started = false;
+    for (let i = 0; i < teeth; i += 1) {
+      const mid = i * step - Math.PI / 2;
+      const corners: ReadonlyArray<readonly [number, number]> = [
+        [mid - step * 0.33, root],
+        [mid - step * 0.14, outer],
+        [mid + step * 0.14, outer],
+        [mid + step * 0.33, root],
+      ];
+      for (const [angle, radius] of corners) {
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (!started) {
+          g.moveTo(x, y);
+          started = true;
+        } else {
+          g.lineTo(x, y);
+        }
+      }
+    }
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0x3a0c0c, 1);
+    g.fillCircle(0, 0, 3.4);
+    g.lineStyle(1.5, 0xf0d56a, 1);
+    g.strokeCircle(0, 0, 3.4);
   }
 }

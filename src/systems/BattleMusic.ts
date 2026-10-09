@@ -5,8 +5,9 @@
 import Phaser from 'phaser';
 import { EnemyFactory } from '../entities/EnemyFactory';
 
-// Громкость фона. Выше неё трек спорит с будущими выстрелами.
-const VOLUME = 0.45;
+// Громкость по умолчанию, если игрок ещё не двигал ползунок.
+const DEFAULT_VOLUME = 0.45;
+const VOLUME_KEY = 'tank-defense-music:v1';
 // Миллисекунды стыка. Короче — щелчок, длиннее — две темы звучат вместе.
 const FADE_MS = 600;
 
@@ -17,6 +18,8 @@ export class BattleMusic {
   private wave!: Track;
   private boss!: Track;
   private theme: Theme | null = null;
+  // 0 — тишина, 1 — как записан файл. Ползунок пишет это число в localStorage.
+  private level = readVolume();
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -26,6 +29,30 @@ export class BattleMusic {
     this.scene.sound.pauseOnBlur = false;
     this.wave = this.add('music-wave');
     this.boss = this.add('music-boss');
+  }
+
+  get volume(): number {
+    return this.level;
+  }
+
+  // Ползунок. Текущий луп сразу берёт новую громкость, второй трек гаснет.
+  setVolume(level: number): void {
+    this.level = clamp01(level);
+    writeVolume(this.level);
+    this.applyVolume();
+  }
+
+  // Окно настроек открылось посреди кроссфейда: слышно должно быть ровно то, что на ползунке.
+  applyVolume(): void {
+    this.scene.tweens.killTweensOf([this.wave, this.boss]);
+    const current = this.current();
+    if (current) {
+      current.volume = this.level;
+    }
+    const other = current === this.boss ? this.wave : this.boss;
+    if (other !== current && (other.isPlaying || other.isPaused)) {
+      other.stop();
+    }
   }
 
   // Босс — каждая 10-я волна. Остальные номера берут спокойный луп.
@@ -87,7 +114,7 @@ export class BattleMusic {
     }
     this.scene.tweens.add({
       targets: next,
-      volume: VOLUME,
+      volume: this.level,
       duration: FADE_MS,
     });
     if (!previous || previous === next) {
@@ -116,4 +143,32 @@ export class BattleMusic {
     }
     return null;
   }
+}
+
+function readVolume(): number {
+  try {
+    const raw = localStorage.getItem(VOLUME_KEY);
+    if (raw === null) {
+      return DEFAULT_VOLUME;
+    }
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+      return DEFAULT_VOLUME;
+    }
+    return clamp01(value);
+  } catch {
+    return DEFAULT_VOLUME;
+  }
+}
+
+function writeVolume(level: number): void {
+  try {
+    localStorage.setItem(VOLUME_KEY, String(level));
+  } catch {
+    // Приватный режим: ползунок работает, пока открыта вкладка.
+  }
+}
+
+function clamp01(level: number): number {
+  return Math.min(1, Math.max(0, level));
 }
