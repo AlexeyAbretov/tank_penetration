@@ -118,6 +118,7 @@ npm run dev
    - `WaveManager` — надпись волны, выход врагов и магазин после зачистки.
    - `BattleMusic` — луп обычной волны (`public/audio/TRACK_01.mp3`) и луп босса (`public/audio/boss.mp3`). На паузе и после гибели базы музыка останавливается.
    - `TankShot` — хлопок пушки (`public/audio/tank_shot.mp3`). Ползунок громкости его не трогает. На паузе и после гибели базы звук тоже останавливается.
+   - `ImpactSounds` — удар снаряда по врагу, один из трёх файлов `public/audio/impact0.mp3`, `impact1.mp3`, `impact2.mp3`. Подряд один и тот же не повторяется.
    - `ShopController` и `src/ui/ShopPanel.ts` — магазин между волнами.
    - `MetaShopController`, `MetaSave` и `src/ui/MetaShopPanel.ts` — магазин после поражения.
    - `RunSave` — запись партии в `localStorage`.

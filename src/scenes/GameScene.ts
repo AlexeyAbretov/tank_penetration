@@ -10,6 +10,7 @@ import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleMusic } from '../systems/BattleMusic';
+import { ImpactSounds } from '../systems/ImpactSounds';
 import { TankShot } from '../systems/TankShot';
 import { CombatSystem } from '../systems/CombatSystem';
 import { loadMeta, resetMeta } from '../systems/MetaSave';
@@ -39,6 +40,8 @@ export class GameScene extends Phaser.Scene {
   private music?: BattleMusic;
   // Хлопок пушки. Живёт отдельно от музыки: ползунок в настройках крутит только луп.
   private tankShot?: TankShot;
+  // Удар снаряда по врагу. Три коротких варианта, чтобы не повторялся один и тот же.
+  private impacts?: ImpactSounds;
   // Окно громкости. Бой замирает, музыка нет: иначе ползунок нечего слушать.
   private settings!: SettingsPanel;
   private settingsOpen = false;
@@ -92,10 +95,14 @@ export class GameScene extends Phaser.Scene {
     this.load.image('tank-turret', 'assets/tank-turret.png');
     this.load.image('tank-gun', 'assets/tank-gun.png');
     this.load.image('tank-mg', 'assets/tank-mg.png');
-    // TRACK_01 — обычные волны. boss — каждая 10-я. tank_shot — хлопок пушки.
+    // TRACK_01 — обычные волны. boss — каждая 10-я.
+    // tank_shot — хлопок пушки. impact0..2 — удар снаряда по врагу.
     this.load.audio('music-wave', 'audio/TRACK_01.mp3');
     this.load.audio('music-boss', 'audio/boss.mp3');
     this.load.audio('tank-shot', 'audio/tank_shot.mp3');
+    this.load.audio('impact-0', 'audio/impact0.mp3');
+    this.load.audio('impact-1', 'audio/impact1.mp3');
+    this.load.audio('impact-2', 'audio/impact2.mp3');
   }
 
   create(): void {
@@ -188,6 +195,8 @@ export class GameScene extends Phaser.Scene {
     const meta = loadMeta();
     const tankShot = new TankShot(this);
     this.tankShot = tankShot;
+    const impacts = new ImpactSounds(this);
+    this.impacts = impacts;
     combat = this.combat = new CombatSystem(
       this,
       this.player.tank,
@@ -200,6 +209,7 @@ export class GameScene extends Phaser.Scene {
       meta.damage,
       meta.blast,
       tankShot,
+      impacts,
     );
     this.metaShop = new MetaShopController(this, () => {
       // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
@@ -344,6 +354,7 @@ export class GameScene extends Phaser.Scene {
     this.shop.panel.coverForPause(paused);
     this.music?.setPaused(paused);
     this.tankShot?.setPaused(paused);
+    this.impacts?.setPaused(paused);
     if (paused) {
       this.writeSave();
     }
@@ -409,6 +420,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.music?.destroy();
     this.tankShot?.destroy();
+    this.impacts?.destroy();
   }
 
   private freezeEmitters(): void {
@@ -500,6 +512,7 @@ export class GameScene extends Phaser.Scene {
     this.closeSettings();
     this.music?.stop();
     this.tankShot?.stop();
+    this.impacts?.stop();
     this.persistEnabled = false;
     if (this.shop.shopOpen) {
       this.shop.panel.hide();

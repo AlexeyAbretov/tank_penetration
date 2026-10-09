@@ -9,6 +9,7 @@ import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
 import type { ShopController } from './ShopController';
+import type { ImpactSounds } from './ImpactSounds';
 import type { TankShot } from './TankShot';
 
 type CombatCallbacks = {
@@ -35,6 +36,7 @@ export class CombatSystem {
     private readonly metaDamage: number,
     private readonly metaBlast: number,
     private readonly tankShot: TankShot,
+    private readonly impacts: ImpactSounds,
   ) {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
@@ -173,6 +175,8 @@ export class CombatSystem {
     const y = shell.y;
     shell.destroy();
     this.playBlast(x, y);
+    // Один удар на снаряд. Осколки взрыва второй раз не звенят.
+    this.impacts.play();
 
     if (direct) {
       this.hurtInfantry(direct);
