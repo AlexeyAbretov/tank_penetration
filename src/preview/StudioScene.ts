@@ -341,6 +341,7 @@ export class StudioScene extends Phaser.Scene {
     const x = holder.x - 8 * view.scale * fit;
     const y = holder.y - 26 * view.scale * fit;
     const keys = { muzzle: 'studio-fx-muzzle' };
+    this.audio?.pickup();
     this.deathFx.push(...PickupTruck.burstAt(this, x, y, visual, keys));
     this.blastTimer = this.time.delayedCall(90, () => {
       this.blastTimer = undefined;

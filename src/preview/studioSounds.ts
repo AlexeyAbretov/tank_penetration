@@ -1,7 +1,7 @@
 // Прослушивание файлов из public/audio без запуска боя.
 // Громкость читается из тех же ползунков, что и в игре.
-// Выстрел пушки, пулемёт, пуля врага, удар о броню, удар о стену, крик и гибель базы сцена вызывает сама,
-// когда в просмотре включены «Стрельба» и «Смерть».
+// Выстрел пушки, пулемёт, пуля врага, удар о броню, удар о стену, крик, взрыв пикапа и гибель базы
+// сцена вызывает сама, когда в просмотре включены «Стрельба» и «Смерть».
 
 import Phaser from 'phaser';
 import { AssaultExplosion } from '../systems/AssaultExplosion';
@@ -11,6 +11,7 @@ import { EffectsVolume } from '../systems/EffectsVolume';
 import { GunnerShot } from '../systems/GunnerShot';
 import { ImpactSounds } from '../systems/ImpactSounds';
 import { InfantryDeath } from '../systems/InfantryDeath';
+import { PickupExplosion } from '../systems/PickupExplosion';
 import { TankDeath } from '../systems/TankDeath';
 import { TankMgShot } from '../systems/TankMgShot';
 import { TankShot } from '../systems/TankShot';
@@ -25,6 +26,7 @@ export const SOUND_CLIPS = [
   { id: 'impact', label: 'Удар', title: 'impact0.mp3, impact1.mp3, impact2.mp3' },
   { id: 'cry', label: 'Крик', title: 'infantry_dead0.mp3, infantry_dead1.mp3' },
   { id: 'assault', label: 'Штурм', title: 'assault_explosion.mp3' },
+  { id: 'pickup', label: 'Пикап', title: 'pickup_exposion.mp3' },
   { id: 'base', label: 'База', title: 'tank_dead.mp3' },
 ] as const;
 
@@ -39,6 +41,7 @@ export class StudioSounds {
   private readonly impacts: ImpactSounds;
   private readonly cryFx: InfantryDeath;
   private readonly assaultFx: AssaultExplosion;
+  private readonly pickupFx: PickupExplosion;
   private readonly baseFx: TankDeath;
   private musicTheme: 'wave' | 'boss' | null = null;
 
@@ -53,6 +56,7 @@ export class StudioSounds {
     this.impacts = new ImpactSounds(scene, effects);
     this.cryFx = new InfantryDeath(scene, effects);
     this.assaultFx = new AssaultExplosion(scene, effects);
+    this.pickupFx = new PickupExplosion(scene, effects);
     this.baseFx = new TankDeath(scene, effects);
   }
 
@@ -65,6 +69,7 @@ export class StudioSounds {
     scene.load.audio('bullet-hit-tank', 'audio/bullet_hit_tank.mp3');
     scene.load.audio('tank-dead', 'audio/tank_dead.mp3');
     scene.load.audio('assault-explosion', 'audio/assault_explosion.mp3');
+    scene.load.audio('pickup-explosion', 'audio/pickup_exposion.mp3');
     scene.load.audio('infantry-dead-0', 'audio/infantry_dead0.mp3');
     scene.load.audio('infantry-dead-1', 'audio/infantry_dead1.mp3');
     scene.load.audio('impact-0', 'audio/impact0.mp3');
@@ -91,6 +96,8 @@ export class StudioSounds {
       this.cry();
     } else if (id === 'assault') {
       this.assaultFx.play();
+    } else if (id === 'pickup') {
+      this.pickup();
     } else {
       this.base();
     }
@@ -121,6 +128,10 @@ export class StudioSounds {
     this.cryFx.play();
   }
 
+  pickup(): void {
+    this.pickupFx.play();
+  }
+
   base(): void {
     this.baseFx.play();
   }
@@ -135,6 +146,7 @@ export class StudioSounds {
     this.impacts.stop();
     this.cryFx.stop();
     this.assaultFx.stop();
+    this.pickupFx.stop();
     this.baseFx.stop();
   }
 
@@ -148,6 +160,7 @@ export class StudioSounds {
     this.impacts.destroy();
     this.cryFx.destroy();
     this.assaultFx.destroy();
+    this.pickupFx.destroy();
     this.baseFx.destroy();
   }
 
