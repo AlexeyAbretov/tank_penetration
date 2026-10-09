@@ -6,10 +6,12 @@ import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
+import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
 import type { AssaultExplosion } from './AssaultExplosion';
+import type { InfantryDeath } from './InfantryDeath';
 import type { ShopController } from './ShopController';
 import type { ImpactSounds } from './ImpactSounds';
 import type { TankShot } from './TankShot';
@@ -40,6 +42,7 @@ export class CombatSystem {
     private readonly tankShot: TankShot,
     private readonly impacts: ImpactSounds,
     private readonly assaultExplosion: AssaultExplosion,
+    private readonly infantryDeath: InfantryDeath,
   ) {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
@@ -348,6 +351,10 @@ export class CombatSystem {
   ): void {
     if (unit.hit(damage, wire)) {
       this.callbacks.onKill(unit.coinReward);
+      // Пикап — техника. Дошедший до базы сюда не попадает: его убивает hitBase.
+      if (!(unit instanceof PickupTruck)) {
+        this.infantryDeath.play();
+      }
       unit.kill();
     }
   }

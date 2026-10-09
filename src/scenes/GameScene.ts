@@ -13,6 +13,7 @@ import { AssaultExplosion } from '../systems/AssaultExplosion';
 import { BattleMusic } from '../systems/BattleMusic';
 import { EffectsVolume } from '../systems/EffectsVolume';
 import { ImpactSounds } from '../systems/ImpactSounds';
+import { InfantryDeath } from '../systems/InfantryDeath';
 import { TankDeath } from '../systems/TankDeath';
 import { TankShot } from '../systems/TankShot';
 import { CombatSystem } from '../systems/CombatSystem';
@@ -49,6 +50,8 @@ export class GameScene extends Phaser.Scene {
   private impacts?: ImpactSounds;
   // Взрыв штурмовика, когда он доходит до брони. Тот же ползунок эффектов.
   private assaultExplosion?: AssaultExplosion;
+  // Крик пехоты, убитой танком. Два варианта, пикап и взрыв о базу его не берут.
+  private infantryDeath?: InfantryDeath;
   // Окно громкости. Бой замирает, музыка нет: иначе ползунок музыки нечего слушать.
   private settings!: SettingsPanel;
   // Когда в последний раз проиграли пример эффекта. Бой на паузе, this.time.now стоит.
@@ -106,12 +109,15 @@ export class GameScene extends Phaser.Scene {
     this.load.image('tank-mg', 'assets/tank-mg.png');
     // TRACK_01 — обычные волны. boss — каждая 10-я.
     // tank_shot — хлопок пушки. tank_dead — гибель базы.
-    // assault_explosion — штурмовик дошёл до брони. impact0..2 — удар снаряда по врагу.
+    // assault_explosion — штурмовик дошёл до брони.
+    // infantry_dead0..1 — крик пехоты, убитой танком. impact0..2 — удар снаряда по врагу.
     this.load.audio('music-wave', 'audio/TRACK_01.mp3');
     this.load.audio('music-boss', 'audio/boss.mp3');
     this.load.audio('tank-shot', 'audio/tank_shot.mp3');
     this.load.audio('tank-dead', 'audio/tank_dead.mp3');
     this.load.audio('assault-explosion', 'audio/assault_explosion.mp3');
+    this.load.audio('infantry-dead-0', 'audio/infantry_dead0.mp3');
+    this.load.audio('infantry-dead-1', 'audio/infantry_dead1.mp3');
     this.load.audio('impact-0', 'audio/impact0.mp3');
     this.load.audio('impact-1', 'audio/impact1.mp3');
     this.load.audio('impact-2', 'audio/impact2.mp3');
@@ -215,6 +221,8 @@ export class GameScene extends Phaser.Scene {
     this.impacts = impacts;
     const assaultExplosion = new AssaultExplosion(this, effects);
     this.assaultExplosion = assaultExplosion;
+    const infantryDeath = new InfantryDeath(this, effects);
+    this.infantryDeath = infantryDeath;
     combat = this.combat = new CombatSystem(
       this,
       this.player.tank,
@@ -229,6 +237,7 @@ export class GameScene extends Phaser.Scene {
       tankShot,
       impacts,
       assaultExplosion,
+      infantryDeath,
     );
     this.metaShop = new MetaShopController(this, () => {
       // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
@@ -380,6 +389,7 @@ export class GameScene extends Phaser.Scene {
     this.tankShot?.setPaused(paused);
     this.impacts?.setPaused(paused);
     this.assaultExplosion?.setPaused(paused);
+    this.infantryDeath?.setPaused(paused);
     if (paused) {
       this.writeSave();
     }
@@ -459,6 +469,7 @@ export class GameScene extends Phaser.Scene {
     this.tankDeath?.destroy();
     this.impacts?.destroy();
     this.assaultExplosion?.destroy();
+    this.infantryDeath?.destroy();
   }
 
   private freezeEmitters(): void {
@@ -552,6 +563,7 @@ export class GameScene extends Phaser.Scene {
     this.tankShot?.stop();
     this.impacts?.stop();
     this.assaultExplosion?.stop();
+    this.infantryDeath?.stop();
     // Взрыв базы доигрывает сам: к этому моменту от файла остаётся короткий хвост.
     this.persistEnabled = false;
     if (this.shop.shopOpen) {
