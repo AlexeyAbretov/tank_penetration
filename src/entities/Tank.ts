@@ -185,8 +185,8 @@ export class Tank extends GameObjects.Container {
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
   // Сколько миллисекунд танк уже тарахтит. Из этого времени считается тряска.
   private engineMs = 0;
-  // Прямоугольник пулемёта в координатах башни. Есть, только пока пулемёт стоит на крыше.
-  private machineGunBox?: PartBox;
+  // Дополнительные прямоугольники башни. Пуля в такую деталь тоже бьёт по танку.
+  private turretHits: PartBox[] = [];
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
   private fireRateLevel = 0;
@@ -275,7 +275,7 @@ export class Tank extends GameObjects.Container {
     if (Tank.inBox(aim.x, aim.y, Tank.gunBox(this.gun.x, this.gun.y))) {
       return true;
     }
-    return this.machineGunBox !== undefined && Tank.inBox(aim.x, aim.y, this.machineGunBox);
+    return this.turretHits.some((box) => Tank.inBox(aim.x, aim.y, box));
   }
 
   // Наводит башню и ствол на точку, обычно на курсор.
@@ -312,12 +312,12 @@ export class Tank extends GameObjects.Container {
     this.fireRateLevel = Math.min(level, Tank.maxFireRateLevel);
   }
 
-  // Пулемёт перед люком, на одной опоре. Маска основного ствола рисуется поверх.
-  // hit — его прямоугольник в координатах башни, чтобы пуля в пулемёт тоже била по танку.
-  mountMachineGun(mg: Phaser.GameObjects.Container, hit: PartBox): void {
+  // Деталь под основным стволом: крутится вместе с башней, ствол рисуется поверх.
+  // hit — прямоугольник в координатах башни, ещё без поворота.
+  attachToTurret(part: Phaser.GameObjects.GameObject, hit: PartBox): void {
     const gunIndex = this.aim.getIndex(this.gun);
-    this.aim.addAt(mg, gunIndex);
-    this.machineGunBox = hit;
+    this.aim.addAt(part, gunIndex);
+    this.turretHits.push(hit);
   }
 
   // Сцена зовёт это каждый кадр, чтобы кулдаун уменьшался даже без выстрела.

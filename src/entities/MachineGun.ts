@@ -8,14 +8,13 @@ import {
   type BulletPaint,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import { Tank } from './Tank';
 
 export class MachineGun extends GameObjects.Container {
   static readonly textureKey = 'mg-bullet';
   static readonly barrelKey = 'tank-mg';
 
   static readonly shop = {
-    cost: 100,
+    cost: 1,
     fireIntervalMs: 3000,
     damage: 1,
     bulletSpeed: 720,
@@ -33,7 +32,7 @@ export class MachineGun extends GameObjects.Container {
   private readonly barrel: Phaser.GameObjects.Image;
   private readonly worldPoint = new Phaser.Math.Vector2();
 
-  constructor(scene: Phaser.Scene, tank: Tank) {
+  constructor(scene: Phaser.Scene) {
     const mount = MachineGun.layout;
     super(scene, mount.x, mount.y);
     MachineGun.ensureTextures(scene);
@@ -41,7 +40,6 @@ export class MachineGun extends GameObjects.Container {
     this.barrel = scene.add.image(0, 0, MachineGun.barrelKey);
     this.barrel.setOrigin(mount.originX, mount.originY);
     this.add(this.barrel);
-    tank.mountMachineGun(this, MachineGun.aimBox());
   }
 
   // Прямоугольник картинки в координатах башни. Просмотр и попадания берут одно и то же.

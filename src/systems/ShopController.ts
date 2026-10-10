@@ -72,7 +72,7 @@ export class ShopController {
     }
     this.machineGunOwned = saved.machineGun;
     if (saved.machineGun) {
-      this.machineGun = new MachineGun(this.scene, this.tank);
+      this.machineGun = this.installMachineGun();
     }
     this.artilleryOwned = saved.artillery;
   }
@@ -204,8 +204,15 @@ export class ShopController {
       return;
     }
     this.machineGunOwned = true;
-    this.machineGun = new MachineGun(this.scene, this.tank);
+    this.machineGun = this.installMachineGun();
     this.refresh();
+  }
+
+  // Ствол садится на башню здесь, при покупке.
+  private installMachineGun(): MachineGun {
+    const gun = new MachineGun(this.scene);
+    this.tank.attachToTurret(gun, MachineGun.aimBox());
+    return gun;
   }
 
   // Открывает клавишу 1. Залп и перезарядку считает CombatSystem.
