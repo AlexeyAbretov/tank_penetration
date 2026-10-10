@@ -26,6 +26,7 @@ export type ShopSave = {
   machineGun: boolean;
   artillery: boolean;
   autoFire: boolean;
+  autoFireOn: boolean;
 };
 
 export type RunSave = {
@@ -137,6 +138,8 @@ function parseShop(value: unknown): ShopSave | null {
   const machineGun = flag(value.machineGun);
   const artillery = flag(value.artillery);
   const autoFire = flag(value.autoFire);
+  // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
+  const autoFireOn = flag(value.autoFireOn) ?? (autoFire === true);
   if (
     blast === null ||
     damage === null ||
@@ -148,7 +151,7 @@ function parseShop(value: unknown): ShopSave | null {
   ) {
     return null;
   }
-  return { blast, damage, fireRate, wire, machineGun, artillery, autoFire };
+  return { blast, damage, fireRate, wire, machineGun, artillery, autoFire, autoFireOn: autoFire && autoFireOn };
 }
 
 function parseEnemies(value: unknown): EnemySave[] {

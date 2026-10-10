@@ -53,6 +53,7 @@ export class ShopController {
       machineGun: this.machineGunOwned,
       artillery: this.artilleryOwned,
       autoFire: this.tank.hasAutoFire,
+      autoFireOn: this.tank.autoFireEnabled,
     };
   }
 
@@ -63,6 +64,7 @@ export class ShopController {
     this.fireRateLevel = Math.min(saved.fireRate, Tank.maxFireRateLevel);
     this.tank.setFireRateLevel(this.fireRateLevel);
     this.tank.setAutoFire(saved.autoFire);
+    this.tank.setAutoFireOn(saved.autoFireOn);
     this.wireOwned = saved.wire;
     if (saved.wire) {
       this.wire = new BarbedWire(this.scene);
@@ -83,6 +85,7 @@ export class ShopController {
     this.machineGunOwned = false;
     this.artilleryOwned = false;
     this.tank.setAutoFire(false);
+    this.tank.setAutoFireOn(false);
     this.wire = undefined;
     this.machineGun = undefined;
     this.shopOpen = false;
@@ -180,6 +183,16 @@ export class ShopController {
       return;
     }
     this.tank.setAutoFire(true);
+    this.tank.setAutoFireOn(true);
+    this.refresh();
+  }
+
+  // Кнопка у шестерёнки. Покупку не отменяет: следующий клик снова включает огонь.
+  toggleAutoFire(): void {
+    if (this.isPaused() || !this.tank.hasAutoFire) {
+      return;
+    }
+    this.tank.setAutoFireOn(!this.tank.autoFireEnabled);
     this.refresh();
   }
 
@@ -215,9 +228,10 @@ export class ShopController {
       Infantry.shellDamage + this.damageLevel + meta.damage,
       (this.blastLevel + meta.blast) * Tank.blastRadiusPerLevel,
       Tank.fireDelayFor(this.fireRateLevel),
-      this.tank.hasAutoFire,
+      this.tank.autoFireEnabled,
       meta.coins,
     );
+    this.hud.setAutoFireToggle(this.tank.hasAutoFire, this.tank.autoFireEnabled);
   }
 
   private isPaused(): boolean {

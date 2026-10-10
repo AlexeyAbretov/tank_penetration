@@ -447,7 +447,7 @@ export class ShopPanel {
 
   private showAutoFire(coins: number, owned: boolean): void {
     if (owned) {
-      this.autoFire.info.setText('танк стреляет сам по кулдауну');
+      this.autoFire.info.setText('кнопка слева от шестерёнки — вкл и выкл');
       this.autoFire.cost.setText('куплено');
       this.autoFire.card.setFillStyle(0x3d2a12);
       this.autoFire.cost.setColor('#f3d56a');

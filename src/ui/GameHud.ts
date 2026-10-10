@@ -19,11 +19,14 @@ export class GameHud {
   private readonly hasteIcon: Phaser.GameObjects.Graphics;
   private readonly pausePlate: Phaser.GameObjects.Rectangle;
   private readonly settingsPlate: Phaser.GameObjects.Rectangle;
+  private readonly autoFirePlate: Phaser.GameObjects.Rectangle;
+  private readonly autoFireIcon: Phaser.GameObjects.Graphics;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
   private artilleryOwned = false;
   private hasteCycle?: () => void;
   private pauseRequest?: () => void;
   private settingsRequest?: () => void;
+  private autoFireRequest?: () => void;
   private resumeRequest?: () => void;
   private newGameRequest?: () => void;
 
@@ -91,6 +94,7 @@ export class GameHud {
     const hasteX = hpLeft - 8 - icon / 2;
     const pauseX = hasteX - 6 - icon;
     const settingsX = pauseX - 6 - icon;
+    const autoFireX = settingsX - 6 - icon;
     const iconY = 28;
 
     this.hastePlate = scene.add
@@ -114,7 +118,7 @@ export class GameHud {
     this.pausePlate.on('pointerup', () => this.pauseRequest?.());
 
     // Выше магазина (глубина 70), но ниже окна настроек (88), паузы (90) и экрана поражения (85).
-    // Иначе шестерёнка пропадает под затемнением между волнами.
+    // Иначе шестерёнка и кнопка автострельбы пропадают под затемнением между волнами.
     this.settingsPlate = scene.add
       .rectangle(settingsX, iconY, icon, icon, 0x3a0c0c)
       .setStrokeStyle(2, 0xc9a227)
@@ -123,6 +127,16 @@ export class GameHud {
     const gear = scene.add.graphics().setPosition(settingsX, iconY).setDepth(81);
     this.drawGear(gear);
     this.settingsPlate.on('pointerup', () => this.settingsRequest?.());
+
+    // Пока автострельба не куплена, плашка не ловит клики: иначе пустое место гасило бы выстрел.
+    this.autoFirePlate = scene.add
+      .rectangle(autoFireX, iconY, icon, icon, 0x3a0c0c)
+      .setStrokeStyle(2, 0xc9a227)
+      .setDepth(80)
+      .setVisible(false);
+    this.autoFireIcon = scene.add.graphics().setPosition(autoFireX, iconY).setDepth(81).setVisible(false);
+    this.drawAutoFire(false);
+    this.autoFirePlate.on('pointerup', () => this.autoFireRequest?.());
 
     this.controls = scene.add
       .text(GAME.width / 2, 708, this.controlsLine(false), {
@@ -250,6 +264,27 @@ export class GameHud {
     this.settingsRequest = request;
   }
 
+  onAutoFire(request: () => void): void {
+    this.autoFireRequest = request;
+  }
+
+  // Кнопка появляется после покупки. Красная плашка — режим включён, тёмная — выключен.
+  setAutoFireToggle(owned: boolean, enabled: boolean): void {
+    this.autoFirePlate.setVisible(owned);
+    this.autoFireIcon.setVisible(owned);
+    if (!owned) {
+      if (this.autoFirePlate.input?.enabled) {
+        this.autoFirePlate.disableInteractive();
+      }
+      return;
+    }
+    if (!this.autoFirePlate.input?.enabled) {
+      this.autoFirePlate.setInteractive({ useHandCursor: true });
+    }
+    this.autoFirePlate.setFillStyle(enabled ? 0x8a1810 : 0x3a0c0c);
+    this.drawAutoFire(enabled);
+  }
+
   onResume(request: () => void): void {
     this.resumeRequest = request;
   }
@@ -321,6 +356,13 @@ export class GameHud {
     return this.settingsPlate.getBounds().contains(pointer.worldX, pointer.worldY);
   }
 
+  // Скрытая кнопка не занимает место: до покупки курсор над ней всё ещё стреляет.
+  coversAutoFire(pointer: Phaser.Input.Pointer): boolean {
+    return (
+      this.autoFirePlate.visible && this.autoFirePlate.getBounds().contains(pointer.worldX, pointer.worldY)
+    );
+  }
+
   setArtillery(owned: boolean, cooldownMs: number): void {
     if (this.artilleryOwned !== owned) {
       this.artilleryOwned = owned;
@@ -380,6 +422,23 @@ export class GameHud {
   private controlsLine(artillery: boolean): string {
     const tempo = 'мышь — прицел   ЛКМ — огонь   2 — темп   Esc — пауза   шестерёнка — звук';
     return artillery ? `${tempo}   1 — удар` : tempo;
+  }
+
+  // Ствол справа и три трассы влево — очередь в сторону врагов. Тусклые, пока режим выключен.
+  private drawAutoFire(on: boolean): void {
+    const g = this.autoFireIcon;
+    g.clear();
+    const color = on ? 0xf0d56a : 0x6e5840;
+    g.fillStyle(color, 1);
+    g.fillRect(6, -8, 3, 16);
+    const traces: ReadonlyArray<readonly [number, number]> = [
+      [-7, 6],
+      [0, 12],
+      [7, 6],
+    ];
+    for (const [y, length] of traces) {
+      g.fillRect(6 - length, y - 1, length, 2);
+    }
   }
 
   // Сплошной обод и короткие зубцы. Лучи из центра читались как штурвал.
