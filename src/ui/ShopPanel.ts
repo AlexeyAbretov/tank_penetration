@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import { GAME, PAUSED } from '../gameConfig';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { AutoFire } from '../entities/AutoFire';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
@@ -455,11 +456,11 @@ export class ShopPanel {
       return;
     }
     this.autoFire.info.setText('не нужно держать ЛКМ');
-    this.autoFire.cost.setText(`цена  ${Tank.shop.autoFireCost}`);
+    this.autoFire.cost.setText(`цена  ${AutoFire.shop.cost}`);
     if (!this.autoFire.card.input?.enabled) {
       this.autoFire.card.setInteractive({ useHandCursor: true });
     }
-    this.tintCard(this.autoFire.card, this.autoFire.cost, coins >= Tank.shop.autoFireCost);
+    this.tintCard(this.autoFire.card, this.autoFire.cost, coins >= AutoFire.shop.cost);
   }
 
   private showMachineGun(coins: number, owned: boolean): void {

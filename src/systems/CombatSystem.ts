@@ -104,7 +104,7 @@ export class CombatSystem {
 
   // ЛКМ и автострельба — здесь, чтобы сцена не знала про покупки магазина.
   handleFireInput(pointer: Phaser.Input.Pointer): void {
-    if (this.tank.autoFireEnabled || pointer.leftButtonDown()) {
+    if (this.shop.autoFire.enabled || pointer.leftButtonDown()) {
       this.shoot();
     }
   }

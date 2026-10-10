@@ -54,9 +54,6 @@ export class Tank extends GameObjects.Container {
   static readonly shellSpeed = 740;
   static readonly baseHp = 100;
   static readonly blastRadiusPerLevel = 1;
-  static readonly shop = {
-    autoFireCost: 1,
-  };
 
   // Точка прицеливания врагов: чуть правее носа танка.
   static aimPoint(): { x: number; y: number } {
@@ -193,10 +190,6 @@ export class Tank extends GameObjects.Container {
   // Миллисекунды до следующего выстрела. 0 — можно стрелять.
   private cooldown = 0;
   private fireRateLevel = 0;
-  // Куплена в магазине этой партии. Сама по себе не стреляет: режим ещё можно выключить.
-  private autoFire = false;
-  // Выключатель на панели. Имеет смысл только вместе с покупкой.
-  private autoFireOn = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     // Контейнер сам стоит в (x, y). Дети внутри задаются уже относительно этой точки.
@@ -317,23 +310,6 @@ export class Tank extends GameObjects.Container {
 
   setFireRateLevel(level: number): void {
     this.fireRateLevel = Math.min(level, Tank.maxFireRateLevel);
-  }
-
-  get hasAutoFire(): boolean {
-    return this.autoFire;
-  }
-
-  // Бой стреляет сам, только когда покупка есть и кнопка включена.
-  get autoFireEnabled(): boolean {
-    return this.autoFire && this.autoFireOn;
-  }
-
-  setAutoFire(owned: boolean): void {
-    this.autoFire = owned;
-  }
-
-  setAutoFireOn(on: boolean): void {
-    this.autoFireOn = on;
   }
 
   // Пулемёт перед люком, на одной опоре. Маска основного ствола рисуется поверх.

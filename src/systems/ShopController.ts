@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { AutoFire } from '../entities/AutoFire';
 import { PAUSED } from '../gameConfig';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
@@ -30,6 +31,7 @@ export class ShopController {
   machineGunOwned = false;
   machineGun?: MachineGun;
   artilleryOwned = false;
+  readonly autoFire = new AutoFire();
   shopOpen = false;
 
   constructor(
@@ -52,8 +54,8 @@ export class ShopController {
       wire: this.wireOwned,
       machineGun: this.machineGunOwned,
       artillery: this.artilleryOwned,
-      autoFire: this.tank.hasAutoFire,
-      autoFireOn: this.tank.autoFireEnabled,
+      autoFire: this.autoFire.isOwned,
+      autoFireOn: this.autoFire.enabled,
     };
   }
 
@@ -63,8 +65,7 @@ export class ShopController {
     this.damageLevel = saved.damage;
     this.fireRateLevel = Math.min(saved.fireRate, Tank.maxFireRateLevel);
     this.tank.setFireRateLevel(this.fireRateLevel);
-    this.tank.setAutoFire(saved.autoFire);
-    this.tank.setAutoFireOn(saved.autoFireOn);
+    this.autoFire.restore(saved.autoFire, saved.autoFireOn);
     this.wireOwned = saved.wire;
     if (saved.wire) {
       this.wire = new BarbedWire(this.scene);
@@ -84,8 +85,7 @@ export class ShopController {
     this.wireOwned = false;
     this.machineGunOwned = false;
     this.artilleryOwned = false;
-    this.tank.setAutoFire(false);
-    this.tank.setAutoFireOn(false);
+    this.autoFire.clear();
     this.wire = undefined;
     this.machineGun = undefined;
     this.shopOpen = false;
@@ -103,7 +103,7 @@ export class ShopController {
       this.damageLevel,
       this.fireRateLevel,
       this.wireOwned,
-      this.tank.hasAutoFire,
+      this.autoFire.isOwned,
       this.machineGunOwned,
       this.artilleryOwned,
     );
@@ -176,23 +176,22 @@ export class ShopController {
 
   // Танк стреляет сам, пока курсор на поле. Покупка одна на партию.
   buyAutoFire(): void {
-    if (this.isPaused() || this.tank.hasAutoFire || this.economy.getCoins() < Tank.shop.autoFireCost) {
+    if (this.isPaused() || this.autoFire.isOwned || this.economy.getCoins() < AutoFire.shop.cost) {
       return;
     }
-    if (!this.economy.spendCoins(Tank.shop.autoFireCost)) {
+    if (!this.economy.spendCoins(AutoFire.shop.cost)) {
       return;
     }
-    this.tank.setAutoFire(true);
-    this.tank.setAutoFireOn(true);
+    this.autoFire.grant();
     this.refresh();
   }
 
   // Кнопка у шестерёнки. Покупку не отменяет: следующий клик снова включает огонь.
   toggleAutoFire(): void {
-    if (this.isPaused() || !this.tank.hasAutoFire) {
+    if (this.isPaused() || !this.autoFire.isOwned) {
       return;
     }
-    this.tank.setAutoFireOn(!this.tank.autoFireEnabled);
+    this.autoFire.toggle();
     this.refresh();
   }
 
@@ -228,10 +227,10 @@ export class ShopController {
       Infantry.shellDamage + this.damageLevel + meta.damage,
       (this.blastLevel + meta.blast) * Tank.blastRadiusPerLevel,
       Tank.fireDelayFor(this.fireRateLevel),
-      this.tank.autoFireEnabled,
+      this.autoFire.enabled,
       meta.coins,
     );
-    this.hud.setAutoFireToggle(this.tank.hasAutoFire, this.tank.autoFireEnabled);
+    this.hud.setAutoFireToggle(this.autoFire.isOwned, this.autoFire.enabled);
   }
 
   private isPaused(): boolean {
@@ -247,7 +246,7 @@ export class ShopController {
       this.damageLevel,
       this.fireRateLevel,
       this.wireOwned,
-      this.tank.hasAutoFire,
+      this.autoFire.isOwned,
       this.machineGunOwned,
       this.artilleryOwned,
     );
