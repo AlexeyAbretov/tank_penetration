@@ -3,7 +3,7 @@
 
 export class AutoFire {
   static readonly shop = {
-    cost: 1,
+    cost: 100,
   };
 
   private owned = false;
