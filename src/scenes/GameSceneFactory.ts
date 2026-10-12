@@ -11,14 +11,28 @@ import { DebugCombatSave } from '../systems/DebugCombatSave';
 import { CombatSave } from '../systems/CombatSave';
 import { WaveManager } from '../systems/WaveManager';
 import { GameScene } from './GameScene';
+import { DebugGameHud } from '../ui/DebugGameHud';
+import { GameHud } from '../ui/GameHud';
 
 export class GameSceneFactory {
   static create(): GameScene {
     if (isDebugRun()) {
       const enemies = DebugEnemyFactory;
-      return new GameScene(new DebugCombatSave(), new WaveManager(enemies), new BattleMusic(enemies));
+      
+      return new GameScene(
+        new DebugCombatSave(), 
+        new WaveManager(enemies),
+        new BattleMusic(enemies),
+        DebugGameHud
+      );
     }
+
     const enemies = EnemyFactory;
-    return new GameScene(new CombatSave(), new WaveManager(enemies), new BattleMusic(enemies));
+
+    return new GameScene(
+      new CombatSave(),
+      new WaveManager(enemies),
+      new BattleMusic(enemies),
+      GameHud);
   }
 }

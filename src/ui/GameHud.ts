@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { Tank } from '../entities/Tank';
-import { GAME, isDebugRun } from '../gameConfig';
+import { GAME } from '../gameConfig';
 export class GameHud {
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waveText: Phaser.GameObjects.Text;
@@ -31,6 +31,14 @@ export class GameHud {
   private resumeRequest?: () => void;
   private newGameRequest?: () => void;
 
+  protected readonly statusY = 28;
+  protected readonly statusStyle = {
+    fontFamily: 'Cinzel, Georgia, serif',
+    fontSize: '18px',
+    stroke: '#2a0a08',
+    strokeThickness: 4,
+  };
+
   constructor(scene: Phaser.Scene) {
     scene.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
 
@@ -45,29 +53,16 @@ export class GameHud {
       .setOrigin(0.5)
       .setDepth(51);
 
-    const statusY = 28;
-    const statusStyle = {
-      fontFamily: 'Cinzel, Georgia, serif',
-      fontSize: '18px',
-      stroke: '#2a0a08',
-      strokeThickness: 4,
-    };
     this.scoreText = scene.add
-      .text(28, statusY, 'SCORE  0', { ...statusStyle, color: '#f3d56a' })
+      .text(28, this.statusY, 'SCORE  0', { ...this.statusStyle, color: '#f3d56a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
     this.waveText = scene.add
-      .text(0, statusY, 'WAVE  0', { ...statusStyle, color: '#e8c48a' })
+      .text(0, this.statusY, 'WAVE  0', { ...this.statusStyle, color: '#e8c48a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
-    if (isDebugRun()) {
-      scene.add
-        .text(GAME.width / 2, statusY, 'DEBUG', { ...statusStyle, color: '#ff5a48' })
-        .setOrigin(0.5, 0.5)
-        .setDepth(51);
-    }
     this.coinsText = scene.add
-      .text(0, statusY, 'COINS  0', { ...statusStyle, color: '#f3d56a' })
+      .text(0, this.statusY, 'COINS  0', { ...this.statusStyle, color: '#f3d56a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
     this.layoutStatus();

@@ -39,7 +39,6 @@ export class GameScene extends Phaser.Scene {
   // Все враги на поле: солдаты, пикап и босс.
   private infantry!: Phaser.Physics.Arcade.Group;
 
-  private hud!: GameHud;
   // Танк и число здоровья базы.
   private player!: PlayerController;
   // Снаряды танка, попадания, проволока, пулемёт и артиллерия.
@@ -109,10 +108,15 @@ export class GameScene extends Phaser.Scene {
     this.writeSave();
   };
 
+  // Класс интерфейса приходит снаружи. Экземпляр создаётся в create():
+  // restart() конструктор сцены не вызывает, а до create() нет scene.add и текстуры баннера.
+  private hud!: GameHud;
+
   constructor(
     private readonly combatSave: CombatSave,
     private readonly waves: WaveManager,
     private readonly music: BattleMusic,
+    private readonly Hud: new (scene: Phaser.Scene) => GameHud,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, волны и музыка, переданные при старте, не подменяются.
@@ -185,7 +189,7 @@ export class GameScene extends Phaser.Scene {
     this.enemyShots = this.physics.add.group();
     this.infantry = this.physics.add.group();
 
-    this.hud = new GameHud(this);
+    this.hud = new this.Hud(this);
     this.hud.setHaste(1);
     this.hud.onHasteCycle(() => {
       if (!this.paused && !this.defeatShop) {
