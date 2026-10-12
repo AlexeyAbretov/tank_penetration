@@ -6,19 +6,8 @@
 
 import Phaser from 'phaser';
 import { EnemyFactory } from '../entities/EnemyFactory';
-import { ArtillerySounds } from '../systems/ArtillerySounds';
-import { AssaultExplosion } from '../systems/AssaultExplosion';
+import { BattleEffects } from '../systems/BattleEffects';
 import { BattleMusic } from '../systems/BattleMusic';
-import { BulletHitTank } from '../systems/BulletHitTank';
-import { EffectsVolume } from '../systems/EffectsVolume';
-import { GunnerShot } from '../systems/GunnerShot';
-import { ImpactSounds } from '../systems/ImpactSounds';
-import { InfantryDeath } from '../systems/InfantryDeath';
-import { PickupExplosion } from '../systems/PickupExplosion';
-import { RocketSounds } from '../systems/RocketSounds';
-import { TankDeath } from '../systems/TankDeath';
-import { TankMgShot } from '../systems/TankMgShot';
-import { TankShot } from '../systems/TankShot';
 
 export const SOUND_CLIPS = [
   { id: 'wave', label: 'Волна', title: 'TRACK_01.mp3', loop: true },
@@ -42,35 +31,14 @@ export type StudioSoundId = (typeof SOUND_CLIPS)[number]['id'];
 
 export class StudioSounds {
   private readonly music: BattleMusic;
-  private readonly shotFx: TankShot;
-  private readonly mgFx: TankMgShot;
-  private readonly bulletFx: GunnerShot;
-  private readonly armorFx: BulletHitTank;
-  private readonly rocketFx: RocketSounds;
-  private readonly artilleryFx: ArtillerySounds;
-  private readonly impacts: ImpactSounds;
-  private readonly cryFx: InfantryDeath;
-  private readonly assaultFx: AssaultExplosion;
-  private readonly pickupFx: PickupExplosion;
-  private readonly baseFx: TankDeath;
+  private readonly fx: BattleEffects;
   private musicTheme: 'wave' | 'boss' | null = null;
 
   constructor(scene: Phaser.Scene) {
-    const effects = new EffectsVolume();
     this.music = new BattleMusic(EnemyFactory);
     this.music.bind(scene);
     this.music.create();
-    this.shotFx = new TankShot(scene, effects);
-    this.mgFx = new TankMgShot(scene, effects);
-    this.bulletFx = new GunnerShot(scene, effects);
-    this.armorFx = new BulletHitTank(scene, effects);
-    this.rocketFx = new RocketSounds(scene, effects);
-    this.artilleryFx = new ArtillerySounds(scene, effects);
-    this.impacts = new ImpactSounds(scene, effects);
-    this.cryFx = new InfantryDeath(scene, effects);
-    this.assaultFx = new AssaultExplosion(scene, effects);
-    this.pickupFx = new PickupExplosion(scene, effects);
-    this.baseFx = new TankDeath(scene, effects);
+    this.fx = new BattleEffects(scene);
   }
 
   static preload(scene: Phaser.Scene): void {
@@ -120,7 +88,7 @@ export class StudioSounds {
     } else if (id === 'cry') {
       this.cry();
     } else if (id === 'assault') {
-      this.assaultFx.play();
+      this.fx.assaultExplosion.play();
     } else if (id === 'pickup') {
       this.pickup();
     } else {
@@ -130,83 +98,64 @@ export class StudioSounds {
   }
 
   shot(): void {
-    this.shotFx.play();
+    this.fx.tankShot.play();
   }
 
   mg(): void {
-    this.mgFx.play();
+    this.fx.tankMgShot.play();
   }
 
   bullet(): void {
-    this.bulletFx.play();
+    this.fx.gunnerShot.play();
   }
 
   armor(): void {
-    this.armorFx.play();
+    this.fx.bulletHit.play();
   }
 
   rocket(): void {
-    this.rocketFx.playLaunch();
+    this.fx.rocketSounds.playLaunch();
   }
 
   burst(): void {
-    this.rocketFx.playHit();
+    this.fx.rocketSounds.playHit();
   }
 
   salvo(): void {
-    this.artilleryFx.playShot();
+    this.fx.artillerySounds.playShot();
   }
 
   crater(): void {
-    this.artilleryFx.playBoom();
+    this.fx.artillerySounds.playBoom();
   }
 
   impact(): void {
-    this.impacts.play();
+    this.fx.impacts.play();
   }
 
   cry(): void {
-    this.cryFx.play();
+    this.fx.infantryDeath.play();
   }
 
   pickup(): void {
-    this.pickupFx.play();
+    this.fx.pickupExplosion.play();
   }
 
   base(): void {
-    this.baseFx.play();
+    this.fx.tankDeath.play();
   }
 
   // Смена спрайта. Недоигранный взрыв не должен висеть над другим рисунком.
   // Музыка остаётся: её выключают своей кнопкой.
+  // stop боя взрыв базы не трогает, здесь его глушим отдельно.
   stopEffects(): void {
-    this.shotFx.stop();
-    this.mgFx.stop();
-    this.bulletFx.stop();
-    this.armorFx.stop();
-    this.rocketFx.stop();
-    this.artilleryFx.stop();
-    this.impacts.stop();
-    this.cryFx.stop();
-    this.assaultFx.stop();
-    this.pickupFx.stop();
-    this.baseFx.stop();
+    this.fx.stop();
+    this.fx.tankDeath.stop();
   }
 
   destroy(): void {
-    this.stopEffects();
+    this.fx.destroy();
     this.music.destroy();
-    this.shotFx.destroy();
-    this.mgFx.destroy();
-    this.bulletFx.destroy();
-    this.armorFx.destroy();
-    this.rocketFx.destroy();
-    this.artilleryFx.destroy();
-    this.impacts.destroy();
-    this.cryFx.destroy();
-    this.assaultFx.destroy();
-    this.pickupFx.destroy();
-    this.baseFx.destroy();
   }
 
   private toggleMusic(theme: 'wave' | 'boss'): 'wave' | 'boss' | null {

@@ -11,13 +11,8 @@ import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from './ArtillerySounds';
-import type { AssaultExplosion } from './AssaultExplosion';
-import type { InfantryDeath } from './InfantryDeath';
-import type { PickupExplosion } from './PickupExplosion';
+import type { BattleEffects } from './BattleEffects';
 import type { ShopController } from './ShopController';
-import type { ImpactSounds } from './ImpactSounds';
-import type { TankMgShot } from './TankMgShot';
-import type { TankShot } from './TankShot';
 
 type CombatCallbacks = {
   onKill: (coinReward: number) => void;
@@ -46,12 +41,7 @@ export class CombatSystem {
     private readonly callbacks: CombatCallbacks,
     private readonly progressDamage: number,
     private readonly progressBlast: number,
-    private readonly tankShot: TankShot,
-    private readonly impacts: ImpactSounds,
-    private readonly assaultExplosion: AssaultExplosion,
-    private readonly pickupExplosion: PickupExplosion,
-    private readonly infantryDeath: InfantryDeath,
-    private readonly tankMgShot: TankMgShot,
+    private readonly effects: BattleEffects,
   ) {
     this.blast = createShellBlast(scene);
     this.shells = scene.physics.add.group();
@@ -106,7 +96,7 @@ export class CombatSystem {
     const shot = this.tank.tryFire();
     if (shot) {
       this.fireShell(shot.x, shot.y, shot.angle);
-      this.tankShot.play();
+      this.effects.tankShot.play();
     }
   }
 
@@ -225,7 +215,7 @@ export class CombatSystem {
     shell.destroy();
     this.playBlast(x, y);
     // Один удар на снаряд. Осколки взрыва второй раз не звенят.
-    this.impacts.play();
+    this.effects.impacts.play();
 
     if (direct) {
       this.hurtInfantry(direct);
@@ -287,7 +277,7 @@ export class CombatSystem {
     }
     const shot = mg.muzzle();
     this.fireMgBullet(shot.x, shot.y, shot.angle);
-    this.tankMgShot.play();
+    this.effects.tankMgShot.play();
     this.mgCooldown = MachineGun.shop.fireIntervalMs;
   }
 
@@ -321,7 +311,7 @@ export class CombatSystem {
         if (Phaser.Math.Distance.Between(bullet.x, bullet.y, torso.x, torso.y) <= unit.hitRadius * 0.55) {
           bullet.destroy();
           // Тот же удар, что у снаряда: пуля долетела до солдата.
-          this.impacts.play();
+          this.effects.impacts.play();
           this.hurtInfantry(unit, MachineGun.shop.damage);
           break;
         }
@@ -400,9 +390,9 @@ export class CombatSystem {
       // Пикап — техника: свой взрыв, не крик пехоты.
       // Дошедший до базы сюда не попадает: его убивает hitBase.
       if (unit instanceof PickupTruck) {
-        this.pickupExplosion.play();
+        this.effects.pickupExplosion.play();
       } else {
-        this.infantryDeath.play();
+        this.effects.infantryDeath.play();
       }
       unit.kill();
     }
@@ -413,7 +403,7 @@ export class CombatSystem {
       return;
     }
     if (unit instanceof AssaultInfantry) {
-      this.assaultExplosion.play();
+      this.effects.assaultExplosion.play();
     }
     unit.kill();
     this.callbacks.onBaseHit(unit.contactDamage);
