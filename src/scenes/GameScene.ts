@@ -219,8 +219,6 @@ export class GameScene extends Phaser.Scene {
     }
     this.events.once('shutdown', this.onShutdown, this);
 
-    // combat объявлен заранее: колбэк поражения зовёт его, а сам объект создаётся строками ниже.
-    let combat: CombatSystem | undefined;
     const effects = new EffectsVolume();
     const tankDeath = new TankDeath(this, effects);
     this.tankDeath = tankDeath;
@@ -230,7 +228,7 @@ export class GameScene extends Phaser.Scene {
       {
         enemyShots: this.enemyShots,
         infantry: this.infantry,
-        clearPlayerCombat: () => combat?.clearProjectiles(),
+        clearPlayerCombat: () => this.combat.clearProjectiles(),
       },
       () => this.openDefeatShop(),
       tankDeath,
@@ -278,7 +276,7 @@ export class GameScene extends Phaser.Scene {
     this.pickupExplosion = pickupExplosion;
     const infantryDeath = new InfantryDeath(this, effects);
     this.infantryDeath = infantryDeath;
-    combat = this.combat = new CombatSystem(
+    this.combat = new CombatSystem(
       this,
       this.player.tank,
       this.infantry,
