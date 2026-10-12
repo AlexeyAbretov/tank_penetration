@@ -8,7 +8,7 @@ import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import type { GameHud } from '../ui/GameHud';
-import type { EnemySave, WavePhase } from './RunSave';
+import type { EnemySave, WavePhase } from './CombatSave';
 
 export class WaveManager {
   // Номер текущей волны. 0 — бой ещё не начался, сохранять такую партию нечего.
@@ -59,7 +59,7 @@ export class WaveManager {
     this.reset();
   }
 
-  // Снимок для RunSave. null — волна ещё не началась.
+  // Снимок для CombatSave. null — волна ещё не началась.
   // В магазине список врагов пустой: они уже уничтожены, а номер волны сохраняется как есть.
   capture(): { wave: number; phase: WavePhase; spawned: number; enemies: EnemySave[] } | null {
     if (this.wave < 1) {

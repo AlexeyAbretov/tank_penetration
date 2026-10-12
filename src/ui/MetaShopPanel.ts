@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
-import { metaCost, type MetaSave } from '../systems/MetaSave';
+import { progressCost, type ProgressSave } from '../systems/ProgressSave';
 
 export type MetaShopDelegate = {
   buyCoins(): void;
@@ -76,8 +76,8 @@ export class MetaShopPanel {
     this.container.setDepth(85).setVisible(false);
   }
 
-  show(meta: MetaSave): void {
-    this.refresh(meta);
+  show(progress: ProgressSave): void {
+    this.refresh(progress);
     this.container.setVisible(true);
   }
 
@@ -85,12 +85,12 @@ export class MetaShopPanel {
     this.container.setVisible(false);
   }
 
-  refresh(meta: MetaSave): void {
-    this.scoreText.setText(`SCORE  ${meta.score}`);
-    this.showCoins(meta);
-    this.showDamage(meta);
-    this.showBlast(meta);
-    this.showSpeed(meta);
+  refresh(progress: ProgressSave): void {
+    this.scoreText.setText(`SCORE  ${progress.score}`);
+    this.showCoins(progress);
+    this.showDamage(progress);
+    this.showBlast(progress);
+    this.showSpeed(progress);
   }
 
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
@@ -167,38 +167,38 @@ export class MetaShopPanel {
     zone.on('pointerup', fire);
   }
 
-  private showCoins(meta: MetaSave): void {
-    const price = metaCost(meta.coins);
-    this.coins.info.setText(`ур. ${meta.coins}   +${meta.coins} → +${meta.coins + 1} к монетам`);
+  private showCoins(progress: ProgressSave): void {
+    const price = progressCost(progress.coins);
+    this.coins.info.setText(`ур. ${progress.coins}   +${progress.coins} → +${progress.coins + 1} к монетам`);
     this.coins.cost.setText(`цена  ${price}`);
-    this.tintCard(this.coins.card, this.coins.cost, meta.score >= price);
+    this.tintCard(this.coins.card, this.coins.cost, progress.score >= price);
   }
 
-  private showDamage(meta: MetaSave): void {
-    const price = metaCost(meta.damage);
-    const now = Infantry.shellDamage + meta.damage;
-    this.damage.info.setText(`ур. ${meta.damage}   урон ${now} → ${now + 1}`);
+  private showDamage(progress: ProgressSave): void {
+    const price = progressCost(progress.damage);
+    const now = Infantry.shellDamage + progress.damage;
+    this.damage.info.setText(`ур. ${progress.damage}   урон ${now} → ${now + 1}`);
     this.damage.cost.setText(`цена  ${price}`);
-    this.tintCard(this.damage.card, this.damage.cost, meta.score >= price);
+    this.tintCard(this.damage.card, this.damage.cost, progress.score >= price);
   }
 
-  private showBlast(meta: MetaSave): void {
-    const price = metaCost(meta.blast);
-    const now = meta.blast * Tank.blastRadiusPerLevel;
-    const next = (meta.blast + 1) * Tank.blastRadiusPerLevel;
-    this.blast.info.setText(`ур. ${meta.blast}   радиус ${now} → ${next}`);
+  private showBlast(progress: ProgressSave): void {
+    const price = progressCost(progress.blast);
+    const now = progress.blast * Tank.blastRadiusPerLevel;
+    const next = (progress.blast + 1) * Tank.blastRadiusPerLevel;
+    this.blast.info.setText(`ур. ${progress.blast}   радиус ${now} → ${next}`);
     this.blast.cost.setText(`цена  ${price}`);
-    this.tintCard(this.blast.card, this.blast.cost, meta.score >= price);
+    this.tintCard(this.blast.card, this.blast.cost, progress.score >= price);
   }
 
-  private showSpeed(meta: MetaSave): void {
-    const now = Tank.fireDelayFor(0, meta.speed);
-    const next = Tank.fireDelayFor(0, meta.speed + 1);
-    const maxed = meta.speed >= Tank.maxMetaSpeedLevel || next >= now;
+  private showSpeed(progress: ProgressSave): void {
+    const now = Tank.fireDelayFor(0, progress.speed);
+    const next = Tank.fireDelayFor(0, progress.speed + 1);
+    const maxed = progress.speed >= Tank.maxProgressSpeedLevel || next >= now;
     this.speed.info.setText(
       maxed
-        ? `ур. ${meta.speed}   ${this.formatDelay(now)} (макс.)`
-        : `ур. ${meta.speed}   ${this.formatDelay(now)} → ${this.formatDelay(next)}`,
+        ? `ур. ${progress.speed}   ${this.formatDelay(now)} (макс.)`
+        : `ур. ${progress.speed}   ${this.formatDelay(now)} → ${this.formatDelay(next)}`,
     );
     if (maxed) {
       this.speed.cost.setText('максимум');
@@ -207,12 +207,12 @@ export class MetaShopPanel {
       this.speed.hit.disableInteractive();
       return;
     }
-    const price = metaCost(meta.speed);
+    const price = progressCost(progress.speed);
     this.speed.cost.setText(`цена  ${price}`);
     if (this.speed.hit.input && !this.speed.hit.input.enabled) {
       this.speed.hit.input.enabled = true;
     }
-    this.tintCard(this.speed.card, this.speed.cost, meta.score >= price);
+    this.tintCard(this.speed.card, this.speed.cost, progress.score >= price);
   }
 
   private formatDelay(ms: number): string {

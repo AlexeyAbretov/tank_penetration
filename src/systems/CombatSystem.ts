@@ -44,8 +44,8 @@ export class CombatSystem {
     private readonly infantry: Phaser.Physics.Arcade.Group,
     private readonly shop: ShopController,
     private readonly callbacks: CombatCallbacks,
-    private readonly metaDamage: number,
-    private readonly metaBlast: number,
+    private readonly progressDamage: number,
+    private readonly progressBlast: number,
     private readonly tankShot: TankShot,
     private readonly impacts: ImpactSounds,
     private readonly assaultExplosion: AssaultExplosion,
@@ -420,11 +420,11 @@ export class CombatSystem {
   }
 
   private shellDamage(): number {
-    return Infantry.shellDamage + this.shop.damageLevel + this.metaDamage;
+    return Infantry.shellDamage + this.shop.damageLevel + this.progressDamage;
   }
 
   private blastRadius(): number {
-    return (this.shop.blastLevel + this.metaBlast) * Tank.blastRadiusPerLevel;
+    return (this.shop.blastLevel + this.progressBlast) * Tank.blastRadiusPerLevel;
   }
 
   private playBlast(x: number, y: number): void {

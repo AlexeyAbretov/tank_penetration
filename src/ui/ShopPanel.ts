@@ -10,7 +10,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
-import { loadMeta } from '../systems/MetaSave';
+import { loadProgress } from '../systems/ProgressSave';
 
 // Методы покупок, которые реализует ShopController.
 export type ShopDelegate = {
@@ -279,10 +279,10 @@ export class ShopPanel {
     const blastPrice = ShopPanel.upgradeCost(blastLevel);
     const damagePrice = ShopPanel.upgradeCost(damageLevel);
     const fireRatePrice = ShopPanel.upgradeCost(fireRateLevel);
-    const meta = loadMeta();
-    const radius = (blastLevel + meta.blast) * Tank.blastRadiusPerLevel;
-    const nextRadius = (blastLevel + 1 + meta.blast) * Tank.blastRadiusPerLevel;
-    const damageNow = Infantry.shellDamage + damageLevel + meta.damage;
+    const progress = loadProgress();
+    const radius = (blastLevel + progress.blast) * Tank.blastRadiusPerLevel;
+    const nextRadius = (blastLevel + 1 + progress.blast) * Tank.blastRadiusPerLevel;
+    const damageNow = Infantry.shellDamage + damageLevel + progress.damage;
 
     this.blast.info.setText(`ур. ${blastLevel}   радиус ${radius} → ${nextRadius}`);
     this.blast.cost.setText(`цена  ${blastPrice}`);

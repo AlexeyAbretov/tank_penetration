@@ -3,11 +3,11 @@
 
 import { Tank } from '../entities/Tank';
 
-const STORAGE_KEY = 'tank-penetration-meta:v1';
+const STORAGE_KEY = 'tank-penetration-progress:v1';
 const SCORE_MAX = 100_000_000;
 const LEVEL_MAX = 500;
 
-export type MetaSave = {
+export type ProgressSave = {
   version: 1;
   score: number;
   awaitingShop: boolean;
@@ -19,34 +19,34 @@ export type MetaSave = {
 
 // Первая покупка стоит 500. Каждая следующая — на 500 × уже купленный уровень дороже:
 // 500, 1000, 1500, …
-export function metaCost(level: number): number {
+export function progressCost(level: number): number {
   return 500 + Math.max(0, level) * 500;
 }
 
-let current: MetaSave | null = null;
+let current: ProgressSave | null = null;
 
-export function loadMeta(): MetaSave {
+export function loadProgress(): ProgressSave {
   if (current) {
     return current;
   }
-  current = read() ?? emptyMeta();
+  current = read() ?? emptyProgress();
   return current;
 }
 
 // Чистая партия: ни score, ни купленных уровней.
-export function resetMeta(): void {
-  const meta = loadMeta();
-  meta.score = 0;
-  meta.awaitingShop = false;
-  meta.coins = 0;
-  meta.damage = 0;
-  meta.blast = 0;
-  meta.speed = 0;
-  saveMeta(meta);
-  Tank.setMetaSpeedLevel(0);
+export function resetProgress(): void {
+  const progress = loadProgress();
+  progress.score = 0;
+  progress.awaitingShop = false;
+  progress.coins = 0;
+  progress.damage = 0;
+  progress.blast = 0;
+  progress.speed = 0;
+  saveProgress(progress);
+  Tank.setProgressSpeedLevel(0);
 }
 
-export function saveMeta(data: MetaSave): void {
+export function saveProgress(data: ProgressSave): void {
   current = data;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -55,7 +55,7 @@ export function saveMeta(data: MetaSave): void {
   }
 }
 
-function emptyMeta(): MetaSave {
+function emptyProgress(): ProgressSave {
   return {
     version: 1,
     score: 0,
@@ -67,7 +67,7 @@ function emptyMeta(): MetaSave {
   };
 }
 
-function read(): MetaSave | null {
+function read(): ProgressSave | null {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(STORAGE_KEY);
@@ -78,7 +78,7 @@ function read(): MetaSave | null {
     return null;
   }
   try {
-    const parsed = parseMeta(JSON.parse(raw));
+    const parsed = parseProgress(JSON.parse(raw));
     if (!parsed) {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -93,7 +93,7 @@ function read(): MetaSave | null {
   }
 }
 
-function parseMeta(value: unknown): MetaSave | null {
+function parseProgress(value: unknown): ProgressSave | null {
   if (!isRecord(value) || value.version !== 1) {
     return null;
   }
@@ -104,7 +104,7 @@ function parseMeta(value: unknown): MetaSave | null {
     coins: requiredInt(value.coins, 0, LEVEL_MAX) ?? 0,
     damage: requiredInt(value.damage, 0, LEVEL_MAX) ?? 0,
     blast: requiredInt(value.blast, 0, LEVEL_MAX) ?? 0,
-    speed: requiredInt(value.speed, 0, Tank.maxMetaSpeedLevel) ?? 0,
+    speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
   };
 }
 

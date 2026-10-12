@@ -3,11 +3,11 @@
 // Монеты за них не списываются: магазин просто поднимает флаги через restore.
 
 import { Tank } from '../entities/Tank';
-import { RunSave, type SavedRun } from './RunSave';
+import { CombatSave, type SavedRun } from './CombatSave';
 
-const DEBUG_KEY = 'tank-penetration-run:debug';
+const DEBUG_KEY = 'tank-penetration-combat:debug';
 
-export class DebugRunSave extends RunSave {
+export class DebugCombatSave extends CombatSave {
   protected storageKey(): string {
     return DEBUG_KEY;
   }

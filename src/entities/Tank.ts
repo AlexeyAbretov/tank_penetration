@@ -27,29 +27,29 @@ export class Tank extends GameObjects.Container {
   static readonly minFireDelay = 200;
   static readonly fireRateStep = 20;
   // Постоянная скорость из магазина между проигрышами: −0.01 с за уровень.
-  static readonly metaSpeedStepMs = 10;
-  static metaSpeedLevel = 0;
+  static readonly progressSpeedStepMs = 10;
+  static progressSpeedLevel = 0;
 
-  static get maxMetaSpeedLevel(): number {
-    return (Tank.baseFireDelay - Tank.minFireDelay) / Tank.metaSpeedStepMs;
+  static get maxProgressSpeedLevel(): number {
+    return (Tank.baseFireDelay - Tank.minFireDelay) / Tank.progressSpeedStepMs;
   }
 
-  static setMetaSpeedLevel(level: number): void {
-    Tank.metaSpeedLevel = Math.min(Tank.maxMetaSpeedLevel, Math.max(0, Math.round(level)));
+  static setProgressSpeedLevel(level: number): void {
+    Tank.progressSpeedLevel = Math.min(Tank.maxProgressSpeedLevel, Math.max(0, Math.round(level)));
   }
 
   // Магазин между волнами упирается в тот же пол 0.20 с, что и постоянная скорость.
   static get maxFireRateLevel(): number {
-    const room = Tank.baseFireDelay - Tank.metaSpeedLevel * Tank.metaSpeedStepMs - Tank.minFireDelay;
+    const room = Tank.baseFireDelay - Tank.progressSpeedLevel * Tank.progressSpeedStepMs - Tank.minFireDelay;
     return Math.max(0, Math.floor(room / Tank.fireRateStep));
   }
 
-  static fireDelayFor(level: number, metaSpeed = Tank.metaSpeedLevel): number {
-    const metaCut = Math.max(0, Math.round(metaSpeed)) * Tank.metaSpeedStepMs;
-    const room = Tank.baseFireDelay - metaCut - Tank.minFireDelay;
+  static fireDelayFor(level: number, progressSpeed = Tank.progressSpeedLevel): number {
+    const progressCut = Math.max(0, Math.round(progressSpeed)) * Tank.progressSpeedStepMs;
+    const room = Tank.baseFireDelay - progressCut - Tank.minFireDelay;
     const maxShop = Math.max(0, Math.floor(room / Tank.fireRateStep));
     const capped = Math.min(Math.max(0, Math.round(level)), maxShop);
-    return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep - metaCut);
+    return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep - progressCut);
   }
   static readonly shellSpeed = 740;
   static readonly baseHp = 100;

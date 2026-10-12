@@ -7,7 +7,7 @@ import { ENEMY_KINDS, EnemyFactory, type EnemySaveKind } from '../entities/Enemy
 import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME } from '../gameConfig';
 
-const CAMPAIGN_KEY = 'tank-penetration-run:v1';
+const CAMPAIGN_KEY = 'tank-penetration-combat:v1';
 
 export type WavePhase = 'combat' | 'shop';
 
@@ -44,7 +44,7 @@ export type SavedRun = {
   shop: ShopSave;
 };
 
-export class RunSave {
+export class CombatSave {
   // Читает партию. null — начинать волну 1 с пустым магазином.
   // Битую запись стираем, чтобы следующий заход не спотыкался о неё снова.
   load(): SavedRun | null {

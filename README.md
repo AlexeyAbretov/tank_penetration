@@ -130,8 +130,8 @@ npm run dev
    - `PickupExplosion` — взрыв пикапа при гибели (`public/audio/pickup_exposion.mp3`). Тот же ползунок эффектов. Файл обрезан под вспышку: звук начинается сразу и кончается вместе с коротким хвостом. На паузе и после гибели базы останавливается.
    - `InfantryDeath` — крик пехоты, убитой танком (`public/audio/infantry_dead0.mp3`, `infantry_dead1.mp3`). Подряд один и тот же не повторяется. Пикап и штурмовик, дошедший до базы, этот звук не берут.
    - `ShopController` и `src/ui/ShopPanel.ts` — магазин между волнами.
-   - `MetaShopController`, `MetaSave` и `src/ui/MetaShopPanel.ts` — магазин после поражения.
-   - `RunSave` — запись партии в `localStorage`.
+   - `ProgressShopController`, `ProgressSave` и `src/ui/ProgressShopPanel.ts` — магазин после поражения.
+   - `CombatSave` — запись партии в `localStorage`.
 4. `src/entities/` — то, что стоит на поле.
    - `Tank` — корпус, башня и ствол.
    - `Infantry` — общий предок врагов: шаг, здоровье, полоска HP. Сам на поле не появляется.

@@ -1,6 +1,6 @@
 // Покупки между волнами. Окно ShopPanel только рисует кнопки и зовёт методы ниже.
-// Уровни живут здесь, пока жива партия. В localStorage их кладёт RunSave через capture().
-// Постоянные улучшения после поражения сюда не входят: их держит MetaSave.
+// Уровни живут здесь, пока жива партия. В localStorage их кладёт CombatSave через capture().
+// Постоянные улучшения после поражения сюда не входят: их держит ProgressSave.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
@@ -11,8 +11,8 @@ import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
 import { ShopPanel } from '../ui/ShopPanel';
 import type { GameHud } from '../ui/GameHud';
-import { loadMeta } from './MetaSave';
-import type { ShopSave } from './RunSave';
+import { loadProgress } from './ProgressSave';
+import type { ShopSave } from './CombatSave';
 
 type Economy = {
   getCoins: () => number;
@@ -140,7 +140,7 @@ export class ShopController {
     this.refresh();
   }
 
-  // +1 к урону снаряда танка. Складывается с постоянным уроном из MetaSave.
+  // +1 к урону снаряда танка. Складывается с постоянным уроном из ProgressSave.
   buyDamage(): void {
     if (this.isPaused()) {
       return;
@@ -235,13 +235,13 @@ export class ShopController {
 
   // Строка характеристик над полем: урон и взрыв партии плюс постоянные уровни.
   syncTankStats(): void {
-    const meta = loadMeta();
+    const progress = loadProgress();
     this.hud.setTankStats(
-      Infantry.shellDamage + this.damageLevel + meta.damage,
-      (this.blastLevel + meta.blast) * Tank.blastRadiusPerLevel,
+      Infantry.shellDamage + this.damageLevel + progress.damage,
+      (this.blastLevel + progress.blast) * Tank.blastRadiusPerLevel,
       Tank.fireDelayFor(this.fireRateLevel),
       this.autoFire.enabled,
-      meta.coins,
+      progress.coins,
     );
     this.hud.setAutoFireToggle(this.autoFire.isOwned, this.autoFire.enabled);
   }

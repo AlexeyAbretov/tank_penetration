@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { Tank } from '../entities/Tank';
 import { MetaShopPanel } from '../ui/MetaShopPanel';
-import { loadMeta, metaCost, resetMeta, saveMeta, type MetaSave } from './MetaSave';
+import { loadProgress, progressCost, resetProgress, saveProgress, type ProgressSave } from './ProgressSave';
 
 const SCORE_MAX = 100_000_000;
 
@@ -11,7 +11,7 @@ type Stat = 'coins' | 'damage' | 'blast' | 'speed';
 
 export class MetaShopController {
   readonly panel: MetaShopPanel;
-  private readonly meta: MetaSave;
+  private readonly progress: ProgressSave;
   // Пауза сцены. Покупки очков ждут продолжения. «В бой» паузу не спрашивает.
   private paused = false;
 
@@ -19,22 +19,22 @@ export class MetaShopController {
     scene: Phaser.Scene,
     private readonly onNewGame: () => void,
   ) {
-    this.meta = loadMeta();
+    this.progress = loadProgress();
     this.panel = new MetaShopPanel(scene, this);
   }
 
   bank(runScore: number): void {
-    if (this.meta.awaitingShop) {
+    if (this.progress.awaitingShop) {
       return;
     }
     const gained = Math.max(0, Math.round(runScore));
-    this.meta.score = Math.min(SCORE_MAX, this.meta.score + gained);
-    this.meta.awaitingShop = true;
-    saveMeta(this.meta);
+    this.progress.score = Math.min(SCORE_MAX, this.progress.score + gained);
+    this.progress.awaitingShop = true;
+    saveProgress(this.progress);
   }
 
   open(): void {
-    this.panel.show(this.meta);
+    this.panel.show(this.progress);
   }
 
   setPaused(paused: boolean): void {
@@ -42,14 +42,14 @@ export class MetaShopController {
   }
 
   closeAndRestart(): void {
-    this.meta.awaitingShop = false;
-    saveMeta(this.meta);
+    this.progress.awaitingShop = false;
+    saveProgress(this.progress);
     this.panel.hide();
     this.onNewGame();
   }
 
   wipeAndRestart(): void {
-    resetMeta();
+    resetProgress();
     this.panel.hide();
     this.onNewGame();
   }
@@ -74,21 +74,21 @@ export class MetaShopController {
     if (this.isPaused()) {
       return;
     }
-    const level = this.meta[stat];
-    if (stat === 'speed' && level >= Tank.maxMetaSpeedLevel) {
+    const level = this.progress[stat];
+    if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
-    const cost = metaCost(level);
-    if (this.meta.score < cost) {
+    const cost = progressCost(level);
+    if (this.progress.score < cost) {
       return;
     }
-    this.meta.score -= cost;
-    this.meta[stat] += 1;
+    this.progress.score -= cost;
+    this.progress[stat] += 1;
     if (stat === 'speed') {
-      Tank.setMetaSpeedLevel(this.meta.speed);
+      Tank.setProgressSpeedLevel(this.progress.speed);
     }
-    saveMeta(this.meta);
-    this.panel.refresh(this.meta);
+    saveProgress(this.progress);
+    this.panel.refresh(this.progress);
   }
 
   private isPaused(): boolean {

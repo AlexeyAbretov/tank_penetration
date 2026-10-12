@@ -23,11 +23,11 @@ import { TankDeath } from '../systems/TankDeath';
 import { TankMgShot } from '../systems/TankMgShot';
 import { TankShot } from '../systems/TankShot';
 import { CombatSystem } from '../systems/CombatSystem';
-import { loadMeta, resetMeta } from '../systems/MetaSave';
-import { MetaShopController } from '../systems/MetaShopController';
+import { loadProgress, resetProgress } from '../systems/ProgressSave';
+import { ProgressShopController } from '../systems/ProgressShopController';
 import { PlayerController } from '../systems/PlayerController';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
-import { RunSave, type SavedRun } from '../systems/RunSave';
+import { CombatSave, type SavedRun } from '../systems/CombatSave';
 import { ShopController } from '../systems/ShopController';
 import { WaveManager } from '../systems/WaveManager';
 import { GameHud } from '../ui/GameHud';
@@ -76,13 +76,13 @@ export class GameScene extends Phaser.Scene {
   // Магазин между волнами.
   private shop!: ShopController;
   // Магазин очков после гибели базы.
-  private metaShop!: MetaShopController;
+  private progressShop!: ProgressShopController;
   // Пули и ракеты, которые летят в танк.
   private projectiles!: ProjectileSystem;
   // true, пока на экране «БАЗА РАЗБИТА». Обычный update в этом состоянии не идёт.
   private defeatShop = false;
 
-  // Очки этой партии. После гибели прибавляются к запасу в MetaSave.
+  // Очки этой партии. После гибели прибавляются к запасу в ProgressSave.
   private score = 0;
   // Монеты этой партии. Тратятся между волнами и пропадают вместе с партией.
   private coins = 0;
@@ -110,7 +110,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   constructor(
-    private readonly runs: RunSave,
+    private readonly combatSave: CombatSave,
     private readonly waves: WaveManager,
     private readonly music: BattleMusic,
   ) {
@@ -174,7 +174,7 @@ export class GameScene extends Phaser.Scene {
     this.persistEnabled = false;
     this.autosaveMs = 0;
     this.defeatShop = false;
-    Tank.setMetaSpeedLevel(loadMeta().speed);
+    Tank.setProgressSpeedLevel(loadProgress().speed);
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
@@ -257,7 +257,7 @@ export class GameScene extends Phaser.Scene {
       () => this.writeSave(),
     );
 
-    const meta = loadMeta();
+    const progress = loadProgress();
     const tankShot = new TankShot(this, effects);
     this.tankShot = tankShot;
     const tankMgShot = new TankMgShot(this, effects);
@@ -287,8 +287,8 @@ export class GameScene extends Phaser.Scene {
         onKill: (reward) => this.onEnemyKill(reward),
         onBaseHit: (amount) => this.onBaseHit(amount),
       },
-      meta.damage,
-      meta.blast,
+      progress.damage,
+      progress.blast,
       tankShot,
       impacts,
       assaultExplosion,
@@ -296,7 +296,7 @@ export class GameScene extends Phaser.Scene {
       infantryDeath,
       tankMgShot,
     );
-    this.metaShop = new MetaShopController(this, () => {
+    this.progressShop = new ProgressShopController(this, () => {
       // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
       this.persistEnabled = false;
       this.scene.restart();
@@ -341,7 +341,7 @@ export class GameScene extends Phaser.Scene {
     this.applyCameraFx();
     // load читает localStorage. Пустое сохранение начинает волну 1.
     // Если игрок закрыл вкладку на «БАЗА РАЗБИТА», continueRun откроет магазин очков.
-    this.continueRun(this.runs.load());
+    this.continueRun(this.combatSave.load());
     if (!this.defeatShop) {
       this.persistEnabled = true;
     }
@@ -425,7 +425,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.paused = paused;
     this.shop.setPaused(paused);
-    this.metaShop.setPaused(paused);
+    this.progressShop.setPaused(paused);
     this.time.paused = paused;
     if (paused) {
       this.resumeRequested = false;
@@ -600,8 +600,8 @@ export class GameScene extends Phaser.Scene {
 
   private onEnemyKill(coinReward: number): void {
     this.score += 10;
-    // coinReward — монеты вида врага. loadMeta().coins — постоянная прибавка за каждое убийство.
-    this.coins += coinReward + loadMeta().coins;
+    // coinReward — монеты вида врага. loadProgress().coins — постоянная прибавка за каждое убийство.
+    this.coins += coinReward + loadProgress().coins;
     this.hud.setScore(this.score);
     this.hud.setCoins(this.coins);
     this.writeSave();
@@ -612,8 +612,8 @@ export class GameScene extends Phaser.Scene {
     if (this.player.isGameOver) {
       // Сначала запрещаем запись, потом стираем партию. Иначе writeSave успеет положить труп боя обратно.
       this.persistEnabled = false;
-      this.metaShop.bank(this.score);
-      this.runs.clear();
+      this.progressShop.bank(this.score);
+      this.combatSave.clear();
       return;
     }
     this.writeSave();
@@ -625,8 +625,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.persistEnabled = false;
-    resetMeta();
-    this.runs.clear();
+    resetProgress();
+    this.combatSave.clear();
     this.scene.restart();
   }
 
@@ -655,13 +655,13 @@ export class GameScene extends Phaser.Scene {
     if (!this.physics.world.isPaused) {
       this.physics.world.pause();
     }
-    this.metaShop.open();
+    this.progressShop.open();
   }
 
   private continueRun(saved: SavedRun | null): void {
     // Гибель уже случилась, а «В бой» игрок не нажал. Магазин очков открывается снова.
-    if (loadMeta().awaitingShop) {
-      this.runs.clear();
+    if (loadProgress().awaitingShop) {
+      this.combatSave.clear();
       this.shop.syncTankStats();
       this.openDefeatShop();
       return;
@@ -710,7 +710,7 @@ export class GameScene extends Phaser.Scene {
     if (!wave) {
       return;
     }
-    this.runs.save({
+    this.combatSave.save({
       version: 1,
       score: this.score,
       coins: this.coins,
