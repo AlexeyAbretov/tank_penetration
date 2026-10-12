@@ -54,6 +54,12 @@ export class EnemyFactory {
     startDelayMs: 700,
   };
 
+  // 28 мс короче за каждую волну после первой, но не ниже minGap.
+  static spawnGap(wave: number): number {
+    const steps = Math.max(0, wave - 1);
+    return Math.max(this.timing.minGap, this.timing.spawnGap - steps * 28);
+  }
+
   // 10, 20, 30… На экран выходит только суперсолдат.
   // Внутри roster более поздняя волна этот номер всё равно проигрывает,
   // чтобы дебют ракетчика на 10-й не потерялся.
@@ -138,40 +144,54 @@ export class EnemyFactory {
   // Здоровье и ранг скорости. Штурмовик растёт от номера волны.
   // Остальные на своей первой волне получают ранг 1, дальше +1 за волну.
   // Суперсолдат: первый выход всегда 100, дальше +500 за каждое следующее появление. Скорость остаётся на ранге 1.
-  private static spawnUnit(kind: EnemyKind, ctx: SpawnContext): Infantry {
+  // Дебаг-наследник подменяет ранги и оставляет первый выход.
+  protected static spawnUnit(kind: EnemyKind, ctx: SpawnContext): Infantry {
     const { scene, x, y, wave, shots, fireTarget } = ctx;
 
     if (kind === SuperSoldier) {
-      const hp = SuperSoldier.hpForAppearance(SuperSoldier.appearanceOn(wave));
+      const hp = SuperSoldier.hpForAppearance(this.bossAppearance(wave));
       const unit = new SuperSoldier(scene, x, y, hp, shots, fireTarget);
       unit.setPaceWave(1);
       return unit;
     }
 
     if (kind === AssaultInfantry) {
-      const unit = new AssaultInfantry(scene, x, y, Infantry.waveHp(wave));
-      unit.setPaceWave(wave);
+      const rank = this.assaultRank(wave);
+      const unit = new AssaultInfantry(scene, x, y, Infantry.waveHp(rank));
+      unit.setPaceWave(rank);
       return unit;
     }
 
     if (kind === GunnerInfantry) {
-      const rank = Infantry.growthRank(wave, GunnerInfantry.debutWave);
+      const rank = this.growthRank(wave, GunnerInfantry.debutWave);
       const unit = new GunnerInfantry(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
       unit.setPaceWave(rank);
       return unit;
     }
 
     if (kind === PickupTruck) {
-      const rank = Infantry.growthRank(wave, PickupTruck.debutWave);
+      const rank = this.growthRank(wave, PickupTruck.debutWave);
       const unit = new PickupTruck(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
       unit.setPaceWave(rank);
       return unit;
     }
 
-    const rank = Infantry.growthRank(wave, RocketInfantry.debutWave);
+    const rank = this.growthRank(wave, RocketInfantry.debutWave);
     const unit = new RocketInfantry(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
     unit.setPaceWave(rank);
     return unit;
+  }
+
+  protected static assaultRank(wave: number): number {
+    return wave;
+  }
+
+  protected static bossAppearance(wave: number): number {
+    return SuperSoldier.appearanceOn(wave);
+  }
+
+  protected static growthRank(wave: number, debutWave: number): number {
+    return Infantry.growthRank(wave, debutWave);
   }
 
   // Симуляция волн 1..N. На каждой итерации в список падает ноль или один новый враг,

@@ -3,10 +3,9 @@
 
 // Phaser — игровой движок: рисует картинки, считает физику, ловит мышь.
 import Phaser from 'phaser';
-// Размер холста — в gameConfig.ts.
+// Размер холста — в gameConfig.ts. Сцену собирает GameSceneFactory.
 import { GAME } from './gameConfig';
-// Единственная игровая сцена: поле боя, танк, враги, магазин.
-import { GameScene } from './scenes/GameScene';
+import { GameSceneFactory } from './scenes/GameSceneFactory';
 
 // Объект настроек, который Phaser читает при старте.
 const config: Phaser.Types.Core.GameConfig = {
@@ -41,7 +40,7 @@ const config: Phaser.Types.Core.GameConfig = {
     },
   },
   // Список сцен. Сейчас одна: она стартует сразу.
-  scene: [GameScene],
+  scene: [GameSceneFactory.create()],
 };
 
 // new Phaser.Game создаёт холст и запускает сцену.

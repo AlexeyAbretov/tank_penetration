@@ -5,7 +5,6 @@
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { AutoFire } from '../entities/AutoFire';
-import { PAUSED } from '../gameConfig';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
@@ -33,6 +32,8 @@ export class ShopController {
   artilleryOwned = false;
   readonly autoFire = new AutoFire();
   shopOpen = false;
+  // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
+  private paused = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -107,6 +108,11 @@ export class ShopController {
       this.machineGunOwned,
       this.artilleryOwned,
     );
+  }
+
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.panel.setPaused(paused);
   }
 
   // «Следующая волна». На паузе кнопка молчит: иначе бой стартовал бы под плашкой «ПАУЗА».
@@ -241,7 +247,7 @@ export class ShopController {
   }
 
   private isPaused(): boolean {
-    return this.scene.registry.get(PAUSED) === true;
+    return this.paused;
   }
 
   private refresh(): void {

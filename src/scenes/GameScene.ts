@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
-import { ENEMY_HASTE, GAME, PAUSED, enemyHasteOf } from '../gameConfig';
+import { ENEMY_HASTE, GAME, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { ArtillerySounds } from '../systems/ArtillerySounds';
@@ -27,7 +27,7 @@ import { loadMeta, resetMeta } from '../systems/MetaSave';
 import { MetaShopController } from '../systems/MetaShopController';
 import { PlayerController } from '../systems/PlayerController';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
-import { clearRun, loadRun, saveRun } from '../systems/RunSave';
+import { RunSave, type SavedRun } from '../systems/RunSave';
 import { ShopController } from '../systems/ShopController';
 import { WaveManager } from '../systems/WaveManager';
 import { GameHud } from '../ui/GameHud';
@@ -44,10 +44,6 @@ export class GameScene extends Phaser.Scene {
   private player!: PlayerController;
   // Снаряды танка, попадания, проволока, пулемёт и артиллерия.
   private combat!: CombatSystem;
-  // Когда выпускать волну и когда считать её зачищенной.
-  private waves!: WaveManager;
-  // Луп волны или босса. На паузе и после гибели базы молчит.
-  private music?: BattleMusic;
   // Хлопок пушки. Громкость — ползунок эффектов, не музыки.
   private tankShot?: TankShot;
   // Треск пулемёта на башне. Тот же ползунок эффектов.
@@ -113,8 +109,13 @@ export class GameScene extends Phaser.Scene {
     this.writeSave();
   };
 
-  constructor() {
-    // Ключ сцены. restart() ищет её по этой строке.
+  constructor(
+    private readonly runs: RunSave,
+    private readonly waves: WaveManager,
+    private readonly music: BattleMusic,
+  ) {
+    // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
+    // поэтому хранилище, волны и музыка, переданные при старте, не подменяются.
     super('game');
   }
 
@@ -162,7 +163,6 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('combat', true);
     // Темп врагов. Читают пехота и пули через enemyHasteOf.
     this.registry.set(ENEMY_HASTE.key, 1);
-    this.registry.set(PAUSED, false);
     this.paused = false;
     this.pausedPhysics = false;
     this.settingsOpen = false;
@@ -298,22 +298,21 @@ export class GameScene extends Phaser.Scene {
     // Пересечения снарядов танка с пехотой. Без этого выстрел пролетает сквозь спрайт.
     this.combat.setupOverlap();
 
-    const music = new BattleMusic(this);
-    music.create();
-    this.music = music;
+    this.music.bind(this);
+    this.music.create();
     this.settings = new SettingsPanel(
       this,
-      (level) => music.setVolume(level),
+      (level) => this.music.setVolume(level),
       (level) => {
         effects.setVolume(level);
         this.previewEffect(impacts);
       },
       () => this.closeSettings(),
     );
-    this.settings.setMusic(music.volume);
+    this.settings.setMusic(this.music.volume);
     this.settings.setEffects(effects.volume);
 
-    this.waves = new WaveManager(
+    this.waves.bind(
       this,
       this.infantry,
       this.enemyShots,
@@ -321,7 +320,7 @@ export class GameScene extends Phaser.Scene {
       () => this.player.isGameOver,
       () => this.shop.open(),
       () => this.writeSave(),
-      (wave) => music.playForWave(wave),
+      (wave) => this.music.playForWave(wave),
     );
 
     this.projectiles = new ProjectileSystem(
@@ -334,9 +333,9 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.applyCameraFx();
-    // loadRun читает localStorage. Пустое сохранение начинает волну 1.
+    // load читает localStorage. Пустое сохранение начинает волну 1.
     // Если игрок закрыл вкладку на «БАЗА РАЗБИТА», continueRun откроет магазин очков.
-    this.continueRun(loadRun());
+    this.continueRun(this.runs.load());
     if (!this.defeatShop) {
       this.persistEnabled = true;
     }
@@ -418,7 +417,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.paused = paused;
-    this.registry.set(PAUSED, paused);
+    this.shop.setPaused(paused);
+    this.metaShop.setPaused(paused);
     this.time.paused = paused;
     if (paused) {
       this.resumeRequested = false;
@@ -441,7 +441,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.hud.setPaused(paused);
     this.shop.panel.coverForPause(paused);
-    this.music?.setPaused(paused);
+    this.music.setPaused(paused);
     this.tankShot?.setPaused(paused);
     this.tankMgShot?.setPaused(paused);
     this.gunnerShot?.setPaused(paused);
@@ -484,7 +484,7 @@ export class GameScene extends Phaser.Scene {
     }
     // Камера списка магазина рисуется поверх основного холста и закрыла бы окно.
     this.shop.panel.coverForPause(true);
-    this.music?.applyVolume();
+    this.music.applyVolume();
     this.settings.setOpen(true);
   }
 
@@ -526,7 +526,7 @@ export class GameScene extends Phaser.Scene {
     if (this.paused) {
       this.anims.resumeAll();
     }
-    this.music?.destroy();
+    this.music.destroy();
     this.tankShot?.destroy();
     this.tankMgShot?.destroy();
     this.gunnerShot?.destroy();
@@ -606,7 +606,7 @@ export class GameScene extends Phaser.Scene {
       // Сначала запрещаем запись, потом стираем партию. Иначе writeSave успеет положить труп боя обратно.
       this.persistEnabled = false;
       this.metaShop.bank(this.score);
-      clearRun();
+      this.runs.clear();
       return;
     }
     this.writeSave();
@@ -619,7 +619,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.persistEnabled = false;
     resetMeta();
-    clearRun();
+    this.runs.clear();
     this.scene.restart();
   }
 
@@ -627,7 +627,7 @@ export class GameScene extends Phaser.Scene {
   private openDefeatShop(): void {
     this.defeatShop = true;
     this.closeSettings();
-    this.music?.stop();
+    this.music.stop();
     this.tankShot?.stop();
     this.tankMgShot?.stop();
     this.gunnerShot?.stop();
@@ -651,10 +651,10 @@ export class GameScene extends Phaser.Scene {
     this.metaShop.open();
   }
 
-  private continueRun(saved: ReturnType<typeof loadRun>): void {
+  private continueRun(saved: SavedRun | null): void {
     // Гибель уже случилась, а «В бой» игрок не нажал. Магазин очков открывается снова.
     if (loadMeta().awaitingShop) {
-      clearRun();
+      this.runs.clear();
       this.shop.syncTankStats();
       this.openDefeatShop();
       return;
@@ -703,7 +703,7 @@ export class GameScene extends Phaser.Scene {
     if (!wave) {
       return;
     }
-    saveRun({
+    this.runs.save({
       version: 1,
       score: this.score,
       coins: this.coins,

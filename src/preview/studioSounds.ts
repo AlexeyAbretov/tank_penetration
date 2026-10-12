@@ -5,6 +5,7 @@
 // сцена вызывает сама, когда в просмотре включены «Стрельба» и «Смерть».
 
 import Phaser from 'phaser';
+import { EnemyFactory } from '../entities/EnemyFactory';
 import { ArtillerySounds } from '../systems/ArtillerySounds';
 import { AssaultExplosion } from '../systems/AssaultExplosion';
 import { BattleMusic } from '../systems/BattleMusic';
@@ -56,7 +57,8 @@ export class StudioSounds {
 
   constructor(scene: Phaser.Scene) {
     const effects = new EffectsVolume();
-    this.music = new BattleMusic(scene);
+    this.music = new BattleMusic(EnemyFactory);
+    this.music.bind(scene);
     this.music.create();
     this.shotFx = new TankShot(scene, effects);
     this.mgFx = new TankMgShot(scene, effects);

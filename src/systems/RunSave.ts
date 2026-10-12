@@ -1,12 +1,13 @@
 // Партия в localStorage. Обновление и закрытие вкладки поднимают ту же волну,
 // а не новую игру. Снаряды не пишем: после загрузки враги просто стреляют заново.
+// Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { ENEMY_KINDS, EnemyFactory, type EnemySaveKind } from '../entities/EnemyFactory';
 import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME } from '../gameConfig';
 
-const STORAGE_KEY = 'tank-penetration-run:v1';
+const CAMPAIGN_KEY = 'tank-penetration-run:v1';
 
 export type WavePhase = 'combat' | 'shop';
 
@@ -29,7 +30,7 @@ export type ShopSave = {
   autoFireOn: boolean;
 };
 
-export type RunSave = {
+export type SavedRun = {
   version: 1;
   score: number;
   coins: number;
@@ -43,47 +44,61 @@ export type RunSave = {
   shop: ShopSave;
 };
 
-export function loadRun(): RunSave | null {
-  let raw: string | null = null;
-  try {
-    // getItem бросает, если браузер запретил хранилище. Для игры это просто «сохранения нет».
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = parseRun(JSON.parse(raw));
-    if (!parsed) {
-      // Битая или старая запись. Стираем, чтобы следующий заход начал чистую партию.
-      clearRun();
+export class RunSave {
+  // Читает партию. null — начинать волну 1 с пустым магазином.
+  // Битую запись стираем, чтобы следующий заход не спотыкался о неё снова.
+  load(): SavedRun | null {
+    let raw: string | null = null;
+    try {
+      // getItem бросает, если браузер запретил хранилище. Для игры это просто «сохранения нет».
+      raw = localStorage.getItem(this.storageKey());
+    } catch {
+      return this.emptyRun();
     }
-    return parsed;
-  } catch {
-    clearRun();
+    if (!raw) {
+      return this.emptyRun();
+    }
+    try {
+      const parsed = parseRun(JSON.parse(raw));
+      if (!parsed) {
+        this.clear();
+        return this.emptyRun();
+      }
+      return parsed;
+    } catch {
+      this.clear();
+      return this.emptyRun();
+    }
+  }
+
+  save(data: SavedRun): void {
+    try {
+      localStorage.setItem(this.storageKey(), JSON.stringify(data));
+    } catch {
+      // Приватный режим или переполненная квота: партия просто не переживёт закрытие вкладки.
+    }
+  }
+
+  clear(): void {
+    try {
+      localStorage.removeItem(this.storageKey());
+    } catch {
+      // Хранилище недоступно — стирать нечего.
+    }
+  }
+
+  // Обычная партия лежит отдельно от дебага, чтобы проверка юнитов её не затёрла.
+  protected storageKey(): string {
+    return CAMPAIGN_KEY;
+  }
+
+  // Пустого сохранения нет: сцена сама запускает первую волну.
+  protected emptyRun(): SavedRun | null {
     return null;
   }
 }
 
-export function saveRun(data: RunSave): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    // Приватный режим или переполненная квота: партия просто не переживёт закрытие вкладки.
-  }
-}
-
-export function clearRun(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Хранилище недоступно — стирать нечего.
-  }
-}
-
-function parseRun(value: unknown): RunSave | null {
+function parseRun(value: unknown): SavedRun | null {
   // version отсекает старый формат. Поле из будущего файла тоже не подойдёт: игра его не понимает.
   if (!isRecord(value) || value.version !== 1) {
     return null;

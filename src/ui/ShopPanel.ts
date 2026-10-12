@@ -3,7 +3,7 @@
 // Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
-import { GAME, PAUSED } from '../gameConfig';
+import { GAME } from '../gameConfig';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { AutoFire } from '../entities/AutoFire';
 import { BarbedWire } from '../entities/BarbedWire';
@@ -86,6 +86,9 @@ export class ShopPanel {
   private readonly trackTop: number;
 
   private scroll = 0;
+  // Пауза сцены. Карточки и «следующая волна» не реагируют, пока игрок сам не продолжит.
+  // Окно настроек этот флаг не ставит: оно только прячет камеру списка.
+  private paused = false;
   private drag: { y: number; scroll: number; moved: boolean } | null = null;
   private pressedCard: Phaser.GameObjects.Rectangle | null = null;
 
@@ -243,6 +246,10 @@ export class ShopPanel {
     this.listCam.setVisible(false);
   }
 
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+  }
+
   // Камера списка рисуется поверх основной и стирает центр экрана.
   // Пока игра на паузе, прячем её, иначе плашка «ПАУЗА» пропадает над карточками.
   coverForPause(paused: boolean): void {
@@ -343,7 +350,7 @@ export class ShopPanel {
   }
 
   private blocked(): boolean {
-    return this.listContent.scene.registry.get(PAUSED) === true;
+    return this.paused;
   }
 
   private beginDrag(pointer: Phaser.Input.Pointer): void {

@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { Tank } from '../entities/Tank';
-import { GAME } from '../gameConfig';
+import { GAME, isDebugRun } from '../gameConfig';
 export class GameHud {
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waveText: Phaser.GameObjects.Text;
@@ -59,6 +59,12 @@ export class GameHud {
       .text(0, statusY, 'WAVE  0', { ...statusStyle, color: '#e8c48a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
+    if (isDebugRun()) {
+      scene.add
+        .text(GAME.width / 2, statusY, 'DEBUG', { ...statusStyle, color: '#ff5a48' })
+        .setOrigin(0.5, 0.5)
+        .setDepth(51);
+    }
     this.coinsText = scene.add
       .text(0, statusY, 'COINS  0', { ...statusStyle, color: '#f3d56a' })
       .setOrigin(0, 0.5)

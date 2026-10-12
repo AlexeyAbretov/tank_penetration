@@ -14,8 +14,11 @@ export const ENEMY_HASTE = {
   max: 3,
 } as const;
 
-// Игра на паузе: бой, магазин и таймеры стоят, пока игрок сам не продолжит.
-export const PAUSED = 'paused';
+// Дебаг-партия включается адресом с ?debug только на сервере разработки.
+// В сборке для игроков Vite подставляет false, и адрес уже ничего не включает.
+export function isDebugRun(): boolean {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug');
+}
 
 // Текущий темп врагов. Registry — общая полка сцены: туда GameScene кладёт число по ключу.
 // Если ключа ещё нет или там не число, темп равен 1. Выше max и ниже 1 значение не уходит.

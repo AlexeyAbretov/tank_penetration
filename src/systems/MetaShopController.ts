@@ -3,7 +3,6 @@
 import Phaser from 'phaser';
 import { Tank } from '../entities/Tank';
 import { MetaShopPanel } from '../ui/MetaShopPanel';
-import { PAUSED } from '../gameConfig';
 import { loadMeta, metaCost, resetMeta, saveMeta, type MetaSave } from './MetaSave';
 
 const SCORE_MAX = 100_000_000;
@@ -13,6 +12,8 @@ type Stat = 'coins' | 'damage' | 'blast' | 'speed';
 export class MetaShopController {
   readonly panel: MetaShopPanel;
   private readonly meta: MetaSave;
+  // Пауза сцены. Покупки очков ждут продолжения. «В бой» паузу не спрашивает.
+  private paused = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -34,6 +35,10 @@ export class MetaShopController {
 
   open(): void {
     this.panel.show(this.meta);
+  }
+
+  setPaused(paused: boolean): void {
+    this.paused = paused;
   }
 
   closeAndRestart(): void {
@@ -87,6 +92,6 @@ export class MetaShopController {
   }
 
   private isPaused(): boolean {
-    return this.panel.container.scene.registry.get(PAUSED) === true;
+    return this.paused;
   }
 }

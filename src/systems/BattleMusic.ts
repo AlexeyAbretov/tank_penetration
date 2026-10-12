@@ -1,9 +1,10 @@
 // Два лупа из public/audio: обычные волны и босс.
+// Объект создаётся при старте игры и передаётся в конструктор сцены.
 // Одинаковые волны трек не перезапускают. Смена темы — короткий кроссфейд.
 // Пауза и гибель базы глушат звук сами: менеджер волн про музыку не знает.
 
 import Phaser from 'phaser';
-import { EnemyFactory } from '../entities/EnemyFactory';
+import type { EnemyRoster } from '../entities/EnemyRoster';
 
 // Громкость по умолчанию, если игрок ещё не двигал ползунок.
 const DEFAULT_VOLUME = 0.45;
@@ -15,13 +16,21 @@ type Track = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.
 type Theme = 'wave' | 'boss';
 
 export class BattleMusic {
+  private scene!: Phaser.Scene;
   private wave!: Track;
   private boss!: Track;
   private theme: Theme | null = null;
   // 0 — тишина, 1 — как записан файл. Ползунок пишет это число в localStorage.
   private level = readVolume();
 
-  constructor(private readonly scene: Phaser.Scene) {}
+  // Фабрика известна до сцены: по ней решается, босс это или обычный луп.
+  // Звуковой менеджер появляется вместе со сценой, его ставит bind().
+  constructor(private readonly enemies: EnemyRoster) {}
+
+  // restart() поднимает ту же сцену и ту же музыку. Звуки потом создаются заново в create().
+  bind(scene: Phaser.Scene): void {
+    this.scene = scene;
+  }
 
   // Ключи кладёт preload сцены. Здесь звук только создаётся, не скачивается.
   create(): void {
@@ -55,9 +64,9 @@ export class BattleMusic {
     }
   }
 
-  // Босс — каждая 10-я волна. Остальные номера берут спокойный луп.
+  // Босс — волна, которую текущая фабрика считает боссом.
   playForWave(wave: number): void {
-    this.fadeTo(EnemyFactory.isBossWave(wave) ? 'boss' : 'wave');
+    this.fadeTo(this.enemies.isBossWave(wave) ? 'boss' : 'wave');
   }
 
   setPaused(paused: boolean): void {
@@ -86,6 +95,9 @@ export class BattleMusic {
 
   // Рестарт сцены оставляет звуки в общем менеджере. Без destroy они наложатся на новую партию.
   destroy(): void {
+    if (!this.wave) {
+      return;
+    }
     this.stop();
     this.wave.destroy();
     this.boss.destroy();
