@@ -27,6 +27,7 @@ export class GameHud {
   private pauseRequest?: () => void;
   private settingsRequest?: () => void;
   private autoFireRequest?: () => void;
+  private artilleryRequest?: () => void;
   private resumeRequest?: () => void;
   private newGameRequest?: () => void;
 
@@ -179,6 +180,7 @@ export class GameHud {
       .container(56, GAME.bannerY - 48, [glyph, this.artillerySweep, this.artilleryTime, badge, key])
       .setDepth(53)
       .setVisible(false);
+    this.artillery.on('pointerup', () => this.artilleryRequest?.());
 
     scene.add.image(1128, 28, 'hp-frame').setDepth(51);
     scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
@@ -272,6 +274,10 @@ export class GameHud {
 
   onAutoFire(request: () => void): void {
     this.autoFireRequest = request;
+  }
+
+  onArtillery(request: () => void): void {
+    this.artilleryRequest = request;
   }
 
   // Кнопка появляется после покупки. Красная плашка — режим включён, тёмная — выключен.
@@ -369,11 +375,27 @@ export class GameHud {
     );
   }
 
+  // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
+  coversArtillery(pointer: Phaser.Input.Pointer): boolean {
+    return this.artillery.visible && this.artillery.getBounds().contains(pointer.worldX, pointer.worldY);
+  }
+
   setArtillery(owned: boolean, cooldownMs: number): void {
     if (this.artilleryOwned !== owned) {
       this.artilleryOwned = owned;
       this.artillery.setVisible(owned);
       this.controls.setText(this.controlsLine(owned));
+      if (owned) {
+        if (!this.artillery.input?.enabled) {
+          this.artillery.setInteractive({
+            hitArea: new Phaser.Geom.Rectangle(-32, -32, 64, 64),
+            hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+            useHandCursor: true,
+          });
+        }
+      } else if (this.artillery.input?.enabled) {
+        this.artillery.disableInteractive();
+      }
     }
     if (!owned) {
       return;

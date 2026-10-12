@@ -492,7 +492,7 @@ export class ShopPanel {
     const reload = offer.cooldownMs / 1000;
     const crater = offer.craterMs / 1000;
     if (owned) {
-      this.artillery.info.setText(`клавиша 1 · перезарядка ${reload} с`);
+      this.artillery.info.setText(`клавиша 1 или иконка · перезарядка ${reload} с`);
       this.artillery.cost.setText('куплено');
       this.artillery.card.setFillStyle(0x3d2a12);
       this.artillery.cost.setColor('#f3d56a');
@@ -500,7 +500,7 @@ export class ShopPanel {
       return;
     }
     this.artillery.info.setText(
-      `${offer.shells} снаряда в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 1 · перезарядка ${reload} с`,
+      `${offer.shells} снаряда в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 1 или иконка · перезарядка ${reload} с`,
     );
     this.artillery.cost.setText(`цена  ${offer.cost}`);
     if (!this.artillery.card.input?.enabled) {

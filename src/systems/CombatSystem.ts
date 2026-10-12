@@ -31,6 +31,8 @@ export class CombatSystem {
   private mgCooldown = 0;
   private artilleryCooldownMs = 0;
   private readonly strikeKeys: Phaser.Input.Keyboard.Key[] = [];
+  // Клик по иконке на HUD. Сбрасывается в том же кадре, даже если удар ещё на перезарядке.
+  private strikeFromIcon = false;
   private flights: ArtilleryFlight[] = [];
   private salvoTimers: Phaser.Time.TimerEvent[] = [];
   // Сброс отменяет залп, который ещё ждёт конца хлопка.
@@ -71,7 +73,13 @@ export class CombatSystem {
     this.artilleryCooldownMs = Math.max(0, ms);
   }
 
+  // Иконка на HUD просит удар. Сработает в tickArtillery, если бой идёт и перезарядка кончилась.
+  requestArtillery(): void {
+    this.strikeFromIcon = true;
+  }
+
   clearProjectiles(): void {
+    this.strikeFromIcon = false;
     this.shells.clear(true, true);
     this.mgShots.clear(true, true);
     this.cancelArtillery();
@@ -109,13 +117,15 @@ export class CombatSystem {
     }
   }
 
-  // Перезарядка идёт и в магазине. Выстрел — только в бою, по клавише 1.
+  // Перезарядка идёт и в магазине. Выстрел — только в бою, по клавише 1 или по иконке.
   tickArtillery(delta: number, canFire: boolean): void {
     if (!this.shop.artilleryOwned) {
+      this.strikeFromIcon = false;
       return;
     }
     this.artilleryCooldownMs = Math.max(0, this.artilleryCooldownMs - delta);
-    if (!canFire || this.artilleryCooldownMs > 0 || !this.strikePressed()) {
+    const pressed = this.strikePressed();
+    if (!canFire || this.artilleryCooldownMs > 0 || !pressed) {
       return;
     }
     this.artilleryCooldownMs = ArtilleryStrike.shop.cooldownMs;
@@ -123,7 +133,9 @@ export class CombatSystem {
   }
 
   private strikePressed(): boolean {
-    return this.strikeKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+    const fromIcon = this.strikeFromIcon;
+    this.strikeFromIcon = false;
+    return fromIcon || this.strikeKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
   }
 
   // Сразу хлопок. Снаряды — через секунду после того, как он доиграл.

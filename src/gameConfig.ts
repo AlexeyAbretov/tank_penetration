@@ -15,7 +15,7 @@ export const ENEMY_HASTE = {
 } as const;
 
 // Дебаг-партия включается адресом с ?debug только на сервере разработки.
-// В сборке для игроков Vite подставляет false, и адрес уже ничего не включает.
+// Команда: npm run debug. В сборке для игроков Vite подставляет false, и адрес уже ничего не включает.
 export function isDebugRun(): boolean {
   return import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug');
 }

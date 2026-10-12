@@ -1,5 +1,5 @@
 // Артиллерийский удар: три снаряда в случайные точки поля.
-// Покупка в магазине открывает вызов по клавише 1. Сам залп считает CombatSystem.
+// Покупка в магазине открывает вызов по клавише 1 и по иконке на HUD. Сам залп считает CombatSystem.
 
 import Phaser from 'phaser';
 import { bake } from '../gfx/textures';
@@ -70,7 +70,7 @@ export class ArtilleryStrike {
   }
 
   // Светящийся снаряд падает сверху. onImpact — взрыв в точке, куда сел носик.
-  // Хлопок батареи к этому моменту уже отзвучал: его играет нажатие клавиши.
+  // Хлопок батареи к этому моменту уже отзвучал: его играет вызов удара.
   static drop(scene: Phaser.Scene, x: number, y: number, onImpact: () => void): ArtilleryFlight {
     ArtilleryStrike.ensureTextures(scene);
     const drift = Phaser.Math.Between(-28, 28);

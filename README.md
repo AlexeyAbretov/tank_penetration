@@ -18,6 +18,7 @@ npm run dev
 | Команда | Что делает |
 | --- | --- |
 | `npm run dev` | Игра с горячей перезагрузкой |
+| `npm run debug` | Дебаг-партия: [http://localhost:8080/index.html?debug](http://localhost:8080/index.html?debug) |
 | `npm run studio` | Просмотр спрайтов: [http://localhost:8080/preview.html](http://localhost:8080/preview.html) |
 | `npm run build` | Проверка TypeScript и сборка в `dist/` |
 | `npm run build:html` | Отдельный файл `release/tank-penetration.html`. Его открывают двойным кликом, без сервера |

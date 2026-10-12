@@ -200,6 +200,12 @@ export class GameScene extends Phaser.Scene {
       }
       this.shop.toggleAutoFire();
     });
+    this.hud.onArtillery(() => {
+      if (this.paused || this.settingsOpen || this.player.isGameOver || this.defeatShop) {
+        return;
+      }
+      this.combat.requestArtillery();
+    });
     this.hud.onResume(() => {
       this.resumeRequested = true;
     });
@@ -386,7 +392,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fighting = !this.shop.shopOpen;
-    // Перезарядка артиллерии идёт и в магазине. Выстрел — только когда fighting.
+    // Перезарядка артиллерии идёт и в магазине. Выстрел — только когда fighting, с клавиши или с иконки.
     this.combat.tickArtillery(delta, fighting);
     this.hud.setArtillery(this.shop.artilleryOwned, this.combat.artilleryCooldown);
     if (!fighting) {
@@ -397,13 +403,14 @@ export class GameScene extends Phaser.Scene {
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
-    // Клик по кнопкам темпа, паузы, автострельбы и настроек не считается выстрелом: они лежат поверх поля.
+    // Клик по кнопкам темпа, паузы, автострельбы, артиллерии и настроек не считается выстрелом: они лежат поверх поля.
     this.combat.tick(
       delta,
       !this.hud.coversHaste(pointer) &&
         !this.hud.coversPause(pointer) &&
         !this.hud.coversSettings(pointer) &&
-        !this.hud.coversAutoFire(pointer),
+        !this.hud.coversAutoFire(pointer) &&
+        !this.hud.coversArtillery(pointer),
     );
     this.projectiles.tick();
     this.waves.tick();
