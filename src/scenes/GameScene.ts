@@ -58,7 +58,7 @@ export class GameScene extends Phaser.Scene {
   // Взрыв, когда здоровье базы доходит до нуля. Тот же ползунок эффектов.
   private tankDeath?: TankDeath;
   // Удар снаряда по врагу. Три коротких варианта, чтобы не повторялся один и тот же.
-  private impacts?: ImpactSounds;
+  private impacts!: ImpactSounds;
   // Взрыв штурмовика, когда он доходит до брони. Тот же ползунок эффектов.
   private assaultExplosion?: AssaultExplosion;
   // Крик пехоты, убитой танком. Два варианта, пикап и взрыв о базу его не берут.
@@ -224,8 +224,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once('shutdown', this.onShutdown, this);
 
     const effects = new EffectsVolume();
-    const tankDeath = new TankDeath(this, effects);
-    this.tankDeath = tankDeath;
+    this.tankDeath = new TankDeath(this, effects);
     this.player = new PlayerController(
       this,
       this.hud,
@@ -235,7 +234,7 @@ export class GameScene extends Phaser.Scene {
         clearPlayerCombat: () => this.combat.clearProjectiles(),
       },
       () => this.openDefeatShop(),
-      tankDeath,
+      this.tankDeath,
     );
     this.player.reset();
 
@@ -260,26 +259,16 @@ export class GameScene extends Phaser.Scene {
     );
 
     const progress = loadProgress();
-    const tankShot = new TankShot(this, effects);
-    this.tankShot = tankShot;
-    const tankMgShot = new TankMgShot(this, effects);
-    this.tankMgShot = tankMgShot;
-    const gunnerShot = new GunnerShot(this, effects);
-    this.gunnerShot = gunnerShot;
-    const bulletHit = new BulletHitTank(this, effects);
-    this.bulletHit = bulletHit;
-    const rocketSounds = new RocketSounds(this, effects);
-    this.rocketSounds = rocketSounds;
-    const artillerySounds = new ArtillerySounds(this, effects);
-    this.artillerySounds = artillerySounds;
-    const impacts = new ImpactSounds(this, effects);
-    this.impacts = impacts;
-    const assaultExplosion = new AssaultExplosion(this, effects);
-    this.assaultExplosion = assaultExplosion;
-    const pickupExplosion = new PickupExplosion(this, effects);
-    this.pickupExplosion = pickupExplosion;
-    const infantryDeath = new InfantryDeath(this, effects);
-    this.infantryDeath = infantryDeath;
+    this.tankShot = new TankShot(this, effects);
+    this.tankMgShot = new TankMgShot(this, effects);
+    this.gunnerShot = new GunnerShot(this, effects);
+    this.bulletHit = new BulletHitTank(this, effects);
+    this.rocketSounds = new RocketSounds(this, effects);
+    this.artillerySounds = new ArtillerySounds(this, effects);
+    this.impacts = new ImpactSounds(this, effects);
+    this.assaultExplosion = new AssaultExplosion(this, effects);
+    this.pickupExplosion = new PickupExplosion(this, effects);
+    this.infantryDeath = new InfantryDeath(this, effects);
     this.combat = new CombatSystem(
       this,
       this.player.tank,
@@ -291,12 +280,12 @@ export class GameScene extends Phaser.Scene {
       },
       progress.damage,
       progress.blast,
-      tankShot,
-      impacts,
-      assaultExplosion,
-      pickupExplosion,
-      infantryDeath,
-      tankMgShot,
+      this.tankShot,
+      this.impacts,
+      this.assaultExplosion,
+      this.pickupExplosion,
+      this.infantryDeath,
+      this.tankMgShot,
     );
     this.progressShop = new ProgressShopController(this, () => {
       // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
@@ -313,7 +302,7 @@ export class GameScene extends Phaser.Scene {
       (level) => this.music.setVolume(level),
       (level) => {
         effects.setVolume(level);
-        this.previewEffect(impacts);
+        this.previewEffect(this.impacts);
       },
       () => this.closeSettings(),
     );
@@ -336,8 +325,8 @@ export class GameScene extends Phaser.Scene {
       this.player.tank,
       this.enemyShots,
       (amount) => this.onBaseHit(amount),
-      bulletHit,
-      rocketSounds,
+      this.bulletHit,
+      this.rocketSounds,
     );
 
     this.applyCameraFx();
