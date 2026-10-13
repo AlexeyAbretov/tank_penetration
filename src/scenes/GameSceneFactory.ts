@@ -1,14 +1,17 @@
 // Собирает сцену до старта Phaser. В список сцен кладётся готовый объект:
 // иначе движок вызовет конструктор без аргументов, и restart() поднимет пустую сцену.
 // Дебаг-ветка стоит отдельно. В сборке для игроков isDebugRun() становится false,
-// и DebugCombatSave с DebugEnemyFactory из бандла выпадают.
+// и DebugCombatSave, DebugProgressSave с DebugEnemyFactory из бандла выпадают.
 
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';
 import { EnemyFactory } from '../entities/EnemyFactory';
 import { isDebugRun } from '../gameConfig';
 import { BattleMusic } from '../systems/BattleMusic';
 import { DebugCombatSave } from '../saves/DebugCombatSave';
+import { DebugProgressSave } from '../saves/DebugProgressSave';
 import { CombatSave } from '../saves/CombatSave';
+import { ProgressSave } from '../saves/ProgressSave';
+import { ProgressShopController } from '../shops/ProgressShopController';
 import { WaveManager } from '../systems/WaveManager';
 import { GameScene } from './GameScene';
 import { DebugGameHud } from '../ui/DebugGameHud';
@@ -20,7 +23,8 @@ export class GameSceneFactory {
       const enemies = DebugEnemyFactory;
       
       return new GameScene(
-        new DebugCombatSave(), 
+        new DebugCombatSave(),
+        new ProgressShopController(new DebugProgressSave()),
         new WaveManager(enemies),
         new BattleMusic(enemies),
         DebugGameHud
@@ -31,6 +35,7 @@ export class GameSceneFactory {
 
     return new GameScene(
       new CombatSave(),
+      new ProgressShopController(new ProgressSave()),
       new WaveManager(enemies),
       new BattleMusic(enemies),
       GameHud);

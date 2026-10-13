@@ -12,7 +12,6 @@ import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleEffects } from '../systems/BattleEffects';
 import { BattleMusic } from '../systems/BattleMusic';
 import { CombatSystem } from '../systems/CombatSystem';
-import { loadProgress, resetProgress } from '../saves/ProgressSave';
 import { ProgressShopController } from '../shops/ProgressShopController';
 import { PlayerController } from '../systems/PlayerController';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
@@ -43,14 +42,12 @@ export class GameScene extends Phaser.Scene {
   private settingsPausedPhysics = false;
   // Магазин между волнами.
   private shop!: ShopController;
-  // Магазин очков после гибели базы.
-  private progressShop!: ProgressShopController;
   // Пули и ракеты, которые летят в танк.
   private projectiles!: ProjectileSystem;
   // true, пока на экране «БАЗА РАЗБИТА». Обычный update в этом состоянии не идёт.
   private defeatShop = false;
 
-  // Очки этой партии. После гибели прибавляются к запасу в ProgressSave.
+  // Очки этой партии. После гибели их забирает магазин постоянных улучшений.
   private score = 0;
   // Монеты этой партии. Тратятся между волнами и пропадают вместе с партией.
   private coins = 0;
@@ -83,12 +80,13 @@ export class GameScene extends Phaser.Scene {
 
   constructor(
     private readonly combatSave: CombatSave,
+    private readonly progressShop: ProgressShopController,
     private readonly waves: WaveManager,
     private readonly music: BattleMusic,
     private readonly Hud: new (scene: Phaser.Scene) => GameHud,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
-    // поэтому хранилище, волны и музыка, переданные при старте, не подменяются.
+    // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
     super('game');
   }
 
@@ -147,7 +145,12 @@ export class GameScene extends Phaser.Scene {
     this.persistEnabled = false;
     this.autosaveMs = 0;
     this.defeatShop = false;
-    Tank.setProgressSpeedLevel(loadProgress().speed);
+    this.progressShop.bind(this, () => {
+      // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
+      this.persistEnabled = false;
+      this.scene.restart();
+    });
+    Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
     this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
@@ -222,12 +225,16 @@ export class GameScene extends Phaser.Scene {
           return true;
         },
       },
+      {
+        damage: this.progressShop.damageBonus(),
+        blast: this.progressShop.blastBonus(),
+        coins: this.progressShop.coinBonus(),
+      },
       () => this.waves.beginNextWave(),
       // Любая покупка сразу пишет партию, не дожидаясь автозаписи раз в 400 мс.
       () => this.writeSave(),
     );
 
-    const progress = loadProgress();
     this.combat = new CombatSystem(
       this,
       this.player.tank,
@@ -237,15 +244,10 @@ export class GameScene extends Phaser.Scene {
         onKill: (reward) => this.onEnemyKill(reward),
         onBaseHit: (amount) => this.onBaseHit(amount),
       },
-      progress.damage,
-      progress.blast,
+      this.progressShop.damageBonus(),
+      this.progressShop.blastBonus(),
       fx,
     );
-    this.progressShop = new ProgressShopController(this, () => {
-      // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
-      this.persistEnabled = false;
-      this.scene.restart();
-    });
     // Пересечения снарядов танка с пехотой. Без этого выстрел пролетает сквозь спрайт.
     this.combat.setupOverlap();
 
@@ -525,8 +527,8 @@ export class GameScene extends Phaser.Scene {
 
   private onEnemyKill(coinReward: number): void {
     this.score += 10;
-    // coinReward — монеты вида врага. loadProgress().coins — постоянная прибавка за каждое убийство.
-    this.coins += coinReward + loadProgress().coins;
+    // coinReward — монеты вида врага. coinBonus() — постоянная прибавка за каждое убийство.
+    this.coins += coinReward + this.progressShop.coinBonus();
     this.hud.setScore(this.score);
     this.hud.setCoins(this.coins);
     this.writeSave();
@@ -550,7 +552,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.persistEnabled = false;
-    resetProgress();
+    this.progressShop.clearProgress();
     this.combatSave.clear();
     this.scene.restart();
   }
@@ -576,7 +578,7 @@ export class GameScene extends Phaser.Scene {
 
   private continueRun(saved: SavedRun | null): void {
     // Гибель уже случилась, а «В бой» игрок не нажал. Магазин очков открывается снова.
-    if (loadProgress().awaitingShop) {
+    if (this.progressShop.isAwaitingShop()) {
       this.combatSave.clear();
       this.shop.syncTankStats();
       this.openDefeatShop();

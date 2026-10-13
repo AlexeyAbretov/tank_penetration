@@ -4,13 +4,25 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
-import { AutoFire } from '../entities/AutoFire';
-import { BarbedWire } from '../entities/BarbedWire';
-import { Infantry } from '../entities/Infantry';
-import { MachineGun } from '../entities/MachineGun';
-import { Tank } from '../entities/Tank';
-import { loadProgress } from '../saves/ProgressSave';
+
+export type ShopCardView = {
+  info: string;
+  cost: string;
+  // false — карточка уже куплена или уровень максимальный, клик не нужен.
+  open: boolean;
+  canBuy: boolean;
+};
+
+export type ShopView = {
+  coins: number;
+  blast: ShopCardView;
+  damage: ShopCardView;
+  fireRate: ShopCardView;
+  wire: ShopCardView;
+  autoFire: ShopCardView;
+  machineGun: ShopCardView;
+  artillery: ShopCardView;
+};
 
 // Методы покупок, которые реализует ShopController.
 export type ShopDelegate = {
@@ -51,15 +63,6 @@ type Offer = {
 };
 
 export class ShopPanel {
-  static readonly upgrades = {
-    baseCost: 3,
-    costStep: 2,
-  };
-
-  static upgradeCost(level: number): number {
-    return ShopPanel.upgrades.baseCost + level * ShopPanel.upgrades.costStep;
-  }
-
   // Шапка, рамка и кнопка. Список карточек сюда не входит: его рисует своя камера.
   readonly container: Phaser.GameObjects.Container;
 
@@ -211,27 +214,9 @@ export class ShopPanel {
     this.syncListCamera();
   }
 
-  show(
-    coins: number,
-    blastLevel: number,
-    damageLevel: number,
-    fireRateLevel: number,
-    wireOwned: boolean,
-    autoFireOwned: boolean,
-    machineGunOwned: boolean,
-    artilleryOwned: boolean,
-  ): void {
+  show(view: ShopView): void {
     this.setScroll(0);
-    this.refresh(
-      coins,
-      blastLevel,
-      damageLevel,
-      fireRateLevel,
-      wireOwned,
-      autoFireOwned,
-      machineGunOwned,
-      artilleryOwned,
-    );
+    this.refresh(view);
     this.syncListCamera();
     this.container.setVisible(true);
     this.listContent.setVisible(true);
@@ -264,38 +249,15 @@ export class ShopPanel {
     this.thumb.setVisible(scroll);
   }
 
-  refresh(
-    coins: number,
-    blastLevel: number,
-    damageLevel: number,
-    fireRateLevel: number,
-    wireOwned: boolean,
-    autoFireOwned: boolean,
-    machineGunOwned: boolean,
-    artilleryOwned: boolean,
-  ): void {
-    this.coinsText.setText(`Монеты  ${coins}`);
-
-    const blastPrice = ShopPanel.upgradeCost(blastLevel);
-    const damagePrice = ShopPanel.upgradeCost(damageLevel);
-    const fireRatePrice = ShopPanel.upgradeCost(fireRateLevel);
-    const progress = loadProgress();
-    const radius = (blastLevel + progress.blast) * Tank.blastRadiusPerLevel;
-    const nextRadius = (blastLevel + 1 + progress.blast) * Tank.blastRadiusPerLevel;
-    const damageNow = Infantry.shellDamage + damageLevel + progress.damage;
-
-    this.blast.info.setText(`ур. ${blastLevel}   радиус ${radius} → ${nextRadius}`);
-    this.blast.cost.setText(`цена  ${blastPrice}`);
-    this.damage.info.setText(`ур. ${damageLevel}   урон ${damageNow} → ${damageNow + 1}`);
-    this.damage.cost.setText(`цена  ${damagePrice}`);
-
-    this.tintCard(this.blast.card, this.blast.cost, coins >= blastPrice);
-    this.tintCard(this.damage.card, this.damage.cost, coins >= damagePrice);
-    this.showFireRate(coins, fireRateLevel, fireRatePrice);
-    this.showWire(coins, wireOwned);
-    this.showAutoFire(coins, autoFireOwned);
-    this.showMachineGun(coins, machineGunOwned);
-    this.showArtillery(coins, artilleryOwned);
+  refresh(view: ShopView): void {
+    this.coinsText.setText(`Монеты  ${view.coins}`);
+    this.paint(this.blast, view.blast);
+    this.paint(this.damage, view.damage);
+    this.paint(this.fireRate, view.fireRate);
+    this.paint(this.wire, view.wire);
+    this.paint(this.autoFire, view.autoFire);
+    this.paint(this.machineGun, view.machineGun);
+    this.paint(this.artillery, view.artillery);
   }
 
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
@@ -409,104 +371,19 @@ export class ShopPanel {
     }
   }
 
-  private formatDelay(ms: number): string {
-    return `${(ms / 1000).toFixed(2)} с`;
-  }
-
-  private showFireRate(coins: number, level: number, price: number): void {
-    const maxed = level >= Tank.maxFireRateLevel;
-    const delay = Tank.fireDelayFor(level);
-    const nextDelay = Tank.fireDelayFor(level + 1);
-    this.fireRate.info.setText(
-      maxed
-        ? `ур. ${level}   ${this.formatDelay(delay)} (макс.)`
-        : `ур. ${level}   ${this.formatDelay(delay)} → ${this.formatDelay(nextDelay)}`,
-    );
-    if (maxed) {
-      this.fireRate.cost.setText('максимум');
-      this.fireRate.card.setFillStyle(0x3d2a12);
-      this.fireRate.cost.setColor('#f3d56a');
-      this.fireRate.card.disableInteractive();
+  private paint(offer: Offer, card: ShopCardView): void {
+    offer.info.setText(card.info);
+    offer.cost.setText(card.cost);
+    if (!card.open) {
+      offer.card.setFillStyle(0x3d2a12);
+      offer.cost.setColor('#f3d56a');
+      offer.card.disableInteractive();
       return;
     }
-    this.fireRate.cost.setText(`цена  ${price}`);
-    if (!this.fireRate.card.input?.enabled) {
-      this.fireRate.card.setInteractive({ useHandCursor: true });
+    if (!offer.card.input?.enabled) {
+      offer.card.setInteractive({ useHandCursor: true });
     }
-    this.tintCard(this.fireRate.card, this.fireRate.cost, coins >= price);
-  }
-
-  private showWire(coins: number, owned: boolean): void {
-    if (owned) {
-      this.wire.info.setText('стоит перед танком, от верха до низа');
-      this.wire.cost.setText('установлена');
-      this.wire.card.setFillStyle(0x3d2a12);
-      this.wire.cost.setColor('#f3d56a');
-      this.wire.card.disableInteractive();
-      return;
-    }
-    this.wire.info.setText('не пускает пехоту · 1 урона / 3 с');
-    this.wire.cost.setText(`цена  ${BarbedWire.shop.cost}`);
-    if (!this.wire.card.input?.enabled) {
-      this.wire.card.setInteractive({ useHandCursor: true });
-    }
-    this.tintCard(this.wire.card, this.wire.cost, coins >= BarbedWire.shop.cost);
-  }
-
-  private showAutoFire(coins: number, owned: boolean): void {
-    if (owned) {
-      this.autoFire.info.setText('кнопка слева от шестерёнки — вкл и выкл');
-      this.autoFire.cost.setText('куплено');
-      this.autoFire.card.setFillStyle(0x3d2a12);
-      this.autoFire.cost.setColor('#f3d56a');
-      this.autoFire.card.disableInteractive();
-      return;
-    }
-    this.autoFire.info.setText('не нужно держать ЛКМ');
-    this.autoFire.cost.setText(`цена  ${AutoFire.shop.cost}`);
-    if (!this.autoFire.card.input?.enabled) {
-      this.autoFire.card.setInteractive({ useHandCursor: true });
-    }
-    this.tintCard(this.autoFire.card, this.autoFire.cost, coins >= AutoFire.shop.cost);
-  }
-
-  private showMachineGun(coins: number, owned: boolean): void {
-    if (owned) {
-      this.machineGun.info.setText('перед люком башни · 1 урона / 3 с');
-      this.machineGun.cost.setText('установлен');
-      this.machineGun.card.setFillStyle(0x3d2a12);
-      this.machineGun.cost.setColor('#f3d56a');
-      this.machineGun.card.disableInteractive();
-      return;
-    }
-    this.machineGun.info.setText('стреляет вдоль прицела башни');
-    this.machineGun.cost.setText(`цена  ${MachineGun.shop.cost}`);
-    if (!this.machineGun.card.input?.enabled) {
-      this.machineGun.card.setInteractive({ useHandCursor: true });
-    }
-    this.tintCard(this.machineGun.card, this.machineGun.cost, coins >= MachineGun.shop.cost);
-  }
-
-  private showArtillery(coins: number, owned: boolean): void {
-    const offer = ArtilleryStrike.shop;
-    const reload = offer.cooldownMs / 1000;
-    const crater = offer.craterMs / 1000;
-    if (owned) {
-      this.artillery.info.setText(`клавиша 1 или иконка · перезарядка ${reload} с`);
-      this.artillery.cost.setText('куплено');
-      this.artillery.card.setFillStyle(0x3d2a12);
-      this.artillery.cost.setColor('#f3d56a');
-      this.artillery.card.disableInteractive();
-      return;
-    }
-    this.artillery.info.setText(
-      `${offer.shells} снаряда в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 1 или иконка · перезарядка ${reload} с`,
-    );
-    this.artillery.cost.setText(`цена  ${offer.cost}`);
-    if (!this.artillery.card.input?.enabled) {
-      this.artillery.card.setInteractive({ useHandCursor: true });
-    }
-    this.tintCard(this.artillery.card, this.artillery.cost, coins >= offer.cost);
+    this.tintCard(offer.card, offer.cost, card.canBuy);
   }
 
   private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {

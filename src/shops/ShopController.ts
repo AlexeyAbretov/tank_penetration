@@ -1,6 +1,6 @@
 // Покупки между волнами. Окно ShopPanel только рисует кнопки и зовёт методы ниже.
 // Уровни живут здесь, пока жива партия. В localStorage их кладёт CombatSave через capture().
-// Постоянные улучшения после поражения сюда не входят: их держит ProgressSave.
+// Постоянные прибавки к урону, взрыву и монетам приходят снаружи и за партию не меняются.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
@@ -9,10 +9,15 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
-import { ShopPanel } from './ShopPanel';
+import { ShopPanel, type ShopCardView, type ShopView } from './ShopPanel';
 import type { GameHud } from '../ui/GameHud';
-import { loadProgress } from '../saves/ProgressSave';
 import type { ShopSave } from '../saves/CombatSave';
+
+type PermanentBonuses = {
+  damage: number;
+  blast: number;
+  coins: number;
+};
 
 type Economy = {
   getCoins: () => number;
@@ -40,6 +45,7 @@ export class ShopController {
     private readonly hud: GameHud,
     private readonly tank: Tank,
     private readonly economy: Economy,
+    private readonly bonuses: PermanentBonuses,
     private readonly onContinue: () => void,
     private readonly onChanged: () => void,
   ) {
@@ -98,16 +104,7 @@ export class ShopController {
     this.scene.registry.set('combat', false);
     // pause замораживает скорости. Враги остаются на тех же координатах.
     this.scene.physics.world.pause();
-    this.panel.show(
-      this.economy.getCoins(),
-      this.blastLevel,
-      this.damageLevel,
-      this.fireRateLevel,
-      this.wireOwned,
-      this.autoFire.isOwned,
-      this.machineGunOwned,
-      this.artilleryOwned,
-    );
+    this.panel.show(this.view());
   }
 
   setPaused(paused: boolean): void {
@@ -127,12 +124,12 @@ export class ShopController {
     this.onContinue();
   }
 
-  // +1 к радиусу взрыва. Цена растёт от текущего уровня, см. ShopPanel.upgradeCost.
+  // +1 к радиусу взрыва. Цена растёт от текущего уровня.
   buyBlast(): void {
     if (this.isPaused()) {
       return;
     }
-    const cost = ShopPanel.upgradeCost(this.blastLevel);
+    const cost = ShopController.upgradeCost(this.blastLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -140,12 +137,12 @@ export class ShopController {
     this.refresh();
   }
 
-  // +1 к урону снаряда танка. Складывается с постоянным уроном из ProgressSave.
+  // +1 к урону снаряда танка. Складывается с постоянной прибавкой, которую передала сцена.
   buyDamage(): void {
     if (this.isPaused()) {
       return;
     }
-    const cost = ShopPanel.upgradeCost(this.damageLevel);
+    const cost = ShopController.upgradeCost(this.damageLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -158,7 +155,7 @@ export class ShopController {
     if (this.isPaused() || this.fireRateLevel >= Tank.maxFireRateLevel) {
       return;
     }
-    const cost = ShopPanel.upgradeCost(this.fireRateLevel);
+    const cost = ShopController.upgradeCost(this.fireRateLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -235,13 +232,12 @@ export class ShopController {
 
   // Строка характеристик над полем: урон и взрыв партии плюс постоянные уровни.
   syncTankStats(): void {
-    const progress = loadProgress();
     this.hud.setTankStats(
-      Infantry.shellDamage + this.damageLevel + progress.damage,
-      (this.blastLevel + progress.blast) * Tank.blastRadiusPerLevel,
+      Infantry.shellDamage + this.damageLevel + this.bonuses.damage,
+      (this.blastLevel + this.bonuses.blast) * Tank.blastRadiusPerLevel,
       Tank.fireDelayFor(this.fireRateLevel),
       this.autoFire.enabled,
-      progress.coins,
+      this.bonuses.coins,
     );
     this.hud.setAutoFireToggle(this.autoFire.isOwned, this.autoFire.enabled);
   }
@@ -253,16 +249,122 @@ export class ShopController {
   private refresh(): void {
     this.hud.setCoins(this.economy.getCoins());
     this.syncTankStats();
-    this.panel.refresh(
-      this.economy.getCoins(),
-      this.blastLevel,
-      this.damageLevel,
-      this.fireRateLevel,
-      this.wireOwned,
-      this.autoFire.isOwned,
-      this.machineGunOwned,
-      this.artilleryOwned,
-    );
+    this.panel.refresh(this.view());
     this.onChanged();
+  }
+
+  // Первая покупка уровня стоит 3. Каждая следующая — на 2 дороже.
+  private static upgradeCost(level: number): number {
+    return 3 + level * 2;
+  }
+
+  private view(): ShopView {
+    const coins = this.economy.getCoins();
+    return {
+      coins,
+      blast: this.blastCard(coins),
+      damage: this.damageCard(coins),
+      fireRate: this.fireRateCard(coins),
+      wire: this.onceCard(
+        coins,
+        this.wireOwned,
+        BarbedWire.shop.cost,
+        'стоит перед танком, от верха до низа',
+        'установлена',
+        'не пускает пехоту · 1 урона / 3 с',
+      ),
+      autoFire: this.onceCard(
+        coins,
+        this.autoFire.isOwned,
+        AutoFire.shop.cost,
+        'кнопка слева от шестерёнки — вкл и выкл',
+        'куплено',
+        'не нужно держать ЛКМ',
+      ),
+      machineGun: this.onceCard(
+        coins,
+        this.machineGunOwned,
+        MachineGun.shop.cost,
+        'перед люком башни · 1 урона / 3 с',
+        'установлен',
+        'стреляет вдоль прицела башни',
+      ),
+      artillery: this.artilleryCard(coins),
+    };
+  }
+
+  private blastCard(coins: number): ShopCardView {
+    const price = ShopController.upgradeCost(this.blastLevel);
+    const radius = (this.blastLevel + this.bonuses.blast) * Tank.blastRadiusPerLevel;
+    const nextRadius = (this.blastLevel + 1 + this.bonuses.blast) * Tank.blastRadiusPerLevel;
+    return {
+      info: `ур. ${this.blastLevel}   радиус ${radius} → ${nextRadius}`,
+      cost: `цена  ${price}`,
+      open: true,
+      canBuy: coins >= price,
+    };
+  }
+
+  private damageCard(coins: number): ShopCardView {
+    const price = ShopController.upgradeCost(this.damageLevel);
+    const now = Infantry.shellDamage + this.damageLevel + this.bonuses.damage;
+    return {
+      info: `ур. ${this.damageLevel}   урон ${now} → ${now + 1}`,
+      cost: `цена  ${price}`,
+      open: true,
+      canBuy: coins >= price,
+    };
+  }
+
+  private fireRateCard(coins: number): ShopCardView {
+    const level = this.fireRateLevel;
+    const price = ShopController.upgradeCost(level);
+    const delay = this.formatDelay(Tank.fireDelayFor(level));
+    const next = this.formatDelay(Tank.fireDelayFor(level + 1));
+    const maxed = level >= Tank.maxFireRateLevel;
+    return {
+      info: maxed ? `ур. ${level}   ${delay} (макс.)` : `ур. ${level}   ${delay} → ${next}`,
+      cost: maxed ? 'максимум' : `цена  ${price}`,
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+    };
+  }
+
+  private artilleryCard(coins: number): ShopCardView {
+    const offer = ArtilleryStrike.shop;
+    const reload = offer.cooldownMs / 1000;
+    const crater = offer.craterMs / 1000;
+    if (this.artilleryOwned) {
+      return {
+        info: `клавиша 1 или иконка · перезарядка ${reload} с`,
+        cost: 'куплено',
+        open: false,
+        canBuy: false,
+      };
+    }
+    return {
+      info: `${offer.shells} снаряда в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 1 или иконка · перезарядка ${reload} с`,
+      cost: `цена  ${offer.cost}`,
+      open: true,
+      canBuy: coins >= offer.cost,
+    };
+  }
+
+  private onceCard(
+    coins: number,
+    owned: boolean,
+    price: number,
+    ownedInfo: string,
+    ownedCost: string,
+    offerInfo: string,
+  ): ShopCardView {
+    if (owned) {
+      return { info: ownedInfo, cost: ownedCost, open: false, canBuy: false };
+    }
+    return { info: offerInfo, cost: `цена  ${price}`, open: true, canBuy: coins >= price };
+  }
+
+  private formatDelay(ms: number): string {
+    return `${(ms / 1000).toFixed(2)} с`;
   }
 }

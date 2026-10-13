@@ -1,10 +1,23 @@
 // Магазин после гибели базы. Четыре постоянных улучшения, оплата накопленным score.
 
 import Phaser from 'phaser';
-import { Infantry } from '../entities/Infantry';
-import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
-import { progressCost, type ProgressSave } from '../saves/ProgressSave';
+
+export type ProgressCardView = {
+  info: string;
+  cost: string;
+  // false — скорость уже на пределе, клик не нужен.
+  open: boolean;
+  canBuy: boolean;
+};
+
+export type ProgressShopView = {
+  score: number;
+  coins: ProgressCardView;
+  damage: ProgressCardView;
+  blast: ProgressCardView;
+  speed: ProgressCardView;
+};
 
 export type ProgressShopDelegate = {
   buyCoins(): void;
@@ -76,8 +89,8 @@ export class ProgressShopPanel {
     this.container.setDepth(85).setVisible(false);
   }
 
-  show(progress: ProgressSave): void {
-    this.refresh(progress);
+  show(view: ProgressShopView): void {
+    this.refresh(view);
     this.container.setVisible(true);
   }
 
@@ -85,12 +98,12 @@ export class ProgressShopPanel {
     this.container.setVisible(false);
   }
 
-  refresh(progress: ProgressSave): void {
-    this.scoreText.setText(`SCORE  ${progress.score}`);
-    this.showCoins(progress);
-    this.showDamage(progress);
-    this.showBlast(progress);
-    this.showSpeed(progress);
+  refresh(view: ProgressShopView): void {
+    this.scoreText.setText(`SCORE  ${view.score}`);
+    this.paint(this.coins, view.coins);
+    this.paint(this.damage, view.damage);
+    this.paint(this.blast, view.blast);
+    this.paint(this.speed, view.speed);
   }
 
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
@@ -167,56 +180,19 @@ export class ProgressShopPanel {
     zone.on('pointerup', fire);
   }
 
-  private showCoins(progress: ProgressSave): void {
-    const price = progressCost(progress.coins);
-    this.coins.info.setText(`ур. ${progress.coins}   +${progress.coins} → +${progress.coins + 1} к монетам`);
-    this.coins.cost.setText(`цена  ${price}`);
-    this.tintCard(this.coins.card, this.coins.cost, progress.score >= price);
-  }
-
-  private showDamage(progress: ProgressSave): void {
-    const price = progressCost(progress.damage);
-    const now = Infantry.shellDamage + progress.damage;
-    this.damage.info.setText(`ур. ${progress.damage}   урон ${now} → ${now + 1}`);
-    this.damage.cost.setText(`цена  ${price}`);
-    this.tintCard(this.damage.card, this.damage.cost, progress.score >= price);
-  }
-
-  private showBlast(progress: ProgressSave): void {
-    const price = progressCost(progress.blast);
-    const now = progress.blast * Tank.blastRadiusPerLevel;
-    const next = (progress.blast + 1) * Tank.blastRadiusPerLevel;
-    this.blast.info.setText(`ур. ${progress.blast}   радиус ${now} → ${next}`);
-    this.blast.cost.setText(`цена  ${price}`);
-    this.tintCard(this.blast.card, this.blast.cost, progress.score >= price);
-  }
-
-  private showSpeed(progress: ProgressSave): void {
-    const now = Tank.fireDelayFor(0, progress.speed);
-    const next = Tank.fireDelayFor(0, progress.speed + 1);
-    const maxed = progress.speed >= Tank.maxProgressSpeedLevel || next >= now;
-    this.speed.info.setText(
-      maxed
-        ? `ур. ${progress.speed}   ${this.formatDelay(now)} (макс.)`
-        : `ур. ${progress.speed}   ${this.formatDelay(now)} → ${this.formatDelay(next)}`,
-    );
-    if (maxed) {
-      this.speed.cost.setText('максимум');
-      this.speed.card.setFillStyle(0x3d2a12);
-      this.speed.cost.setColor('#f3d56a');
-      this.speed.hit.disableInteractive();
+  private paint(offer: Offer, card: ProgressCardView): void {
+    offer.info.setText(card.info);
+    offer.cost.setText(card.cost);
+    if (!card.open) {
+      offer.card.setFillStyle(0x3d2a12);
+      offer.cost.setColor('#f3d56a');
+      offer.hit.disableInteractive();
       return;
     }
-    const price = progressCost(progress.speed);
-    this.speed.cost.setText(`цена  ${price}`);
-    if (this.speed.hit.input && !this.speed.hit.input.enabled) {
-      this.speed.hit.input.enabled = true;
+    if (offer.hit.input && !offer.hit.input.enabled) {
+      offer.hit.input.enabled = true;
     }
-    this.tintCard(this.speed.card, this.speed.cost, progress.score >= price);
-  }
-
-  private formatDelay(ms: number): string {
-    return `${(ms / 1000).toFixed(2)} с`;
+    this.tintCard(offer.card, offer.cost, card.canBuy);
   }
 
   private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {

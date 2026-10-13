@@ -3,11 +3,11 @@
 
 import { Tank } from '../entities/Tank';
 
-const STORAGE_KEY = 'tank-penetration-progress:v1';
+const CAMPAIGN_KEY = 'tank-penetration-progress:v1';
 const SCORE_MAX = 100_000_000;
 const LEVEL_MAX = 500;
 
-export type ProgressSave = {
+export type SavedProgress = {
   version: 1;
   score: number;
   awaitingShop: boolean;
@@ -17,83 +17,91 @@ export type ProgressSave = {
   speed: number;
 };
 
-// Первая покупка стоит 500. Каждая следующая — на 500 × уже купленный уровень дороже:
-// 500, 1000, 1500, …
-export function progressCost(level: number): number {
-  return 500 + Math.max(0, level) * 500;
-}
+export class ProgressSave {
+  // Одна запись на экземпляр. Магазин держит её и меняет поля, сцена читает те же числа.
+  private current: SavedProgress | null = null;
 
-let current: ProgressSave | null = null;
-
-export function loadProgress(): ProgressSave {
-  if (current) {
-    return current;
+  // Первая покупка стоит 500. Каждая следующая — на 500 × уже купленный уровень дороже:
+  // 500, 1000, 1500, …
+  static cost(level: number): number {
+    return 500 + Math.max(0, level) * 500;
   }
-  current = read() ?? emptyProgress();
-  return current;
-}
 
-// Чистая партия: ни score, ни купленных уровней.
-export function resetProgress(): void {
-  const progress = loadProgress();
-  progress.score = 0;
-  progress.awaitingShop = false;
-  progress.coins = 0;
-  progress.damage = 0;
-  progress.blast = 0;
-  progress.speed = 0;
-  saveProgress(progress);
-  Tank.setProgressSpeedLevel(0);
-}
-
-export function saveProgress(data: ProgressSave): void {
-  current = data;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    // Приватный режим или переполненная квота: улучшения живут до закрытия вкладки.
-  }
-}
-
-function emptyProgress(): ProgressSave {
-  return {
-    version: 1,
-    score: 0,
-    awaitingShop: false,
-    coins: 0,
-    damage: 0,
-    blast: 0,
-    speed: 0,
-  };
-}
-
-function read(): ProgressSave | null {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = parseProgress(JSON.parse(raw));
-    if (!parsed) {
-      localStorage.removeItem(STORAGE_KEY);
+  load(): SavedProgress {
+    if (this.current) {
+      return this.current;
     }
-    return parsed;
-  } catch {
+    this.current = this.read() ?? this.empty();
+    return this.current;
+  }
+
+  // Чистая партия: ни score, ни купленных уровней.
+  reset(): void {
+    const progress = this.load();
+    progress.score = 0;
+    progress.awaitingShop = false;
+    progress.coins = 0;
+    progress.damage = 0;
+    progress.blast = 0;
+    progress.speed = 0;
+    this.save(progress);
+    Tank.setProgressSpeedLevel(0);
+  }
+
+  save(data: SavedProgress): void {
+    this.current = data;
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(this.storageKey(), JSON.stringify(data));
     } catch {
-      // Хранилище недоступно — стирать нечего.
+      // Приватный режим или переполненная квота: улучшения живут до закрытия вкладки.
     }
-    return null;
+  }
+
+  // Обычный прогресс лежит отдельно от дебага, чтобы проверка юнитов его не затёрла.
+  protected storageKey(): string {
+    return CAMPAIGN_KEY;
+  }
+
+  private empty(): SavedProgress {
+    return {
+      version: 1,
+      score: 0,
+      awaitingShop: false,
+      coins: 0,
+      damage: 0,
+      blast: 0,
+      speed: 0,
+    };
+  }
+
+  private read(): SavedProgress | null {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(this.storageKey());
+    } catch {
+      return null;
+    }
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = parseProgress(JSON.parse(raw));
+      if (!parsed) {
+        localStorage.removeItem(this.storageKey());
+      }
+      return parsed;
+    } catch {
+      try {
+        localStorage.removeItem(this.storageKey());
+      } catch {
+        // Хранилище недоступно — стирать нечего.
+      }
+      return null;
+    }
   }
 }
 
-function parseProgress(value: unknown): ProgressSave | null {
+function parseProgress(value: unknown): SavedProgress | null {
   if (!isRecord(value) || value.version !== 1) {
     return null;
   }
