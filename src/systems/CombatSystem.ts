@@ -1,4 +1,4 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, арт удар и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, арт удар, мины и контакт с базой.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight } from '../entities/ArtilleryStrike';
@@ -6,6 +6,7 @@ import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
+import { Mines, PlantedMine, type MineKeepOut } from '../entities/Mines';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
@@ -32,6 +33,11 @@ export class CombatSystem {
   private salvoTimers: Phaser.Time.TimerEvent[] = [];
   // Сброс отменяет залп, который ещё ждёт конца хлопка.
   private artilleryToken = 0;
+  private minesCooldownMs = 0;
+  private readonly mineKeys: Phaser.Input.Keyboard.Key[] = [];
+  // Клик по иконке мин. Сбрасывается в том же кадре, даже если постановка ещё на перезарядке.
+  private mineFromIcon = false;
+  private mines: PlantedMine[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -52,6 +58,10 @@ export class CombatSystem {
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ONE),
       );
+      this.mineKeys.push(
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_TWO),
+      );
     }
   }
 
@@ -63,16 +73,31 @@ export class CombatSystem {
     this.artilleryCooldownMs = Math.max(0, ms);
   }
 
+  get minesCooldown(): number {
+    return this.minesCooldownMs;
+  }
+
+  setMinesCooldown(ms: number): void {
+    this.minesCooldownMs = Math.max(0, ms);
+  }
+
   // Иконка на HUD просит удар. Сработает в tickArtillery, если бой идёт и перезарядка кончилась.
   requestArtillery(): void {
     this.strikeFromIcon = true;
   }
 
+  // Иконка мин на HUD. Сработает в tickMines, если бой идёт и перезарядка кончилась.
+  requestMines(): void {
+    this.mineFromIcon = true;
+  }
+
   clearProjectiles(): void {
     this.strikeFromIcon = false;
+    this.mineFromIcon = false;
     this.shells.clear(true, true);
     this.mgShots.clear(true, true);
     this.cancelArtillery();
+    this.clearMines();
   }
 
   setupOverlap(): void {
@@ -122,10 +147,126 @@ export class CombatSystem {
     this.launchArtillery();
   }
 
+  // Перезарядка идёт и в магазине. Постановка — только в бою, по клавише 2 или по иконке.
+  // Уже лежащие мины в магазине молчат: физика на паузе, пехота не шагает.
+  tickMines(delta: number, canFire: boolean): void {
+    if (!this.shop.minesOwned) {
+      this.mineFromIcon = false;
+      return;
+    }
+    this.minesCooldownMs = Math.max(0, this.minesCooldownMs - delta);
+    const pressed = this.minePressed();
+    if (canFire) {
+      this.touchMines();
+    }
+    if (!canFire || this.minesCooldownMs > 0 || !pressed) {
+      return;
+    }
+    if (this.layMines()) {
+      this.minesCooldownMs = Mines.shop.cooldownMs;
+    }
+  }
+
   private strikePressed(): boolean {
     const fromIcon = this.strikeFromIcon;
     this.strikeFromIcon = false;
     return fromIcon || this.strikeKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  private minePressed(): boolean {
+    const fromIcon = this.mineFromIcon;
+    this.mineFromIcon = false;
+    return fromIcon || this.mineKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  // true — хотя бы одна мина встала. Пустое поле кулдаун не тратит.
+  private layMines(): boolean {
+    const occupied = this.mines.map((mine) => ({ x: mine.x, y: mine.y }));
+    const spots = Mines.spots(this.mineKeepOut(), occupied);
+    if (spots.length === 0) {
+      return false;
+    }
+    for (const spot of spots) {
+      this.mines.push(Mines.plant(this.scene, spot.x, spot.y));
+    }
+    return true;
+  }
+
+  private touchMines(): void {
+    for (const mine of [...this.mines]) {
+      if (!mine.isArmed || !this.stepsOn(mine)) {
+        continue;
+      }
+      this.detonateMine(mine);
+    }
+  }
+
+  // Полоса корпуса на всю высоту поля: мина не садится ни на танк, ни выше или ниже него.
+  // Проволока добавляется, только когда она уже куплена. Отступ — половина корпуса мины.
+  private mineKeepOut(): MineKeepOut[] {
+    const pad = Mines.footprint;
+    const hull = Tank.hullBox();
+    const left = this.tank.x + hull.x;
+    const field = Mines.field;
+    const zones: MineKeepOut[] = [
+      {
+        minX: left - pad,
+        maxX: left + hull.w + pad,
+        minY: field.minY,
+        maxY: field.maxY,
+      },
+    ];
+    if (this.shop.wire) {
+      const bounds = BarbedWire.bounds;
+      zones.push({
+        minX: bounds.x - pad,
+        maxX: bounds.face + pad,
+        minY: bounds.top - pad,
+        maxY: bounds.bottom + pad,
+      });
+    }
+    return zones;
+  }
+
+  // Корпус фигуры, не точка ног: край спрайта уже на мине, пока центр ещё в стороне.
+  private stepsOn(mine: PlantedMine): boolean {
+    const pad = Mines.footprint;
+    return (this.infantry.getChildren() as Infantry[]).some((unit) => {
+      if (!unit.active || unit.reachedWall) {
+        return false;
+      }
+      const halfW = unit.displayWidth * 0.28;
+      const dx = Math.abs(unit.x - mine.x);
+      const dy = Math.abs(unit.y - mine.y);
+      return dx <= halfW + pad && dy <= 22 + pad;
+    });
+  }
+
+  private detonateMine(mine: PlantedMine): void {
+    this.mines = this.mines.filter((item) => item !== mine);
+    const { x, y } = mine;
+    mine.destroy();
+    Mines.boom(this.scene, x, y);
+    this.effects.assaultExplosion.play();
+    const radius = Mines.shop.blastRadius;
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (!unit.active || unit.reachedWall) {
+        return;
+      }
+      const torso = this.torsoPoint(unit);
+      const nearFeet = Phaser.Math.Distance.Between(x, y, unit.x, unit.y) <= radius;
+      const nearChest = Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= radius;
+      if (nearFeet || nearChest) {
+        this.hurtInfantry(unit, Mines.shop.damage);
+      }
+    });
+  }
+
+  private clearMines(): void {
+    for (const mine of this.mines) {
+      mine.destroy();
+    }
+    this.mines = [];
   }
 
   // Сразу хлопок. Снаряды — через секунду после того, как он доиграл.

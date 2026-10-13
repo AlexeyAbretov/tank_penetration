@@ -3,8 +3,10 @@
 // Порядок чтения: поля — кто участвует в партии, create() их собирает, update() крутит кадр.
 
 import Phaser from 'phaser';
+import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
+import { Mines } from '../entities/Mines';
 import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
@@ -18,7 +20,7 @@ import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { CombatSave, type SavedRun } from '../saves/CombatSave';
 import { ShopController } from '../shops/ShopController';
 import { WaveManager } from '../systems/WaveManager';
-import { GameHud } from '../ui/GameHud';
+import { GameHud, type HudAbility, type HudFrame } from '../ui/GameHud';
 import { SettingsPanel } from '../ui/SettingsPanel';
 
 export class GameScene extends Phaser.Scene {
@@ -29,7 +31,7 @@ export class GameScene extends Phaser.Scene {
 
   // Танк и число здоровья базы.
   private player!: PlayerController;
-  // Снаряды танка, попадания, проволока, пулемёт и артиллерия.
+  // Снаряды танка, попадания, проволока, пулемёт, артиллерия и мины.
   private combat!: CombatSystem;
   // Выстрелы, взрывы и крики. Музыка сюда не входит: у неё свой ползунок.
   private fx?: BattleEffects;
@@ -61,7 +63,8 @@ export class GameScene extends Phaser.Scene {
   // Первый кадр паузы игнорирует Esc и клик. Та же кнопка, которой паузу включили, не снимает её сразу.
   private resumeArmed = false;
   private pausedEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
-  // Клавиша 2 и та же клавиша на цифровом блоке. Обе крутят темп врагов.
+  // Клавиша 3 и та же клавиша на цифровом блоке. Обе крутят темп врагов.
+  // Клавиша 2 — мины, её слушает CombatSystem.
   private hasteKey?: Phaser.Input.Keyboard.Key;
   private hasteNumpad?: Phaser.Input.Keyboard.Key;
   private pauseKey?: Phaser.Input.Keyboard.Key;
@@ -83,7 +86,12 @@ export class GameScene extends Phaser.Scene {
     private readonly progressShop: ProgressShopController,
     private readonly waves: WaveManager,
     private readonly music: BattleMusic,
-    private readonly Hud: new (scene: Phaser.Scene) => GameHud,
+    private readonly Hud: new (
+      scene: Phaser.Scene,
+      frame: HudFrame,
+      maxHp: number,
+      abilities: readonly HudAbility[],
+    ) => GameHud,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
@@ -161,7 +169,25 @@ export class GameScene extends Phaser.Scene {
     this.enemyShots = this.physics.add.group();
     this.infantry = this.physics.add.group();
 
-    this.hud = new this.Hud(this);
+    // Следующая покупка — ещё одна строка. Порядок слева направо.
+    this.hud = new this.Hud(this, GAME, Tank.baseHp, [
+      {
+        id: 'artillery',
+        texture: ArtilleryStrike.iconKey,
+        keyLabel: '1',
+        hint: '1 — удар',
+        cooldownMs: ArtilleryStrike.shop.cooldownMs,
+        iconRadius: ArtilleryStrike.iconRadius,
+      },
+      {
+        id: 'mines',
+        texture: Mines.iconKey,
+        keyLabel: '2',
+        hint: '2 — мины',
+        cooldownMs: Mines.shop.cooldownMs,
+        iconRadius: Mines.iconRadius,
+      },
+    ]);
     this.hud.setHaste(1);
     this.hud.onHasteCycle(() => {
       if (!this.paused && !this.defeatShop) {
@@ -176,11 +202,17 @@ export class GameScene extends Phaser.Scene {
       }
       this.shop.toggleAutoFire();
     });
-    this.hud.onArtillery(() => {
+    this.hud.onAbility('artillery', () => {
       if (this.paused || this.settingsOpen || this.player.isGameOver || this.defeatShop) {
         return;
       }
       this.combat.requestArtillery();
+    });
+    this.hud.onAbility('mines', () => {
+      if (this.paused || this.settingsOpen || this.player.isGameOver || this.defeatShop) {
+        return;
+      }
+      this.combat.requestMines();
     });
     this.hud.onResume(() => {
       this.resumeRequested = true;
@@ -189,8 +221,8 @@ export class GameScene extends Phaser.Scene {
     this.hud.onNewGame(() => this.restartRun());
     const keyboard = this.input.keyboard;
     if (keyboard) {
-      this.hasteKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
-      this.hasteNumpad = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_TWO);
+      this.hasteKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE);
+      this.hasteNumpad = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_THREE);
       this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     }
     this.events.once('shutdown', this.onShutdown, this);
@@ -255,6 +287,7 @@ export class GameScene extends Phaser.Scene {
     this.music.create();
     this.settings = new SettingsPanel(
       this,
+      GAME,
       (level) => this.music.setVolume(level),
       (level) => {
         fx.setVolume(level);
@@ -338,9 +371,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fighting = !this.shop.shopOpen;
-    // Перезарядка артиллерии идёт и в магазине. Выстрел — только когда fighting, с клавиши или с иконки.
+    // Перезарядка артиллерии и мин идёт и в магазине. Вызов — только когда fighting, с клавиши или с иконки.
     this.combat.tickArtillery(delta, fighting);
-    this.hud.setArtillery(this.shop.artilleryOwned, this.combat.artilleryCooldown);
+    this.combat.tickMines(delta, fighting);
+    this.hud.setAbility('artillery', this.shop.artilleryOwned, this.combat.artilleryCooldown);
+    this.hud.setAbility('mines', this.shop.minesOwned, this.combat.minesCooldown);
     if (!fighting) {
       return;
     }
@@ -349,14 +384,14 @@ export class GameScene extends Phaser.Scene {
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
-    // Клик по кнопкам темпа, паузы, автострельбы, артиллерии и настроек не считается выстрелом: они лежат поверх поля.
+    // Клик по кнопкам темпа, паузы, автострельбы, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
     this.combat.tick(
       delta,
       !this.hud.coversHaste(pointer) &&
         !this.hud.coversPause(pointer) &&
         !this.hud.coversSettings(pointer) &&
         !this.hud.coversAutoFire(pointer) &&
-        !this.hud.coversArtillery(pointer),
+        !this.hud.coversAbility(pointer),
     );
     this.projectiles.tick();
     this.waves.tick();
@@ -599,6 +634,7 @@ export class GameScene extends Phaser.Scene {
     this.shop.restore(saved.shop);
     this.shop.syncTankStats();
     this.combat.setArtilleryCooldown(saved.artilleryCooldownMs);
+    this.combat.setMinesCooldown(saved.minesCooldownMs);
     this.registry.set(ENEMY_HASTE.key, saved.haste);
     this.hud.setHaste(saved.haste);
     if (saved.phase === 'shop') {
@@ -635,6 +671,7 @@ export class GameScene extends Phaser.Scene {
       hp: this.player.health,
       haste: enemyHasteOf(this.registry),
       artilleryCooldownMs: Math.round(this.combat.artilleryCooldown),
+      minesCooldownMs: Math.round(this.combat.minesCooldown),
       wave: wave.wave,
       phase: wave.phase,
       spawned: wave.spawned,

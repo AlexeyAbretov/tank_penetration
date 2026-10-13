@@ -35,7 +35,6 @@ export class MachineGun extends GameObjects.Container {
   constructor(scene: Phaser.Scene) {
     const mount = MachineGun.layout;
     super(scene, mount.x, mount.y);
-    MachineGun.ensureTextures(scene);
 
     this.barrel = scene.add.image(0, 0, MachineGun.barrelKey);
     this.barrel.setOrigin(mount.originX, mount.originY);

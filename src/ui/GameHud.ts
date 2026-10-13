@@ -1,9 +1,37 @@
 // Счёт, полоска HP и баннер волны. Плашка поражения — магазин между проигрышами.
 
 import Phaser from 'phaser';
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
-import { Tank } from '../entities/Tank';
-import { GAME } from '../gameConfig';
+
+// Размер холста и линия баннера. Сцена передаёт их сама, HUD не читает gameConfig.
+export type HudFrame = {
+  width: number;
+  height: number;
+  bannerY: number;
+};
+
+// Иконка способности. Картинка и перезарядка приходят от сущности, подпись — от сцены.
+export type HudAbility = {
+  id: string;
+  texture: string;
+  keyLabel: string;
+  hint: string;
+  cooldownMs: number;
+  iconRadius: number;
+};
+
+// Иконка покупки над баннером: картинка, затемнение перезарядки и цифра секунд.
+type AbilityIcon = {
+  id: string;
+  root: Phaser.GameObjects.Container;
+  sweep: Phaser.GameObjects.Graphics;
+  time: Phaser.GameObjects.Text;
+  owned: boolean;
+  hint: string;
+  cooldownMs: number;
+  iconRadius: number;
+  request?: () => void;
+};
+
 export class GameHud {
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waveText: Phaser.GameObjects.Text;
@@ -12,9 +40,7 @@ export class GameHud {
   private readonly hpFill: Phaser.GameObjects.Rectangle;
   private readonly waveBanner: Phaser.GameObjects.Text;
   private readonly controls: Phaser.GameObjects.Text;
-  private readonly artillery: Phaser.GameObjects.Container;
-  private readonly artillerySweep: Phaser.GameObjects.Graphics;
-  private readonly artilleryTime: Phaser.GameObjects.Text;
+  private readonly abilities: AbilityIcon[];
   private readonly hastePlate: Phaser.GameObjects.Rectangle;
   private readonly hasteIcon: Phaser.GameObjects.Graphics;
   private readonly pausePlate: Phaser.GameObjects.Rectangle;
@@ -22,12 +48,12 @@ export class GameHud {
   private readonly autoFirePlate: Phaser.GameObjects.Rectangle;
   private readonly autoFireIcon: Phaser.GameObjects.Graphics;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
-  private artilleryOwned = false;
+  private readonly frame: HudFrame;
+  private readonly maxHp: number;
   private hasteCycle?: () => void;
   private pauseRequest?: () => void;
   private settingsRequest?: () => void;
   private autoFireRequest?: () => void;
-  private artilleryRequest?: () => void;
   private resumeRequest?: () => void;
   private newGameRequest?: () => void;
 
@@ -39,11 +65,14 @@ export class GameHud {
     strokeThickness: 4,
   };
 
-  constructor(scene: Phaser.Scene) {
-    scene.add.image(GAME.width / 2, 677, 'banner').setDepth(50);
+  constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number, abilities: readonly HudAbility[]) {
+    this.frame = frame;
+    this.maxHp = maxHp;
+
+    scene.add.image(frame.width / 2, 677, 'banner').setDepth(50);
 
     scene.add
-      .text(GAME.width / 2, 678, 'TANK', {
+      .text(frame.width / 2, 678, 'TANK', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '42px',
         color: '#f3d56a',
@@ -79,7 +108,7 @@ export class GameHud {
       .setDepth(51);
 
     this.waveBanner = scene.add
-      .text(GAME.width / 2, 120, '', {
+      .text(frame.width / 2, 120, '', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '56px',
         color: '#f3d56a',
@@ -140,8 +169,11 @@ export class GameHud {
     this.drawAutoFire(false);
     this.autoFirePlate.on('pointerup', () => this.autoFireRequest?.());
 
+    // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
+    this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
+
     this.controls = scene.add
-      .text(GAME.width / 2, 708, this.controlsLine(false), {
+      .text(frame.width / 2, 708, this.controlsLine(), {
         fontFamily: 'Georgia, serif',
         fontSize: '14px',
         color: '#e8c48a',
@@ -150,39 +182,12 @@ export class GameHud {
       .setDepth(51)
       .setAlpha(0.8);
 
-    ArtilleryStrike.ensureTextures(scene);
-    const glyph = scene.add.image(0, 0, ArtilleryStrike.iconKey);
-    this.artillerySweep = scene.add.graphics();
-    this.artilleryTime = scene.add
-      .text(0, 2, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '22px',
-        color: '#f3d56a',
-        stroke: '#2a0a08',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5);
-    const badge = scene.add.circle(20, 20, 10, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
-    const key = scene.add
-      .text(20, 20, '1', {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '14px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
-    // Над баннером, у левого края поля.
-    this.artillery = scene.add
-      .container(56, GAME.bannerY - 48, [glyph, this.artillerySweep, this.artilleryTime, badge, key])
-      .setDepth(53)
-      .setVisible(false);
-    this.artillery.on('pointerup', () => this.artilleryRequest?.());
-
     scene.add.image(1128, 28, 'hp-frame').setDepth(51);
     scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
     this.hpFill = scene.add.rectangle(1018, 28, 236, 10, 0xd42a2a).setOrigin(0, 0.5).setDepth(52);
 
-    this.pauseOverlay = scene.add.container(GAME.width / 2, GAME.height / 2).setDepth(90).setVisible(false);
-    const pauseDim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.45).setInteractive();
+    this.pauseOverlay = scene.add.container(frame.width / 2, frame.height / 2).setDepth(90).setVisible(false);
+    const pauseDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
     pauseDim.on('pointerup', () => this.resumeRequest?.());
     const pauseTitle = scene.add
       .text(0, -70, 'ПАУЗА', {
@@ -271,8 +276,11 @@ export class GameHud {
     this.autoFireRequest = request;
   }
 
-  onArtillery(request: () => void): void {
-    this.artilleryRequest = request;
+  onAbility(id: string, request: () => void): void {
+    const icon = this.ability(id);
+    if (icon) {
+      icon.request = request;
+    }
   }
 
   // Кнопка появляется после покупки. Красная плашка — режим включён, тёмная — выключен.
@@ -371,54 +379,21 @@ export class GameHud {
   }
 
   // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
-  coversArtillery(pointer: Phaser.Input.Pointer): boolean {
-    return this.artillery.visible && this.artillery.getBounds().contains(pointer.worldX, pointer.worldY);
+  coversAbility(pointer: Phaser.Input.Pointer): boolean {
+    return this.abilities.some(
+      (icon) => icon.root.visible && icon.root.getBounds().contains(pointer.worldX, pointer.worldY),
+    );
   }
 
-  setArtillery(owned: boolean, cooldownMs: number): void {
-    if (this.artilleryOwned !== owned) {
-      this.artilleryOwned = owned;
-      this.artillery.setVisible(owned);
-      this.controls.setText(this.controlsLine(owned));
-      if (owned) {
-        if (!this.artillery.input?.enabled) {
-          this.artillery.setInteractive({
-            hitArea: new Phaser.Geom.Rectangle(-32, -32, 64, 64),
-            hitAreaCallback: Phaser.Geom.Rectangle.Contains,
-            useHandCursor: true,
-          });
-        }
-      } else if (this.artillery.input?.enabled) {
-        this.artillery.disableInteractive();
-      }
+  setAbility(id: string, owned: boolean, cooldownMs: number): void {
+    const icon = this.ability(id);
+    if (icon) {
+      this.paintAbility(icon, owned, cooldownMs);
     }
-    if (!owned) {
-      return;
-    }
-
-    const cooling = cooldownMs > 0;
-    const label = cooling ? `${Math.ceil(cooldownMs / 1000)}` : '';
-    if (this.artilleryTime.text !== label) {
-      this.artilleryTime.setText(label);
-    }
-
-    this.artillerySweep.clear();
-    if (!cooling) {
-      return;
-    }
-    const ratio = Math.min(1, cooldownMs / ArtilleryStrike.shop.cooldownMs);
-    const radius = ArtilleryStrike.iconRadius - 4;
-    this.artillerySweep.fillStyle(0x000000, 0.62);
-    if (ratio > 0.98) {
-      this.artillerySweep.fillCircle(0, 0, radius);
-      return;
-    }
-    this.artillerySweep.slice(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
-    this.artillerySweep.fillPath();
   }
 
   setHp(hp: number): void {
-    this.hpFill.width = 236 * (hp / Tank.baseHp);
+    this.hpFill.width = 236 * (hp / this.maxHp);
   }
 
   showWaveBanner(wave: number, boss = false): void {
@@ -442,9 +417,99 @@ export class GameHud {
     });
   }
 
-  private controlsLine(artillery: boolean): string {
-    const tempo = 'мышь — прицел   ЛКМ — огонь   2 — темп   Esc — пауза   шестерёнка — звук';
-    return artillery ? `${tempo}   1 — удар` : tempo;
+  private syncControls(): void {
+    this.controls.setText(this.controlsLine());
+  }
+
+  private controlsLine(): string {
+    const tempo = 'мышь — прицел   ЛКМ — огонь   3 — темп   Esc — пауза   шестерёнка — звук';
+    const extra = this.abilities.filter((icon) => icon.owned).map((icon) => icon.hint);
+    return extra.length > 0 ? `${tempo}   ${extra.join('   ')}` : tempo;
+  }
+
+  // Ряд над баннером, слева направо. index 0 — первая иконка у края поля.
+  private makeAbility(scene: Phaser.Scene, index: number, spec: HudAbility): AbilityIcon {
+    const glyph = scene.add.image(0, 0, spec.texture);
+    const sweep = scene.add.graphics();
+    const time = scene.add
+      .text(0, 2, '', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '22px',
+        color: '#f3d56a',
+        stroke: '#2a0a08',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5);
+    const badge = scene.add.circle(20, 20, 10, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const key = scene.add
+      .text(20, 20, spec.keyLabel, {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '14px',
+        color: '#f3d56a',
+      })
+      .setOrigin(0.5);
+    const root = scene.add
+      .container(56 + index * 88, this.frame.bannerY - 48, [glyph, sweep, time, badge, key])
+      .setDepth(53)
+      .setVisible(false);
+    const icon: AbilityIcon = {
+      id: spec.id,
+      root,
+      sweep,
+      time,
+      owned: false,
+      hint: spec.hint,
+      cooldownMs: spec.cooldownMs,
+      iconRadius: spec.iconRadius,
+    };
+    root.on('pointerup', () => icon.request?.());
+    return icon;
+  }
+
+  private ability(id: string): AbilityIcon | undefined {
+    return this.abilities.find((icon) => icon.id === id);
+  }
+
+  private paintAbility(icon: AbilityIcon, owned: boolean, cooldownMs: number): void {
+    if (icon.owned !== owned) {
+      icon.owned = owned;
+      icon.root.setVisible(owned);
+      this.syncControls();
+      if (owned) {
+        if (!icon.root.input?.enabled) {
+          icon.root.setInteractive({
+            hitArea: new Phaser.Geom.Rectangle(-32, -32, 64, 64),
+            hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+            useHandCursor: true,
+          });
+        }
+      } else if (icon.root.input?.enabled) {
+        icon.root.disableInteractive();
+      }
+    }
+    if (!owned) {
+      return;
+    }
+
+    const cooling = cooldownMs > 0;
+    const label = cooling ? `${Math.ceil(cooldownMs / 1000)}` : '';
+    if (icon.time.text !== label) {
+      icon.time.setText(label);
+    }
+
+    icon.sweep.clear();
+    if (!cooling) {
+      return;
+    }
+    const ratio = Math.min(1, cooldownMs / icon.cooldownMs);
+    const radius = icon.iconRadius - 4;
+    icon.sweep.fillStyle(0x000000, 0.62);
+    if (ratio > 0.98) {
+      icon.sweep.fillCircle(0, 0, radius);
+      return;
+    }
+    icon.sweep.slice(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
+    icon.sweep.fillPath();
   }
 
   // Ствол справа и три трассы влево — очередь в сторону врагов. Тусклые, пока режим выключен.

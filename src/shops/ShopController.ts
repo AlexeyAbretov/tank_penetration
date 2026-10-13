@@ -8,6 +8,7 @@ import { AutoFire } from '../entities/AutoFire';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
+import { Mines } from '../entities/Mines';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { ShopPanel, type ShopCardView, type ShopView } from './ShopPanel';
@@ -36,6 +37,7 @@ export class ShopController {
   machineGunOwned = false;
   machineGun?: MachineGun;
   artilleryOwned = false;
+  minesOwned = false;
   readonly autoFire = new AutoFire();
   shopOpen = false;
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
@@ -62,6 +64,7 @@ export class ShopController {
       wire: this.wireOwned,
       machineGun: this.machineGunOwned,
       artillery: this.artilleryOwned,
+      mines: this.minesOwned,
       autoFire: this.autoFire.isOwned,
       autoFireOn: this.autoFire.enabled,
     };
@@ -83,6 +86,7 @@ export class ShopController {
       this.machineGun = this.installMachineGun();
     }
     this.artilleryOwned = saved.artillery;
+    this.minesOwned = saved.mines;
   }
 
   // Чистая партия: уровни и постройки обнуляются. Предметы на поле убирает перезапуск сцены.
@@ -93,6 +97,7 @@ export class ShopController {
     this.wireOwned = false;
     this.machineGunOwned = false;
     this.artilleryOwned = false;
+    this.minesOwned = false;
     this.autoFire.clear();
     this.wire = undefined;
     this.machineGun = undefined;
@@ -231,6 +236,18 @@ export class ShopController {
     this.refresh();
   }
 
+  // Открывает клавишу 2. Постановку и подрыв считает CombatSystem.
+  buyMines(): void {
+    if (this.isPaused() || this.minesOwned || this.economy.getCoins() < Mines.shop.cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(Mines.shop.cost)) {
+      return;
+    }
+    this.minesOwned = true;
+    this.refresh();
+  }
+
   // Строка характеристик над полем: урон и взрыв партии плюс постоянные уровни.
   syncTankStats(): void {
     this.hud.setTankStats(
@@ -263,34 +280,43 @@ export class ShopController {
     const coins = this.economy.getCoins();
     return {
       coins,
-      blast: this.blastCard(coins),
-      damage: this.damageCard(coins),
-      fireRate: this.fireRateCard(coins),
-      wire: this.onceCard(
-        coins,
-        this.wireOwned,
-        BarbedWire.shop.cost,
-        'стоит перед танком, от верха до низа',
-        'установлена',
-        'не пускает пехоту · 1 урона / 3 с',
-      ),
-      autoFire: this.onceCard(
-        coins,
-        this.autoFire.isOwned,
-        AutoFire.shop.cost,
-        'кнопка слева от шестерёнки — вкл и выкл',
-        'куплено',
-        'не нужно держать ЛКМ',
-      ),
-      machineGun: this.onceCard(
-        coins,
-        this.machineGunOwned,
-        MachineGun.shop.cost,
-        'перед люком башни · 1 урона / 3 с',
-        'установлен',
-        'стреляет вдоль прицела башни',
-      ),
-      artillery: this.artilleryCard(coins),
+      cards: [
+        this.blastCard(coins),
+        this.damageCard(coins),
+        this.fireRateCard(coins),
+        this.onceCard(
+          'Колючая проволока',
+          () => this.buyWire(),
+          coins,
+          this.wireOwned,
+          BarbedWire.shop.cost,
+          'стоит перед танком, от верха до низа',
+          'установлена',
+          'не пускает пехоту · 1 урона / 3 с',
+        ),
+        this.onceCard(
+          'Автострельба',
+          () => this.buyAutoFire(),
+          coins,
+          this.autoFire.isOwned,
+          AutoFire.shop.cost,
+          'кнопка слева от шестерёнки — вкл и выкл',
+          'куплено',
+          'не нужно держать ЛКМ',
+        ),
+        this.onceCard(
+          'Пулемёт',
+          () => this.buyMachineGun(),
+          coins,
+          this.machineGunOwned,
+          MachineGun.shop.cost,
+          'перед люком башни · 1 урона / 3 с',
+          'установлен',
+          'стреляет вдоль прицела башни',
+        ),
+        this.artilleryCard(coins),
+        this.minesCard(coins),
+      ],
     };
   }
 
@@ -299,6 +325,8 @@ export class ShopController {
     const radius = (this.blastLevel + this.bonuses.blast) * Tank.blastRadiusPerLevel;
     const nextRadius = (this.blastLevel + 1 + this.bonuses.blast) * Tank.blastRadiusPerLevel;
     return {
+      title: '+1 область взрыва',
+      buy: () => this.buyBlast(),
       info: `ур. ${this.blastLevel}   радиус ${radius} → ${nextRadius}`,
       cost: `цена  ${price}`,
       open: true,
@@ -310,6 +338,8 @@ export class ShopController {
     const price = ShopController.upgradeCost(this.damageLevel);
     const now = Infantry.shellDamage + this.damageLevel + this.bonuses.damage;
     return {
+      title: '+1 урон',
+      buy: () => this.buyDamage(),
       info: `ур. ${this.damageLevel}   урон ${now} → ${now + 1}`,
       cost: `цена  ${price}`,
       open: true,
@@ -324,6 +354,8 @@ export class ShopController {
     const next = this.formatDelay(Tank.fireDelayFor(level + 1));
     const maxed = level >= Tank.maxFireRateLevel;
     return {
+      title: '−0.02 с перезарядки',
+      buy: () => this.buyFireRate(),
       info: maxed ? `ур. ${level}   ${delay} (макс.)` : `ур. ${level}   ${delay} → ${next}`,
       cost: maxed ? 'максимум' : `цена  ${price}`,
       open: !maxed,
@@ -337,6 +369,8 @@ export class ShopController {
     const crater = offer.craterMs / 1000;
     if (this.artilleryOwned) {
       return {
+        title: 'Артиллерийский удар',
+        buy: () => this.buyArtillery(),
         info: `клавиша 1 или иконка · перезарядка ${reload} с`,
         cost: 'куплено',
         open: false,
@@ -344,6 +378,8 @@ export class ShopController {
       };
     }
     return {
+      title: 'Артиллерийский удар',
+      buy: () => this.buyArtillery(),
       info: `${offer.shells} снаряда в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 1 или иконка · перезарядка ${reload} с`,
       cost: `цена  ${offer.cost}`,
       open: true,
@@ -351,7 +387,33 @@ export class ShopController {
     };
   }
 
+  private minesCard(coins: number): ShopCardView {
+    const offer = Mines.shop;
+    const reload = offer.cooldownMs / 1000;
+    const crater = offer.craterMs / 1000;
+    if (this.minesOwned) {
+      return {
+        title: 'Мины',
+        buy: () => this.buyMines(),
+        info: `клавиша 2 или иконка · перезарядка ${reload} с`,
+        cost: 'куплено',
+        open: false,
+        canBuy: false,
+      };
+    }
+    return {
+      title: 'Мины',
+      buy: () => this.buyMines(),
+      info: `${offer.count} мины в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 2 или иконка · перезарядка ${reload} с`,
+      cost: `цена  ${offer.cost}`,
+      open: true,
+      canBuy: coins >= offer.cost,
+    };
+  }
+
   private onceCard(
+    title: string,
+    buy: () => void,
     coins: number,
     owned: boolean,
     price: number,
@@ -360,9 +422,9 @@ export class ShopController {
     offerInfo: string,
   ): ShopCardView {
     if (owned) {
-      return { info: ownedInfo, cost: ownedCost, open: false, canBuy: false };
+      return { title, buy, info: ownedInfo, cost: ownedCost, open: false, canBuy: false };
     }
-    return { info: offerInfo, cost: `цена  ${price}`, open: true, canBuy: coins >= price };
+    return { title, buy, info: offerInfo, cost: `цена  ${price}`, open: true, canBuy: coins >= price };
   }
 
   private formatDelay(ms: number): string {

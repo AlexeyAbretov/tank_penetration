@@ -28,7 +28,6 @@ export class BarbedWire extends GameObjects.Image {
   };
 
   constructor(scene: Phaser.Scene) {
-    BarbedWire.ensureTextures(scene);
     const top = BarbedWire.bounds.top;
     const height = BarbedWire.bounds.bottom - top;
     // Картинка якорится центром, поэтому X — середина между левым краем и линией упора.

@@ -5,33 +5,22 @@
 import Phaser from 'phaser';
 
 export type ShopCardView = {
+  title: string;
   info: string;
   cost: string;
   // false — карточка уже куплена или уровень максимальный, клик не нужен.
   open: boolean;
   canBuy: boolean;
+  buy: () => void;
 };
 
 export type ShopView = {
   coins: number;
-  blast: ShopCardView;
-  damage: ShopCardView;
-  fireRate: ShopCardView;
-  wire: ShopCardView;
-  autoFire: ShopCardView;
-  machineGun: ShopCardView;
-  artillery: ShopCardView;
+  cards: ShopCardView[];
 };
 
-// Методы покупок, которые реализует ShopController.
+// «Следующая волна». Сами покупки приходят в карточке: окно их список не знает.
 export type ShopDelegate = {
-  buyBlast(): void;
-  buyDamage(): void;
-  buyFireRate(): void;
-  buyWire(): void;
-  buyAutoFire(): void;
-  buyMachineGun(): void;
-  buyArtillery(): void;
   closeAndContinue(): void;
 };
 
@@ -50,15 +39,16 @@ const CARD_H = 112;
 const CARD_GAP = 12;
 const CARD_W = VIEW_W - 16;
 const CONTENT_PAD = 6;
-const OFFER_COUNT = 7;
 
 const TITLE_WRAP = CARD_W - 190;
 const INFO_WRAP = CARD_W - 44;
 
 type Offer = {
   card: Phaser.GameObjects.Rectangle;
+  title: Phaser.GameObjects.Text;
   info: Phaser.GameObjects.Text;
   cost: Phaser.GameObjects.Text;
+  buy: () => void;
 };
 
 export class ShopPanel {
@@ -66,13 +56,7 @@ export class ShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly coinsText: Phaser.GameObjects.Text;
-  private readonly blast: Offer;
-  private readonly damage: Offer;
-  private readonly fireRate: Offer;
-  private readonly wire: Offer;
-  private readonly autoFire: Offer;
-  private readonly machineGun: Offer;
-  private readonly artillery: Offer;
+  private readonly offers: Offer[] = [];
 
   // Камера с маленьким окном обрезает карточки, которые уехали за шапку или кнопку.
   private readonly listCam: Phaser.Cameras.Scene2D.Camera;
@@ -82,9 +66,9 @@ export class ShopPanel {
 
   private readonly viewLeft: number;
   private readonly viewTop: number;
-  private readonly contentHeight: number;
-  private readonly maxScroll: number;
-  private readonly thumbH: number;
+  private contentHeight = 0;
+  private maxScroll = 0;
+  private thumbH = 36;
   private readonly trackTop: number;
 
   private scroll = 0;
@@ -102,9 +86,6 @@ export class ShopPanel {
     const groupW = VIEW_W + SCROLL_GAP + SCROLL_W;
     this.viewLeft = this.screen.width / 2 - groupW / 2;
     this.viewTop = this.screen.height / 2 + VIEW_TOP;
-    this.contentHeight = CONTENT_PAD * 2 + OFFER_COUNT * CARD_H + (OFFER_COUNT - 1) * CARD_GAP;
-    this.maxScroll = Math.max(0, this.contentHeight - VIEW_H);
-    this.thumbH = Math.max(36, Math.round((VIEW_H * VIEW_H) / this.contentHeight));
     this.trackTop = VIEW_TOP;
 
     // scrollX/scrollY — левый верх окна камеры в мире. Окно совпадает с полосой карточек.
@@ -117,14 +98,6 @@ export class ShopPanel {
     // ignore() на контейнере помечает только уже существующих детей.
     // Бит на самом контейнере прячет и текущие, и будущие карточки от основной камеры.
     this.listContent.cameraFilter |= scene.cameras.main.id;
-
-    this.blast = this.makeOffer(scene, 0, '+1 область взрыва', () => shop.buyBlast());
-    this.damage = this.makeOffer(scene, 1, '+1 урон', () => shop.buyDamage());
-    this.fireRate = this.makeOffer(scene, 2, '−0.02 с перезарядки', () => shop.buyFireRate());
-    this.wire = this.makeOffer(scene, 3, 'Колючая проволока', () => shop.buyWire());
-    this.autoFire = this.makeOffer(scene, 4, 'Автострельба', () => shop.buyAutoFire());
-    this.machineGun = this.makeOffer(scene, 5, 'Пулемёт', () => shop.buyMachineGun());
-    this.artillery = this.makeOffer(scene, 6, 'Артиллерийский удар', () => shop.buyArtillery());
 
     const dim = scene.add.rectangle(0, 0, this.screen.width, this.screen.height, 0x000000, 0.62);
     const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
@@ -155,9 +128,8 @@ export class ShopPanel {
       .setInteractive({ useHandCursor: true, draggable: true });
     scene.input.setDraggable(this.thumb);
     this.thumb.on('drag', (pointer: Phaser.Input.Pointer) => this.dragThumb(pointer));
-    const canScroll = this.maxScroll > 0;
-    this.track.setVisible(canScroll);
-    this.thumb.setVisible(canScroll);
+    this.track.setVisible(false);
+    this.thumb.setVisible(false);
 
     const next = scene.add.rectangle(0, 262, 280, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
     next.setInteractive({ useHandCursor: true });
@@ -218,12 +190,13 @@ export class ShopPanel {
   }
 
   show(view: ShopView): void {
-    this.setScroll(0);
     this.refresh(view);
+    this.setScroll(0);
     this.syncListCamera();
     this.container.setVisible(true);
     this.listContent.setVisible(true);
     this.listCam.setVisible(true);
+    this.applyScrollChrome(true);
   }
 
   hide(): void {
@@ -247,20 +220,51 @@ export class ShopPanel {
     const showList = !paused;
     this.listCam.setVisible(showList);
     this.listContent.setVisible(showList);
-    const scroll = showList && this.maxScroll > 0;
-    this.track.setVisible(scroll);
-    this.thumb.setVisible(scroll);
+    this.applyScrollChrome(showList);
   }
 
   refresh(view: ShopView): void {
     this.coinsText.setText(`Монеты  ${view.coins}`);
-    this.paint(this.blast, view.blast);
-    this.paint(this.damage, view.damage);
-    this.paint(this.fireRate, view.fireRate);
-    this.paint(this.wire, view.wire);
-    this.paint(this.autoFire, view.autoFire);
-    this.paint(this.machineGun, view.machineGun);
-    this.paint(this.artillery, view.artillery);
+    this.syncOffers(view.cards);
+    for (let i = 0; i < view.cards.length; i += 1) {
+      this.paint(this.offers[i], view.cards[i]);
+    }
+  }
+
+  // Карточки появляются вместе с первым списком. Новая покупка — ещё одна строка в нём, не новое поле окна.
+  private syncOffers(cards: ShopCardView[]): void {
+    if (this.offers.length === cards.length) {
+      return;
+    }
+    for (const offer of this.offers) {
+      offer.card.destroy();
+      offer.title.destroy();
+      offer.info.destroy();
+      offer.cost.destroy();
+    }
+    this.offers.length = 0;
+    const scene = this.listContent.scene;
+    cards.forEach((card, index) => {
+      this.offers.push(this.makeOffer(scene, index, card.title, card.buy));
+    });
+    this.layout(cards.length);
+  }
+
+  private layout(count: number): void {
+    const gaps = Math.max(0, count - 1);
+    this.contentHeight = CONTENT_PAD * 2 + count * CARD_H + gaps * CARD_GAP;
+    this.maxScroll = Math.max(0, this.contentHeight - VIEW_H);
+    const span = Math.max(this.contentHeight, 1);
+    this.thumbH = Math.min(VIEW_H, Math.max(36, Math.round((VIEW_H * VIEW_H) / span)));
+    this.thumb.setSize(SCROLL_W, this.thumbH);
+    this.setScroll(this.scroll);
+    this.applyScrollChrome(this.listCam.visible);
+  }
+
+  private applyScrollChrome(listVisible: boolean): void {
+    const scroll = listVisible && this.maxScroll > 0;
+    this.track.setVisible(scroll);
+    this.thumb.setVisible(scroll);
   }
 
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
@@ -275,13 +279,6 @@ export class ShopPanel {
       }
       this.pressedCard = card;
       this.beginDrag(pointer);
-    });
-    // Короткое нажатие покупает. Сдвиг списка — это уже скролл, не покупка.
-    card.on('pointerup', () => {
-      if (this.blocked() || this.pressedCard !== card || this.drag?.moved) {
-        return;
-      }
-      buy();
     });
 
     const title = scene.add
@@ -311,7 +308,15 @@ export class ShopPanel {
       .setOrigin(1, 0);
 
     this.listContent.add([card, title, info, cost]);
-    return { card, info, cost };
+    const offer: Offer = { card, title, info, cost, buy };
+    // Короткое нажатие покупает. Сдвиг списка — это уже скролл, не покупка.
+    card.on('pointerup', () => {
+      if (this.blocked() || this.pressedCard !== card || this.drag?.moved) {
+        return;
+      }
+      offer.buy();
+    });
+    return offer;
   }
 
   private blocked(): boolean {
@@ -375,6 +380,7 @@ export class ShopPanel {
   }
 
   private paint(offer: Offer, card: ShopCardView): void {
+    offer.buy = card.buy;
     offer.info.setText(card.info);
     offer.cost.setText(card.cost);
     if (!card.open) {

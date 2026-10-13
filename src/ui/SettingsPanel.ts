@@ -3,7 +3,6 @@
 // Второй ползунок — эффекты. Музыку он не трогает.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
 
 const PANEL_W = 520;
 const PANEL_H = 400;
@@ -25,11 +24,12 @@ export class SettingsPanel {
 
   constructor(
     scene: Phaser.Scene,
+    private readonly frame: { width: number; height: number },
     onMusic: (level: number) => void,
     onEffects: (level: number) => void,
     private readonly onClose: () => void,
   ) {
-    const dim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.45).setInteractive();
+    const dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
     // Отпускание после перетаскивания ползунка за край окна не должно его закрывать.
     dim.on('pointerup', () => {
       if (this.dragging) {
@@ -85,7 +85,7 @@ export class SettingsPanel {
       .setOrigin(0.5);
 
     this.container = scene.add
-      .container(GAME.width / 2, GAME.height / 2, [
+      .container(frame.width / 2, frame.height / 2, [
         dim,
         panel,
         title,
@@ -139,7 +139,7 @@ export class SettingsPanel {
         valueText.setText(`${Math.round(level * 100)}%`);
       },
       apply: (pointer) => {
-        const left = GAME.width / 2 - TRACK_W / 2;
+        const left = this.frame.width / 2 - TRACK_W / 2;
         const ratio = clamp01((pointer.worldX - left) / TRACK_W);
         const level = Math.round(ratio * 100) / 100;
         slider.paint(level);

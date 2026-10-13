@@ -72,7 +72,6 @@ export class ArtilleryStrike {
   // Светящийся снаряд падает сверху. onImpact — взрыв в точке, куда сел носик.
   // Хлопок батареи к этому моменту уже отзвучал: его играет вызов удара.
   static drop(scene: Phaser.Scene, x: number, y: number, onImpact: () => void): ArtilleryFlight {
-    ArtilleryStrike.ensureTextures(scene);
     const drift = Phaser.Math.Between(-28, 28);
     const shell = scene.add.image(x + drift, -8, ArtilleryStrike.shellKey).setDepth(18);
     shell.setOrigin(0.5, 1);
@@ -111,7 +110,6 @@ export class ArtilleryStrike {
   // Вспышка, искры и тёмная яма. Яма гаснет сама через craterMs.
   // Разрыв — artillery_explosion.mp3, свой звук на каждый снаряд.
   static boom(scene: Phaser.Scene, x: number, y: number): void {
-    ArtilleryStrike.ensureTextures(scene);
     playArtilleryBoom(scene);
 
     const flash = scene.add

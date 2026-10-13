@@ -3,6 +3,7 @@
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { Mines } from '../entities/Mines';
 import { ENEMY_KINDS, EnemyFactory, type EnemySaveKind } from '../entities/EnemyFactory';
 import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME } from '../gameConfig';
@@ -26,6 +27,7 @@ export type ShopSave = {
   wire: boolean;
   machineGun: boolean;
   artillery: boolean;
+  mines: boolean;
   autoFire: boolean;
   autoFireOn: boolean;
 };
@@ -37,6 +39,7 @@ export type SavedRun = {
   hp: number;
   haste: number;
   artilleryCooldownMs: number;
+  minesCooldownMs: number;
   wave: number;
   phase: WavePhase;
   spawned: number;
@@ -117,6 +120,7 @@ function parseRun(value: unknown): SavedRun | null {
   const haste = requiredInt(value.haste, 1, ENEMY_HASTE.max) ?? 1;
   const artilleryCooldownMs =
     requiredInt(value.artilleryCooldownMs, 0, ArtilleryStrike.shop.cooldownMs) ?? 0;
+  const minesCooldownMs = requiredInt(value.minesCooldownMs, 0, Mines.shop.cooldownMs) ?? 0;
   // В магазине список врагов пустой по смыслу фазы, даже если в JSON они остались.
   const enemies = phase === 'shop' ? [] : parseEnemies(value.enemies);
   const spawned =
@@ -134,6 +138,7 @@ function parseRun(value: unknown): SavedRun | null {
     hp,
     haste,
     artilleryCooldownMs,
+    minesCooldownMs,
     wave,
     phase,
     spawned,
@@ -152,6 +157,8 @@ function parseShop(value: unknown): ShopSave | null {
   const wire = flag(value.wire);
   const machineGun = flag(value.machineGun);
   const artillery = flag(value.artillery);
+  // Старые сохранения не писали мины: покупки ещё не было.
+  const mines = flag(value.mines) ?? false;
   const autoFire = flag(value.autoFire);
   // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
   const autoFireOn = flag(value.autoFireOn) ?? (autoFire === true);
@@ -166,7 +173,17 @@ function parseShop(value: unknown): ShopSave | null {
   ) {
     return null;
   }
-  return { blast, damage, fireRate, wire, machineGun, artillery, autoFire, autoFireOn: autoFire && autoFireOn };
+  return {
+    blast,
+    damage,
+    fireRate,
+    wire,
+    machineGun,
+    artillery,
+    mines,
+    autoFire,
+    autoFireOn: autoFire && autoFireOn,
+  };
 }
 
 function parseEnemies(value: unknown): EnemySave[] {
