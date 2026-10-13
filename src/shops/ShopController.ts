@@ -9,6 +9,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
+import { GAME } from '../gameConfig';
 import { ShopPanel, type ShopCardView, type ShopView } from './ShopPanel';
 import type { GameHud } from '../ui/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
@@ -49,7 +50,7 @@ export class ShopController {
     private readonly onContinue: () => void,
     private readonly onChanged: () => void,
   ) {
-    this.panel = new ShopPanel(scene, this);
+    this.panel = new ShopPanel(scene, this, { width: GAME.width, height: GAME.height });
   }
 
   // Снимок покупок для сохранения партии. Монеты и номер волны пишет сцена, не этот метод.

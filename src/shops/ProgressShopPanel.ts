@@ -1,7 +1,6 @@
 // Магазин после гибели базы. Четыре постоянных улучшения, оплата накопленным score.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
 
 export type ProgressCardView = {
   info: string;
@@ -51,8 +50,12 @@ export class ProgressShopPanel {
   private readonly blast: Offer;
   private readonly speed: Offer;
 
-  constructor(scene: Phaser.Scene, shop: ProgressShopDelegate) {
-    const dim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.62).setInteractive();
+  constructor(
+    scene: Phaser.Scene,
+    shop: ProgressShopDelegate,
+    screen: { width: number; height: number },
+  ) {
+    const dim = scene.add.rectangle(0, 0, screen.width, screen.height, 0x000000, 0.62).setInteractive();
     const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
     panel.setStrokeStyle(4, 0xc9a227);
 
@@ -74,7 +77,7 @@ export class ProgressShopPanel {
       })
       .setOrigin(0.5);
 
-    this.container = scene.add.container(GAME.width / 2, GAME.height / 2, [dim, panel, title, this.scoreText]);
+    this.container = scene.add.container(screen.width / 2, screen.height / 2, [dim, panel, title, this.scoreText]);
 
     this.coins = this.makeOffer(scene, 0, '+1 монета за убийство', () => shop.buyCoins());
     this.damage = this.makeOffer(scene, 1, '+1 урон', () => shop.buyDamage());

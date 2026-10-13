@@ -3,7 +3,6 @@
 // Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
-import { GAME } from '../gameConfig';
 
 export type ShopCardView = {
   info: string;
@@ -95,10 +94,14 @@ export class ShopPanel {
   private drag: { y: number; scroll: number; moved: boolean } | null = null;
   private pressedCard: Phaser.GameObjects.Rectangle | null = null;
 
-  constructor(scene: Phaser.Scene, shop: ShopDelegate) {
+  constructor(
+    scene: Phaser.Scene,
+    shop: ShopDelegate,
+    private readonly screen: { width: number; height: number },
+  ) {
     const groupW = VIEW_W + SCROLL_GAP + SCROLL_W;
-    this.viewLeft = GAME.width / 2 - groupW / 2;
-    this.viewTop = GAME.height / 2 + VIEW_TOP;
+    this.viewLeft = this.screen.width / 2 - groupW / 2;
+    this.viewTop = this.screen.height / 2 + VIEW_TOP;
     this.contentHeight = CONTENT_PAD * 2 + OFFER_COUNT * CARD_H + (OFFER_COUNT - 1) * CARD_GAP;
     this.maxScroll = Math.max(0, this.contentHeight - VIEW_H);
     this.thumbH = Math.max(36, Math.round((VIEW_H * VIEW_H) / this.contentHeight));
@@ -123,7 +126,7 @@ export class ShopPanel {
     this.machineGun = this.makeOffer(scene, 5, 'Пулемёт', () => shop.buyMachineGun());
     this.artillery = this.makeOffer(scene, 6, 'Артиллерийский удар', () => shop.buyArtillery());
 
-    const dim = scene.add.rectangle(0, 0, GAME.width, GAME.height, 0x000000, 0.62);
+    const dim = scene.add.rectangle(0, 0, this.screen.width, this.screen.height, 0x000000, 0.62);
     const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
     panel.setStrokeStyle(4, 0xc9a227);
 
@@ -171,7 +174,7 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
 
-    this.container = scene.add.container(GAME.width / 2, GAME.height / 2, [
+    this.container = scene.add.container(this.screen.width / 2, this.screen.height / 2, [
       dim,
       panel,
       title,
@@ -336,7 +339,7 @@ export class ShopPanel {
     if (this.blocked()) {
       return;
     }
-    const screenTop = GAME.height / 2 + this.trackTop;
+    const screenTop = this.screen.height / 2 + this.trackTop;
     const travel = VIEW_H - this.thumbH;
     const center = Phaser.Math.Clamp(pointer.y, screenTop + this.thumbH / 2, screenTop + travel + this.thumbH / 2);
     const t = travel > 0 ? (center - (screenTop + this.thumbH / 2)) / travel : 0;
@@ -352,8 +355,8 @@ export class ShopPanel {
   }
 
   private overPanel(pointer: Phaser.Input.Pointer): boolean {
-    const left = GAME.width / 2 - PANEL_W / 2;
-    const top = GAME.height / 2 - PANEL_H / 2;
+    const left = this.screen.width / 2 - PANEL_W / 2;
+    const top = this.screen.height / 2 - PANEL_H / 2;
     return pointer.x >= left && pointer.x <= left + PANEL_W && pointer.y >= top && pointer.y <= top + PANEL_H;
   }
 

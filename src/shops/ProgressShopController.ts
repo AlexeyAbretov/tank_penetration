@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
+import { GAME } from '../gameConfig';
 import { ProgressShopPanel, type ProgressCardView, type ProgressShopView } from './ProgressShopPanel';
 import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
@@ -27,7 +28,7 @@ export class ProgressShopController {
   bind(scene: Phaser.Scene, onNewGame: () => void): void {
     this.onNewGame = onNewGame;
     this.paused = false;
-    this.panel = new ProgressShopPanel(scene, this);
+    this.panel = new ProgressShopPanel(scene, this, { width: GAME.width, height: GAME.height });
   }
 
   speedLevel(): number {
