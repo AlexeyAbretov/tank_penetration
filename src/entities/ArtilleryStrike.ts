@@ -3,7 +3,7 @@
 
 import Phaser from 'phaser';
 import { bake } from '../gfx/textures';
-import { playArtilleryBoom } from '../systems/ArtillerySounds';
+import { playArtilleryBoom } from '../sounds/ArtillerySounds';
 
 export type ArtilleryFlight = {
   cancel(): void;

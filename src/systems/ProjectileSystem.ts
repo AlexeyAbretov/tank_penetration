@@ -6,7 +6,7 @@ import { Rocket } from '../entities/Rocket';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
-import type { BattleEffects } from './BattleEffects';
+import type { BattleEffects } from '../sounds/BattleEffects';
 
 export class ProjectileSystem {
   private readonly armorSparks: Phaser.GameObjects.Particles.ParticleEmitter;

@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { Tank } from '../entities/Tank';
 import type { GameHud } from '../ui/huds/GameHud';
-import type { TankDeath } from './TankDeath';
+import type { TankDeath } from '../sounds/TankDeath';
 
 type DefeatDeps = {
   enemyShots: Phaser.Physics.Arcade.Group;

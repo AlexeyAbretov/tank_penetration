@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { ROCKET_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import { playRocketLaunch } from '../systems/RocketSounds';
+import { playRocketLaunch } from '../sounds/RocketSounds';
 import { EnemyShot } from './EnemyShot';
 
 export class Rocket extends EnemyShot {

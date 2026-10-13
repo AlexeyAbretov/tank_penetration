@@ -6,8 +6,8 @@
 
 import Phaser from 'phaser';
 import { EnemyFactory } from '../entities/EnemyFactory';
-import { BattleEffects } from '../systems/BattleEffects';
-import { BattleMusic } from '../systems/BattleMusic';
+import { BattleEffects } from '../sounds/BattleEffects';
+import { BattleMusic } from '../sounds/BattleMusic';
 
 export const SOUND_CLIPS = [
   { id: 'wave', label: 'Волна', title: 'TRACK_01.mp3', loop: true },

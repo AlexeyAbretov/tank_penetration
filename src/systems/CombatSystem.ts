@@ -12,8 +12,8 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
-import { playArtilleryShot } from './ArtillerySounds';
-import type { BattleEffects } from './BattleEffects';
+import { playArtilleryShot } from '../sounds/ArtillerySounds';
+import type { BattleEffects } from '../sounds/BattleEffects';
 import type { ShopController } from '../controllers/ShopController';
 
 type CombatCallbacks = {

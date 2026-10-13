@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
 import { nuke, nukeAt } from '../gfx/nuke';
 import { bake } from '../gfx/textures';
-import { playNuclearBoom } from '../systems/NuclearExplosion';
+import { playNuclearBoom } from '../sounds/NuclearExplosion';
 
 export type NuclearFlight = {
   cancel(): void;

@@ -6,7 +6,7 @@
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';
 import { EnemyFactory } from '../entities/EnemyFactory';
 import { isDebugRun } from '../gameConfig';
-import { BattleMusic } from '../systems/BattleMusic';
+import { BattleMusic } from '../sounds/BattleMusic';
 import { DebugCombatSave } from '../saves/DebugCombatSave';
 import { DebugProgressSave } from '../saves/DebugProgressSave';
 import { CombatSave } from '../saves/CombatSave';

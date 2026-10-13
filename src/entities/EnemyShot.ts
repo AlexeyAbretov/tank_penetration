@@ -4,7 +4,7 @@ import { GameObjects, Physics, Scene } from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
 import { BULLET_FRAME, BULLET_PAINT, type BulletPaint } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import { playGunnerShot } from '../systems/GunnerShot';
+import { playGunnerShot } from '../sounds/GunnerShot';
 
 // Image, не Sprite: у пули нет покадровой анимации, только одна текстура enemy-bullet.
 export class EnemyShot extends Physics.Arcade.Image {
