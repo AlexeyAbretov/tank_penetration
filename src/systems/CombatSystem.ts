@@ -12,7 +12,7 @@ import { GAME } from '../gameConfig';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from './ArtillerySounds';
 import type { BattleEffects } from './BattleEffects';
-import type { ShopController } from './ShopController';
+import type { ShopController } from '../shops/ShopController';
 
 type CombatCallbacks = {
   onKill: (coinReward: number) => void;

@@ -8,7 +8,7 @@ import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import type { GameHud } from '../ui/GameHud';
-import type { EnemySave, WavePhase } from './CombatSave';
+import type { EnemySave, WavePhase } from '../saves/CombatSave';
 
 export class WaveManager {
   // Номер текущей волны. 0 — бой ещё не начался, сохранять такую партию нечего.

@@ -2,8 +2,8 @@
 
 import Phaser from 'phaser';
 import { Tank } from '../entities/Tank';
-import { ProgressShopPanel } from '../ui/ProgressShopPanel';
-import { loadProgress, progressCost, resetProgress, saveProgress, type ProgressSave } from './ProgressSave';
+import { ProgressShopPanel } from './ProgressShopPanel';
+import { loadProgress, progressCost, resetProgress, saveProgress, type ProgressSave } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;
 

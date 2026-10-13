@@ -10,7 +10,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
-import { loadProgress } from '../systems/ProgressSave';
+import { loadProgress } from '../saves/ProgressSave';
 
 // Методы покупок, которые реализует ShopController.
 export type ShopDelegate = {

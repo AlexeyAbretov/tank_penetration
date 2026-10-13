@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
-import { progressCost, type ProgressSave } from '../systems/ProgressSave';
+import { progressCost, type ProgressSave } from '../saves/ProgressSave';
 
 export type ProgressShopDelegate = {
   buyCoins(): void;
