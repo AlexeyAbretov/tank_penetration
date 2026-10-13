@@ -6,6 +6,7 @@ import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BarbedWire } from '../entities/BarbedWire';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
+import { NuclearStrike } from '../entities/NuclearStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
@@ -25,6 +26,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   BarbedWire.ensureTextures(scene);
   ArtilleryStrike.ensureTextures(scene);
   Mines.ensureTextures(scene);
+  NuclearStrike.ensureTextures(scene);
   AssaultInfantry.ensureTextures(scene);
   GunnerInfantry.ensureTextures(scene);
   RocketInfantry.ensureTextures(scene);

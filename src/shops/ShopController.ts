@@ -9,6 +9,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
+import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { ShopPanel, type ShopCardView, type ShopView } from './ShopPanel';
@@ -38,6 +39,7 @@ export class ShopController {
   machineGun?: MachineGun;
   artilleryOwned = false;
   minesOwned = false;
+  nuclearOwned = false;
   readonly autoFire = new AutoFire();
   shopOpen = false;
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
@@ -65,6 +67,7 @@ export class ShopController {
       machineGun: this.machineGunOwned,
       artillery: this.artilleryOwned,
       mines: this.minesOwned,
+      nuclear: this.nuclearOwned,
       autoFire: this.autoFire.isOwned,
       autoFireOn: this.autoFire.enabled,
     };
@@ -87,6 +90,7 @@ export class ShopController {
     }
     this.artilleryOwned = saved.artillery;
     this.minesOwned = saved.mines;
+    this.nuclearOwned = saved.nuclear;
   }
 
   // Чистая партия: уровни и постройки обнуляются. Предметы на поле убирает перезапуск сцены.
@@ -98,6 +102,7 @@ export class ShopController {
     this.machineGunOwned = false;
     this.artilleryOwned = false;
     this.minesOwned = false;
+    this.nuclearOwned = false;
     this.autoFire.clear();
     this.wire = undefined;
     this.machineGun = undefined;
@@ -236,6 +241,18 @@ export class ShopController {
     this.refresh();
   }
 
+  // Открывает клавишу 3. Падение и взрыв считает CombatSystem.
+  buyNuclear(): void {
+    if (this.isPaused() || this.nuclearOwned || this.economy.getCoins() < NuclearStrike.shop.cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(NuclearStrike.shop.cost)) {
+      return;
+    }
+    this.nuclearOwned = true;
+    this.refresh();
+  }
+
   // Открывает клавишу 2. Постановку и подрыв считает CombatSystem.
   buyMines(): void {
     if (this.isPaused() || this.minesOwned || this.economy.getCoins() < Mines.shop.cost) {
@@ -316,6 +333,7 @@ export class ShopController {
         ),
         this.artilleryCard(coins),
         this.minesCard(coins),
+        this.nuclearCard(coins),
       ],
     };
   }
@@ -405,6 +423,30 @@ export class ShopController {
       title: 'Мины',
       buy: () => this.buyMines(),
       info: `${offer.count} мины в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 2 или иконка · перезарядка ${reload} с`,
+      cost: `цена  ${offer.cost}`,
+      open: true,
+      canBuy: coins >= offer.cost,
+    };
+  }
+
+  private nuclearCard(coins: number): ShopCardView {
+    const offer = NuclearStrike.shop;
+    const crater = offer.craterMs / 1000;
+    const reload = offer.cooldownMs / 60_000;
+    if (this.nuclearOwned) {
+      return {
+        title: 'Атомный взрыв',
+        buy: () => this.buyNuclear(),
+        info: `клавиша 3 или иконка · перезарядка ${reload} мин`,
+        cost: 'куплено',
+        open: false,
+        canBuy: false,
+      };
+    }
+    return {
+      title: 'Атомный взрыв',
+      buy: () => this.buyNuclear(),
+      info: `убивает всех на экране\nбомба в центр поля · гриб и воронка ${crater} с\nклавиша 3 или иконка · перезарядка ${reload} мин`,
       cost: `цена  ${offer.cost}`,
       open: true,
       canBuy: coins >= offer.cost,

@@ -71,13 +71,14 @@ export class GameHud {
 
     scene.add.image(frame.width / 2, 677, 'banner').setDepth(50);
 
+    // Название выше центра ленты: нижнюю половину красного поля занимает подсказка клавиш.
     scene.add
-      .text(frame.width / 2, 678, 'TANK', {
+      .text(frame.width / 2, 668, 'TANK', {
         fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '42px',
+        fontSize: '32px',
         color: '#f3d56a',
         stroke: '#4a1208',
-        strokeThickness: 6,
+        strokeThickness: 5,
       })
       .setOrigin(0.5)
       .setDepth(51);
@@ -172,15 +173,17 @@ export class GameHud {
     // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
     this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
 
+    // Внутри красного поля, над нижней золотой кромкой. На самой кромке строка терялась.
     this.controls = scene.add
-      .text(frame.width / 2, 708, this.controlsLine(), {
+      .text(frame.width / 2, 696, this.controlsLine(), {
         fontFamily: 'Georgia, serif',
-        fontSize: '14px',
-        color: '#e8c48a',
+        fontSize: '15px',
+        color: '#f3d56a',
+        stroke: '#4a1208',
+        strokeThickness: 3,
       })
       .setOrigin(0.5)
-      .setDepth(51)
-      .setAlpha(0.8);
+      .setDepth(51);
 
     scene.add.image(1128, 28, 'hp-frame').setDepth(51);
     scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
@@ -422,7 +425,7 @@ export class GameHud {
   }
 
   private controlsLine(): string {
-    const tempo = 'мышь — прицел   ЛКМ — огонь   3 — темп   Esc — пауза   шестерёнка — звук';
+    const tempo = 'мышь — прицел   ЛКМ — огонь   + — темп   Esc — пауза   шестерёнка — звук';
     const extra = this.abilities.filter((icon) => icon.owned).map((icon) => icon.hint);
     return extra.length > 0 ? `${tempo}   ${extra.join('   ')}` : tempo;
   }
@@ -470,6 +473,16 @@ export class GameHud {
     return this.abilities.find((icon) => icon.id === id);
   }
 
+  private cooldownLabel(ms: number): string {
+    const sec = Math.ceil(ms / 1000);
+    if (sec < 60) {
+      return `${sec}`;
+    }
+    const min = Math.floor(sec / 60);
+    const rest = sec % 60;
+    return `${min}:${rest.toString().padStart(2, '0')}`;
+  }
+
   private paintAbility(icon: AbilityIcon, owned: boolean, cooldownMs: number): void {
     if (icon.owned !== owned) {
       icon.owned = owned;
@@ -492,7 +505,8 @@ export class GameHud {
     }
 
     const cooling = cooldownMs > 0;
-    const label = cooling ? `${Math.ceil(cooldownMs / 1000)}` : '';
+    // Дольше минуты три цифры секунд не влезают в кружок, поэтому 3:00.
+    const label = cooling ? this.cooldownLabel(cooldownMs) : '';
     if (icon.time.text !== label) {
       icon.time.setText(label);
     }

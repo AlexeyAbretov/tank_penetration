@@ -4,6 +4,7 @@
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { Mines } from '../entities/Mines';
+import { NuclearStrike } from '../entities/NuclearStrike';
 import { ENEMY_KINDS, EnemyFactory, type EnemySaveKind } from '../entities/EnemyFactory';
 import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME } from '../gameConfig';
@@ -28,6 +29,7 @@ export type ShopSave = {
   machineGun: boolean;
   artillery: boolean;
   mines: boolean;
+  nuclear: boolean;
   autoFire: boolean;
   autoFireOn: boolean;
 };
@@ -40,6 +42,7 @@ export type SavedRun = {
   haste: number;
   artilleryCooldownMs: number;
   minesCooldownMs: number;
+  nuclearCooldownMs: number;
   wave: number;
   phase: WavePhase;
   spawned: number;
@@ -121,6 +124,8 @@ function parseRun(value: unknown): SavedRun | null {
   const artilleryCooldownMs =
     requiredInt(value.artilleryCooldownMs, 0, ArtilleryStrike.shop.cooldownMs) ?? 0;
   const minesCooldownMs = requiredInt(value.minesCooldownMs, 0, Mines.shop.cooldownMs) ?? 0;
+  const nuclearCooldownMs =
+    requiredInt(value.nuclearCooldownMs, 0, NuclearStrike.shop.cooldownMs) ?? 0;
   // В магазине список врагов пустой по смыслу фазы, даже если в JSON они остались.
   const enemies = phase === 'shop' ? [] : parseEnemies(value.enemies);
   const spawned =
@@ -139,6 +144,7 @@ function parseRun(value: unknown): SavedRun | null {
     haste,
     artilleryCooldownMs,
     minesCooldownMs,
+    nuclearCooldownMs,
     wave,
     phase,
     spawned,
@@ -157,8 +163,9 @@ function parseShop(value: unknown): ShopSave | null {
   const wire = flag(value.wire);
   const machineGun = flag(value.machineGun);
   const artillery = flag(value.artillery);
-  // Старые сохранения не писали мины: покупки ещё не было.
+  // Старые сохранения не писали мины и атомный взрыв: этих покупок ещё не было.
   const mines = flag(value.mines) ?? false;
+  const nuclear = flag(value.nuclear) ?? false;
   const autoFire = flag(value.autoFire);
   // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
   const autoFireOn = flag(value.autoFireOn) ?? (autoFire === true);
@@ -181,6 +188,7 @@ function parseShop(value: unknown): ShopSave | null {
     machineGun,
     artillery,
     mines,
+    nuclear,
     autoFire,
     autoFireOn: autoFire && autoFireOn,
   };

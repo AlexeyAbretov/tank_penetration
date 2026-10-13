@@ -1,7 +1,7 @@
 // Прослушивание файлов из public/audio без запуска боя.
 // Громкость читается из тех же ползунков, что и в игре.
 // Выстрел пушки, пулемёт, пуля врага, удар о броню, пуск ракеты, взрыв ракеты,
-// залп артиллерии, разрыв снаряда, удар о стену, крик, взрыв пикапа и гибель базы
+// залп артиллерии, разрыв снаряда, атомный взрыв, удар о стену, крик, взрыв пикапа и гибель базы
 // сцена вызывает сама, когда в просмотре включены «Стрельба» и «Смерть».
 
 import Phaser from 'phaser';
@@ -20,6 +20,7 @@ export const SOUND_CLIPS = [
   { id: 'burst', label: 'Разрыв', title: 'rocket_hit_tank.mp3' },
   { id: 'salvo', label: 'Залп', title: 'artillery_shot.mp3' },
   { id: 'crater', label: 'Воронка', title: 'artillery_explosion.mp3' },
+  { id: 'nuclear', label: 'Атом', title: 'nuclear_explosion.mp3' },
   { id: 'impact', label: 'Удар', title: 'impact0.mp3, impact1.mp3, impact2.mp3' },
   { id: 'cry', label: 'Крик', title: 'infantry_dead0.mp3, infantry_dead1.mp3' },
   { id: 'assault', label: 'Штурм', title: 'assault_explosion.mp3' },
@@ -60,6 +61,7 @@ export class StudioSounds {
     scene.load.audio('rocket-hit-tank', 'audio/rocket_hit_tank.mp3');
     scene.load.audio('artillery-shot', 'audio/artillery_shot.mp3');
     scene.load.audio('artillery-explosion', 'audio/artillery_explosion.mp3');
+    scene.load.audio('nuclear-explosion', 'audio/nuclear_explosion.mp3');
   }
 
   // Кнопка на панели. Луп включается и выключается, короткий звук играет с начала.
@@ -83,6 +85,8 @@ export class StudioSounds {
       this.salvo();
     } else if (id === 'crater') {
       this.crater();
+    } else if (id === 'nuclear') {
+      this.nuclear();
     } else if (id === 'impact') {
       this.impact();
     } else if (id === 'cry') {
@@ -127,6 +131,10 @@ export class StudioSounds {
 
   crater(): void {
     this.fx.artillerySounds.playBoom();
+  }
+
+  nuclear(): void {
+    this.fx.nuclearExplosion.play();
   }
 
   impact(): void {

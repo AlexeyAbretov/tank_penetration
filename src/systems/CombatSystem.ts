@@ -1,4 +1,4 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, арт удар, мины и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, арт удар, мины, атомный взрыв и контакт с базой.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight } from '../entities/ArtilleryStrike';
@@ -7,6 +7,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines, PlantedMine, type MineKeepOut } from '../entities/Mines';
+import { NuclearStrike, type NuclearFlight } from '../entities/NuclearStrike';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
@@ -38,6 +39,15 @@ export class CombatSystem {
   // Клик по иконке мин. Сбрасывается в том же кадре, даже если постановка ещё на перезарядке.
   private mineFromIcon = false;
   private mines: PlantedMine[] = [];
+  private nuclearCooldownMs = 0;
+  private readonly nuclearKeys: Phaser.Input.Keyboard.Key[] = [];
+  // Клик по иконке атомного взрыва. Сбрасывается в том же кадре, даже если удар ещё на перезарядке.
+  private nuclearFromIcon = false;
+  private nuclearFlight?: NuclearFlight;
+  // Сброс отменяет бомбу, которая ещё падает.
+  private nuclearToken = 0;
+  // Момент, когда гриб атомного удара уже погас. 0 — облака на поле нет.
+  private nuclearCloudUntil = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -62,6 +72,10 @@ export class CombatSystem {
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_TWO),
       );
+      this.nuclearKeys.push(
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_THREE),
+      );
     }
   }
 
@@ -81,6 +95,19 @@ export class CombatSystem {
     this.minesCooldownMs = Math.max(0, ms);
   }
 
+  get nuclearCooldown(): number {
+    return this.nuclearCooldownMs;
+  }
+
+  setNuclearCooldown(ms: number): void {
+    this.nuclearCooldownMs = Math.max(0, ms);
+  }
+
+  // Сколько миллисекунд гриб ещё будет на поле. Магазин волны ждёт это, чтобы не закрыть взрыв.
+  nuclearCloudLeft(): number {
+    return Math.max(0, this.nuclearCloudUntil - this.scene.time.now);
+  }
+
   // Иконка на HUD просит удар. Сработает в tickArtillery, если бой идёт и перезарядка кончилась.
   requestArtillery(): void {
     this.strikeFromIcon = true;
@@ -91,12 +118,19 @@ export class CombatSystem {
     this.mineFromIcon = true;
   }
 
+  // Иконка атомного взрыва на HUD. Сработает в tickNuclear, если бой идёт и перезарядка кончилась.
+  requestNuclear(): void {
+    this.nuclearFromIcon = true;
+  }
+
   clearProjectiles(): void {
     this.strikeFromIcon = false;
     this.mineFromIcon = false;
+    this.nuclearFromIcon = false;
     this.shells.clear(true, true);
     this.mgShots.clear(true, true);
     this.cancelArtillery();
+    this.cancelNuclear();
     this.clearMines();
   }
 
@@ -167,6 +201,21 @@ export class CombatSystem {
     }
   }
 
+  // Перезарядка идёт и в магазине. Взрыв — только в бою, по клавише 3 или по иконке.
+  tickNuclear(delta: number, canFire: boolean): void {
+    if (!this.shop.nuclearOwned) {
+      this.nuclearFromIcon = false;
+      return;
+    }
+    this.nuclearCooldownMs = Math.max(0, this.nuclearCooldownMs - delta);
+    const pressed = this.nuclearPressed();
+    if (!canFire || this.nuclearCooldownMs > 0 || !pressed) {
+      return;
+    }
+    this.nuclearCooldownMs = NuclearStrike.shop.cooldownMs;
+    this.launchNuclear();
+  }
+
   private strikePressed(): boolean {
     const fromIcon = this.strikeFromIcon;
     this.strikeFromIcon = false;
@@ -177,6 +226,12 @@ export class CombatSystem {
     const fromIcon = this.mineFromIcon;
     this.mineFromIcon = false;
     return fromIcon || this.mineKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  private nuclearPressed(): boolean {
+    const fromIcon = this.nuclearFromIcon;
+    this.nuclearFromIcon = false;
+    return fromIcon || this.nuclearKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
   }
 
   // true — хотя бы одна мина встала. Пустое поле кулдаун не тратит.
@@ -319,6 +374,50 @@ export class CombatSystem {
         this.hurtInfantry(unit, ArtilleryStrike.shop.damage);
       }
     });
+  }
+
+  private launchNuclear(): void {
+    const token = this.nuclearToken;
+    this.nuclearFlight = NuclearStrike.drop(this.scene, () => {
+      this.nuclearFlight = undefined;
+      if (token !== this.nuclearToken) {
+        return;
+      }
+      this.detonateNuclear();
+    });
+  }
+
+  private detonateNuclear(): void {
+    NuclearStrike.boom(this.scene);
+    this.nuclearCloudUntil = this.scene.time.now + NuclearStrike.cloudMs;
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (!this.onScreen(unit)) {
+        return;
+      }
+      // Крик на каждого солдата забил бы взрыв. Монеты всё равно начисляются.
+      if (unit.hit(1_000_000)) {
+        this.callbacks.onKill(unit.coinReward);
+        unit.kill();
+      }
+    });
+  }
+
+  // Правее кадра враг ещё не вошёл: взрыв его не берёт. Труп уже не боец.
+  private onScreen(unit: Infantry): boolean {
+    if (!unit.active || unit.reachedWall) {
+      return false;
+    }
+    const left = unit.x - unit.displayWidth * unit.originX;
+    const right = left + unit.displayWidth;
+    const top = unit.y - unit.displayHeight * unit.originY;
+    const bottom = top + unit.displayHeight;
+    return right > 0 && left < GAME.width && bottom > 0 && top < GAME.bannerY;
+  }
+
+  private cancelNuclear(): void {
+    this.nuclearToken += 1;
+    this.nuclearFlight?.cancel();
+    this.nuclearFlight = undefined;
   }
 
   private cancelArtillery(): void {

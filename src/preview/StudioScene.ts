@@ -37,6 +37,7 @@ import {
   type SoldierLook,
   type TankPaint,
 } from '../gfx/looks';
+import { nuke, nukeAt } from '../gfx/nuke';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import { bake, copyImage } from '../gfx/textures';
 import { ENTITIES, type PreviewEntity } from './catalog';
@@ -356,7 +357,7 @@ export class StudioScene extends Phaser.Scene {
     const layout = Tank.layout;
     const x = holder.x + layout.hullX * holder.scaleX;
     const y = holder.y + (layout.hullY - 12) * holder.scaleY;
-    this.deathFx.push(...Tank.nukeAt(this, x, y, Math.abs(holder.scaleX)));
+    this.deathFx.push(...nukeAt(this, x, y, Math.abs(holder.scaleX)));
     this.audio?.base();
   }
 
@@ -718,9 +719,9 @@ export class StudioScene extends Phaser.Scene {
     if (view.death && this.entity.death === 'nuke') {
       // Запас сверху и по бокам — под шапку гриба. Иначе взрыв обрезается краем холста.
       return {
-        left: layout.hullX - Tank.doom.half - 24,
-        top: layout.hullY - 12 - Tank.doom.rise - 48,
-        right: layout.hullX + Tank.doom.half + 24,
+        left: layout.hullX - nuke.half - 24,
+        top: layout.hullY - 12 - nuke.rise - 48,
+        right: layout.hullX + nuke.half + 24,
         bottom: layout.hullY + TANK_WRECK_FRAME.h / 2,
       };
     }
