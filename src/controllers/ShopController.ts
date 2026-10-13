@@ -12,8 +12,8 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
-import { ShopPanel, type ShopCardView, type ShopView } from './ShopPanel';
-import type { GameHud } from '../ui/GameHud';
+import { ShopPanel, type ShopCardView, type ShopView } from '../ui/shops/ShopPanel';
+import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
 type PermanentBonuses = {

@@ -15,14 +15,14 @@ import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleEffects } from '../systems/BattleEffects';
 import { BattleMusic } from '../systems/BattleMusic';
 import { CombatSystem } from '../systems/CombatSystem';
-import { ProgressShopController } from '../shops/ProgressShopController';
+import { ProgressShopController } from '../controllers/ProgressShopController';
 import { PlayerController } from '../systems/PlayerController';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { CombatSave, type SavedRun } from '../saves/CombatSave';
-import { ShopController } from '../shops/ShopController';
+import { ShopController } from '../controllers/ShopController';
 import { WaveManager } from '../systems/WaveManager';
-import { GameHud, type HudAbility, type HudFrame } from '../ui/GameHud';
-import { SettingsPanel } from '../ui/SettingsPanel';
+import { GameHud, type HudAbility, type HudFrame } from '../ui/huds/GameHud';
+import { SettingsPanel } from '../ui/settings/SettingsPanel';
 import { preloadImages } from '../images/imagePreloader';
 import { preloadSounds } from '../sounds/soundPreloader';
 

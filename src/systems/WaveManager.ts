@@ -7,7 +7,7 @@ import type { EnemyRoster } from '../entities/EnemyRoster';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
-import type { GameHud } from '../ui/GameHud';
+import type { GameHud } from '../ui/huds/GameHud';
 import type { EnemySave, WavePhase } from '../saves/CombatSave';
 
 export class WaveManager {

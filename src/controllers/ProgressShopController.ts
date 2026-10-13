@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
-import { ProgressShopPanel, type ProgressCardView, type ProgressShopView } from './ProgressShopPanel';
+import { ProgressShopPanel, type ProgressCardView, type ProgressShopView } from '../ui/shops/ProgressShopPanel';
 import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;

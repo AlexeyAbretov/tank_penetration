@@ -11,11 +11,11 @@ import { DebugCombatSave } from '../saves/DebugCombatSave';
 import { DebugProgressSave } from '../saves/DebugProgressSave';
 import { CombatSave } from '../saves/CombatSave';
 import { ProgressSave } from '../saves/ProgressSave';
-import { ProgressShopController } from '../shops/ProgressShopController';
+import { ProgressShopController } from '../controllers/ProgressShopController';
 import { WaveManager } from '../systems/WaveManager';
 import { GameScene } from './GameScene';
-import { DebugGameHud } from '../ui/DebugGameHud';
-import { GameHud } from '../ui/GameHud';
+import { DebugGameHud } from '../ui/huds/DebugGameHud';
+import { GameHud } from '../ui/huds/GameHud';
 
 export class GameSceneFactory {
   static create(): GameScene {
