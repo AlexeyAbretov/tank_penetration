@@ -86,19 +86,19 @@ export class ProgressShopController {
     this.onNewGame();
   }
 
-  buyCoins(): void {
+  private buyCoins(): void {
     this.buy('coins');
   }
 
-  buyDamage(): void {
+  private buyDamage(): void {
     this.buy('damage');
   }
 
-  buyBlast(): void {
+  private buyBlast(): void {
     this.buy('blast');
   }
 
-  buySpeed(): void {
+  private buySpeed(): void {
     this.buy('speed');
   }
 
@@ -127,10 +127,7 @@ export class ProgressShopController {
     const score = this.progress.score;
     return {
       score,
-      coins: this.coinsCard(score),
-      damage: this.damageCard(score),
-      blast: this.blastCard(score),
-      speed: this.speedCard(score),
+      cards: [this.coinsCard(score), this.damageCard(score), this.blastCard(score), this.speedCard(score)],
     };
   }
 
@@ -138,6 +135,8 @@ export class ProgressShopController {
     const level = this.progress.coins;
     const price = ProgressSave.cost(level);
     return {
+      title: '+1 монета за убийство',
+      buy: () => this.buyCoins(),
       info: `ур. ${level}   +${level} → +${level + 1} к монетам`,
       cost: `цена  ${price}`,
       open: true,
@@ -150,6 +149,8 @@ export class ProgressShopController {
     const price = ProgressSave.cost(level);
     const now = Infantry.shellDamage + level;
     return {
+      title: '+1 урон',
+      buy: () => this.buyDamage(),
       info: `ур. ${level}   урон ${now} → ${now + 1}`,
       cost: `цена  ${price}`,
       open: true,
@@ -163,6 +164,8 @@ export class ProgressShopController {
     const now = level * Tank.blastRadiusPerLevel;
     const next = (level + 1) * Tank.blastRadiusPerLevel;
     return {
+      title: '+1 область взрыва',
+      buy: () => this.buyBlast(),
       info: `ур. ${level}   радиус ${now} → ${next}`,
       cost: `цена  ${price}`,
       open: true,
@@ -178,6 +181,8 @@ export class ProgressShopController {
     const maxed = level >= Tank.maxProgressSpeedLevel || next >= now;
     const delay = this.formatDelay(now);
     return {
+      title: 'Скорость −0.01 с',
+      buy: () => this.buySpeed(),
       info: maxed ? `ур. ${level}   ${delay} (макс.)` : `ур. ${level}   ${delay} → ${this.formatDelay(next)}`,
       cost: maxed ? 'максимум' : `цена  ${price}`,
       open: !maxed,

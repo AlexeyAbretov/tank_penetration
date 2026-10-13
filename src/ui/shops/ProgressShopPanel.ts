@@ -1,28 +1,25 @@
-// Магазин после гибели базы. Четыре постоянных улучшения, оплата накопленным score.
+// Магазин после гибели базы. Оплата накопленным score.
+// Покупки и тексты карточек приходят из контроллера: окно их список не знает.
 
 import Phaser from 'phaser';
 
 export type ProgressCardView = {
+  title: string;
   info: string;
   cost: string;
   // false — скорость уже на пределе, клик не нужен.
   open: boolean;
   canBuy: boolean;
+  buy: () => void;
 };
 
 export type ProgressShopView = {
   score: number;
-  coins: ProgressCardView;
-  damage: ProgressCardView;
-  blast: ProgressCardView;
-  speed: ProgressCardView;
+  cards: ProgressCardView[];
 };
 
+// «Новая игра» и «в бой». Сами покупки приходят в карточке.
 export type ProgressShopDelegate = {
-  buyCoins(): void;
-  buyDamage(): void;
-  buyBlast(): void;
-  buySpeed(): void;
   closeAndRestart(): void;
   wipeAndRestart(): void;
 };
@@ -37,18 +34,17 @@ const CARD_TOP = -190;
 type Offer = {
   card: Phaser.GameObjects.Rectangle;
   hit: Phaser.GameObjects.Container;
+  title: Phaser.GameObjects.Text;
   info: Phaser.GameObjects.Text;
   cost: Phaser.GameObjects.Text;
+  buy: () => void;
 };
 
 export class ProgressShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly scoreText: Phaser.GameObjects.Text;
-  private readonly coins: Offer;
-  private readonly damage: Offer;
-  private readonly blast: Offer;
-  private readonly speed: Offer;
+  private readonly offers: Offer[] = [];
 
   constructor(
     scene: Phaser.Scene,
@@ -79,11 +75,6 @@ export class ProgressShopPanel {
 
     this.container = scene.add.container(screen.width / 2, screen.height / 2, [dim, panel, title, this.scoreText]);
 
-    this.coins = this.makeOffer(scene, 0, '+1 монета за убийство', () => shop.buyCoins());
-    this.damage = this.makeOffer(scene, 1, '+1 урон', () => shop.buyDamage());
-    this.blast = this.makeOffer(scene, 2, '+1 область взрыва', () => shop.buyBlast());
-    this.speed = this.makeOffer(scene, 3, 'Скорость −0.01 с', () => shop.buySpeed());
-
     const fresh = this.makeButton(scene, -155, 286, 290, 'НОВАЯ ИГРА', () => shop.wipeAndRestart());
     const next = this.makeButton(scene, 155, 286, 290, 'В БОЙ', () => shop.closeAndRestart());
     this.container.add([fresh, next]);
@@ -103,10 +94,25 @@ export class ProgressShopPanel {
 
   refresh(view: ProgressShopView): void {
     this.scoreText.setText(`SCORE  ${view.score}`);
-    this.paint(this.coins, view.coins);
-    this.paint(this.damage, view.damage);
-    this.paint(this.blast, view.blast);
-    this.paint(this.speed, view.speed);
+    this.syncOffers(view.cards);
+    for (let i = 0; i < view.cards.length; i += 1) {
+      this.paint(this.offers[i], view.cards[i]);
+    }
+  }
+
+  // Карточки появляются вместе с первым списком. Новый пункт — ещё одна строка, не новое поле окна.
+  private syncOffers(cards: ProgressCardView[]): void {
+    if (this.offers.length === cards.length) {
+      return;
+    }
+    for (const offer of this.offers) {
+      offer.hit.destroy();
+    }
+    this.offers.length = 0;
+    const scene = this.container.scene;
+    cards.forEach((card, index) => {
+      this.offers.push(this.makeOffer(scene, index, card.title, card.buy));
+    });
   }
 
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
@@ -138,14 +144,15 @@ export class ProgressShopPanel {
       .setOrigin(1, 0);
 
     hit.add([card, title, info, cost]);
+    const offer: Offer = { card, hit, title, info, cost, buy };
     // Одна зона на всю карточку: надписи не перехватывают клик по центру.
     this.arm(hit, CARD_W, CARD_H, () => {
       if (this.container.visible) {
-        buy();
+        offer.buy();
       }
     });
     this.container.add(hit);
-    return { card, hit, info, cost };
+    return offer;
   }
 
   private makeButton(
@@ -184,6 +191,8 @@ export class ProgressShopPanel {
   }
 
   private paint(offer: Offer, card: ProgressCardView): void {
+    offer.buy = card.buy;
+    offer.title.setText(card.title);
     offer.info.setText(card.info);
     offer.cost.setText(card.cost);
     if (!card.open) {
