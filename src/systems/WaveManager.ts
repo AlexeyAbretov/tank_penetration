@@ -3,12 +3,12 @@
 // Сам менеджер врагов не двигает: он только ставит их на поле и следит, жив ли ещё кто-то.
 
 import Phaser from 'phaser';
-import type { EnemyRoster } from '../entities/EnemyRoster';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import type { GameHud } from '../ui/huds/GameHud';
 import type { EnemySave, WavePhase } from '../saves/CombatSave';
+import { EnemyFactory } from '../entities/EnemyFactory';
 
 export class WaveManager {
   // Номер текущей волны. 0 — бой ещё не начался, сохранять такую партию нечего.
@@ -35,7 +35,7 @@ export class WaveManager {
   private onWaveBegan!: (wave: number) => void;
 
   // Фабрика известна до сцены. Группы и колбэки появляются в create(), их ставит bind().
-  constructor(private readonly enemies: EnemyRoster) {}
+  constructor(private readonly enemies: typeof EnemyFactory) {}
 
   // restart() поднимает ту же сцену и тот же менеджер, а группы и интерфейс создаёт заново.
   bind(

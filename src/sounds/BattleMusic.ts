@@ -4,7 +4,7 @@
 // Пауза и гибель базы глушат звук сами: менеджер волн про музыку не знает.
 
 import Phaser from 'phaser';
-import type { EnemyRoster } from '../entities/EnemyRoster';
+import { EnemyFactory } from '../entities/EnemyFactory';
 
 // Громкость по умолчанию, если игрок ещё не двигал ползунок.
 const DEFAULT_VOLUME = 0.45;
@@ -25,7 +25,7 @@ export class BattleMusic {
 
   // Фабрика известна до сцены: по ней решается, босс это или обычный луп.
   // Звуковой менеджер появляется вместе со сценой, его ставит bind().
-  constructor(private readonly enemies: EnemyRoster) {}
+  constructor(private readonly enemies: typeof EnemyFactory) {}
 
   // restart() поднимает ту же сцену и ту же музыку. Звуки потом создаются заново в create().
   bind(scene: Phaser.Scene): void {
