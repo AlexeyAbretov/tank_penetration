@@ -220,10 +220,10 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'gunner',
     title: 'Стрелок',
-    hint: 'То же тело, другие цвета и длинная винтовка. Жёлтая точка — откуда вылетает пуля. При выстреле ствол откатывается и вспыхивает. «Смерть» кладёт тело в кровь.',
+    hint: 'Шесть кадров бега, как у штурмовика, сине-серый камуфляж. Жёлтая точка — откуда вылетает пуля. «Стрельба» ставит его в стойку: ствол откатывается и вспыхивает. «Смерть» — тело с поля.',
     exportName: 'GUNNER_LOOK',
     kind: 'frames',
-    frameCount: 2,
+    frameCount: GunnerInfantry.frameKeys.length,
     animFps: GunnerInfantry.walkFps,
     gameScale: Infantry.placed.scale,
     originX: Infantry.placed.originX,
@@ -231,21 +231,20 @@ export const ENTITIES: PreviewEntity[] = [
     texW: SOLDIER_FRAME.w,
     texH: SOLDIER_FRAME.h,
     defaults: asPaint(GUNNER_LOOK),
-    fields: soldierFields(),
+    fields: [],
     hitbox: soldierHit,
     muzzle: GunnerInfantry.muzzleOffset,
     hpColor: 0x3a8ad4,
     death: 'corpse',
+    corpseImage: GunnerInfantry.corpseKey,
     shot: {
       delay: GunnerInfantry.shotInterval,
       speed: GunnerInfantry.shotSpeed,
       projectile: 'bullet',
       flash: 'gunner',
     },
-    bake: (scene, paint, keys) => {
-      const look = paint as SoldierLook;
-      stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 0, look));
-      stamp(scene, keys[1], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 1, look));
+    bake: (scene, _paint, keys) => {
+      GunnerInfantry.frameKeys.forEach((key, i) => copyImage(scene, key, keys[i]));
     },
   },
   {

@@ -105,12 +105,17 @@ export class StudioScene extends Phaser.Scene {
     Tank.preload(this);
     MachineGun.preload(this);
     AssaultInfantry.preload(this);
+    GunnerInfantry.preload(this);
     preloadTankBoom(this);
     StudioSounds.preload(this);
   }
 
   create(): void {
-    for (const key of [...AssaultInfantry.frameKeys, AssaultInfantry.corpseKey]) {
+    for (const key of [
+      ...AssaultInfantry.frameKeys,
+      AssaultInfantry.corpseKey,
+      ...Object.keys(GunnerInfantry.images),
+    ]) {
       if (this.textures.exists(key)) {
         this.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
       }
@@ -1060,26 +1065,9 @@ export class StudioScene extends Phaser.Scene {
     PickupTruck.poseGun(rig.gun, 0, 0, scale, 0, rig.recoil);
   }
 
-  // Стрелок в бою рисует винтовку отдельно от тела. Здесь то же самое, иначе откат не виден.
+  // Стрельба в просмотре — стойка из боя: тело без ствола, ствол и кисти отдельными картинками.
   private bakeGunnerBody(): void {
     this.dropGunnerBody();
-    const look = this.paint as SoldierLook;
-    this.gunnerBodyKeys = ([0, 1] as const).map((phase) => {
-      const key = `studio-gunner-body-${phase}`;
-      this.restamp(key, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        Infantry.drawSoldier(g, phase, look, false),
-      );
-      return key;
-    });
-    this.restamp('studio-gunner-rifle', GUNNER_RIFLE_FRAME.w, GUNNER_RIFLE_FRAME.h, (g) =>
-      GunnerInfantry.renderRifle(g, look),
-    );
-    this.anims.create({
-      key: 'studio-gunner-body',
-      frames: this.gunnerBodyKeys.map((key) => ({ key })),
-      frameRate: GunnerInfantry.walkFps,
-      repeat: -1,
-    });
   }
 
   private dropGunnerBody(): void {
@@ -1096,20 +1084,23 @@ export class StudioScene extends Phaser.Scene {
 
   private makeGunner(view: ViewState): Phaser.GameObjects.Container {
     const root = this.add.container(0, 0);
-    const sprite = this.add.sprite(0, 0, this.gunnerBodyKeys[0]);
+    const sprite = this.add.sprite(0, 0, GunnerInfantry.aimKey);
     sprite.setOrigin(this.entity.originX, this.entity.originY);
     sprite.setScale(view.scale);
-    if (view.animate) {
-      sprite.play('studio-gunner-body');
-    }
     root.add(sprite);
-    const rifle = this.add.image(0, 0, 'studio-gunner-rifle');
+    const rifle = this.add.image(0, 0, GunnerInfantry.rifleKey);
     rifle.setOrigin(
       (GunnerInfantry.breech.x - GunnerInfantry.rifleCut.x) / GUNNER_RIFLE_FRAME.w,
       (GunnerInfantry.breech.y - GunnerInfantry.rifleCut.y) / GUNNER_RIFLE_FRAME.h,
     );
     rifle.setScale(view.scale);
     root.add(rifle);
+    if (this.textures.exists(GunnerInfantry.handsKey)) {
+      const hands = this.add.image(0, 0, GunnerInfantry.handsKey);
+      hands.setOrigin(this.entity.originX, this.entity.originY);
+      hands.setScale(view.scale);
+      root.add(hands);
+    }
     const guides = this.add.graphics();
     root.add(guides);
     this.paintSpriteGuides(guides, view);
@@ -1541,11 +1532,13 @@ export class StudioScene extends Phaser.Scene {
     }
     if (rig.flash === 'gunner') {
       const pop = GunnerInfantry.flashPop;
-      const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-gunner-flash');
+      const scale = readView().scale;
+      const at = GunnerInfantry.flashOrigin(rig.muzzle.x, rig.muzzle.y, rig.angle, scale);
+      const flash = this.add.image(at.x, at.y, 'studio-fx-gunner-flash');
       flash.setOrigin(0, 0.5);
       flash.setBlendMode(Phaser.BlendModes.ADD);
       flash.setRotation(rig.angle);
-      flash.setScale(pop.x * rig.pixel, pop.y * rig.pixel);
+      flash.setScale(scale * pop.x, scale * pop.y);
       rig.root.add(flash);
       this.tweens.add({
         targets: flash,
