@@ -37,7 +37,7 @@ import {
   type ShellPaint,
   type SoldierLook,
 } from '../gfx/looks';
-import { nuke, nukeAt } from '../gfx/nuke';
+import { tankBoom, tankBoomAt, preloadTankBoom } from '../gfx/tankBoom';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import { bake, copyImage } from '../gfx/textures';
 import { ENTITIES, type PreviewEntity } from './catalog';
@@ -105,6 +105,7 @@ export class StudioScene extends Phaser.Scene {
     Tank.preload(this);
     MachineGun.preload(this);
     AssaultInfantry.preload(this);
+    preloadTankBoom(this);
     StudioSounds.preload(this);
   }
 
@@ -367,7 +368,7 @@ export class StudioScene extends Phaser.Scene {
     const layout = Tank.layout;
     const x = holder.x + layout.hullX * holder.scaleX;
     const y = holder.y + (layout.hullY - 12) * holder.scaleY;
-    this.deathFx.push(...nukeAt(this, x, y, Math.abs(holder.scaleX)));
+    this.deathFx.push(...tankBoomAt(this, x, y, Math.abs(holder.scaleX)));
     this.audio?.base();
   }
 
@@ -792,9 +793,9 @@ export class StudioScene extends Phaser.Scene {
     if (view.death && this.entity.death === 'nuke') {
       // Запас сверху и по бокам — под шапку гриба. Иначе взрыв обрезается краем холста.
       return {
-        left: layout.hullX - nuke.half - 24,
-        top: layout.hullY - 12 - nuke.rise - 48,
-        right: layout.hullX + nuke.half + 24,
+        left: layout.hullX - tankBoom.half - 24,
+        top: layout.hullY - 12 - tankBoom.rise - 48,
+        right: layout.hullX + tankBoom.half + 24,
         bottom: layout.hullY + TANK_WRECK_FRAME.h / 2,
       };
     }
@@ -850,7 +851,7 @@ export class StudioScene extends Phaser.Scene {
 
   private labels(view: ViewState): string[] {
     if (view.death && this.entity.death === 'nuke') {
-      return ['ядерный взрыв · обломки'];
+      return ['взрыв · обломки'];
     }
     if (view.death && this.entity.death === 'wreck') {
       return ['взрыв · обломки'];

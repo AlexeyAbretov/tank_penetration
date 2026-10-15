@@ -16,7 +16,7 @@ import {
   type ShellPaint,
   type TankPaint,
 } from '../gfx/looks';
-import { nukeAt } from '../gfx/nuke';
+import { tankBoomAt } from '../gfx/tankBoom';
 import { bake } from '../gfx/textures';
 
 // Прямоугольник части в координатах её родителя, до поворота башни.
@@ -385,8 +385,8 @@ export class Tank extends GameObjects.Container {
     }
     const wreck = this.scene.add.image(layout.hullX, layout.hullY, Tank.wreckKey);
     this.add(wreck);
-    // Взрыв чуть выше середины корпуса: оттуда растёт ножка гриба.
-    nukeAt(this.scene, this.x + layout.hullX, this.y + layout.hullY - 12);
+    // Взрыв чуть выше середины корпуса: оттуда растут кадры спрайта.
+    tankBoomAt(this.scene, this.x + layout.hullX, this.y + layout.hullY - 12);
     // Сначала огонь, поверх него — дым от тех же очагов.
     this.fires = Tank.firesAt(this.scene, this.x, this.y);
     this.smokes = Tank.smokesAt(this.scene, this.x, this.y);
