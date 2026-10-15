@@ -1,7 +1,7 @@
 // Собирает сцену до старта Phaser. В список сцен кладётся готовый объект:
 // иначе движок вызовет конструктор без аргументов, и restart() поднимет пустую сцену.
 // Дебаг-ветка стоит отдельно. В сборке для игроков isDebugRun() становится false,
-// и DebugCombatSave, DebugProgressSave с DebugEnemyFactory из бандла выпадают.
+// и DebugCombatSave, DebugProgressSave, DebugEnemyFactory с DebugCombatSystem из бандла выпадают.
 
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';
 import { EnemyFactory } from '../entities/EnemyFactory';
@@ -14,6 +14,8 @@ import { ProgressSave } from '../saves/ProgressSave';
 import { ProgressShopController } from '../controllers/ProgressShopController';
 import { WaveManager } from '../systems/WaveManager';
 import { GameScene } from './GameScene';
+import { DebugCombatSystem } from '../systems/DebugCombatSystem';
+import { CombatSystem } from '../systems/CombatSystem';
 import { DebugGameHud } from '../ui/huds/DebugGameHud';
 import { GameHud } from '../ui/huds/GameHud';
 
@@ -27,7 +29,8 @@ export class GameSceneFactory {
         new ProgressShopController(new DebugProgressSave()),
         new WaveManager(enemies, GAME),
         new BattleMusic(enemies),
-        DebugGameHud
+        DebugGameHud,
+        DebugCombatSystem,
       );
     }
 
@@ -38,6 +41,8 @@ export class GameSceneFactory {
       new ProgressShopController(new ProgressSave()),
       new WaveManager(enemies, GAME),
       new BattleMusic(enemies),
-      GameHud);
+      GameHud,
+      CombatSystem,
+    );
   }
 }

@@ -14,7 +14,8 @@ import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleEffects } from '../sounds/BattleEffects';
 import { BattleMusic } from '../sounds/BattleMusic';
-import { CombatSystem } from '../systems/CombatSystem';
+import type { CombatCallbacks } from '../types/CombatCallbacks';
+import type { CombatSystem } from '../types/CombatSystem';
 import { ProgressShopController } from '../controllers/ProgressShopController';
 import { PlayerController } from '../controllers/PlayerController';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
@@ -80,7 +81,7 @@ export class GameScene extends Phaser.Scene {
     this.writeSave();
   };
 
-  // Класс интерфейса приходит снаружи. Экземпляр создаётся в create():
+  // Классы интерфейса и боя приходят снаружи. Экземпляры создаются в create():
   // restart() конструктор сцены не вызывает, а до create() нет scene.add и текстуры баннера.
   private hud!: GameHud;
 
@@ -95,6 +96,16 @@ export class GameScene extends Phaser.Scene {
       maxHp: number,
       abilities: readonly HudAbility[],
     ) => GameHud,
+    private readonly Combat: new (
+      scene: Phaser.Scene,
+      tank: Tank,
+      infantry: Phaser.Physics.Arcade.Group,
+      shop: ShopController,
+      callbacks: CombatCallbacks,
+      progressDamage: number,
+      progressBlast: number,
+      effects: BattleEffects,
+    ) => CombatSystem,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
@@ -255,7 +266,7 @@ export class GameScene extends Phaser.Scene {
       () => this.writeSave(),
     );
 
-    this.combat = new CombatSystem(
+    this.combat = new this.Combat(
       this,
       this.player.tank,
       this.infantry,

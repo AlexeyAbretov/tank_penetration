@@ -424,7 +424,7 @@ export class GameHud {
     this.controls.setText(this.controlsLine());
   }
 
-  private controlsLine(): string {
+  protected controlsLine(): string {
     const tempo = 'мышь — прицел   ЛКМ — огонь   + — темп   Esc — пауза   шестерёнка — звук';
     const extra = this.abilities.filter((icon) => icon.owned).map((icon) => icon.hint);
     return extra.length > 0 ? `${tempo}   ${extra.join('   ')}` : tempo;

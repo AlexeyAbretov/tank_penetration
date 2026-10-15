@@ -15,13 +15,10 @@ import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from '../sounds/ArtillerySounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
 import type { ShopController } from '../controllers/ShopController';
+import type { CombatCallbacks } from '../types/CombatCallbacks';
+import type { CombatSystem as Combat } from '../types/CombatSystem';
 
-type CombatCallbacks = {
-  onKill: (coinReward: number) => void;
-  onBaseHit: (amount: number) => void;
-};
-
-export class CombatSystem {
+export class CombatSystem implements Combat {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly shells: Phaser.Physics.Arcade.Group;
   private readonly mgShots: Phaser.Physics.Arcade.Group;
@@ -173,8 +170,14 @@ export class CombatSystem {
       return;
     }
     this.artilleryCooldownMs = Math.max(0, this.artilleryCooldownMs - delta);
-    const pressed = this.strikePressed();
-    if (!canFire || this.artilleryCooldownMs > 0 || !pressed) {
+    if (!this.strikePressed()) {
+      return;
+    }
+    this.useArtillery(canFire);
+  }
+
+  protected useArtillery(canFire: boolean): void {
+    if (!canFire || this.artilleryCooldownMs > 0) {
       return;
     }
     this.artilleryCooldownMs = ArtilleryStrike.shop.cooldownMs;
@@ -193,7 +196,14 @@ export class CombatSystem {
     if (canFire) {
       this.touchMines();
     }
-    if (!canFire || this.minesCooldownMs > 0 || !pressed) {
+    if (!pressed) {
+      return;
+    }
+    this.useMines(canFire);
+  }
+
+  protected useMines(canFire: boolean): void {
+    if (!canFire || this.minesCooldownMs > 0) {
       return;
     }
     if (this.layMines()) {
@@ -208,8 +218,14 @@ export class CombatSystem {
       return;
     }
     this.nuclearCooldownMs = Math.max(0, this.nuclearCooldownMs - delta);
-    const pressed = this.nuclearPressed();
-    if (!canFire || this.nuclearCooldownMs > 0 || !pressed) {
+    if (!this.nuclearPressed()) {
+      return;
+    }
+    this.useNuclear(canFire);
+  }
+
+  protected useNuclear(canFire: boolean): void {
+    if (!canFire || this.nuclearCooldownMs > 0) {
       return;
     }
     this.nuclearCooldownMs = NuclearStrike.shop.cooldownMs;
