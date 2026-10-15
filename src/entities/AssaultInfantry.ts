@@ -10,8 +10,25 @@ import { bake } from '../gfx/textures';
 import { Infantry } from './Infantry';
 
 export class AssaultInfantry extends Infantry {
-  static readonly walkFps = 7;
+  static readonly walkFps = 9;
   static readonly corpseKey = 'infantry-corpse';
+
+  // Контакт → подъём → пронос → контакт другой ноги → подъём → пронос. Последний — труп.
+  // Пути в public/. Строки буквальные: singlefile-сборка подменяет их на data:.
+  static readonly images = {
+    'infantry-0': 'assets/infantry-0.png',
+    'infantry-1': 'assets/infantry-1.png',
+    'infantry-2': 'assets/infantry-2.png',
+    'infantry-3': 'assets/infantry-3.png',
+    'infantry-4': 'assets/infantry-4.png',
+    'infantry-5': 'assets/infantry-5.png',
+    [AssaultInfantry.corpseKey]: 'assets/infantry-corpse.png',
+  } as const;
+
+  // Все ключи кроме трупа — в порядке шага.
+  static readonly frameKeys = (
+    Object.keys(AssaultInfantry.images) as (keyof typeof AssaultInfantry.images)[]
+  ).filter((key) => key !== AssaultInfantry.corpseKey);
 
   // Убийство даёт 1 монету.
   readonly coinReward = 1;
@@ -20,36 +37,55 @@ export class AssaultInfantry extends Infantry {
   // Столько здоровья базы снимает один дошедший солдат.
   readonly contactDamage = 12;
 
-  // Два кадра шага и анимация, которая их чередует. Повторный вызов ничего не рисует заново.
+  // GameScene и студия зовут до create.
+  static preload(scene: Phaser.Scene): void {
+    for (const [key, path] of Object.entries(this.images)) {
+      scene.load.image(key, path);
+    }
+  }
+
+  // Четыре кадра шага и анимация, которая их крутит. Повторный вызов ничего не рисует заново.
+  // В бою кадры — картинки из assets/. Фигурный рисунок остаётся, если файл не загрузили.
   static ensureTextures(scene: Phaser.Scene): void {
-    if (!scene.textures.exists('infantry-0')) {
-      bake(scene, 'infantry-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+    const idle = this.frameKeys[0];
+    const step = this.frameKeys[1];
+    if (idle && !scene.textures.exists(idle)) {
+      bake(scene, idle, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
         this.drawSoldier(g, 0, ASSAULT_LOOK),
       );
-      bake(scene, 'infantry-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 1, ASSAULT_LOOK),
-      );
+      if (step) {
+        bake(scene, step, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
+          this.drawSoldier(g, 1, ASSAULT_LOOK),
+        );
+      }
     }
     if (!scene.textures.exists(this.corpseKey)) {
       bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) =>
         this.drawCorpse(g, ASSAULT_LOOK),
       );
     }
-    // exists: после поражения сцена создаётся снова, а анимация живёт в общем менеджере.
-    if (!scene.anims.exists('infantry-walk')) {
-      scene.anims.create({
-        key: 'infantry-walk',
-        // Кадры — две отдельные текстуры, не разрезанный лист.
-        frames: [{ key: 'infantry-0' }, { key: 'infantry-1' }],
-        frameRate: this.walkFps,
-        repeat: -1, // крутить без конца
-      });
+    const frames = this.frameKeys.filter((key) => scene.textures.exists(key));
+    // Картинки рисованные, не пиксель-арт: линейный фильтр меньше «лесенки» при масштабе.
+    for (const key of [...frames, this.corpseKey]) {
+      if (scene.textures.exists(key)) {
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
     }
+    // Анимация живёт в общем менеджере. Собираем заново: порядок кадров мог смениться.
+    if (scene.anims.exists('infantry-walk')) {
+      scene.anims.remove('infantry-walk');
+    }
+    scene.anims.create({
+      key: 'infantry-walk',
+      frames: frames.map((key) => ({ key })),
+      frameRate: this.walkFps,
+      repeat: -1,
+    });
   }
 
   constructor(scene: Phaser.Scene, x: number, y: number, hp: number) {
-    // Картинки infantry-0 / infantry-1 и анимация infantry-walk, красная полоска HP.
-    super(scene, x, y, hp, 'infantry-0', 'infantry-walk', 0xd42a2a);
+    // Первый кадр шага и анимация infantry-walk, красная полоска HP.
+    super(scene, x, y, hp, AssaultInfantry.frameKeys[0], 'infantry-walk', 0xd42a2a);
   }
 
   protected override corpseTexture(): string | null {

@@ -1,7 +1,10 @@
+import { AssaultInfantry } from '../entities/AssaultInfantry';
+import { MachineGun } from '../entities/MachineGun';
+import { Tank } from '../entities/Tank';
+
+// Картинки живут у сущностей. Здесь только собираем их в один вызов для GameScene.
 export const preloadImages = (scene: Phaser.Scene) => {
-  scene.load.image('tank-hull', 'assets/tank-hull.png');
-  scene.load.image('tank-turret', 'assets/tank-turret.png');
-  scene.load.image('tank-gun', 'assets/tank-gun.png');
-  scene.load.image('tank-mg', 'assets/tank-mg.png');
-  scene.load.image('tank-wreck', 'assets/tank-wreck.png');
+  Tank.preload(scene);
+  MachineGun.preload(scene);
+  AssaultInfantry.preload(scene);
 };

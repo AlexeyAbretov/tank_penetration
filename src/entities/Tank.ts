@@ -167,6 +167,21 @@ export class Tank extends GameObjects.Container {
 
   static readonly wreckKey = 'tank-wreck';
 
+  // Пути в public/. Строки буквальные: singlefile-сборка подменяет их на data:.
+  static readonly images = {
+    'tank-hull': 'assets/tank-hull.png',
+    'tank-turret': 'assets/tank-turret.png',
+    'tank-gun': 'assets/tank-gun.png',
+    'tank-wreck': 'assets/tank-wreck.png',
+  } as const;
+
+  // GameScene и студия зовут до create. ensureTextures потом дорисует запасные кадры.
+  static preload(scene: Phaser.Scene): void {
+    for (const [key, path] of Object.entries(this.images)) {
+      scene.load.image(key, path);
+    }
+  }
+
   // Башня и ствол внутри. Крутится целиком, откат двигает только ствол.
   private readonly aim: Phaser.GameObjects.Container;
   private readonly hull: Phaser.GameObjects.Image;

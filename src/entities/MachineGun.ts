@@ -12,6 +12,8 @@ import { bake } from '../gfx/textures';
 export class MachineGun extends GameObjects.Container {
   static readonly textureKey = 'mg-bullet';
   static readonly barrelKey = 'tank-mg';
+  // Путь в public/. Строка буквальная: singlefile-сборка подменяет её на data:.
+  static readonly imagePath = 'assets/tank-mg.png';
 
   static readonly shop = {
     cost: 100,
@@ -50,6 +52,11 @@ export class MachineGun extends GameObjects.Container {
       w: MG_MOUNT_FRAME.w,
       h: MG_MOUNT_FRAME.h,
     };
+  }
+
+  // GameScene и студия зовут до create. Пуля по-прежнему рисуется в ensureTextures.
+  static preload(scene: Phaser.Scene): void {
+    scene.load.image(MachineGun.barrelKey, MachineGun.imagePath);
   }
 
   static ensureTextures(scene: Phaser.Scene): void {

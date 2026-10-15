@@ -1,6 +1,7 @@
 // Холст просмотра: запекает текстуры выбранной сущности и рисует их с рамками игры.
 
 import Phaser from 'phaser';
+import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { Infantry } from '../entities/Infantry';
@@ -101,15 +102,18 @@ export class StudioScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image('tank-hull', 'assets/tank-hull.png');
-    this.load.image('tank-turret', 'assets/tank-turret.png');
-    this.load.image('tank-gun', 'assets/tank-gun.png');
-    this.load.image('tank-mg', 'assets/tank-mg.png');
-    this.load.image('tank-wreck', 'assets/tank-wreck.png');
+    Tank.preload(this);
+    MachineGun.preload(this);
+    AssaultInfantry.preload(this);
     StudioSounds.preload(this);
   }
 
   create(): void {
+    for (const key of [...AssaultInfantry.frameKeys, AssaultInfantry.corpseKey]) {
+      if (this.textures.exists(key)) {
+        this.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
+    }
     this.cameras.main.setZoom(1);
     this.backdrop = this.add.graphics();
     this.ground = this.add.graphics();
@@ -299,6 +303,9 @@ export class StudioScene extends Phaser.Scene {
   private makeDeath(view: ViewState): Phaser.GameObjects.Container {
     if (this.entity.death === 'nuke') {
       return this.makeTankWreck(view);
+    }
+    if (this.entity.corpseImage) {
+      return this.makeSprite(this.entity.corpseImage, view, false);
     }
     const wreck = this.entity.death === 'wreck';
     const frame = wreck ? PICKUP_FRAME : CORPSE_FRAME;

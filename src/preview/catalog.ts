@@ -80,6 +80,8 @@ export type PreviewEntity = {
   bake: (scene: Phaser.Scene, paint: Paint, keys: string[]) => void;
   // Труп, если он не общая винтовка пехоты. Ракетчик кладёт рядом трубу.
   paintCorpse?: (g: Phaser.GameObjects.Graphics, paint: Paint) => void;
+  // Готовая картинка тела. Если задана, просмотр не рисует труп заново.
+  corpseImage?: string;
 };
 
 function asPaint(source: object): Paint {
@@ -195,10 +197,10 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'assault',
     title: 'Штурмовик',
-    hint: 'Два кадра шага. Полоска HP в игре рисуется отдельно от текстуры — здесь она для сверки места. «Смерть» кладёт тело в кровь.',
+    hint: 'Шесть кадров бега: контакт → подъём → пронос, потом то же другой ногой. Полоска HP отдельно. «Смерть» — тело с поля.',
     exportName: 'ASSAULT_LOOK',
     kind: 'frames',
-    frameCount: 2,
+    frameCount: AssaultInfantry.frameKeys.length,
     animFps: AssaultInfantry.walkFps,
     gameScale: Infantry.placed.scale,
     originX: Infantry.placed.originX,
@@ -206,14 +208,13 @@ export const ENTITIES: PreviewEntity[] = [
     texW: SOLDIER_FRAME.w,
     texH: SOLDIER_FRAME.h,
     defaults: asPaint(ASSAULT_LOOK),
-    fields: soldierFields(),
+    fields: [],
     hitbox: soldierHit,
     hpColor: 0xd42a2a,
     death: 'corpse',
-    bake: (scene, paint, keys) => {
-      const look = paint as SoldierLook;
-      stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 0, look));
-      stamp(scene, keys[1], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => Infantry.drawSoldier(g, 1, look));
+    corpseImage: AssaultInfantry.corpseKey,
+    bake: (scene, _paint, keys) => {
+      AssaultInfantry.frameKeys.forEach((key, i) => copyImage(scene, key, keys[i]));
     },
   },
   {
