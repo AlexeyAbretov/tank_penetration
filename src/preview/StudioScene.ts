@@ -35,7 +35,6 @@ import {
   type PickupPaint,
   type ShellPaint,
   type SoldierLook,
-  type TankPaint,
 } from '../gfx/looks';
 import { nuke, nukeAt } from '../gfx/nuke';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
@@ -87,6 +86,8 @@ export class StudioScene extends Phaser.Scene {
   private blastTimer?: Phaser.Time.TimerEvent;
   private deathFx: Phaser.GameObjects.GameObject[] = [];
   private wreckSmoke?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private wreckSmokes: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  private wreckFires: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private wreckSmokeScale = 0;
   // Корпус и башня превью. update сдвигает контейнер той же формулой, что и бой.
   private tankShake?: Phaser.GameObjects.Container;
@@ -104,6 +105,7 @@ export class StudioScene extends Phaser.Scene {
     this.load.image('tank-turret', 'assets/tank-turret.png');
     this.load.image('tank-gun', 'assets/tank-gun.png');
     this.load.image('tank-mg', 'assets/tank-mg.png');
+    this.load.image('tank-wreck', 'assets/tank-wreck.png');
     StudioSounds.preload(this);
   }
 
@@ -316,11 +318,12 @@ export class StudioScene extends Phaser.Scene {
 
   private makeTankWreck(view: ViewState): Phaser.GameObjects.Container {
     const layout = Tank.layout;
-    this.restamp('studio-death', TANK_WRECK_FRAME.w, TANK_WRECK_FRAME.h, (g) => {
-      Tank.renderWreck(g, this.paint as TankPaint);
-    });
+    // Та же готовая картинка, что и после гибели в бою.
+    if (!this.textures.exists(Tank.wreckKey)) {
+      Tank.ensureTextures(this);
+    }
     const root = this.add.container(0, 0);
-    const wreck = this.add.image(layout.hullX, layout.hullY, 'studio-death');
+    const wreck = this.add.image(layout.hullX, layout.hullY, Tank.wreckKey);
     root.add(wreck);
     const guides = this.add.graphics();
     root.add(guides);
@@ -371,6 +374,14 @@ export class StudioScene extends Phaser.Scene {
     this.deathFx = [];
     this.wreckSmoke?.destroy();
     this.wreckSmoke = undefined;
+    for (const smoke of this.wreckSmokes) {
+      smoke.destroy();
+    }
+    this.wreckSmokes = [];
+    for (const fire of this.wreckFires) {
+      fire.destroy();
+    }
+    this.wreckFires = [];
   }
 
   private makeTank(view: ViewState): Phaser.GameObjects.Container {
@@ -574,33 +585,88 @@ export class StudioScene extends Phaser.Scene {
     this.placeWreckSmoke(view);
   }
 
-  // Столб над обломками. Частицы живут на сцене: в контейнере холста они не рисуются.
+  // Дым и огонь над обломками. Частицы живут на сцене: в контейнере холста они не рисуются.
   private placeWreckSmoke(view: ViewState): void {
     const holder = this.holders[0];
     const wreck = view.death && this.entity.death === 'wreck';
     const nuke = view.death && this.entity.death === 'nuke';
     if ((!wreck && !nuke) || !holder) {
-      this.wreckSmoke?.destroy();
-      this.wreckSmoke = undefined;
+      this.clearWreckParticles();
       return;
     }
     const puff = wreck
       ? Math.abs(view.scale * holder.scaleX)
       : Math.abs(holder.scaleX);
-    const anchor = wreck
-      ? PickupTruck.smokeAnchor(view.scale)
-      : Tank.smokeAnchor();
-    const x = holder.x + anchor.x * holder.scaleX;
-    const y = holder.y + anchor.y * holder.scaleY;
-    if (!this.wreckSmoke?.active || Math.abs(puff - this.wreckSmokeScale) > 0.05) {
-      this.wreckSmoke?.destroy();
-      this.wreckSmoke = wreck
-        ? PickupTruck.smokeAt(this, x, y, puff)
-        : Tank.smokeAt(this, x, y, puff);
+    const sx = holder.scaleX;
+    const sy = holder.scaleY;
+    if (this.needWreckRebuild(puff, nuke)) {
+      this.clearWreckParticles();
+      if (wreck) {
+        const anchor = PickupTruck.smokeAnchor(view.scale);
+        this.wreckSmoke = PickupTruck.smokeAt(
+          this,
+          holder.x + anchor.x * sx,
+          holder.y + anchor.y * sy,
+          puff,
+        );
+      } else {
+        this.wreckFires = Tank.firesAt(this, holder.x, holder.y, Math.abs(sx));
+        this.wreckSmokes = Tank.smokesAt(this, holder.x, holder.y, Math.abs(sx));
+      }
       this.wreckSmokeScale = puff;
       return;
     }
-    this.wreckSmoke.setPosition(x, y);
+    if (wreck && this.wreckSmoke) {
+      const anchor = PickupTruck.smokeAnchor(view.scale);
+      this.wreckSmoke.setPosition(holder.x + anchor.x * sx, holder.y + anchor.y * sy);
+      return;
+    }
+    if (!nuke) {
+      return;
+    }
+    this.moveTankWreckFx(holder.x, holder.y, sx, sy);
+  }
+
+  private clearWreckParticles(): void {
+    this.wreckSmoke?.destroy();
+    this.wreckSmoke = undefined;
+    for (const smoke of this.wreckSmokes) {
+      smoke.destroy();
+    }
+    this.wreckSmokes = [];
+    for (const fire of this.wreckFires) {
+      fire.destroy();
+    }
+    this.wreckFires = [];
+  }
+
+  private needWreckRebuild(puff: number, nuke: boolean): boolean {
+    if (Math.abs(puff - this.wreckSmokeScale) > 0.05) {
+      return true;
+    }
+    if (nuke) {
+      return this.wreckFires.length === 0 || this.wreckSmokes.some((smoke) => !smoke.active);
+    }
+    return !this.wreckSmoke?.active;
+  }
+
+  // Огонь: пара flame+core на очаг и угольки. Дым: столб на очаг и общий шлейф.
+  private moveTankWreckFx(ox: number, oy: number, sx: number, sy: number): void {
+    const foci = Tank.fireFoci();
+    let fireIndex = 0;
+    let smokeIndex = 0;
+    for (const focus of foci) {
+      const fx = ox + focus.x * sx;
+      const fy = oy + focus.y * sy;
+      this.wreckFires[fireIndex]?.setPosition(fx, fy);
+      this.wreckFires[fireIndex + 1]?.setPosition(fx, fy + 2 * Math.abs(sy));
+      fireIndex += 2;
+      this.wreckSmokes[smokeIndex]?.setPosition(fx, fy - 30 * focus.power * Math.abs(sy));
+      smokeIndex += 1;
+    }
+    const mid = foci[0];
+    this.wreckFires[fireIndex]?.setPosition(ox + mid.x * sx, oy + mid.y * sy);
+    this.wreckSmokes[smokeIndex]?.setPosition(ox + mid.x * sx, oy + (mid.y - 48) * sy);
   }
 
   // Прямоугольник всего, что рисуется вокруг сущности: текстура, полоска HP, дуло, крест опоры.

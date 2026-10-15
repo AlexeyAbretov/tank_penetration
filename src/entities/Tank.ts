@@ -175,8 +175,10 @@ export class Tank extends GameObjects.Container {
   private dead = false;
   // Редкий выхлоп, пока мотор работает. Гаснет в момент гибели.
   private engine?: Phaser.GameObjects.Particles.ParticleEmitter;
-  // Столб над обломками. Живёт, пока контейнер танка на сцене.
-  private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Столбы дыма над очагами. Живут, пока контейнер танка на сцене.
+  private smokes: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  // Несколько очагов пламени над проломами. Тоже живут вместе с обломками.
+  private fires: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   // Сколько миллисекунд танк уже тарахтит. Из этого времени считается тряска.
   private engineMs = 0;
   // Дополнительные прямоугольники башни. Пуля в такую деталь тоже бьёт по танку.
@@ -215,7 +217,14 @@ export class Tank extends GameObjects.Container {
     this.once('destroy', () => {
       scene.events.off(Phaser.Scenes.Events.PRE_UPDATE, onIdle);
       this.stopEngine();
-      this.smoke?.destroy();
+      for (const smoke of this.smokes) {
+        smoke.destroy();
+      }
+      this.smokes = [];
+      for (const fire of this.fires) {
+        fire.destroy();
+      }
+      this.fires = [];
     });
   }
 
@@ -363,8 +372,9 @@ export class Tank extends GameObjects.Container {
     this.add(wreck);
     // Взрыв чуть выше середины корпуса: оттуда растёт ножка гриба.
     nukeAt(this.scene, this.x + layout.hullX, this.y + layout.hullY - 12);
-    const anchor = Tank.smokeAnchor();
-    this.smoke = Tank.smokeAt(this.scene, this.x + anchor.x, this.y + anchor.y);
+    // Сначала огонь, поверх него — дым от тех же очагов.
+    this.fires = Tank.firesAt(this.scene, this.x, this.y);
+    this.smokes = Tank.smokesAt(this.scene, this.x, this.y);
   }
 
   // Мировые координаты конца ствола.
@@ -390,8 +400,10 @@ export class Tank extends GameObjects.Container {
     if (!scene.textures.exists('tank-gun')) {
       this.createGun(scene);
     }
-    for (const key of ['tank-hull', 'tank-turret', 'tank-gun']) {
-      scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    for (const key of ['tank-hull', 'tank-turret', 'tank-gun', Tank.wreckKey]) {
+      if (scene.textures.exists(key)) {
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
     }
     if (!scene.textures.exists('shell')) {
       this.createShell(scene);
@@ -399,8 +411,11 @@ export class Tank extends GameObjects.Container {
     if (!scene.textures.exists('muzzle')) {
       this.createMuzzle(scene);
     }
+    // Обломки — готовая картинка из assets/, как корпус и башня.
+    // Запекание остаётся запасным вариантом, если файл не загрузили.
     if (!scene.textures.exists(Tank.wreckKey)) {
       this.createWreck(scene);
+      scene.textures.get(Tank.wreckKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
   }
 
@@ -604,10 +619,7 @@ export class Tank extends GameObjects.Container {
     g.fillRect(52, ground - 34, 40, 6);
     g.fillStyle(0x0c0806);
     g.fillEllipse(108, ground - 26, 36, 18);
-    g.fillStyle(0xff4a10);
-    g.fillTriangle(96, ground - 28, 108, ground - 52, 122, ground - 28);
-    g.fillStyle(0xffe080);
-    g.fillTriangle(102, ground - 28, 108, ground - 42, 116, ground - 28);
+    // Пламя не рисуем: над обломками его крутят частицы firesAt.
 
     // Сорванный лист крыши и погнутый нос лежат отдельно от корпуса.
     this.fillTurned(g, paint.armorLight, 70, ground - 36, 40, 10, -0.7);
@@ -660,15 +672,27 @@ export class Tank extends GameObjects.Container {
     return engine;
   }
 
-  // Точка над проломом корпуса в координатах контейнера танка. От неё поднимается дым.
+  // Главный очаг: студия двигает по нему старый одиночный якорь дыма.
   static smokeAnchor(): { x: number; y: number } {
+    const focus = Tank.fireFoci()[0];
+    return { x: focus.x, y: focus.y - 36 };
+  }
+
+  // Очаги в координатах кадра обломков → контейнера танка.
+  // Главный в проломе, ещё два по бокам, маленький у ствола.
+  static fireFoci(): ReadonlyArray<{ x: number; y: number; power: number }> {
     const ground = TANK_WRECK_FRAME.h / 2 + 24;
-    const tx = 108;
-    const ty = ground - 44;
-    return {
+    const toTank = (tx: number, ty: number, power: number) => ({
       x: Tank.layout.hullX + (tx - TANK_WRECK_FRAME.w / 2),
       y: Tank.layout.hullY + (ty - TANK_WRECK_FRAME.h / 2),
-    };
+      power,
+    });
+    return [
+      toTank(102, ground - 22, 1.15),
+      toTank(68, ground - 18, 0.75),
+      toTank(148, ground - 16, 0.85),
+      toTank(118, ground - 10, 0.55),
+    ];
   }
 
   // Мягкое пятно для обоих дымов: выхлопа на ходу и столба над обломками.
@@ -687,26 +711,168 @@ export class Tank extends GameObjects.Container {
     return key;
   }
 
-  // Непрерывный столб над обломками. Толще и выше, чем у пикапа.
+  // Белое мягкое пятно: цвет пламени задаёт tint частиц.
+  private static flameKey(scene: Phaser.Scene): string {
+    const key = 'flame-puff';
+    if (!scene.textures.exists(key)) {
+      bake(scene, key, 32, 32, (g) => {
+        g.fillStyle(0xffffff, 0.12);
+        g.fillCircle(16, 16, 15);
+        g.fillStyle(0xffffff, 0.35);
+        g.fillCircle(16, 16, 10);
+        g.fillStyle(0xffffff, 0.7);
+        g.fillCircle(16, 16, 5);
+        g.fillStyle(0xffffff, 1);
+        g.fillCircle(16, 16, 2);
+      });
+    }
+    return key;
+  }
+
+  // Один столб — для студии, когда нужен старый API с якорем.
+  // Над большим пламенем лучше брать smokesAt: дым от каждого очага.
   static smokeAt(
     scene: Phaser.Scene,
     x: number,
     y: number,
     scale = 1,
   ): Phaser.GameObjects.Particles.ParticleEmitter {
+    return Tank.plumeAt(scene, x, y, 1.1 * scale);
+  }
+
+  // Плотный тёмный дым над пламенем: от каждого очага и общий широкий столб.
+  // originX/Y — мировые координаты контейнера танка.
+  static smokesAt(
+    scene: Phaser.Scene,
+    originX: number,
+    originY: number,
+    scale = 1,
+  ): Phaser.GameObjects.Particles.ParticleEmitter[] {
+    const made: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+    for (const focus of Tank.fireFoci()) {
+      const power = focus.power * scale;
+      // Старт чуть выше языков огня, чтобы столб читался над пламенем.
+      const x = originX + focus.x * scale;
+      const y = originY + (focus.y - 30 * focus.power) * scale;
+      made.push(Tank.plumeAt(scene, x, y, power));
+    }
+    // Общий широкий шлейф над всей кучей.
+    const mid = Tank.fireFoci()[0];
+    const haze = scene.add.particles(
+      originX + mid.x * scale,
+      originY + (mid.y - 48) * scale,
+      Tank.puffKey(scene),
+      {
+        x: { min: -42 * scale, max: 42 * scale },
+        y: { min: -6 * scale, max: 10 * scale },
+        lifespan: { min: 1800, max: 3200 },
+        frequency: 55,
+        quantity: 2,
+        speedX: { min: -16 * scale, max: 20 * scale },
+        speedY: { min: -55 * scale, max: -22 * scale },
+        scale: { start: 1.1 * scale, end: 3.8 * scale },
+        alpha: { start: 0.55, end: 0 },
+        color: [0x5a5348, 0x3e3830, 0x2a2620, 0x181410],
+        gravityY: -18 * scale,
+      },
+    );
+    haze.setDepth(31);
+    made.push(haze);
+    return made;
+  }
+
+  // Один столб копоти. power — сила очага (и масштаб студии).
+  private static plumeAt(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    power: number,
+  ): Phaser.GameObjects.Particles.ParticleEmitter {
     const smoke = scene.add.particles(x, y, Tank.puffKey(scene), {
-      lifespan: { min: 1100, max: 2100 },
-      frequency: 90,
-      quantity: 1,
-      speed: { min: 14 * scale, max: 36 * scale },
-      angle: { min: -108, max: -72 },
-      scale: { start: 0.5 * scale, end: 2.2 * scale },
-      alpha: { start: 0.78, end: 0 },
-      color: [0xc8c0b4, 0x8a8278, 0x524c46],
-      gravityY: -22 * scale,
+      x: { min: -16 * power, max: 16 * power },
+      y: { min: -4 * power, max: 8 * power },
+      lifespan: { min: 1200, max: 2400 },
+      frequency: Math.max(36, Math.round(58 / Math.max(0.4, power))),
+      quantity: 2,
+      speedX: { min: -20 * power, max: 24 * power },
+      speedY: { min: -78 * power, max: -32 * power },
+      scale: { start: 0.75 * power, end: 3.0 * power },
+      alpha: { start: 0.82, end: 0 },
+      color: [0x6e665c, 0x4c463e, 0x322e28, 0x1c1814],
+      gravityY: -26 * power,
     });
-    smoke.setDepth(26);
+    // Выше пламени (27–29), иначе ADD-огонь съедает светлый дым.
+    smoke.setDepth(30);
     return smoke;
+  }
+
+  // Живое пламя над обломками: несколько очагов, выше и шире статичной картинки.
+  // originX/Y — мировые координаты контейнера танка; scale — увеличение в студии.
+  static firesAt(
+    scene: Phaser.Scene,
+    originX: number,
+    originY: number,
+    scale = 1,
+  ): Phaser.GameObjects.Particles.ParticleEmitter[] {
+    const texture = Tank.flameKey(scene);
+    const made: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+    for (const focus of Tank.fireFoci()) {
+      const power = focus.power * scale;
+      const x = originX + focus.x * scale;
+      const y = originY + focus.y * scale;
+      // Широкое мягкое пламя: языки вверх, колышутся в стороны.
+      const flame = scene.add.particles(x, y, texture, {
+        x: { min: -17 * power, max: 17 * power },
+        y: { min: 0, max: 8 * power },
+        lifespan: { min: 380, max: 820 },
+        frequency: Math.max(28, Math.round(48 / focus.power)),
+        quantity: 2,
+        speedX: { min: -28 * power, max: 28 * power },
+        speedY: { min: -110 * power, max: -48 * power },
+        scale: { start: 0.85 * power, end: 2.6 * power },
+        alpha: { start: 0.95, end: 0 },
+        color: [0xfff6c8, 0xffcc44, 0xff7a18, 0xe03808, 0x6a1408],
+        blendMode: Phaser.BlendModes.ADD,
+        gravityY: -40 * power,
+      });
+      flame.setDepth(27);
+      made.push(flame);
+      // Яркое ядро у земли очага — меньше и горячее.
+      const core = scene.add.particles(x, y + 2 * scale, texture, {
+        x: { min: -8 * power, max: 8 * power },
+        y: { min: -2 * power, max: 4 * power },
+        lifespan: { min: 180, max: 360 },
+        frequency: Math.max(36, Math.round(60 / focus.power)),
+        quantity: 1,
+        speedX: { min: -12 * power, max: 12 * power },
+        speedY: { min: -50 * power, max: -18 * power },
+        scale: { start: 0.45 * power, end: 1.1 * power },
+        alpha: { start: 1, end: 0.15 },
+        color: [0xffffff, 0xfff0a0, 0xffaa33],
+        blendMode: Phaser.BlendModes.ADD,
+      });
+      core.setDepth(28);
+      made.push(core);
+    }
+    // Искры-угольки над всей кучей.
+    const mid = Tank.fireFoci()[0];
+    const embers = scene.add.particles(originX + mid.x * scale, originY + mid.y * scale, texture, {
+      x: { min: -35 * scale, max: 35 * scale },
+      y: { min: -4 * scale, max: 10 * scale },
+      lifespan: { min: 700, max: 1400 },
+      frequency: 70,
+      quantity: 1,
+      speedX: { min: -40 * scale, max: 40 * scale },
+      speedY: { min: -130 * scale, max: -60 * scale },
+      scale: { start: 0.22 * scale, end: 0.05 * scale },
+      alpha: { start: 1, end: 0 },
+      color: [0xffe080, 0xff6010, 0xc03008],
+      blendMode: Phaser.BlendModes.ADD,
+      gravityY: -10 * scale,
+    });
+    embers.setDepth(29);
+    made.push(embers);
+    return made;
   }
 
   // Прямоугольник, повёрнутый вокруг своего центра. angle в радианах, по часовой: ось Y вниз.

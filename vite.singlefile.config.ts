@@ -13,6 +13,7 @@ const packedFiles = [
   ['assets/tank-turret.png', 'image/png'],
   ['assets/tank-gun.png', 'image/png'],
   ['assets/tank-mg.png', 'image/png'],
+  ['assets/tank-wreck.png', 'image/png'],
   ['audio/TRACK_01.mp3', 'audio/mpeg'],
   ['audio/boss.mp3', 'audio/mpeg'],
   ['audio/tank_shot.mp3', 'audio/mpeg'],
