@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
 import { EnemyShot } from './EnemyShot';
 import { Infantry } from './Infantry';
-import type { WorldPoint } from './WorldPoint';
+import type { WorldPoint } from '../types/WorldPoint';
 
 export abstract class RangedEnemy extends Infantry {
   // Координата X, до которой юнит идёт. Дальше останавливается и стреляет.

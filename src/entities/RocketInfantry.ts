@@ -14,7 +14,7 @@ import {
 import { bake } from '../gfx/textures';
 import { RangedEnemy } from './RangedEnemy';
 import { Rocket } from './Rocket';
-import type { WorldPoint } from './WorldPoint';
+import type { WorldPoint } from '../types/WorldPoint';
 
 export class RocketInfantry extends RangedEnemy {
   static readonly debutWave = 20;

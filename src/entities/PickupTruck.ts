@@ -10,7 +10,7 @@ import {
   type PickupPaint,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
-import type { WorldPoint } from './WorldPoint';
+import type { WorldPoint } from '../types/WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
 export class PickupTruck extends RangedEnemy {

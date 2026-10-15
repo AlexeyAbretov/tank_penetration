@@ -5,7 +5,7 @@
 
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';
 import { EnemyFactory } from '../entities/EnemyFactory';
-import { isDebugRun } from '../gameConfig';
+import { GAME, isDebugRun } from '../gameConfig';
 import { BattleMusic } from '../sounds/BattleMusic';
 import { DebugCombatSave } from '../saves/DebugCombatSave';
 import { DebugProgressSave } from '../saves/DebugProgressSave';
@@ -25,7 +25,7 @@ export class GameSceneFactory {
       return new GameScene(
         new DebugCombatSave(),
         new ProgressShopController(new DebugProgressSave()),
-        new WaveManager(enemies),
+        new WaveManager(enemies, GAME),
         new BattleMusic(enemies),
         DebugGameHud
       );
@@ -36,7 +36,7 @@ export class GameSceneFactory {
     return new GameScene(
       new CombatSave(),
       new ProgressShopController(new ProgressSave()),
-      new WaveManager(enemies),
+      new WaveManager(enemies, GAME),
       new BattleMusic(enemies),
       GameHud);
   }

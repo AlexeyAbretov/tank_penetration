@@ -12,7 +12,7 @@ import {
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { Infantry } from './Infantry';
-import type { WorldPoint } from './WorldPoint';
+import type { WorldPoint } from '../types/WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
 export class GunnerInfantry extends RangedEnemy {

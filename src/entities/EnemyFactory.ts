@@ -12,7 +12,7 @@ import { SuperSoldier } from './SuperSoldier';
 import type { SpawnContext } from './SpawnContext';
 
 export type { SpawnContext } from './SpawnContext';
-export type { WorldPoint } from './WorldPoint';
+export type { WorldPoint } from '../types/WorldPoint';
 
 // Короткое имя вида для сохранения партии. Имя класса после сборки Vite может измениться,
 // поэтому в localStorage пишется эта строка, а не AssaultInfantry.

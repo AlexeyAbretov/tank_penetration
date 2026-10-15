@@ -4,9 +4,7 @@
 
 import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
-import { Tank } from '../entities/Tank';
-import { GAME } from '../gameConfig';
-import type { GameHud } from '../ui/huds/GameHud';
+import type { WorldPoint } from '../types/WorldPoint';
 import type { EnemySave, WavePhase } from '../saves/CombatSave';
 import { EnemyFactory } from '../entities/EnemyFactory';
 
@@ -24,34 +22,39 @@ export class WaveManager {
   private infantry!: Phaser.Physics.Arcade.Group;
   // Та же группа, что у стрелков: сюда они складывают пули.
   private enemyShots!: Phaser.Physics.Arcade.Group;
-  private hud!: GameHud;
+  // Куда целятся дальнобойные. Сцена отдаёт точку; менеджер класс танка не знает.
+  private fireTarget!: WorldPoint;
   // Поражение обрывает отложенные выходы. Иначе враг появится уже на экране «БАЗА РАЗБИТА».
   private isGameOver!: () => boolean;
   // Сцена открывает магазин. Сам менеджер про покупки не знает.
   private onWaveCleared!: () => void;
   // Запись партии: после старта волны, после зачистки и по ходу спавна её зовёт сцена отдельно.
   private onProgress!: () => void;
-  // Сцена включает луп этой волны. Менеджер звук не хранит.
-  private onWaveBegan!: (wave: number) => void;
+  // Сцена обновляет номер волны, при необходимости баннер и включает музыку.
+  // banner — показать объявление; без него номер обновляется тихо (магазин, середина боя).
+  private onWaveBegan!: (wave: number, banner?: { boss: boolean }) => void;
 
-  // Фабрика известна до сцены. Группы и колбэки появляются в create(), их ставит bind().
-  constructor(private readonly enemies: typeof EnemyFactory) {}
+  // Фабрика и размер холста известны до сцены. Группы и колбэки появляются в create(), их ставит bind().
+  constructor(
+    private readonly enemies: typeof EnemyFactory,
+    private readonly game: { width: number },
+  ) {}
 
   // restart() поднимает ту же сцену и тот же менеджер, а группы и интерфейс создаёт заново.
   bind(
     scene: Phaser.Scene,
     infantry: Phaser.Physics.Arcade.Group,
     enemyShots: Phaser.Physics.Arcade.Group,
-    hud: GameHud,
+    fireTarget: WorldPoint,
     isGameOver: () => boolean,
     onWaveCleared: () => void,
     onProgress: () => void,
-    onWaveBegan: (wave: number) => void,
+    onWaveBegan: (wave: number, banner?: { boss: boolean }) => void,
   ): void {
     this.scene = scene;
     this.infantry = infantry;
     this.enemyShots = enemyShots;
-    this.hud = hud;
+    this.fireTarget = fireTarget;
     this.isGameOver = isGameOver;
     this.onWaveCleared = onWaveCleared;
     this.onProgress = onProgress;
@@ -101,7 +104,6 @@ export class WaveManager {
     this.wave = wave;
     this.remainingToSpawn = 0;
     this.awaitingClear = true;
-    this.hud.setWave(wave);
     this.onWaveBegan(wave);
   }
 
@@ -109,8 +111,6 @@ export class WaveManager {
   resumeCombat(wave: number, spawned: number, enemies: EnemySave[]): void {
     this.wave = wave;
     this.awaitingClear = false;
-    this.hud.setWave(wave);
-    this.onWaveBegan(wave);
     for (const enemy of enemies) {
       this.restoreEnemy(enemy);
     }
@@ -120,8 +120,8 @@ export class WaveManager {
     const already = Math.min(total, Math.max(spawned, enemies.length));
     this.remainingToSpawn = total - already;
     if (already === 0) {
-      // Волна записана, но никто ещё не вышел: снова показываем баннер и ждём announceMs.
-      this.hud.showWaveBanner(wave, this.enemies.isBossWave(wave));
+      // Волна записана, но никто ещё не вышел: снова объявляем и ждём announceMs.
+      this.onWaveBegan(wave, { boss: this.enemies.isBossWave(wave) });
       this.scene.time.delayedCall(this.enemies.timing.announceMs, () => {
         if (this.isGameOver()) {
           return;
@@ -131,6 +131,7 @@ export class WaveManager {
       return;
     }
     // Баннер не повторяем: игрок уже видел эту волну до перезагрузки.
+    this.onWaveBegan(wave);
     this.releaseFrom(already);
   }
 
@@ -155,9 +156,7 @@ export class WaveManager {
     this.awaitingClear = false;
     // Длина списка на этот номер. Босс-волна даёт 1.
     this.remainingToSpawn = this.enemies.count(this.wave);
-    this.hud.setWave(this.wave);
-    this.hud.showWaveBanner(this.wave, this.enemies.isBossWave(this.wave));
-    this.onWaveBegan(this.wave);
+    this.onWaveBegan(this.wave, { boss: this.enemies.isBossWave(this.wave) });
 
     // Пишем волну сразу, до выхода врагов. Закрытие вкладки на баннере не откатит номер.
     this.onProgress();
@@ -212,7 +211,7 @@ export class WaveManager {
         y: enemy.y,
         wave: this.wave,
         shots: this.enemyShots,
-        fireTarget: Tank.aimPoint(),
+        fireTarget: this.fireTarget,
       },
       enemy.hp,
       enemy.pace,
@@ -231,16 +230,16 @@ export class WaveManager {
     const lanes = [176, 248, 320, 392, 464, 536];
     const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
     // Правее края экрана: враг въезжает в кадр, а не появляется уже на поле.
-    const x = GAME.width + 24 + Phaser.Math.Between(0, 70);
+    const x = this.game.width + 24 + Phaser.Math.Between(0, 70);
     // index — место в списке волны. Фабрика по нему выбирает вид и здоровье.
-    // aimPoint — точка на танке, в которую целятся стрелки.
+    // fireTarget — точка, в которую целятся стрелки; её задала сцена в bind().
     const unit = this.enemies.create(index, {
       scene: this.scene,
       x,
       y,
       wave: this.wave,
       shots: this.enemyShots,
-      fireTarget: Tank.aimPoint(),
+      fireTarget: this.fireTarget,
     });
     this.infantry.add(unit);
     unit.march();

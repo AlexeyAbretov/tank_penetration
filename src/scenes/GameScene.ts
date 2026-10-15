@@ -290,11 +290,17 @@ export class GameScene extends Phaser.Scene {
       this,
       this.infantry,
       this.enemyShots,
-      this.hud,
+      Tank.aimPoint(),
       () => this.player.isGameOver,
       () => this.openWaveShop(),
       () => this.writeSave(),
-      (wave) => this.music.playForWave(wave),
+      (wave, banner) => {
+        this.hud.setWave(wave);
+        if (banner) {
+          this.hud.showWaveBanner(wave, banner.boss);
+        }
+        this.music.playForWave(wave);
+      },
     );
 
     this.projectiles = new ProjectileSystem(

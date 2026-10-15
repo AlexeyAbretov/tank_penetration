@@ -15,7 +15,7 @@ import {
 import { bake } from '../gfx/textures';
 import { EnemyShot } from './EnemyShot';
 import { Infantry } from './Infantry';
-import type { WorldPoint } from './WorldPoint';
+import type { WorldPoint } from '../types/WorldPoint';
 
 // Три фазы одного цикла.
 // run — бежит к точке. burst — стоит и стреляет. idle — очередь кончилась, ждёт таймер до следующего рывка.
