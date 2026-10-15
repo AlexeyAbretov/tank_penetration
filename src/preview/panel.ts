@@ -121,6 +121,10 @@ export function configureView(entity: PreviewEntity): void {
   show('fire-row', entity.shot !== undefined);
   show('machinegun-row', entity.kind === 'tank');
   show('death-row', entity.death !== undefined);
+  const deathLabel = document.querySelector('#death-row span');
+  if (deathLabel) {
+    deathLabel.textContent = entity.death === 'bomb' ? 'Взрыв' : 'Смерть';
+  }
   const death = document.getElementById('death') as HTMLInputElement | null;
   if (death) {
     death.checked = false;

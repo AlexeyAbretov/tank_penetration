@@ -10,6 +10,7 @@ import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
 import { Rocket } from '../entities/Rocket';
 import { MachineGun } from '../entities/MachineGun';
+import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank';
 import {
   BULLET_FRAME,
@@ -37,6 +38,7 @@ import {
   type ShellPaint,
   type SoldierLook,
 } from '../gfx/looks';
+import { nuke, nukeAt, preloadNuke } from '../gfx/nuke';
 import { tankBoom, tankBoomAt, preloadTankBoom } from '../gfx/tankBoom';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import { bake, copyImage } from '../gfx/textures';
@@ -107,6 +109,7 @@ export class StudioScene extends Phaser.Scene {
     AssaultInfantry.preload(this);
     GunnerInfantry.preload(this);
     preloadTankBoom(this);
+    preloadNuke(this);
     StudioSounds.preload(this);
   }
 
@@ -239,7 +242,9 @@ export class StudioScene extends Phaser.Scene {
     const view = readView();
     const dying = view.death && this.entity.death !== undefined;
     this.blastPending =
-      dying && (this.entity.death === 'wreck' || this.entity.death === 'nuke') && !this.deathOn;
+      dying &&
+      (this.entity.death === 'wreck' || this.entity.death === 'nuke' || this.entity.death === 'bomb') &&
+      !this.deathOn;
     // Крик один раз при включении «Смерть», не на каждый ползунок цвета.
     const cryPending = dying && this.entity.death === 'corpse' && !this.deathOn;
     this.deathOn = dying;
@@ -310,6 +315,9 @@ export class StudioScene extends Phaser.Scene {
     if (this.entity.death === 'nuke') {
       return this.makeTankWreck(view);
     }
+    if (this.entity.death === 'bomb') {
+      return this.makeBombCrater(view);
+    }
     if (this.entity.corpseImage) {
       return this.makeSprite(this.entity.corpseImage, view, false);
     }
@@ -368,6 +376,24 @@ export class StudioScene extends Phaser.Scene {
     });
   }
 
+  private makeBombCrater(view: ViewState): Phaser.GameObjects.Container {
+    NuclearStrike.ensureTextures(this);
+    const root = this.add.container(0, 0);
+    // Центр воронки на носике: в бою бомба садится этой точкой.
+    const crater = this.add.image(0, 0, NuclearStrike.craterKey).setOrigin(0.5, 0.5).setScale(view.scale);
+    root.add(crater);
+    const guides = this.add.graphics();
+    root.add(guides);
+    if (view.bounds) {
+      guides.lineStyle(1, 0xf0d56a, 0.9);
+      strokeImage(guides, crater);
+    }
+    if (view.origin) {
+      paintCross(guides);
+    }
+    return root;
+  }
+
   // Гриб в мировых координатах холста. Масштаб контейнера уже включает зум просмотра.
   private playStudioNuke(holder: Phaser.GameObjects.Container): void {
     const layout = Tank.layout;
@@ -375,6 +401,15 @@ export class StudioScene extends Phaser.Scene {
     const y = holder.y + (layout.hullY - 12) * holder.scaleY;
     this.deathFx.push(...tankBoomAt(this, x, y, Math.abs(holder.scaleX)));
     this.audio?.base();
+  }
+
+  // Атомная бомба: носик контейнера — точка удара. Масштаб гриба тот же, что на поле.
+  private playStudioBomb(holder: Phaser.GameObjects.Container): void {
+    const view = readView();
+    const scale = Math.abs(holder.scaleX) * view.scale * NuclearStrike.mushroomScale;
+    this.audio?.nuclear();
+    this.deathFx.push(...nukeAt(this, holder.x, holder.y, scale));
+    this.cameras.main.shake(480, 0.009);
   }
 
   private clearDeathFx(): void {
@@ -571,6 +606,8 @@ export class StudioScene extends Phaser.Scene {
       this.blastPending = false;
       if (this.entity.death === 'nuke') {
         this.playStudioNuke(this.holders[0]);
+      } else if (this.entity.death === 'bomb') {
+        this.playStudioBomb(this.holders[0]);
       } else {
         this.playStudioBlast(this.holders[0]);
       }
@@ -685,6 +722,9 @@ export class StudioScene extends Phaser.Scene {
   // Прямоугольник всего, что рисуется вокруг сущности: текстура, полоска HP, дуло, крест опоры.
   // Координаты — локальные, до увеличения контейнера.
   private contentBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
+    if (view.death && this.entity.death === 'bomb') {
+      return this.bombCloudBounds(view);
+    }
     if (this.entity.kind === 'tank') {
       const box = this.tankBounds(view);
       if (view.death) {
@@ -793,6 +833,26 @@ export class StudioScene extends Phaser.Scene {
     root.add(g);
   }
 
+  // Гриб и воронка в локальных пикселях холста. Носик бомбы — ноль.
+  private bombCloudBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
+    const fitted = view.scale;
+    const cloud = NuclearStrike.mushroomScale * fitted;
+    let craterW = 640;
+    let craterH = 260;
+    if (this.textures.exists(NuclearStrike.craterKey)) {
+      const frame = this.textures.get(NuclearStrike.craterKey).get();
+      craterW = frame.width;
+      craterH = frame.height;
+    }
+    const halfW = Math.max(nuke.half * cloud, (craterW * fitted) / 2);
+    return {
+      left: -halfW - 24,
+      top: -nuke.rise * cloud - 28,
+      right: halfW + 24,
+      bottom: (craterH * fitted) / 2 + 16,
+    };
+  }
+
   private tankBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
     const layout = Tank.layout;
     if (view.death && this.entity.death === 'nuke') {
@@ -857,6 +917,9 @@ export class StudioScene extends Phaser.Scene {
   private labels(view: ViewState): string[] {
     if (view.death && this.entity.death === 'nuke') {
       return ['взрыв · обломки'];
+    }
+    if (view.death && this.entity.death === 'bomb') {
+      return ['гриб · воронка'];
     }
     if (view.death && this.entity.death === 'wreck') {
       return ['взрыв · обломки'];

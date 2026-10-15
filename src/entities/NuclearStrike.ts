@@ -25,9 +25,8 @@ export class NuclearStrike {
     fallMs: 780,
   };
 
-  // Процедурный гриб из nuke.ts, крупнее гибели танка.
-  // 2.2 — шапка упирается в верх кадра и накрывает середину поля, не вторую копию маленького взрыва.
-  static readonly mushroomScale = 2.2;
+  // Кадр листа 401×212. 1.55 — шапка последней фазы почти у верхнего края и накрывает середину поля.
+  static readonly mushroomScale = 1.55;
 
   // Облако гаснет за это время. Воронка живёт дольше: это след на земле, не сам взрыв.
   static readonly cloudMs = nuke.goneMs;
@@ -99,8 +98,8 @@ export class NuclearStrike {
       onComplete: () => crater.destroy(),
     });
 
-    // Ножка растёт от воронки: земля гриба на nuke.ground ниже переданной точки.
-    nukeAt(scene, x, y - nuke.ground * scale, scale);
+    // Пыль кадра стоит на воронке: origin гриба — нижняя линия листа.
+    nukeAt(scene, x, y, scale);
     scene.cameras.main.shake(480, 0.009);
   }
 

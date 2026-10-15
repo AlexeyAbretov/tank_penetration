@@ -9,6 +9,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
 import { MachineGun } from '../entities/MachineGun';
+import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank';
 import {
   ASSAULT_LOOK,
@@ -65,8 +66,8 @@ export type PreviewEntity = {
   muzzle?: { x: number; y: number };
   hpColor?: number;
   addBlend?: boolean;
-  // Галочка «Смерть»: труп солдата, взрыв пикапа или ядерный гриб танка.
-  death?: 'corpse' | 'wreck' | 'nuke';
+  // Галочка «Смерть»: труп солдата, взрыв пикапа, гриб танка или атомная бомба.
+  death?: 'corpse' | 'wreck' | 'nuke' | 'bomb';
   // Если задано, в просмотре есть галочка «Стрельба»: темп, снаряд и вспышка как в бою.
   shot?: {
     delay: number;
@@ -192,6 +193,26 @@ export const ENTITIES: PreviewEntity[] = [
       copyImage(scene, 'tank-hull', keys[0]);
       copyImage(scene, 'tank-turret', keys[1]);
       copyImage(scene, 'tank-gun', keys[2]);
+    },
+  },
+  {
+    id: 'nuclear',
+    title: 'Атомная бомба',
+    hint: 'Та же бомба, что падает по клавише 3. Носик — точка опоры и место удара. «Взрыв» ставит воронку и поднимает гриб из девяти кадров, как в бою.',
+    exportName: 'NUCLEAR_BOMB',
+    kind: 'frames',
+    frameCount: 1,
+    gameScale: 1,
+    originX: 0.5,
+    originY: 1,
+    texW: 96,
+    texH: 210,
+    defaults: {},
+    fields: [],
+    death: 'bomb',
+    bake: (scene, _paint, keys) => {
+      NuclearStrike.ensureTextures(scene);
+      copyImage(scene, NuclearStrike.bombKey, keys[0]);
     },
   },
   {

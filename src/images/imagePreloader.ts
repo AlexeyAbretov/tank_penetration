@@ -2,6 +2,7 @@ import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank';
+import { preloadNuke } from '../gfx/nuke';
 import { preloadTankBoom } from '../gfx/tankBoom';
 
 // Картинки живут у сущностей. Здесь только собираем их в один вызов для GameScene.
@@ -11,4 +12,5 @@ export const preloadImages = (scene: Phaser.Scene) => {
   AssaultInfantry.preload(scene);
   GunnerInfantry.preload(scene);
   preloadTankBoom(scene);
+  preloadNuke(scene);
 };
