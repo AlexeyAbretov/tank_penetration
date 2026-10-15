@@ -5,21 +5,19 @@
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
-import { ENEMY_KINDS, EnemyFactory, type EnemySaveKind } from '../entities/EnemyFactory';
+import { EnemyFactory } from '../entities/EnemyFactory';
 import { Tank } from '../entities/Tank';
 import { ENEMY_HASTE, GAME } from '../gameConfig';
+import {
+  ENEMY_KINDS,
+  type EnemySave,
+  type EnemySaveKind,
+  type WavePhase,
+} from '../types/EnemySave';
+
+export type { EnemySave, WavePhase } from '../types/EnemySave';
 
 const CAMPAIGN_KEY = 'tank-penetration-combat:v1';
-
-export type WavePhase = 'combat' | 'shop';
-
-export type EnemySave = {
-  kind: EnemySaveKind;
-  x: number;
-  y: number;
-  hp: number;
-  pace: number;
-};
 
 export type ShopSave = {
   blast: number;

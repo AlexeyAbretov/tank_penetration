@@ -3,13 +3,14 @@
 // Здоровье и скорость всегда как у первого выхода: номер волны их не поднимает.
 
 import { AssaultInfantry } from './AssaultInfantry';
-import { EnemyFactory, type EnemySaveKind } from './EnemyFactory';
+import { EnemyFactory } from './EnemyFactory';
+import type { EnemySaveKind } from '../types/EnemySave';
 import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
 import { PickupTruck } from './PickupTruck';
 import { RocketInfantry } from './RocketInfantry';
 import { SuperSoldier } from './SuperSoldier';
-import type { SpawnContext } from './SpawnContext';
+import type { SpawnContext } from '../types/SpawnContext';
 
 type EnemyKind =
   | typeof AssaultInfantry

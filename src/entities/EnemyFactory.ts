@@ -9,15 +9,14 @@ import { Infantry } from './Infantry';
 import { PickupTruck } from './PickupTruck';
 import { RocketInfantry } from './RocketInfantry';
 import { SuperSoldier } from './SuperSoldier';
-import type { SpawnContext } from './SpawnContext';
+import type { SpawnContext } from '../types/SpawnContext';
+import type { EnemySaveKind } from '../types/EnemySave';
+import type { WaveUnit } from '../types/WaveUnit';
 
-export type { SpawnContext } from './SpawnContext';
+export type { SpawnContext } from '../types/SpawnContext';
 export type { WorldPoint } from '../types/WorldPoint';
-
-// Короткое имя вида для сохранения партии. Имя класса после сборки Vite может измениться,
-// поэтому в localStorage пишется эта строка, а не AssaultInfantry.
-export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket', 'super'] as const;
-export type EnemySaveKind = (typeof ENEMY_KINDS)[number];
+export type { EnemySaveKind } from '../types/EnemySave';
+export { ENEMY_KINDS } from '../types/EnemySave';
 
 type EnemyKind =
   | typeof AssaultInfantry
@@ -80,7 +79,7 @@ export class EnemyFactory {
   }
 
   // Обратное превращение: живой спрайт → строка для сохранения. null — это не наш враг.
-  static kindOf(unit: Infantry): EnemySaveKind | null {
+  static kindOf(unit: WaveUnit): EnemySaveKind | null {
     if (unit instanceof PickupTruck) {
       return 'truck';
     }

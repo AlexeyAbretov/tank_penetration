@@ -3,10 +3,10 @@
 // Сам менеджер врагов не двигает: он только ставит их на поле и следит, жив ли ещё кто-то.
 
 import Phaser from 'phaser';
-import { Infantry } from '../entities/Infantry';
+import type { EnemySave, WavePhase } from '../types/EnemySave';
+import type { EnemyWaves } from '../types/EnemyWaves';
+import type { WaveUnit } from '../types/WaveUnit';
 import type { WorldPoint } from '../types/WorldPoint';
-import type { EnemySave, WavePhase } from '../saves/CombatSave';
-import { EnemyFactory } from '../entities/EnemyFactory';
 
 export class WaveManager {
   // Номер текущей волны. 0 — бой ещё не начался, сохранять такую партию нечего.
@@ -36,7 +36,7 @@ export class WaveManager {
 
   // Фабрика и размер холста известны до сцены. Группы и колбэки появляются в create(), их ставит bind().
   constructor(
-    private readonly enemies: typeof EnemyFactory,
+    private readonly enemies: EnemyWaves,
     private readonly game: { width: number },
   ) {}
 
@@ -73,7 +73,7 @@ export class WaveManager {
     }
     const total = this.enemies.count(this.wave);
     const enemies: EnemySave[] = [];
-    for (const unit of this.infantry.getChildren() as Infantry[]) {
+    for (const unit of this.infantry.getChildren() as WaveUnit[]) {
       // reachedWall — уже дошёл до базы или убит и доигрывает смерть. В сохранение он не входит.
       if (!unit.active || unit.reachedWall) {
         continue;
@@ -247,7 +247,7 @@ export class WaveManager {
 
   // Живые бойцы. active === false — спрайт уже уничтожен. reachedWall — выбыл из волны.
   private livingInfantryCount(): number {
-    return (this.infantry.getChildren() as Infantry[]).filter(
+    return (this.infantry.getChildren() as WaveUnit[]).filter(
       (unit) => unit.active && !unit.reachedWall,
     ).length;
   }

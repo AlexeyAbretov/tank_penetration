@@ -1,7 +1,7 @@
 // Данные для появления одного врага. Собирает сцена, читает только EnemyFactory.
 
 import Phaser from 'phaser';
-import type { WorldPoint } from '../types/WorldPoint';
+import type { WorldPoint } from './WorldPoint';
 
 export type SpawnContext = {
   scene: Phaser.Scene; // сцена, на которую встанет спрайт
