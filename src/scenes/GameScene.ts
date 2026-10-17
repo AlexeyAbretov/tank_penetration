@@ -18,6 +18,7 @@ import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem } from '../types/CombatSystem';
 import { ProgressShopController } from '../controllers/ProgressShopController';
 import { PlayerController } from '../controllers/PlayerController';
+import { FramePace } from '../systems/FramePace';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { CombatSave, type SavedRun } from '../saves/CombatSave';
 import { ShopController } from '../controllers/ShopController';
@@ -106,6 +107,7 @@ export class GameScene extends Phaser.Scene {
       progressBlast: number,
       effects: BattleEffects,
     ) => CombatSystem,
+    private readonly framePace: FramePace,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
@@ -224,6 +226,7 @@ export class GameScene extends Phaser.Scene {
       this.hasteNumpad = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD);
       this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     }
+    this.framePace.attach(this);
     this.events.once('shutdown', this.onShutdown, this);
 
     const fx = new BattleEffects(this);
@@ -406,14 +409,16 @@ export class GameScene extends Phaser.Scene {
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
-    // Клик по кнопкам темпа, паузы, автострельбы, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
+    // Клик по кнопкам темпа, паузы, автострельбы, иконкам покупок, настройкам и замедлению
+    // не считается выстрелом: они лежат поверх поля.
     this.combat.tick(
       delta,
       !this.hud.coversHaste(pointer) &&
         !this.hud.coversPause(pointer) &&
         !this.hud.coversSettings(pointer) &&
         !this.hud.coversAutoFire(pointer) &&
-        !this.hud.coversAbility(pointer),
+        !this.hud.coversAbility(pointer) &&
+        !this.framePace.covers(pointer),
     );
     this.projectiles.tick();
     this.waves.tick();

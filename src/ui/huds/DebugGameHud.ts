@@ -3,7 +3,7 @@ import { GameHud, type HudAbility, type HudFrame } from './GameHud';
 
 export class DebugGameHud extends GameHud {
   protected override controlsLine(): string {
-    return `${super.controlsLine()}   двойное нажатие — сброс`;
+    return `${super.controlsLine()}   двойное нажатие — сброс   F — замедление`;
   }
 
   constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number, abilities: readonly HudAbility[]) {
