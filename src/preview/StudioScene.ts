@@ -111,6 +111,7 @@ export class StudioScene extends Phaser.Scene {
     preloadCraters(this);
     AssaultInfantry.preload(this);
     GunnerInfantry.preload(this);
+    RocketInfantry.preload(this);
     preloadTankBoom(this);
     preloadNuke(this);
     StudioSounds.preload(this);
@@ -205,7 +206,7 @@ export class StudioScene extends Phaser.Scene {
       this.bakeGunnerBody();
     }
     if (this.entity.id === 'rocketman') {
-      this.bakeRocketBody();
+      this.dropRocketBody();
     }
     if (this.entity.id === 'super') {
       this.bakeSuperBody();
@@ -1188,21 +1189,8 @@ export class StudioScene extends Phaser.Scene {
     if (!rig.gun || !rig.recoil) {
       return;
     }
-    // В просмотре пуск всегда влево, труба уже на плече. Отдача идёт вдоль ствола.
-    RocketInfantry.poseLauncher(rig.gun, 0, 0, scale, 0, rig.recoil, true);
-  }
-
-  // Стрельба в просмотре показывает стойку с колена: в бою он пускает ракету только так.
-  private bakeRocketBody(): void {
-    this.dropRocketBody();
-    const look = this.paint as SoldierLook;
-    this.restamp('studio-rocketman-kneel', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-      RocketInfantry.drawKneel(g, look),
-    );
-    this.restamp('studio-rocketman-launcher', LAUNCHER_FRAME.w, LAUNCHER_FRAME.h, (g) =>
-      RocketInfantry.renderLauncher(g, look),
-    );
-    this.rocketBodyKeys = ['studio-rocketman-kneel', 'studio-rocketman-launcher'];
+    // В просмотре пуск всегда влево. Отдача идёт вдоль трубы.
+    RocketInfantry.poseLauncher(rig.gun, 0, 0, scale, 0, rig.recoil);
   }
 
   private dropRocketBody(): void {
@@ -1214,19 +1202,26 @@ export class StudioScene extends Phaser.Scene {
     this.rocketBodyKeys = [];
   }
 
+  // Стрельба в просмотре — стойка из боя: тело без трубы, труба и кисти отдельными картинками.
   private makeRocket(view: ViewState): Phaser.GameObjects.Container {
     const root = this.add.container(0, 0);
-    const sprite = this.add.sprite(0, 0, 'studio-rocketman-kneel');
+    const sprite = this.add.sprite(0, 0, RocketInfantry.aimKey);
     sprite.setOrigin(this.entity.originX, this.entity.originY);
     sprite.setScale(view.scale);
     root.add(sprite);
-    const launcher = this.add.image(0, 0, 'studio-rocketman-launcher');
+    const launcher = this.add.image(0, 0, RocketInfantry.launcherKey);
     launcher.setOrigin(
-      RocketInfantry.breech.x / LAUNCHER_FRAME.w,
-      RocketInfantry.breech.y / LAUNCHER_FRAME.h,
+      (RocketInfantry.breech.x - RocketInfantry.launcherCut.x) / LAUNCHER_FRAME.w,
+      (RocketInfantry.breech.y - RocketInfantry.launcherCut.y) / LAUNCHER_FRAME.h,
     );
     launcher.setScale(view.scale);
     root.add(launcher);
+    if (this.textures.exists(RocketInfantry.handsKey)) {
+      const hands = this.add.image(0, 0, RocketInfantry.handsKey);
+      hands.setOrigin(this.entity.originX, this.entity.originY);
+      hands.setScale(view.scale);
+      root.add(hands);
+    }
     const guides = this.add.graphics();
     root.add(guides);
     this.paintSpriteGuides(guides, view);
@@ -1524,6 +1519,10 @@ export class StudioScene extends Phaser.Scene {
         const point = GunnerInfantry.muzzleAt(0, 0, readView().scale, 0, rig.recoil);
         rig.muzzle = { x: point.x, y: point.y };
       }
+      if (this.entity.id === 'rocketman') {
+        const point = RocketInfantry.muzzleAt(0, 0, readView().scale, 0, rig.recoil);
+        rig.muzzle = { x: point.x, y: point.y };
+      }
       if (this.entity.id === 'super') {
         const point = SuperSoldier.muzzleAt(0, 0, readView().scale, 0, rig.recoil);
         rig.muzzle = { x: point.x, y: point.y };
@@ -1635,7 +1634,8 @@ export class StudioScene extends Phaser.Scene {
     }
     if (rig.flash === 'rocket') {
       const pop = RocketInfantry.flashPop;
-      const flash = this.add.image(rig.muzzle.x, rig.muzzle.y, 'studio-fx-rocket-flash');
+      const at = RocketInfantry.flashOrigin(rig.muzzle.x, rig.muzzle.y, rig.angle, rig.pixel);
+      const flash = this.add.image(at.x, at.y, 'studio-fx-rocket-flash');
       flash.setOrigin(0, 0.5);
       flash.setBlendMode(Phaser.BlendModes.ADD);
       flash.setRotation(rig.angle);

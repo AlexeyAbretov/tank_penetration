@@ -272,10 +272,10 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'rocketman',
     title: 'Ракетчик',
-    hint: 'Оливковая форма и труба на груди. «Стрельба» сажает его на колено: труба ложится на плечо, ракета оставляет дым и взрывается о стену. «Смерть» кладёт тело в кровь.',
+    hint: 'Шесть кадров бега, как у штурмовика, зелёная форма. Жёлтая точка — откуда вылетает ракета. «Стрельба» ставит его в стойку: труба откатывается, ракета оставляет дым. «Смерть» — тело с поля.',
     exportName: 'ROCKET_LOOK',
     kind: 'frames',
-    frameCount: 2,
+    frameCount: RocketInfantry.frameKeys.length,
     animFps: RocketInfantry.walkFps,
     gameScale: Infantry.placed.scale,
     originX: Infantry.placed.originX,
@@ -283,26 +283,20 @@ export const ENTITIES: PreviewEntity[] = [
     texW: SOLDIER_FRAME.w,
     texH: SOLDIER_FRAME.h,
     defaults: asPaint(ROCKET_LOOK),
-    fields: soldierFields(),
+    fields: [],
     hitbox: soldierHit,
     muzzle: RocketInfantry.muzzleOffset,
     hpColor: 0xe07020,
     death: 'corpse',
-    paintCorpse: (g, paint) => RocketInfantry.drawCorpse(g, paint as SoldierLook),
+    corpseImage: RocketInfantry.corpseKey,
     shot: {
       delay: RocketInfantry.shotInterval,
       speed: RocketInfantry.shotSpeed,
       projectile: 'rocket',
       flash: 'rocket',
     },
-    bake: (scene, paint, keys) => {
-      const look = paint as SoldierLook;
-      stamp(scene, keys[0], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        RocketInfantry.drawMarch(g, 0, look, true),
-      );
-      stamp(scene, keys[1], SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        RocketInfantry.drawMarch(g, 1, look, true),
-      );
+    bake: (scene, _paint, keys) => {
+      RocketInfantry.frameKeys.forEach((key, i) => copyImage(scene, key, keys[i]));
     },
   },
   {

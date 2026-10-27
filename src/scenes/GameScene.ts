@@ -16,6 +16,7 @@ import { BattleEffects } from '../sounds/BattleEffects';
 import { BattleMusic } from '../sounds/BattleMusic';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem } from '../types/CombatSystem';
+import { PauseStack } from '../controllers/PauseStack';
 import { ProgressShopController } from '../controllers/ProgressShopController';
 import { PlayerController } from '../controllers/PlayerController';
 import { ProjectileSystem } from '../systems/ProjectileSystem';
@@ -57,15 +58,11 @@ export class GameScene extends Phaser.Scene {
   private score = 0;
   // Монеты этой партии. Тратятся между волнами и пропадают вместе с партией.
   private coins = 0;
-  // Игрок нажал паузу или вкладка ушла в фон.
-  private paused = false;
+  // Сколько пауз держит часы. Ноль — бой идёт. Вид паузы сцена не хранит.
+  private holdDepth = 0;
   // true, если пауза сама остановила физику. Магазин останавливает её раньше,
   // и тогда снятие паузы физику не отпускает: магазин всё ещё открыт.
   private pausedPhysics = false;
-  // Клик по плашке только поднимает флаг. Снятие паузы делает следующий кадр update.
-  private resumeRequested = false;
-  // Первый кадр паузы игнорирует Esc и клик. Та же кнопка, которой паузу включили, не снимает её сразу.
-  private resumeArmed = false;
   private pausedEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   // Клавиша + и плюс на цифровом блоке. Обе крутят темп врагов.
   // Клавиша 2 — мины, её слушает CombatSystem.
@@ -106,6 +103,7 @@ export class GameScene extends Phaser.Scene {
       progressBlast: number,
       effects: BattleEffects,
     ) => CombatSystem,
+    private readonly pauses: PauseStack,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
@@ -127,12 +125,10 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('combat', true);
     // Темп врагов. Читают пехота и пули через enemyHasteOf.
     this.registry.set(ENEMY_HASTE.key, 1);
-    this.paused = false;
+    this.holdDepth = 0;
     this.pausedPhysics = false;
     this.settingsOpen = false;
     this.settingsPausedPhysics = false;
-    this.resumeRequested = false;
-    this.resumeArmed = false;
     this.pausedEmitters = [];
     this.time.paused = false;
     this.persistEnabled = false;
@@ -183,38 +179,34 @@ export class GameScene extends Phaser.Scene {
     ]);
     this.hud.setHaste(1);
     this.hud.onHasteCycle(() => {
-      if (!this.paused && !this.defeatShop) {
+      if (!this.pauses.blocking && !this.defeatShop) {
         this.cycleEnemyHaste();
       }
     });
-    this.hud.onPause(() => this.setPaused(true));
     this.hud.onSettings(() => this.openSettings());
     this.hud.onAutoFire(() => {
-      if (this.paused || this.settingsOpen || this.player.isGameOver || this.defeatShop) {
+      if (this.blocksPlay()) {
         return;
       }
       this.shop.toggleAutoFire();
     });
     this.hud.onAbility('artillery', () => {
-      if (this.paused || this.settingsOpen || this.player.isGameOver || this.defeatShop) {
+      if (this.blocksPlay()) {
         return;
       }
       this.combat.requestArtillery();
     });
     this.hud.onAbility('mines', () => {
-      if (this.paused || this.settingsOpen || this.player.isGameOver || this.defeatShop) {
+      if (this.blocksPlay()) {
         return;
       }
       this.combat.requestMines();
     });
     this.hud.onAbility('nuclear', () => {
-      if (this.paused || this.settingsOpen || this.player.isGameOver || this.defeatShop) {
+      if (this.blocksPlay()) {
         return;
       }
       this.combat.requestNuclear();
-    });
-    this.hud.onResume(() => {
-      this.resumeRequested = true;
     });
     // Стирает и партию, и постоянные улучшения. Кнопка живёт на плашке паузы.
     this.hud.onNewGame(() => this.restartRun());
@@ -334,8 +326,16 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.addEventListener('pagehide', this.onPageHide);
     window.addEventListener('beforeunload', this.onPageHide);
+    this.pauses.attach(this, this.hud, keyboard ?? null, {
+      canPause: () => !this.settingsOpen && !this.player.isGameOver && !this.defeatShop,
+      acquire: () => this.acquireClock(),
+      release: () => this.releaseClock(),
+      save: () => this.writeSave(),
+      showPlate: (on) => this.hud.setPaused(on),
+      coverShop: (on) => this.shop.panel.coverForPause(on),
+    });
     if (document.hidden) {
-      this.setPaused(true);
+      this.pauses.onHidden();
     }
   }
 
@@ -361,18 +361,6 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.paused) {
-      // resumeArmed становится true только со второго захода. Первый кадр паузы клик проглатывает.
-      const resume = this.resumeArmed && (this.resumeRequested || this.pausePressed());
-      this.resumeRequested = false;
-      if (resume) {
-        this.setPaused(false);
-      } else {
-        this.resumeArmed = true;
-      }
-      return;
-    }
-
     // Esc закрывает настройки и не ставит паузу тем же нажатием.
     if (this.settingsOpen) {
       if (this.pausePressed()) {
@@ -381,8 +369,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.pausePressed()) {
-      this.setPaused(true);
+    const held = this.pauses.blocking;
+    this.pauses.tick(this.pausePressed());
+    if (held || this.pauses.blocking) {
       return;
     }
 
@@ -422,40 +411,50 @@ export class GameScene extends Phaser.Scene {
 
   // Ранний выход из update не останавливает физику, таймеры, твины и анимации.
   // Магазин уже держит физику на паузе — тогда мир не трогаем, чтобы не отпустить врагов.
-  private setPaused(paused: boolean): void {
-    if (this.paused === paused || (paused && (this.player.isGameOver || this.defeatShop))) {
+  // Повторный acquire, пока часы уже стоят, частицы второй раз не собирает.
+  private acquireClock(): void {
+    this.holdDepth += 1;
+    if (this.holdDepth > 1) {
       return;
     }
-    this.paused = paused;
-    this.shop.setPaused(paused);
-    this.progressShop.setPaused(paused);
-    this.time.paused = paused;
-    if (paused) {
-      this.resumeRequested = false;
-      this.resumeArmed = false;
-      this.tweens.pauseAll();
-      this.anims.pauseAll();
-      this.freezeEmitters();
-      if (!this.physics.world.isPaused) {
-        this.physics.world.pause();
-        this.pausedPhysics = true;
-      }
-    } else {
-      this.tweens.resumeAll();
-      this.anims.resumeAll();
-      this.thawEmitters();
-      if (this.pausedPhysics) {
-        this.physics.world.resume();
-        this.pausedPhysics = false;
-      }
+    this.shop.setPaused(true);
+    this.progressShop.setPaused(true);
+    this.time.paused = true;
+    this.tweens.pauseAll();
+    this.anims.pauseAll();
+    this.freezeEmitters();
+    if (!this.physics.world.isPaused) {
+      this.physics.world.pause();
+      this.pausedPhysics = true;
     }
-    this.hud.setPaused(paused);
-    this.shop.panel.coverForPause(paused);
-    this.music.setPaused(paused);
-    this.fx?.setPaused(paused);
-    if (paused) {
-      this.writeSave();
+    this.music.setPaused(true);
+    this.fx?.setPaused(true);
+  }
+
+  private releaseClock(): void {
+    if (this.holdDepth === 0) {
+      return;
     }
+    this.holdDepth -= 1;
+    if (this.holdDepth > 0) {
+      return;
+    }
+    this.shop.setPaused(false);
+    this.progressShop.setPaused(false);
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.anims.resumeAll();
+    this.thawEmitters();
+    if (this.pausedPhysics) {
+      this.physics.world.resume();
+      this.pausedPhysics = false;
+    }
+    this.music.setPaused(false);
+    this.fx?.setPaused(false);
+  }
+
+  private blocksPlay(): boolean {
+    return this.pauses.blocking || this.settingsOpen || this.player.isGameOver || this.defeatShop;
   }
 
   // Ползунок эффектов. Бой стоит, поэтому без примера новую громкость не услышать.
@@ -470,7 +469,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private openSettings(): void {
-    if (this.settingsOpen || this.paused || this.player.isGameOver || this.defeatShop) {
+    if (this.blocksPlay()) {
       return;
     }
     this.settingsOpen = true;
@@ -503,7 +502,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.world.resume();
       this.settingsPausedPhysics = false;
     }
-    this.shop.panel.coverForPause(this.paused);
+    this.shop.panel.coverForPause(this.pauses.coversShop);
   }
 
   private onTabHidden(): void {
@@ -514,17 +513,14 @@ export class GameScene extends Phaser.Scene {
     if (this.settingsOpen) {
       this.closeSettings();
     }
-    if (this.paused) {
-      return;
-    }
-    this.setPaused(true);
+    this.pauses.onHidden();
   }
 
   private onShutdown(): void {
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('beforeunload', this.onPageHide);
-    if (this.paused) {
+    if (this.holdDepth > 0) {
       this.anims.resumeAll();
     }
     this.music.destroy();

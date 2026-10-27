@@ -1,0 +1,98 @@
+// Обычная пауза: кнопка, Esc и плашка «ПАУЗА». Клик по затемнению или Esc продолжают бой.
+
+import type { Pause, PauseEnv } from './PauseStack';
+
+export class ScreenPause implements Pause {
+  private env?: PauseEnv;
+  private active = false;
+  private armed = false;
+  private resumeClick = false;
+
+  get blocking(): boolean {
+    return this.active;
+  }
+
+  get coversShop(): boolean {
+    return this.active;
+  }
+
+  attach(env: PauseEnv): void {
+    this.env = env;
+    this.active = false;
+    this.armed = false;
+    this.resumeClick = false;
+    env.hud.onPause(() => {
+      if (!env.canPause() || this.active) {
+        return;
+      }
+      this.enter();
+    });
+    env.hud.onResume(() => {
+      this.resumeClick = true;
+    });
+  }
+
+  tick(esc: boolean): void {
+    if (!this.env) {
+      return;
+    }
+    if (this.active) {
+      // Первый кадр проглатывает Esc и клик, которыми паузу включили.
+      if (!this.armed) {
+        this.armed = true;
+        this.resumeClick = false;
+        return;
+      }
+      if (esc || this.resumeClick) {
+        this.exit();
+      }
+      this.resumeClick = false;
+      return;
+    }
+    this.resumeClick = false;
+    if (esc && this.env.canPause() && !this.env.blockedAbove()) {
+      this.enter();
+    }
+  }
+
+  onHidden(): void {
+    if (this.active || !this.env?.canPause()) {
+      return;
+    }
+    this.enter();
+  }
+
+  yield(): void {
+    if (!this.active || !this.env) {
+      return;
+    }
+    this.active = false;
+    this.env.showPlate(false);
+    this.env.coverShop(false);
+    this.env.release();
+  }
+
+  private enter(): void {
+    if (!this.env) {
+      return;
+    }
+    this.env.acquire();
+    this.env.preemptLower();
+    this.active = true;
+    this.armed = false;
+    this.resumeClick = false;
+    this.env.showPlate(true);
+    this.env.coverShop(true);
+    this.env.save();
+  }
+
+  private exit(): void {
+    if (!this.env) {
+      return;
+    }
+    this.active = false;
+    this.env.showPlate(false);
+    this.env.coverShop(false);
+    this.env.release();
+  }
+}

@@ -34,6 +34,9 @@ export class WaveManager {
   // banner — показать объявление; без него номер обновляется тихо (магазин, середина боя).
   private onWaveBegan!: (wave: number, banner?: { boss: boolean }) => void;
 
+  // Поколение отложенных выходов. Пропуск волны его увеличивает, и старый таймер врага уже не выпускает.
+  private spawnStamp = 0;
+
   // Фабрика и размер холста известны до сцены. Группы и колбэки появляются в create(), их ставит bind().
   constructor(
     private readonly enemies: EnemyWaves,
@@ -60,7 +63,11 @@ export class WaveManager {
     this.onProgress = onProgress;
     this.onWaveBegan = onWaveBegan;
     this.reset();
+    this.onBound(scene);
   }
+
+  // После bind. Дебаг-наследник здесь вешает свою клавишу. Обычная партия метод не занимает.
+  protected onBound(_scene: Phaser.Scene): void {}
 
   // Снимок для CombatSave. null — волна ещё не началась.
   // В магазине список врагов пустой: они уже уничтожены, а номер волны сохраняется как есть.
@@ -122,7 +129,7 @@ export class WaveManager {
     if (already === 0) {
       // Волна записана, но никто ещё не вышел: снова объявляем и ждём announceMs.
       this.onWaveBegan(wave, { boss: this.enemies.isBossWave(wave) });
-      this.scene.time.delayedCall(this.enemies.timing.announceMs, () => {
+      this.callLater(this.enemies.timing.announceMs, () => {
         if (this.isGameOver()) {
           return;
         }
@@ -140,11 +147,26 @@ export class WaveManager {
     this.wave = 0;
     this.remainingToSpawn = 0;
     this.awaitingClear = true;
+    // Старые таймеры прошлого заезда не должны выпустить врага в новую партию.
+    this.spawnStamp += 1;
   }
 
   // Старт новой партии. delayedCall живёт в таймерах сцены и переживает кадры, пока не сработает.
   scheduleFirstWave(): void {
-    this.scene.time.delayedCall(this.enemies.timing.startDelayMs, () => this.beginNextWave());
+    this.callLater(this.enemies.timing.startDelayMs, () => this.beginNextWave());
+  }
+
+  // Пропуск текущей волны. Живые умирают, ещё не вышедшие не появляются.
+  // Магазин не открывается: следующая волна начинается сразу, onWaveCleared не зовётся.
+  // Волна 0 и уже открытый магазин не пропускаются — там нечего зачищать.
+  skipToNext(): void {
+    if (this.isGameOver() || this.wave < 1 || this.awaitingClear) {
+      return;
+    }
+    this.spawnStamp += 1;
+    this.slayLiving();
+    this.clearShots();
+    this.beginNextWave();
   }
 
   beginNextWave(): void {
@@ -160,7 +182,7 @@ export class WaveManager {
 
     // Пишем волну сразу, до выхода врагов. Закрытие вкладки на баннере не откатит номер.
     this.onProgress();
-    this.scene.time.delayedCall(this.enemies.timing.announceMs, () => {
+    this.callLater(this.enemies.timing.announceMs, () => {
       if (this.isGameOver()) {
         return;
       }
@@ -192,7 +214,7 @@ export class WaveManager {
 
     for (let i = startIndex; i < total; i += 1) {
       // (i - startIndex) — очередь среди тех, кто ещё не вышел. После загрузки она снова с нуля.
-      this.scene.time.delayedCall((i - startIndex) * gap, () => {
+      this.callLater((i - startIndex) * gap, () => {
         if (this.isGameOver()) {
           return;
         }
@@ -243,6 +265,35 @@ export class WaveManager {
     });
     this.infantry.add(unit);
     unit.march();
+  }
+
+  // Таймер этой волны. Пропуск увеличивает штамп, и вызов от прошлой волны молча сгорает.
+  private callLater(delay: number, fn: () => void): void {
+    const stamp = this.spawnStamp;
+    this.scene.time.delayedCall(delay, () => {
+      if (stamp !== this.spawnStamp || this.isGameOver()) {
+        return;
+      }
+      fn();
+    });
+  }
+
+  // Живые падают как убитые: hp в ноль, чтобы остался труп, а не уход «дошёл до стены».
+  private slayLiving(): void {
+    for (const unit of this.infantry.getChildren() as WaveUnit[]) {
+      if (!unit.active || unit.reachedWall) {
+        continue;
+      }
+      unit.hp = 0;
+      unit.kill();
+    }
+  }
+
+  // Пули и ракеты уже в полёте. После пропуска они не добивают базу на баннере следующей волны.
+  private clearShots(): void {
+    for (const shot of [...this.enemyShots.getChildren()]) {
+      shot.destroy();
+    }
   }
 
   // Живые бойцы. active === false — спрайт уже уничтожен. reachedWall — выбыл из волны.

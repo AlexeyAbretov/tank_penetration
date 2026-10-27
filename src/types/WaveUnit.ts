@@ -12,4 +12,6 @@ export type WaveUnit = Phaser.GameObjects.GameObject & {
   paceRank: number;
   // Включает скорость после появления или восстановления из сохранения.
   march(): void;
+  // Смерть. Пропуск волны зовёт это, не зная класс пехоты.
+  kill(): void;
 };
