@@ -18,9 +18,7 @@ import { Tank } from '../entities/Tank';
 import { createTextures } from './textures';
 
 export function ensureGameTextures(scene: Phaser.Scene): void {
-  if (!scene.textures.exists('battlefield')) {
-    createTextures(scene);
-  }
+  createTextures(scene);
   Tank.ensureTextures(scene);
   MachineGun.ensureTextures(scene);
   BarbedWire.ensureTextures(scene);

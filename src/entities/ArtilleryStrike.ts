@@ -2,6 +2,7 @@
 // Покупка в магазине открывает вызов по клавише 1 и по иконке на HUD. Сам залп считает CombatSystem.
 
 import Phaser from 'phaser';
+import { BarbedWire } from './BarbedWire';
 import { bake } from '../gfx/textures';
 import { playArtilleryBoom } from '../sounds/ArtillerySounds';
 
@@ -12,9 +13,20 @@ export type ArtilleryFlight = {
 export class ArtilleryStrike {
   static readonly iconKey = 'artillery-icon';
   static readonly shellKey = 'artillery-shell';
-  static readonly craterKey = 'artillery-crater';
   // Радиус круга на иконке. Затемнение перезарядки рисуется чуть уже, чтобы золотой обод оставался виден.
   static readonly iconRadius = 30;
+
+  // Четыре воронки с одной фотографии. Трава снята, у каждой свой край:
+  // лучи, камни, плоская чаша, вал. Строки буквальные: singlefile-сборка подменяет их на data:.
+  static readonly craterImages = {
+    'artillery-crater-0': 'assets/artillery-crater-0.png',
+    'artillery-crater-1': 'assets/artillery-crater-1.png',
+    'artillery-crater-2': 'assets/artillery-crater-2.png',
+    'artillery-crater-3': 'assets/artillery-crater-3.png',
+  } as const;
+
+  // Кадр около 200 px. На поле чаша меньше: иначе три воронки накрывают середину экрана.
+  static readonly craterScale = 0.55;
 
   static readonly shop = {
     cost: 100,
@@ -29,13 +41,21 @@ export class ArtilleryStrike {
     afterShotMs: 0,
   };
 
-  // Прямоугольник, куда можно положить воронку, не наезжая на танк и баннер.
+  // Прямоугольник удара. Слева — линия проволоки плюс полкадра самой широкой
+  // воронки (камни, 243 px): и точка разрыва, и чаша остаются перед ней.
   static readonly field = {
-    minX: 250,
+    minX: Math.ceil(BarbedWire.bounds.face + (243 * ArtilleryStrike.craterScale) / 2),
     maxX: 1160,
     minY: 160,
     maxY: 540,
   };
+
+  // imagePreloader зовёт до create. Иконка и снаряд по-прежнему рисуются в ensureTextures.
+  static preload(scene: Phaser.Scene): void {
+    for (const [key, path] of Object.entries(ArtilleryStrike.craterImages)) {
+      scene.load.image(key, path);
+    }
+  }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists(ArtilleryStrike.iconKey)) {
@@ -44,8 +64,10 @@ export class ArtilleryStrike {
     if (!scene.textures.exists(ArtilleryStrike.shellKey)) {
       bake(scene, ArtilleryStrike.shellKey, 16, 40, (g) => ArtilleryStrike.renderShell(g));
     }
-    if (!scene.textures.exists(ArtilleryStrike.craterKey)) {
-      bake(scene, ArtilleryStrike.craterKey, 168, 96, (g) => ArtilleryStrike.renderCrater(g));
+    for (const key of Object.keys(ArtilleryStrike.craterImages)) {
+      if (scene.textures.exists(key)) {
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
     }
   }
 
@@ -107,7 +129,7 @@ export class ArtilleryStrike {
     };
   }
 
-  // Вспышка, искры и тёмная яма. Яма гаснет сама через craterMs.
+  // Вспышка, искры и воронка. Воронка гаснет сама через craterMs.
   // Разрыв — artillery_explosion.mp3, свой звук на каждый снаряд.
   static boom(scene: Phaser.Scene, x: number, y: number): void {
     playArtilleryBoom(scene);
@@ -169,14 +191,18 @@ export class ArtilleryStrike {
       }
     });
 
-    const crater = scene.add.image(x, y, ArtilleryStrike.craterKey).setDepth(3);
-    scene.tweens.add({
-      targets: crater,
-      alpha: 0,
-      delay: ArtilleryStrike.shop.craterMs - 400,
-      duration: 400,
-      onComplete: () => crater.destroy(),
-    });
+    const keys = Object.keys(ArtilleryStrike.craterImages);
+    const key = keys[Phaser.Math.Between(0, keys.length - 1)];
+    if (scene.textures.exists(key)) {
+      const crater = scene.add.image(x, y, key).setDepth(3).setScale(ArtilleryStrike.craterScale);
+      scene.tweens.add({
+        targets: crater,
+        alpha: 0,
+        delay: ArtilleryStrike.shop.craterMs - 400,
+        duration: 400,
+        onComplete: () => crater.destroy(),
+      });
+    }
 
     scene.cameras.main.shake(90, 0.0035);
   }
@@ -220,27 +246,5 @@ export class ArtilleryStrike {
     g.fillTriangle(2, 22, 14, 22, 8, 38);
     g.fillStyle(0xffffff);
     g.fillCircle(8, 8, 2.5);
-  }
-
-  private static renderCrater(g: Phaser.GameObjects.Graphics): void {
-    const cx = 84;
-    const cy = 48;
-    // Светлый вал и чёрная яма: на тёмном поле мягкое пятно не читается.
-    g.fillStyle(0x000000, 0.55);
-    g.fillEllipse(cx, cy + 8, 166, 70);
-    g.fillStyle(0xf0d2a0, 1);
-    g.fillEllipse(cx, cy, 158, 82);
-    g.fillStyle(0x8a5a32, 1);
-    g.fillEllipse(cx, cy, 132, 64);
-    g.fillStyle(0x140804, 1);
-    g.fillEllipse(cx, cy + 1, 104, 48);
-    g.fillStyle(0x000000, 1);
-    g.fillEllipse(cx + 1, cy + 3, 70, 32);
-    g.fillStyle(0xfff0c8, 1);
-    g.fillEllipse(cx - 50, cy - 10, 26, 10);
-    g.fillEllipse(cx + 46, cy + 12, 20, 8);
-    g.fillStyle(0xff6a18, 1);
-    g.fillCircle(cx - 12, cy + 2, 3);
-    g.fillCircle(cx + 18, cy + 6, 2);
   }
 }

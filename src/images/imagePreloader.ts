@@ -1,3 +1,4 @@
+import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { MachineGun } from '../entities/MachineGun';
@@ -8,7 +9,10 @@ import { preloadTankBoom } from '../gfx/tankBoom';
 
 // Картинки живут у сущностей. Здесь только собираем их в один вызов для GameScene.
 export const preloadImages = (scene: Phaser.Scene) => {
+  // Трава с той же фотографии, что и воронки. Строка буквальная: singlefile подменяет её на data:.
+  scene.load.image('battlefield', 'assets/battlefield.jpg');
   Tank.preload(scene);
+  ArtilleryStrike.preload(scene);
   MachineGun.preload(scene);
   NuclearStrike.preload(scene);
   AssaultInfantry.preload(scene);

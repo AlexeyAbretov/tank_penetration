@@ -56,11 +56,23 @@ function mulberry32(seed: number): () => number {
 }
 
 // Фон и элементы интерфейса. Картинки сущностей сцена просит у их классов.
+// Поле боя может уже лежать в загрузчике (фото травы). Тогда фигурный фон не затирает его,
+// а искры и лента всё равно пекутся: раньше вся функция пропускалась вместе с ними.
 export function createTextures(scene: Phaser.Scene): void {
-  createBattlefield(scene); // фон поля
-  createParticles(scene); // искра взрыва, искра по броне и уголёк
-  createBanner(scene); // нижняя декоративная лента
-  createHpFrame(scene); // рамка полоски здоровья базы
+  if (scene.textures.exists('battlefield')) {
+    scene.textures.get('battlefield').setFilter(Phaser.Textures.FilterMode.LINEAR);
+  } else {
+    createBattlefield(scene);
+  }
+  if (!scene.textures.exists('spark')) {
+    createParticles(scene);
+  }
+  if (!scene.textures.exists('banner')) {
+    createBanner(scene);
+  }
+  if (!scene.textures.exists('hp-frame')) {
+    createHpFrame(scene);
+  }
 }
 
 // Фон 1280×720: выжженная земля, пятна, трещины с огнём, искры.
