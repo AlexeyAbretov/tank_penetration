@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
+import { nuclearCraterKeys, placeCrater } from '../gfx/craters';
 import { nuke, nukeAt } from '../gfx/nuke';
 import { bake } from '../gfx/textures';
 import { playNuclearBoom } from '../sounds/NuclearExplosion';
@@ -15,7 +16,6 @@ export type NuclearFlight = {
 export class NuclearStrike {
   static readonly iconKey = 'nuclear-icon';
   static readonly bombKey = 'nuclear-bomb';
-  static readonly craterKey = 'nuclear-crater';
   static readonly iconRadius = 30;
 
   // Путь в public/. Строка буквальная: singlefile-сборка подменяет её на data:.
@@ -33,6 +33,11 @@ export class NuclearStrike {
   // Кадр листа 401×212. 1.55 — шапка последней фазы почти у верхнего края и накрывает середину поля.
   static readonly mushroomScale = 1.55;
 
+  // Чаша на ширину гриба. Кадры 0–2 разной ширины, масштаб считается от выбранного.
+  static craterWidth(): number {
+    return nuke.frame.w * NuclearStrike.mushroomScale;
+  }
+
   // Облако гаснет за это время. Воронка живёт дольше: это след на земле, не сам взрыв.
   static readonly cloudMs = nuke.goneMs;
 
@@ -42,7 +47,7 @@ export class NuclearStrike {
     y: 356,
   };
 
-  // GameScene и студия зовут до create. Иконка и воронка по-прежнему рисуются в ensureTextures.
+  // GameScene и студия зовут до create. Иконка по-прежнему рисуется в ensureTextures.
   static preload(scene: Phaser.Scene): void {
     scene.load.image(NuclearStrike.bombKey, NuclearStrike.imagePath);
   }
@@ -53,9 +58,6 @@ export class NuclearStrike {
     }
     if (scene.textures.exists(NuclearStrike.bombKey)) {
       scene.textures.get(NuclearStrike.bombKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
-    }
-    if (!scene.textures.exists(NuclearStrike.craterKey)) {
-      bake(scene, NuclearStrike.craterKey, 640, 260, (g) => NuclearStrike.renderCrater(g));
     }
   }
 
@@ -99,13 +101,10 @@ export class NuclearStrike {
     const { x, y } = NuclearStrike.impact;
     const scale = NuclearStrike.mushroomScale;
 
-    const crater = scene.add.image(x, y, NuclearStrike.craterKey).setDepth(3);
-    scene.tweens.add({
-      targets: crater,
-      alpha: 0,
-      delay: NuclearStrike.shop.craterMs - 500,
-      duration: 500,
-      onComplete: () => crater.destroy(),
+    placeCrater(scene, x, y, NuclearStrike.shop.craterMs, {
+      keys: nuclearCraterKeys,
+      width: NuclearStrike.craterWidth(),
+      fadeMs: 500,
     });
 
     // Пыль кадра стоит на воронке: origin гриба — нижняя линия листа.
@@ -129,30 +128,5 @@ export class NuclearStrike {
     g.fillEllipse(32, 28, 24, 8);
     g.fillStyle(0xfff6d0);
     g.fillCircle(32, 24, 4);
-  }
-
-  private static renderCrater(g: Phaser.GameObjects.Graphics): void {
-    const cx = 320;
-    const cy = 130;
-    // Светлый вал и чёрная яма: на тёмном поле мягкое пятно не читается.
-    g.fillStyle(0x000000, 0.45);
-    g.fillEllipse(cx, cy + 16, 630, 150);
-    g.fillStyle(0xe7d2a4, 1);
-    g.fillEllipse(cx, cy, 600, 210);
-    g.fillStyle(0x6a4328, 1);
-    g.fillEllipse(cx, cy, 490, 164);
-    g.fillStyle(0x1a0c06, 1);
-    g.fillEllipse(cx, cy + 4, 370, 112);
-    g.fillStyle(0x000000, 1);
-    g.fillEllipse(cx, cy + 8, 230, 68);
-    g.fillStyle(0xfff0c8, 1);
-    g.fillEllipse(cx - 190, cy - 36, 78, 22);
-    g.fillEllipse(cx + 170, cy + 40, 60, 18);
-    g.fillStyle(0xff6a18, 1);
-    g.fillCircle(cx - 48, cy + 8, 7);
-    g.fillCircle(cx + 72, cy + 18, 5);
-    g.fillCircle(cx + 8, cy - 6, 4);
-    g.fillStyle(0xffe080, 1);
-    g.fillCircle(cx - 48, cy + 6, 3);
   }
 }

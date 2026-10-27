@@ -38,6 +38,7 @@ import {
   type ShellPaint,
   type SoldierLook,
 } from '../gfx/looks';
+import { ensureCraters, nuclearCraterKeys, preloadCraters } from '../gfx/craters';
 import { nuke, nukeAt, preloadNuke } from '../gfx/nuke';
 import { tankBoom, tankBoomAt, preloadTankBoom } from '../gfx/tankBoom';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
@@ -107,6 +108,7 @@ export class StudioScene extends Phaser.Scene {
     Tank.preload(this);
     MachineGun.preload(this);
     NuclearStrike.preload(this);
+    preloadCraters(this);
     AssaultInfantry.preload(this);
     GunnerInfantry.preload(this);
     preloadTankBoom(this);
@@ -379,9 +381,14 @@ export class StudioScene extends Phaser.Scene {
 
   private makeBombCrater(view: ViewState): Phaser.GameObjects.Container {
     NuclearStrike.ensureTextures(this);
+    ensureCraters(this);
     const root = this.add.container(0, 0);
     // Центр воронки на нижней точке бомбы: в бою она садится сюда.
-    const crater = this.add.image(0, 0, NuclearStrike.craterKey).setOrigin(0.5, 0.5).setScale(view.scale);
+    // В просмотре одна чаша, в бою — случайная из 0–2 того же размера.
+    const key = nuclearCraterKeys[0];
+    const frame = this.textures.get(key).get();
+    const scale = (NuclearStrike.craterWidth() * view.scale) / frame.width;
+    const crater = this.add.image(0, 0, key).setOrigin(0.5, 0.5).setScale(scale);
     root.add(crater);
     const guides = this.add.graphics();
     root.add(guides);
@@ -838,14 +845,10 @@ export class StudioScene extends Phaser.Scene {
   private bombCloudBounds(view: ViewState): { left: number; top: number; right: number; bottom: number } {
     const fitted = view.scale;
     const cloud = NuclearStrike.mushroomScale * fitted;
-    let craterW = 640;
-    let craterH = 260;
-    if (this.textures.exists(NuclearStrike.craterKey)) {
-      const frame = this.textures.get(NuclearStrike.craterKey).get();
-      craterW = frame.width;
-      craterH = frame.height;
-    }
-    const halfW = Math.max(nuke.half * cloud, (craterW * fitted) / 2);
+    // Чаши 0 и 1 одинаково приземистые: высота около 0.4 ширины.
+    const craterW = NuclearStrike.craterWidth() * fitted;
+    const craterH = craterW * (77 / 193);
+    const halfW = Math.max(nuke.half * cloud, craterW / 2);
     return {
       left: -halfW - 24,
       top: -nuke.rise * cloud - 28,

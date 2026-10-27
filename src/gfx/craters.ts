@@ -1,5 +1,5 @@
-// Четыре воронки с одной фотографии. Ими пользуются артиллерия и мины,
-// поэтому картинка лежит здесь, а не у одной из сущностей.
+// Четыре воронки с одной фотографии. Артиллерия и мины берут любую,
+// атомный взрыв — только 0–2. Картинка здесь, а не у одной из сущностей.
 // Строки путей буквальные: singlefile-сборка подменяет каждую на data: ровно один раз.
 
 import Phaser from 'phaser';
@@ -20,6 +20,13 @@ export function craterReach(): number {
   return (craterWidth * craterScale) / 2;
 }
 
+// Атомный взрыв не берёт вал (картинка 3): у него другая высота чаши.
+export const nuclearCraterKeys = [
+  'artillery-crater-0',
+  'artillery-crater-1',
+  'artillery-crater-2',
+] as const;
+
 export function preloadCraters(scene: Phaser.Scene): void {
   for (const [key, path] of Object.entries(craterImages)) {
     scene.load.image(key, path);
@@ -34,19 +41,36 @@ export function ensureCraters(scene: Phaser.Scene): void {
   }
 }
 
-// Случайная чаша. Гаснет сама: последние 400 мс — затухание.
-export function placeCrater(scene: Phaser.Scene, x: number, y: number, lifeMs: number): void {
-  const keys = Object.keys(craterImages);
+type CraterPlace = {
+  keys?: readonly string[];
+  scale?: number;
+  // Ширина на поле. Масштаб считается от выбранного кадра, чтобы 0–2 легли одним размером.
+  width?: number;
+  fadeMs?: number;
+};
+
+// Случайная чаша. Гаснет сама: последние fadeMs — затухание.
+export function placeCrater(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  lifeMs: number,
+  place?: CraterPlace,
+): void {
+  const keys = place?.keys ?? Object.keys(craterImages);
   const key = keys[Phaser.Math.Between(0, keys.length - 1)];
   if (!scene.textures.exists(key)) {
     return;
   }
-  const crater = scene.add.image(x, y, key).setDepth(3).setScale(craterScale);
+  const frame = scene.textures.get(key).get();
+  const scale = place?.width ? place.width / frame.width : (place?.scale ?? craterScale);
+  const fadeMs = place?.fadeMs ?? 400;
+  const crater = scene.add.image(x, y, key).setDepth(3).setScale(scale);
   scene.tweens.add({
     targets: crater,
     alpha: 0,
-    delay: Math.max(0, lifeMs - 400),
-    duration: 400,
+    delay: Math.max(0, lifeMs - fadeMs),
+    duration: fadeMs,
     onComplete: () => crater.destroy(),
   });
 }
