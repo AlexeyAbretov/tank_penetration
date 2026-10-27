@@ -106,6 +106,7 @@ export class StudioScene extends Phaser.Scene {
   preload(): void {
     Tank.preload(this);
     MachineGun.preload(this);
+    NuclearStrike.preload(this);
     AssaultInfantry.preload(this);
     GunnerInfantry.preload(this);
     preloadTankBoom(this);
@@ -379,7 +380,7 @@ export class StudioScene extends Phaser.Scene {
   private makeBombCrater(view: ViewState): Phaser.GameObjects.Container {
     NuclearStrike.ensureTextures(this);
     const root = this.add.container(0, 0);
-    // Центр воронки на носике: в бою бомба садится этой точкой.
+    // Центр воронки на нижней точке бомбы: в бою она садится сюда.
     const crater = this.add.image(0, 0, NuclearStrike.craterKey).setOrigin(0.5, 0.5).setScale(view.scale);
     root.add(crater);
     const guides = this.add.graphics();
@@ -403,7 +404,7 @@ export class StudioScene extends Phaser.Scene {
     this.audio?.base();
   }
 
-  // Атомная бомба: носик контейнера — точка удара. Масштаб гриба тот же, что на поле.
+  // Атомная бомба: низ контейнера — точка удара. Масштаб гриба тот же, что на поле.
   private playStudioBomb(holder: Phaser.GameObjects.Container): void {
     const view = readView();
     const scale = Math.abs(holder.scaleX) * view.scale * NuclearStrike.mushroomScale;

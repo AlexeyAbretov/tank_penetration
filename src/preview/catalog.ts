@@ -198,21 +198,22 @@ export const ENTITIES: PreviewEntity[] = [
   {
     id: 'nuclear',
     title: 'Атомная бомба',
-    hint: 'Та же бомба, что падает по клавише 3. Носик — точка опоры и место удара. «Взрыв» ставит воронку и поднимает гриб из девяти кадров, как в бою.',
+    hint: 'Та же бомба, что падает по клавише 3. Низ корпуса — точка опоры и место удара. «Взрыв» ставит воронку и поднимает гриб из девяти кадров, как в бою.',
     exportName: 'NUCLEAR_BOMB',
     kind: 'frames',
     frameCount: 1,
     gameScale: 1,
     originX: 0.5,
     originY: 1,
-    texW: 96,
-    texH: 210,
+    texW: NuclearStrike.bombFrame.w,
+    texH: NuclearStrike.bombFrame.h,
     defaults: {},
     fields: [],
     death: 'bomb',
     bake: (scene, _paint, keys) => {
       NuclearStrike.ensureTextures(scene);
       copyImage(scene, NuclearStrike.bombKey, keys[0]);
+      scene.textures.get(keys[0]).setFilter(Phaser.Textures.FilterMode.LINEAR);
     },
   },
   {

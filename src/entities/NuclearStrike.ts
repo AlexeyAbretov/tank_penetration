@@ -18,6 +18,11 @@ export class NuclearStrike {
   static readonly craterKey = 'nuclear-crater';
   static readonly iconRadius = 30;
 
+  // Путь в public/. Строка буквальная: singlefile-сборка подменяет её на data:.
+  // Кадр 100×210. Низ корпуса — точка опоры: бомба садится им в центр поля.
+  static readonly imagePath = 'assets/nuclear-bomb.png';
+  static readonly bombFrame = { w: 100, h: 210 };
+
   static readonly shop = {
     cost: 500,
     cooldownMs: 3 * 60_000,
@@ -37,19 +42,24 @@ export class NuclearStrike {
     y: 356,
   };
 
+  // GameScene и студия зовут до create. Иконка и воронка по-прежнему рисуются в ensureTextures.
+  static preload(scene: Phaser.Scene): void {
+    scene.load.image(NuclearStrike.bombKey, NuclearStrike.imagePath);
+  }
+
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists(NuclearStrike.iconKey)) {
       bake(scene, NuclearStrike.iconKey, 64, 64, (g) => NuclearStrike.renderIcon(g));
     }
-    if (!scene.textures.exists(NuclearStrike.bombKey)) {
-      bake(scene, NuclearStrike.bombKey, 96, 210, (g) => NuclearStrike.renderBomb(g));
+    if (scene.textures.exists(NuclearStrike.bombKey)) {
+      scene.textures.get(NuclearStrike.bombKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
     }
     if (!scene.textures.exists(NuclearStrike.craterKey)) {
       bake(scene, NuclearStrike.craterKey, 640, 260, (g) => NuclearStrike.renderCrater(g));
     }
   }
 
-  // Большая бомба падает из-за верхнего края носом в центр поля. onImpact — взрыв, когда носик сел.
+  // Большая бомба падает из-за верхнего края низом в центр поля. onImpact — взрыв, когда корпус сел.
   static drop(scene: Phaser.Scene, onImpact: () => void): NuclearFlight {
     const { x, y } = NuclearStrike.impact;
     const bomb = scene.add.image(x, -12, NuclearStrike.bombKey).setDepth(20);
@@ -119,30 +129,6 @@ export class NuclearStrike {
     g.fillEllipse(32, 28, 24, 8);
     g.fillStyle(0xfff6d0);
     g.fillCircle(32, 24, 4);
-  }
-
-  // Носик у нижнего края: origin спрайта стоит на острие.
-  private static renderBomb(g: Phaser.GameObjects.Graphics): void {
-    const cx = 48;
-    g.fillStyle(0x4a4034);
-    g.fillTriangle(18, 18, 34, 64, 6, 72);
-    g.fillTriangle(78, 18, 62, 64, 90, 72);
-    g.fillStyle(0x2a261e);
-    g.fillRoundedRect(40, 8, 16, 54, 4);
-
-    g.fillStyle(0x2a3026);
-    g.fillRoundedRect(22, 54, 52, 102, 22);
-    g.fillStyle(0x4c5644);
-    g.fillRoundedRect(28, 62, 16, 80, 8);
-
-    g.fillStyle(0xf0c43a);
-    g.fillRect(22, 90, 52, 10);
-    g.fillRect(22, 114, 52, 7);
-
-    g.fillStyle(0x241e16);
-    g.fillTriangle(22, 142, 74, 142, cx, 206);
-    g.fillStyle(0xffe080);
-    g.fillCircle(cx, 176, 5);
   }
 
   private static renderCrater(g: Phaser.GameObjects.Graphics): void {
