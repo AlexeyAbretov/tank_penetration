@@ -1,28 +1,33 @@
 import Phaser from 'phaser';
-import { QUIET_PAUSE } from '../../controllers/DebugQuietPause';
-import { WAVE_SKIP_HINT } from '../../systems/DebugWaveManager';
 import { GameHud, type HudAbility, type HudFrame } from './GameHud';
 
 export class DebugGameHud extends GameHud {
   private readonly debugLabel: Phaser.GameObjects.Text;
 
-  protected override controlsLine(): string {
-    return `${super.controlsLine()}   пробел — пауза без экрана   двойное нажатие — сброс`;
+  // Дебаг-клавиши только в окне списка. Верхняя плашка остаётся статусом партии.
+  protected override controlHints(): readonly string[] {
+    return [
+      ...super.controlHints(),
+      'пробел — пауза без экрана',
+      'двойное нажатие — сброс',
+      'N — пропуск волны',
+    ];
   }
 
   constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number, abilities: readonly HudAbility[]) {
     super(scene, frame, maxHp, abilities);
 
     this.debugLabel = scene.add
-      .text(frame.width / 2, this.statusY, `DEBUG   ${WAVE_SKIP_HINT}`, {
+      .text(frame.width / 2, this.statusY, 'DEBUG', {
         ...this.statusStyle,
         color: '#ff5a48',
       })
       .setOrigin(0.5, 0.5)
       .setDepth(51);
 
-    scene.events.on(QUIET_PAUSE, (on: boolean) => {
-      this.debugLabel.setText(on ? `DEBUG  ПАУЗА   ${WAVE_SKIP_HINT}` : `DEBUG   ${WAVE_SKIP_HINT}`);
+    // То же имя шлёт DebugQuietPause. Константа ради одной подписи не нужна.
+    scene.events.on('quiet-pause', (on: boolean) => {
+      this.debugLabel.setText(on ? 'DEBUG  ПАУЗА' : 'DEBUG');
     });
   }
 }

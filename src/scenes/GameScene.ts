@@ -395,14 +395,15 @@ export class GameScene extends Phaser.Scene {
     const pointer = this.input.activePointer;
     this.player.tick(delta, pointer.worldX, pointer.worldY);
 
-    // Клик по кнопкам темпа, паузы, автострельбы, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
+    // Клик по кнопкам темпа, паузы, автострельбы, клавиш, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
     this.combat.tick(
       delta,
       !this.hud.coversHaste(pointer) &&
         !this.hud.coversPause(pointer) &&
         !this.hud.coversSettings(pointer) &&
         !this.hud.coversAutoFire(pointer) &&
-        !this.hud.coversAbility(pointer),
+        !this.hud.coversAbility(pointer) &&
+        !this.hud.coversKeys(pointer),
     );
     this.projectiles.tick();
     this.waves.tick();
@@ -613,6 +614,7 @@ export class GameScene extends Phaser.Scene {
   // Экран после гибели. Партия к этому моменту уже стёрта, здесь только окно очков.
   private openDefeatShop(): void {
     this.defeatShop = true;
+    this.hud.hideKeys();
     this.closeSettings();
     this.music.stop();
     // Взрыв базы доигрывает сам: к этому моменту от файла остаётся короткий хвост.

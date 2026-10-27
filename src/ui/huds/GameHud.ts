@@ -1,4 +1,4 @@
-// Счёт, полоска HP и баннер волны. Плашка поражения — магазин между проигрышами.
+// Счёт, полоска HP, баннер волны и окно клавиш. Плашка поражения — магазин между проигрышами.
 
 import Phaser from 'phaser';
 
@@ -39,7 +39,12 @@ export class GameHud {
   private readonly tankStatsText: Phaser.GameObjects.Text;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
   private readonly waveBanner: Phaser.GameObjects.Text;
-  private readonly controls: Phaser.GameObjects.Text;
+  private readonly keysButton: Phaser.GameObjects.Rectangle;
+  private readonly keysOverlay: Phaser.GameObjects.Container;
+  private readonly keysPanel: Phaser.GameObjects.Rectangle;
+  private readonly keysTitle: Phaser.GameObjects.Text;
+  private readonly keysRule: Phaser.GameObjects.Graphics;
+  private keyRows: Phaser.GameObjects.Text[] = [];
   private readonly abilities: AbilityIcon[];
   private readonly hastePlate: Phaser.GameObjects.Rectangle;
   private readonly hasteIcon: Phaser.GameObjects.Graphics;
@@ -71,9 +76,9 @@ export class GameHud {
 
     scene.add.image(frame.width / 2, 677, 'banner').setDepth(50);
 
-    // Название выше центра ленты: нижнюю половину красного поля занимает подсказка клавиш.
+    // Центр ленты. Список клавиш открывается кнопкой справа, на самой ленте его больше нет.
     scene.add
-      .text(frame.width / 2, 668, 'TANK', {
+      .text(frame.width / 2, 677, 'TANK', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '32px',
         color: '#f3d56a',
@@ -147,7 +152,10 @@ export class GameHud {
     // сдвигает её низ в сторону.
     scene.add.rectangle(pauseX - 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
     scene.add.rectangle(pauseX + 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
-    this.pausePlate.on('pointerup', () => this.pauseRequest?.());
+    this.pausePlate.on('pointerup', () => {
+      this.setKeysOpen(false);
+      this.pauseRequest?.();
+    });
 
     // Выше магазина (глубина 70), но ниже окна настроек (88), паузы (90) и экрана поражения (85).
     // Иначе шестерёнка и кнопка автострельбы пропадают под затемнением между волнами.
@@ -158,7 +166,10 @@ export class GameHud {
       .setInteractive({ useHandCursor: true });
     const gear = scene.add.graphics().setPosition(settingsX, iconY).setDepth(81);
     this.drawGear(gear);
-    this.settingsPlate.on('pointerup', () => this.settingsRequest?.());
+    this.settingsPlate.on('pointerup', () => {
+      this.setKeysOpen(false);
+      this.settingsRequest?.();
+    });
 
     // Пока автострельба не куплена, плашка не ловит клики: иначе пустое место гасило бы выстрел.
     this.autoFirePlate = scene.add
@@ -173,17 +184,49 @@ export class GameHud {
     // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
     this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
 
-    // Внутри красного поля, над нижней золотой кромкой. На самой кромке строка терялась.
-    this.controls = scene.add
-      .text(frame.width / 2, 696, this.controlsLine(), {
-        fontFamily: 'Georgia, serif',
-        fontSize: '15px',
+    // Справа на ленте, внутри золотой рамки. Заливка чуть прозрачная: красное поле под кнопкой остаётся видно.
+    const keysX = frame.width - 56;
+    const keysY = 677;
+    this.keysButton = scene.add
+      .rectangle(keysX, keysY, 40, 40, 0x3a0c0c, 0.72)
+      .setStrokeStyle(2, 0xc9a227)
+      .setDepth(80)
+      .setInteractive({ useHandCursor: true });
+    scene.add
+      .text(keysX, keysY, '?', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '24px',
         color: '#f3d56a',
-        stroke: '#4a1208',
-        strokeThickness: 3,
       })
       .setOrigin(0.5)
-      .setDepth(51);
+      .setDepth(81);
+    this.keysButton.on('pointerup', () => {
+      if (!this.keysOverlay.visible) {
+        this.setKeysOpen(true);
+      }
+    });
+
+    // Выше ленты и магазина (70), ниже поражения (85), настроек (88) и паузы (90).
+    // Затемнение слабое: окно само полупрозрачное, поле за ним должно остаться узнаваемым.
+    const dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.28).setInteractive();
+    dim.on('pointerup', () => this.setKeysOpen(false));
+    this.keysPanel = scene.add.rectangle(0, 0, 540, 320, 0x3a0c0c, 0.78).setStrokeStyle(3, 0xc9a227);
+    this.keysPanel.setInteractive();
+    this.keysTitle = scene.add
+      .text(0, 0, 'КЛАВИШИ', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '32px',
+        color: '#f3d56a',
+        stroke: '#4a1208',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5);
+    this.keysRule = scene.add.graphics();
+    this.keysOverlay = scene.add
+      .container(frame.width / 2, frame.height / 2, [dim, this.keysPanel, this.keysTitle, this.keysRule])
+      .setDepth(82)
+      .setVisible(false);
+    this.layoutKeys();
 
     scene.add.image(1128, 28, 'hp-frame').setDepth(51);
     scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
@@ -313,6 +356,14 @@ export class GameHud {
 
   setPaused(paused: boolean): void {
     this.pauseOverlay.setVisible(paused);
+    if (paused) {
+      this.setKeysOpen(false);
+    }
+  }
+
+  // Экран поражения лежит выше списка. Пока окно открыто, его затемнение перехватывало бы клики магазина.
+  hideKeys(): void {
+    this.setKeysOpen(false);
   }
 
   setHaste(multiplier: number): void {
@@ -357,6 +408,14 @@ export class GameHud {
     g.moveTo(ux * 1.5, cy + uy * 1.5);
     g.lineTo(ux * tip, cy + uy * tip);
     g.strokePath();
+  }
+
+  // Клик по кнопке списка и по открытому окну не должен быть выстрелом танка.
+  coversKeys(pointer: Phaser.Input.Pointer): boolean {
+    if (this.keysOverlay.visible) {
+      return true;
+    }
+    return this.keysButton.getBounds().contains(pointer.worldX, pointer.worldY);
   }
 
   // Клик по плашке темпа не должен быть выстрелом танка.
@@ -421,13 +480,74 @@ export class GameHud {
   }
 
   private syncControls(): void {
-    this.controls.setText(this.controlsLine());
+    this.layoutKeys();
   }
 
-  protected controlsLine(): string {
-    const tempo = 'мышь — прицел   ЛКМ — огонь   + — темп   Esc — пауза   шестерёнка — звук';
-    const extra = this.abilities.filter((icon) => icon.owned).map((icon) => icon.hint);
-    return extra.length > 0 ? `${tempo}   ${extra.join('   ')}` : tempo;
+  // Строки окна. Купленная способность дописывает свою, пока её нет — в списке её нет.
+  protected controlHints(): readonly string[] {
+    const hints = ['мышь — прицел', 'ЛКМ — огонь', '+ — темп', 'Esc — пауза', 'шестерёнка — звук'];
+    for (const icon of this.abilities) {
+      if (icon.owned) {
+        hints.push(icon.hint);
+      }
+    }
+    return hints;
+  }
+
+  private setKeysOpen(open: boolean): void {
+    if (open) {
+      this.layoutKeys();
+    }
+    this.keysOverlay.setVisible(open);
+  }
+
+  // Высота карточки растёт вместе со списком: у дебага и купленных способностей строк больше.
+  private layoutKeys(): void {
+    for (const row of this.keyRows) {
+      row.destroy();
+    }
+    this.keyRows = [];
+
+    const hints = this.controlHints();
+    const rowH = 34;
+    const titleBand = 68;
+    const padBottom = 28;
+    const w = 540;
+    const h = titleBand + hints.length * rowH + padBottom;
+    this.keysPanel.setSize(w, h);
+    this.keysTitle.setY(-h / 2 + 34);
+
+    this.keysRule.clear();
+    this.keysRule.lineStyle(2, 0xc9a227, 0.9);
+    const ruleY = -h / 2 + 58;
+    this.keysRule.beginPath();
+    this.keysRule.moveTo(-w / 2 + 28, ruleY);
+    this.keysRule.lineTo(w / 2 - 28, ruleY);
+    this.keysRule.strokePath();
+
+    const scene = this.keysTitle.scene;
+    const keyX = -w / 2 + 40;
+    const actionX = -w / 2 + 248;
+    const firstY = -h / 2 + titleBand + rowH / 2;
+    const keyStyle = {
+      fontFamily: 'Georgia, serif',
+      fontSize: '20px',
+      color: '#f3d56a',
+      stroke: '#2a0a08',
+      strokeThickness: 3,
+    };
+    const actionStyle = { ...keyStyle, color: '#f0dcc0' };
+
+    hints.forEach((line, index) => {
+      const parts = line.split(' — ');
+      const key = parts[0] ?? line;
+      const action = parts.length > 1 ? parts.slice(1).join(' — ') : '';
+      const y = firstY + index * rowH;
+      const keyText = scene.add.text(keyX, y, key, keyStyle).setOrigin(0, 0.5);
+      const actionText = scene.add.text(actionX, y, action, actionStyle).setOrigin(0, 0.5);
+      this.keysOverlay.add([keyText, actionText]);
+      this.keyRows.push(keyText, actionText);
+    });
   }
 
   // Ряд над баннером, слева направо. index 0 — первая иконка у края поля.

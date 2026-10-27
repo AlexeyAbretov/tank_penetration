@@ -5,8 +5,6 @@
 import Phaser from 'phaser';
 import { WaveManager } from './WaveManager';
 
-export const WAVE_SKIP_HINT = 'N — пропуск волны';
-
 export class DebugWaveManager extends WaveManager {
   private key?: Phaser.Input.Keyboard.Key;
 

@@ -4,8 +4,6 @@
 import Phaser from 'phaser';
 import type { Pause, PauseEnv } from './PauseStack';
 
-export const QUIET_PAUSE = 'quiet-pause';
-
 export class DebugQuietPause implements Pause {
   private env?: PauseEnv;
   private key?: Phaser.Input.Keyboard.Key;
@@ -81,7 +79,8 @@ export class DebugQuietPause implements Pause {
   }
 
   private mark(on: boolean): void {
-    this.env?.scene.events.emit(QUIET_PAUSE, on);
+    // DebugGameHud слушает это имя и меняет верхнюю плашку. Общей константы нет.
+    this.env?.scene.events.emit('quiet-pause', on);
   }
 
   private pressed(): boolean {
