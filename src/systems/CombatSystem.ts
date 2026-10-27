@@ -301,17 +301,17 @@ export class CombatSystem implements Combat {
     return zones;
   }
 
-  // Корпус фигуры, не точка ног: край спрайта уже на мине, пока центр ещё в стороне.
+  // Ширина хитбокса, не доля картинки. У пикапа нос далеко впереди якоря:
+  // мина под бампером уже на корпусе, пока точка ног ещё в стороне.
   private stepsOn(mine: PlantedMine): boolean {
     const pad = Mines.footprint;
     return (this.infantry.getChildren() as Infantry[]).some((unit) => {
       if (!unit.active || unit.reachedWall) {
         return false;
       }
-      const halfW = unit.displayWidth * 0.28;
-      const dx = Math.abs(unit.x - mine.x);
+      const dx = this.hullGapX(unit, mine.x);
       const dy = Math.abs(unit.y - mine.y);
-      return dx <= halfW + pad && dy <= 22 + pad;
+      return dx <= pad && dy <= 22 + pad;
     });
   }
 
@@ -326,13 +326,30 @@ export class CombatSystem implements Combat {
       if (!unit.active || unit.reachedWall) {
         return;
       }
+      // Тот же зазор до корпуса. Иначе взрыв под бампером не достаёт до якоря, и машина без урона.
+      const gap = this.hullGapX(unit, x);
       const torso = this.torsoPoint(unit);
-      const nearFeet = Phaser.Math.Distance.Between(x, y, unit.x, unit.y) <= radius;
-      const nearChest = Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= radius;
+      const nearFeet = Math.hypot(gap, unit.y - y) <= radius;
+      const nearChest = Math.hypot(gap, torso.y - y) <= radius;
       if (nearFeet || nearChest) {
         this.hurtInfantry(unit, Mines.shop.damage);
       }
     });
+  }
+
+  // 0 — вертикаль точки уже над силуэтом. Иначе расстояние до ближайшего края хитбокса.
+  // Ширину берём из setSize и масштаба спрайта: body.width до первого шага физики ещё без масштаба.
+  private hullGapX(unit: Infantry, x: number): number {
+    const body = unit.body as Phaser.Physics.Arcade.Body;
+    const left = unit.x + unit.scaleX * (body.offset.x - unit.displayOriginX);
+    const right = left + body.sourceWidth * Math.abs(unit.scaleX);
+    if (x < left) {
+      return left - x;
+    }
+    if (x > right) {
+      return x - right;
+    }
+    return 0;
   }
 
   private clearMines(): void {
