@@ -13,7 +13,7 @@ import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
 import { craterReach } from '../gfx/craters';
 import { createShellBlast } from '../gfx/particles';
-import { playArtilleryShot } from '../sounds/ArtillerySounds';
+import { playArtilleryShot } from '../sounds/BoomSounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
 import type { ShopController } from '../controllers/ShopController';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
@@ -324,7 +324,6 @@ export class CombatSystem implements Combat {
     const { x, y } = mine;
     mine.destroy();
     Mines.boom(this.scene, x, y);
-    this.effects.assaultExplosion.play();
     const radius = Mines.shop.blastRadius;
     (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
       if (!unit.active || unit.reachedWall) {

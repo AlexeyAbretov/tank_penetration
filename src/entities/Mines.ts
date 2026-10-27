@@ -3,9 +3,10 @@
 // Расстановку и подрыв считает CombatSystem. Заряд лежит, пока на него не наступит пехота.
 
 import Phaser from 'phaser';
-import { contactBlast } from '../gfx/contactBlast';
+import { boomAt } from '../gfx/boom';
 import { placeCrater } from '../gfx/craters';
 import { bake } from '../gfx/textures';
+import { playBoom } from '../sounds/BoomSounds';
 
 // Прямоугольник, куда центр мины ставить нельзя. Отступ на корпус уже снаружи.
 export type MineKeepOut = {
@@ -183,13 +184,13 @@ export class Mines {
     return new PlantedMine(scene, x, y);
   }
 
-  // Тот же хлопок, что у штурмовика о броню, без кусков формы.
-  // Звук assault_explosion играет CombatSystem: у вспышки нет своего ползунка.
-  // Чаша общая, из gfx. Гаснет сама через craterMs.
+  // Общий разрыв у земли: четыре кадра, звук и тряска.
+  // Воронка общая, из gfx. Гаснет сама через craterMs.
   static boom(scene: Phaser.Scene, x: number, y: number): void {
-    // feetY - 6 в contactBlast совпадает с центром мины, кольцо не уезжает под землю.
-    contactBlast(scene, x, y, y + 6);
+    playBoom(scene);
+    boomAt(scene, x, y);
     placeCrater(scene, x, y, Mines.shop.craterMs);
+    scene.cameras.main.shake(90, 0.0035);
   }
 
   private static findSpot(

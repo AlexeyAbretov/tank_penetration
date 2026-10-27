@@ -60,7 +60,7 @@ export class StudioSounds {
     scene.load.audio('rocket-shot', 'audio/rocket_shot.mp3');
     scene.load.audio('rocket-hit-tank', 'audio/rocket_hit_tank.mp3');
     scene.load.audio('artillery-shot', 'audio/artillery_shot.mp3');
-    scene.load.audio('artillery-explosion', 'audio/artillery_explosion.mp3');
+    scene.load.audio('boom', 'audio/artillery_explosion.mp3');
     scene.load.audio('nuclear-explosion', 'audio/nuclear_explosion.mp3');
   }
 
@@ -126,11 +126,11 @@ export class StudioSounds {
   }
 
   salvo(): void {
-    this.fx.artillerySounds.playShot();
+    this.fx.boomSounds.playShot();
   }
 
   crater(): void {
-    this.fx.artillerySounds.playBoom();
+    this.fx.boomSounds.playBoom();
   }
 
   nuclear(): void {

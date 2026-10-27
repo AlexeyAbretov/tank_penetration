@@ -1,11 +1,11 @@
 // Звуки боя, кроме музыки. Пауза и рестарт сцены глушат их одним вызовом.
 // stop при гибели базы взрыв базы не трогает: он доигрывает.
 // Новый клип добавляется здесь: поле и строка в clips. Сцена список не знает.
-// gunnerShot, artillerySounds, nuclearExplosion и пуск ракеты сами кладут себя в registry.
+// gunnerShot, boomSounds, nuclearExplosion и пуск ракеты сами кладут себя в registry.
 // Их всё равно создаём здесь, иначе пауза и destroy их не найдут.
 
 import Phaser from 'phaser';
-import { ArtillerySounds } from './ArtillerySounds';
+import { BoomSounds } from './BoomSounds';
 import { AssaultExplosion } from './AssaultExplosion';
 import { BulletHitTank } from './BulletHitTank';
 import { EffectsVolume } from './EffectsVolume';
@@ -32,7 +32,7 @@ export class BattleEffects {
   readonly gunnerShot: GunnerShot;
   readonly bulletHit: BulletHitTank;
   readonly rocketSounds: RocketSounds;
-  readonly artillerySounds: ArtillerySounds;
+  readonly boomSounds: BoomSounds;
   readonly nuclearExplosion: NuclearExplosion;
   readonly impacts: ImpactSounds;
   readonly assaultExplosion: AssaultExplosion;
@@ -49,7 +49,7 @@ export class BattleEffects {
     this.gunnerShot = new GunnerShot(scene, this.gain);
     this.bulletHit = new BulletHitTank(scene, this.gain);
     this.rocketSounds = new RocketSounds(scene, this.gain);
-    this.artillerySounds = new ArtillerySounds(scene, this.gain);
+    this.boomSounds = new BoomSounds(scene, this.gain);
     this.nuclearExplosion = new NuclearExplosion(scene, this.gain);
     this.impacts = new ImpactSounds(scene, this.gain);
     this.assaultExplosion = new AssaultExplosion(scene, this.gain);
@@ -63,7 +63,7 @@ export class BattleEffects {
       this.gunnerShot,
       this.bulletHit,
       this.rocketSounds,
-      this.artillerySounds,
+      this.boomSounds,
       this.nuclearExplosion,
       this.impacts,
       this.assaultExplosion,

@@ -1,19 +1,18 @@
-// Залп и разрыв — два файла, не один.
-// public/audio/artillery_shot.mp3 — первая часть artillery.mp3, до тишины перед вторым ударом.
-// public/audio/artillery_explosion.mp3 — разрыв в точке, куда сел снаряд. Пустой хвост срезан.
-// Хлопок один, на нажатие клавиши. Разрыв — свой на каждый снаряд, когда тот уже сел.
+// Хлопок батареи и разрыв у земли — два файла, не один.
+// public/audio/artillery_shot.mp3 — хлопок в момент залпа. Его играет только артиллерия.
+// public/audio/artillery_explosion.mp3 — разрыв в точке. Снаряд и мина берут один и тот же звук.
 // Пауза и гибель базы глушат оба вместе с выстрелом пушки.
 // Рестарт сцены звуки общего менеджера не удаляет, поэтому нужен destroy.
 
 import Phaser from 'phaser';
 import type { EffectsVolume } from './EffectsVolume';
 
-// Ключ на полке сцены. ArtilleryStrike берёт отсюда плеер, не держа ссылку в каждом снаряде.
-const REGISTRY_KEY = 'artillerySounds';
+// Ключ на полке сцены. Залп и разрыв берут плеер отсюда, не держа ссылку в каждом вызове.
+const REGISTRY_KEY = 'boomSounds';
 
 // Оба файла записаны почти на полную громкость, и три штуки звучат почти вместе.
 // 0.55 — тише пушки (0.65): залп слышен, три длинных хвоста не забивают бой.
-// 0.7 — как взрыв пикапа (0.72). Три разрыва садятся друг на друга, поэтому не громче гибели базы.
+// 0.7 — как взрыв пикапа (0.72). Несколько разрывов садятся друг на друга, поэтому не громче гибели базы.
 const SHOT_GAIN = 0.55;
 const BOOM_GAIN = 0.7;
 
@@ -25,7 +24,7 @@ type Playing = {
   onEnded?: () => void;
 };
 
-export class ArtillerySounds {
+export class BoomSounds {
   private readonly active: Playing[] = [];
 
   constructor(
@@ -42,7 +41,7 @@ export class ArtillerySounds {
   }
 
   playBoom(): void {
-    this.play('artillery-explosion', BOOM_GAIN);
+    this.play('boom', BOOM_GAIN);
   }
 
   setPaused(paused: boolean): void {
@@ -115,16 +114,16 @@ export class ArtillerySounds {
 // Студия рисует картинки без этого плеера — тогда залп молчит и функция возвращает false.
 export function playArtilleryShot(scene: Phaser.Scene, onEnded?: () => void): boolean {
   const fx = scene.registry.get(REGISTRY_KEY);
-  if (fx instanceof ArtillerySounds) {
+  if (fx instanceof BoomSounds) {
     return fx.playShot(onEnded);
   }
   return false;
 }
 
-// Разрыв в точке попадания. Свой звук на каждый снаряд.
-export function playArtilleryBoom(scene: Phaser.Scene): void {
+// Разрыв в точке. Свой звук на каждый снаряд и на каждую мину.
+export function playBoom(scene: Phaser.Scene): void {
   const fx = scene.registry.get(REGISTRY_KEY);
-  if (fx instanceof ArtillerySounds) {
+  if (fx instanceof BoomSounds) {
     fx.playBoom();
   }
 }

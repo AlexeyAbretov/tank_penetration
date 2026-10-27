@@ -2,10 +2,10 @@
 // Покупка в магазине открывает вызов по клавише 1 и по иконке на HUD. Сам залп считает CombatSystem.
 
 import Phaser from 'phaser';
-import { artilleryBoomAt } from '../gfx/artilleryBoom';
+import { boomAt } from '../gfx/boom';
 import { placeCrater } from '../gfx/craters';
 import { bake } from '../gfx/textures';
-import { playArtilleryBoom } from '../sounds/ArtillerySounds';
+import { playBoom } from '../sounds/BoomSounds';
 
 export type ArtilleryFlight = {
   cancel(): void;
@@ -166,10 +166,10 @@ export class ArtilleryStrike {
   }
 
   // Четыре кадра разрыва и воронка. Воронка гаснет сама через craterMs.
-  // Разрыв — artillery_explosion.mp3, свой звук на каждый снаряд.
+  // Свой звук на каждый снаряд.
   static boom(scene: Phaser.Scene, x: number, y: number): void {
-    playArtilleryBoom(scene);
-    artilleryBoomAt(scene, x, y);
+    playBoom(scene);
+    boomAt(scene, x, y);
     placeCrater(scene, x, y, ArtilleryStrike.shop.craterMs);
     scene.cameras.main.shake(90, 0.0035);
   }
