@@ -1,4 +1,5 @@
-// Колючая проволока перед танком: одна полоса от верха поля до баннера.
+// Колючая проволока перед танком: две полосы спиралей от верха поля до баннера.
+// Вторая сдвинута на полвитка и заполняет просветы первой.
 // Пехоту, которая идёт к базе, она не пускает и каждые несколько секунд ранит.
 
 import Phaser, { GameObjects, Physics, Scene } from 'phaser';
@@ -13,9 +14,20 @@ type WireBlockTarget = {
 
 export class BarbedWire extends GameObjects.Image {
   static readonly textureKey = 'barbed-wire';
+  // Сырая полоса. В бою из неё собирается текстура из двух слоёв.
+  private static readonly sourceKey = 'barbed-wire-coil';
+  // Путь в public/. Строка буквальная: singlefile-сборка подменяет её на data:.
+  static readonly imagePath = 'assets/barbed-wire.png';
+  // Сдвиг второго слоя в пикселях исходной полосы: спирали попадают в просветы первой.
+  private static readonly coilShift = 34;
+  // Повтор тех же спиралей. Второй слой замыкается на него, а не на всю высоту картинки:
+  // иначе вверх попадает обрубок нижнего края и там остаётся один виток.
+  private static readonly coilPeriod = 92;
 
+  // face — правый край, в него упирается пехота.
+  // x — левый край витка: полоса из картинки растянута на высоту поля, ширина равна диаметру спирали.
   static readonly bounds = {
-    x: 196,
+    x: 170,
     face: 232,
     top: 72,
     bottom: 630,
@@ -30,6 +42,7 @@ export class BarbedWire extends GameObjects.Image {
   constructor(scene: Phaser.Scene) {
     const top = BarbedWire.bounds.top;
     const height = BarbedWire.bounds.bottom - top;
+    const width = BarbedWire.bounds.face - BarbedWire.bounds.x;
     // Картинка якорится центром, поэтому X — середина между левым краем и линией упора.
     super(
       scene,
@@ -38,17 +51,42 @@ export class BarbedWire extends GameObjects.Image {
       BarbedWire.textureKey,
     );
     scene.add.existing(this);
+    this.setDisplaySize(width, height);
     // Выше солдат (10), ниже снарядов (15) и танка (25): фигуры упираются в нити и читаются за ними.
     this.setDepth(13);
   }
 
+  // GameScene зовёт до create.
+  static preload(scene: Phaser.Scene): void {
+    scene.load.image(this.sourceKey, this.imagePath);
+  }
+
+  // В бою полоса — картинка из assets/, наложенная дважды. Фигурный рисунок остаётся, если файл не загрузили.
   static ensureTextures(scene: Scene): void {
     if (scene.textures.exists(this.textureKey)) {
+      scene.textures.get(this.textureKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
       return;
     }
     const width = BarbedWire.bounds.face - BarbedWire.bounds.x;
     const height = BarbedWire.bounds.bottom - BarbedWire.bounds.top;
-    bake(scene, this.textureKey, width, height, (g) => this.draw(g, width, height));
+    if (!scene.textures.exists(this.sourceKey)) {
+      bake(scene, this.textureKey, width, height, (g) => this.draw(g, width, height));
+      return;
+    }
+    const source = scene.textures.get(this.sourceKey).getSourceImage() as CanvasImageSource;
+    const frame = scene.textures.get(this.sourceKey).get();
+    const canvas = scene.textures.createCanvas(this.textureKey, width, height);
+    if (!canvas) {
+      return;
+    }
+    const scale = height / frame.height;
+    const shift = Math.round(BarbedWire.coilShift * scale);
+    const period = Math.round(BarbedWire.coilPeriod * scale);
+    canvas.context.drawImage(source, 0, 0, width, height);
+    canvas.context.drawImage(source, 0, shift, width, height);
+    canvas.context.drawImage(source, 0, shift - period, width, height);
+    canvas.refresh();
+    scene.textures.get(this.textureKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
   }
 
   // Два столба и косые нити с колючками. Высота уже посчитана сценой, рисуем её целиком без швов.

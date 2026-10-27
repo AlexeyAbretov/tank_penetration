@@ -1,4 +1,5 @@
 import { AssaultInfantry } from '../entities/AssaultInfantry';
+import { BarbedWire } from '../entities/BarbedWire';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { MachineGun } from '../entities/MachineGun';
 import { NuclearStrike } from '../entities/NuclearStrike';
@@ -13,6 +14,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   // Трава с той же фотографии, что и воронки. Строка буквальная: singlefile подменяет её на data:.
   scene.load.image('battlefield', 'assets/battlefield.jpg');
   Tank.preload(scene);
+  BarbedWire.preload(scene);
   preloadCraters(scene);
   MachineGun.preload(scene);
   NuclearStrike.preload(scene);
