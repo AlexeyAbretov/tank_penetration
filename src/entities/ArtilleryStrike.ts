@@ -20,9 +20,6 @@ export class ArtilleryStrike {
   static readonly shellKey = 'artillery-shell';
   // private static readonly flareKey = 'artillery-flare';
   private static readonly flarePuffKey = 'artillery-flare-puff';
-  // Хвост лежащей трубки в кадре 64×18. От него крутится спрайт и считается горло.
-  // private static readonly flareOrigin = { x: 6 / 64, y: 14 / 18 };
-  // private static readonly flareMouthLocal = { x: 50, y: -5 };
   // Радиус круга на иконке. Затемнение перезарядки рисуется чуть уже, чтобы золотой обод оставался виден.
   static readonly iconRadius = 30;
 
@@ -80,44 +77,6 @@ export class ArtilleryStrike {
   // clear гасит метку: удар уже случился или залп отменён.
   static mark(scene: Phaser.Scene, x: number, y: number): ArtilleryMark {
     ArtilleryStrike.ensureFlareTextures(scene);
-    // Хвост на точке удара, горло приподнято. Знак — влево или вправо, чтобы залп не смотрел в одну сторону.
-    // const lift = Phaser.Math.FloatBetween(0.55, 0.95);
-    // const rotation = Math.random() < 0.5 ? -lift : Math.PI + lift;
-    // const tube = scene.add
-    //   .image(x, y, ArtilleryStrike.flareKey)
-    //   .setOrigin(ArtilleryStrike.flareOrigin.x, ArtilleryStrike.flareOrigin.y)
-    //   .setDepth(13)
-    //   .setRotation(rotation);
-    //
-    // const mouth = ArtilleryStrike.flareMouth(x, y, rotation);
-    // const deg = Phaser.Math.RadToDeg(rotation);
-    // const flame = scene.add.particles(mouth.x, mouth.y, puff, {
-    //   lifespan: { min: 140, max: 280 },
-    //   frequency: 28,
-    //   quantity: 2,
-    //   angle: { min: deg - 12, max: deg + 12 },
-    //   speed: { min: 70, max: 150 },
-    //   scale: { start: 0.34, end: 0.85 },
-    //   alpha: { start: 1, end: 0 },
-    //   color: [0xffffff, 0xfff4b0, 0xffa020, 0xff4a10],
-    //   blendMode: Phaser.BlendModes.ADD,
-    //   gravityY: -30,
-    // });
-    // flame.setDepth(15);
-    // const core = scene.add.particles(mouth.x, mouth.y, puff, {
-    //   lifespan: { min: 60, max: 140 },
-    //   frequency: 32,
-    //   quantity: 1,
-    //   angle: { min: deg - 6, max: deg + 6 },
-    //   speed: { min: 24, max: 70 },
-    //   scale: { start: 0.18, end: 0.4 },
-    //   alpha: { start: 1, end: 0.3 },
-    //   color: [0xffffff, 0xfff6c0],
-    //   blendMode: Phaser.BlendModes.ADD,
-    // });
-    // core.setDepth(15);
-    // const alongX = Math.cos(rotation);
-    // const alongY = Math.sin(rotation);
     const puff = ArtilleryStrike.flarePuffKey;
     // Один шлейф вправо и вверх. Оранжевый и светлый летят одним ветром, светлый чуть выше по тому же следу.
     const smoke = scene.add.particles(x, y, puff, {
@@ -162,9 +121,6 @@ export class ArtilleryStrike {
           return;
         }
         gone = true;
-        // tube.destroy();
-        // flame.destroy();
-        // core.destroy();
         smoke.destroy();
         cap.destroy();
       },
@@ -218,17 +174,6 @@ export class ArtilleryStrike {
     scene.cameras.main.shake(90, 0.0035);
   }
 
-  // Горло в мировых координатах: локальный вектор крутится вместе со спрайтом (по часовой, ось Y вниз).
-  // private static flareMouth(x: number, y: number, rotation: number): { x: number; y: number } {
-  //   const local = ArtilleryStrike.flareMouthLocal;
-  //   const cos = Math.cos(rotation);
-  //   const sin = Math.sin(rotation);
-  //   return {
-  //     x: x + local.x * cos - local.y * sin,
-  //     y: y + local.x * sin + local.y * cos,
-  //   };
-  // }
-
   // Трубка факела и мягкое пятно для огня и дыма. Пятно белое: цвет задаёт tint частиц.
   private static ensureFlareTextures(scene: Phaser.Scene): void {
     // if (!scene.textures.exists(ArtilleryStrike.flareKey)) {
@@ -246,20 +191,6 @@ export class ArtilleryStrike {
       });
     }
   }
-
-  // Лежащая трубка: хвост слева, горло справа. Низ кадра садится на землю.
-  // private static renderFlare(g: Phaser.GameObjects.Graphics): void {
-  //   g.fillStyle(0x3a1614);
-  //   g.fillRoundedRect(2, 5, 50, 9, 4);
-  //   g.fillStyle(0x6a3028);
-  //   g.fillRect(8, 6, 38, 3);
-  //   g.fillStyle(0x1a0c0c);
-  //   g.fillCircle(6, 9, 5);
-  //   g.fillStyle(0x140a0a);
-  //   g.fillRoundedRect(46, 3, 12, 13, 3);
-  //   g.fillStyle(0xfff0c0);
-  //   g.fillCircle(56, 9, 2.5);
-  // }
 
   private static randomPoint(minX: number): { x: number; y: number } {
     const field = ArtilleryStrike.field;
