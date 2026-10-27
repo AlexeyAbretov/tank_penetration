@@ -2,7 +2,7 @@
 // Покупка в магазине открывает вызов по клавише 1 и по иконке на HUD. Сам залп считает CombatSystem.
 
 import Phaser from 'phaser';
-import { BarbedWire } from './BarbedWire';
+import { placeCrater } from '../gfx/craters';
 import { bake } from '../gfx/textures';
 import { playArtilleryBoom } from '../sounds/ArtillerySounds';
 
@@ -15,18 +15,6 @@ export class ArtilleryStrike {
   static readonly shellKey = 'artillery-shell';
   // Радиус круга на иконке. Затемнение перезарядки рисуется чуть уже, чтобы золотой обод оставался виден.
   static readonly iconRadius = 30;
-
-  // Четыре воронки с одной фотографии. Трава снята, у каждой свой край:
-  // лучи, камни, плоская чаша, вал. Строки буквальные: singlefile-сборка подменяет их на data:.
-  static readonly craterImages = {
-    'artillery-crater-0': 'assets/artillery-crater-0.png',
-    'artillery-crater-1': 'assets/artillery-crater-1.png',
-    'artillery-crater-2': 'assets/artillery-crater-2.png',
-    'artillery-crater-3': 'assets/artillery-crater-3.png',
-  } as const;
-
-  // Кадр около 200 px. На поле чаша меньше: иначе три воронки накрывают середину экрана.
-  static readonly craterScale = 0.55;
 
   static readonly shop = {
     cost: 100,
@@ -41,21 +29,12 @@ export class ArtilleryStrike {
     afterShotMs: 0,
   };
 
-  // Прямоугольник удара. Слева — линия проволоки плюс полкадра самой широкой
-  // воронки (камни, 243 px): и точка разрыва, и чаша остаются перед ней.
+  // Прямоугольник удара без левого края: его даёт бой, чтобы чаша не ушла за проволоку.
   static readonly field = {
-    minX: Math.ceil(BarbedWire.bounds.face + (243 * ArtilleryStrike.craterScale) / 2),
     maxX: 1160,
     minY: 160,
     maxY: 540,
   };
-
-  // imagePreloader зовёт до create. Иконка и снаряд по-прежнему рисуются в ensureTextures.
-  static preload(scene: Phaser.Scene): void {
-    for (const [key, path] of Object.entries(ArtilleryStrike.craterImages)) {
-      scene.load.image(key, path);
-    }
-  }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists(ArtilleryStrike.iconKey)) {
@@ -64,19 +43,15 @@ export class ArtilleryStrike {
     if (!scene.textures.exists(ArtilleryStrike.shellKey)) {
       bake(scene, ArtilleryStrike.shellKey, 16, 40, (g) => ArtilleryStrike.renderShell(g));
     }
-    for (const key of Object.keys(ArtilleryStrike.craterImages)) {
-      if (scene.textures.exists(key)) {
-        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
-      }
-    }
   }
 
   // Три точки с зазором, чтобы воронки не легли друг на друга.
-  static impacts(): { x: number; y: number }[] {
+  // minX приходит снаружи: артиллерия не знает, где стоит проволока.
+  static impacts(minX: number): { x: number; y: number }[] {
     const minGap = ArtilleryStrike.shop.blastRadius * 2;
     const points: { x: number; y: number }[] = [];
     for (let i = 0; i < ArtilleryStrike.shop.shells; i += 1) {
-      let point = ArtilleryStrike.randomPoint();
+      let point = ArtilleryStrike.randomPoint(minX);
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const clear = points.every(
           (other) => Phaser.Math.Distance.Between(other.x, other.y, point.x, point.y) >= minGap,
@@ -84,7 +59,7 @@ export class ArtilleryStrike {
         if (clear) {
           break;
         }
-        point = ArtilleryStrike.randomPoint();
+        point = ArtilleryStrike.randomPoint(minX);
       }
       points.push(point);
     }
@@ -191,26 +166,15 @@ export class ArtilleryStrike {
       }
     });
 
-    const keys = Object.keys(ArtilleryStrike.craterImages);
-    const key = keys[Phaser.Math.Between(0, keys.length - 1)];
-    if (scene.textures.exists(key)) {
-      const crater = scene.add.image(x, y, key).setDepth(3).setScale(ArtilleryStrike.craterScale);
-      scene.tweens.add({
-        targets: crater,
-        alpha: 0,
-        delay: ArtilleryStrike.shop.craterMs - 400,
-        duration: 400,
-        onComplete: () => crater.destroy(),
-      });
-    }
+    placeCrater(scene, x, y, ArtilleryStrike.shop.craterMs);
 
     scene.cameras.main.shake(90, 0.0035);
   }
 
-  private static randomPoint(): { x: number; y: number } {
+  private static randomPoint(minX: number): { x: number; y: number } {
     const field = ArtilleryStrike.field;
     return {
-      x: Phaser.Math.Between(field.minX, field.maxX),
+      x: Phaser.Math.Between(minX, field.maxX),
       y: Phaser.Math.Between(field.minY, field.maxY),
     };
   }

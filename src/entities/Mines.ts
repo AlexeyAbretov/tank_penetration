@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { contactBlast } from '../gfx/contactBlast';
+import { placeCrater } from '../gfx/craters';
 import { bake } from '../gfx/textures';
 
 // Прямоугольник, куда центр мины ставить нельзя. Отступ на корпус уже снаружи.
@@ -120,7 +121,6 @@ export class PlantedMine {
 export class Mines {
   static readonly iconKey = 'mine-icon';
   static readonly bodyKey = 'mine-body';
-  static readonly craterKey = 'mine-crater';
   static readonly clodKey = 'mine-clod';
   static readonly iconRadius = 30;
   // Половина корпуса. Отступ, чтобы картинка не легла на танк, проволоку и чужую мину.
@@ -151,9 +151,6 @@ export class Mines {
     }
     if (!scene.textures.exists(Mines.bodyKey)) {
       bake(scene, Mines.bodyKey, 48, 36, (g) => Mines.renderBody(g));
-    }
-    if (!scene.textures.exists(Mines.craterKey)) {
-      bake(scene, Mines.craterKey, 128, 72, (g) => Mines.renderCrater(g));
     }
     if (!scene.textures.exists(Mines.clodKey)) {
       bake(scene, Mines.clodKey, 8, 8, (g) => {
@@ -188,19 +185,11 @@ export class Mines {
 
   // Тот же хлопок, что у штурмовика о броню, без кусков формы.
   // Звук assault_explosion играет CombatSystem: у вспышки нет своего ползунка.
-  // Воронка гаснет сама через craterMs.
+  // Чаша общая, из gfx. Гаснет сама через craterMs.
   static boom(scene: Phaser.Scene, x: number, y: number): void {
     // feetY - 6 в contactBlast совпадает с центром мины, кольцо не уезжает под землю.
     contactBlast(scene, x, y, y + 6);
-
-    const crater = scene.add.image(x, y, Mines.craterKey).setDepth(3);
-    scene.tweens.add({
-      targets: crater,
-      alpha: 0,
-      delay: Mines.shop.craterMs - 400,
-      duration: 400,
-      onComplete: () => crater.destroy(),
-    });
+    placeCrater(scene, x, y, Mines.shop.craterMs);
   }
 
   private static findSpot(
@@ -271,23 +260,5 @@ export class Mines {
     g.fillEllipse(24, 12, 22, 10);
     g.fillStyle(0x6d7d48);
     g.fillEllipse(24, 11, 12, 5);
-  }
-
-  private static renderCrater(g: Phaser.GameObjects.Graphics): void {
-    const cx = 64;
-    const cy = 36;
-    g.fillStyle(0x000000, 0.55);
-    g.fillEllipse(cx, cy + 6, 124, 52);
-    g.fillStyle(0xf0d2a0, 1);
-    g.fillEllipse(cx, cy, 116, 58);
-    g.fillStyle(0x8a5a32, 1);
-    g.fillEllipse(cx, cy, 96, 44);
-    g.fillStyle(0x140804, 1);
-    g.fillEllipse(cx, cy + 1, 74, 32);
-    g.fillStyle(0x000000, 1);
-    g.fillEllipse(cx + 1, cy + 2, 48, 20);
-    g.fillStyle(0xfff0c8, 1);
-    g.fillEllipse(cx - 34, cy - 8, 16, 6);
-    g.fillEllipse(cx + 30, cy + 8, 12, 5);
   }
 }

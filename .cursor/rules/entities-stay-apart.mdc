@@ -1,0 +1,35 @@
+---
+description: Сущности не импортируют соседние сущности
+alwaysApply: true
+---
+
+# Сущности не знают друг о друге
+
+Файл в `src/entities` не импортирует другой файл из `src/entities`.
+
+Исключения только эти:
+
+- базовый класс, от которого файл наследует (`Infantry`, `RangedEnemy`)
+- снаряд, который эта сущность сама выпускает (`Rocket`, `EnemyShot`)
+- фабрика, которая перечисляет создаваемые виды
+
+Общая картинка и эффект живут в `src/gfx`. Где встать относительно чужой сущности, решает `CombatSystem` и передаёт уже готовое число. Сущность это число не вычисляет из чужого класса.
+
+```ts
+// Плохо: артиллерия знает про проволоку
+import { BarbedWire } from './BarbedWire';
+minX: BarbedWire.bounds.face + reach
+
+// Хорошо: бой передаёт левый край
+ArtilleryStrike.impacts(minX)
+```
+
+```ts
+// Плохо: мины знают про артиллерию
+import { ArtilleryStrike } from './ArtilleryStrike';
+ArtilleryStrike.placeCrater(scene, x, y, lifeMs)
+
+// Хорошо: общая чаша в графике
+import { placeCrater } from '../gfx/craters';
+placeCrater(scene, x, y, lifeMs)
+```

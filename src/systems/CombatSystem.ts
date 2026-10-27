@@ -11,6 +11,7 @@ import { NuclearStrike, type NuclearFlight } from '../entities/NuclearStrike';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Tank } from '../entities/Tank';
 import { GAME } from '../gameConfig';
+import { craterReach } from '../gfx/craters';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from '../sounds/ArtillerySounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
@@ -289,9 +290,10 @@ export class CombatSystem implements Combat {
     ];
     if (this.shop.wire) {
       const bounds = BarbedWire.bounds;
+      // Центр мины так, чтобы общая чаша не ушла за проволоку.
       zones.push({
         minX: bounds.x - pad,
-        maxX: bounds.face + pad,
+        maxX: Math.ceil(bounds.face + craterReach()),
         minY: bounds.top - pad,
         maxY: bounds.bottom + pad,
       });
@@ -365,7 +367,9 @@ export class CombatSystem implements Combat {
 
   private releaseShells(): void {
     const gap = ArtilleryStrike.shop.gapMs;
-    ArtilleryStrike.impacts().forEach((point, index) => {
+    // Левый край — линия проволоки плюс полчаши. Проволока может быть ещё не куплена.
+    const minX = Math.ceil(BarbedWire.bounds.face + craterReach());
+    ArtilleryStrike.impacts(minX).forEach((point, index) => {
       const timer = this.scene.time.delayedCall(index * gap, () => {
         this.salvoTimers = this.salvoTimers.filter((item) => item !== timer);
         const flight = ArtilleryStrike.drop(this.scene, point.x, point.y, () => {

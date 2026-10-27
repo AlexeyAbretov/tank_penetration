@@ -15,10 +15,12 @@ import { Rocket } from '../entities/Rocket';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
 import { Tank } from '../entities/Tank';
+import { ensureCraters } from './craters';
 import { createTextures } from './textures';
 
 export function ensureGameTextures(scene: Phaser.Scene): void {
   createTextures(scene);
+  ensureCraters(scene);
   Tank.ensureTextures(scene);
   MachineGun.ensureTextures(scene);
   BarbedWire.ensureTextures(scene);
