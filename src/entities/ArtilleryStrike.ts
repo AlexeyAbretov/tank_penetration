@@ -2,6 +2,7 @@
 // Покупка в магазине открывает вызов по клавише 1 и по иконке на HUD. Сам залп считает CombatSystem.
 
 import Phaser from 'phaser';
+import { artilleryBoomAt } from '../gfx/artilleryBoom';
 import { placeCrater } from '../gfx/craters';
 import { bake } from '../gfx/textures';
 import { playArtilleryBoom } from '../sounds/ArtillerySounds';
@@ -10,9 +11,18 @@ export type ArtilleryFlight = {
   cancel(): void;
 };
 
+export type ArtilleryMark = {
+  clear(): void;
+};
+
 export class ArtilleryStrike {
   static readonly iconKey = 'artillery-icon';
   static readonly shellKey = 'artillery-shell';
+  // private static readonly flareKey = 'artillery-flare';
+  private static readonly flarePuffKey = 'artillery-flare-puff';
+  // Хвост лежащей трубки в кадре 64×18. От него крутится спрайт и считается горло.
+  // private static readonly flareOrigin = { x: 6 / 64, y: 14 / 18 };
+  // private static readonly flareMouthLocal = { x: 50, y: -5 };
   // Радиус круга на иконке. Затемнение перезарядки рисуется чуть уже, чтобы золотой обод оставался виден.
   static readonly iconRadius = 30;
 
@@ -66,6 +76,78 @@ export class ArtilleryStrike {
     return points;
   }
 
+  // Розовый дым в точке, куда сядет снаряд. Трубка и струя огня ниже выключены.
+  // clear гасит метку: удар уже случился или залп отменён.
+  static mark(scene: Phaser.Scene, x: number, y: number): ArtilleryMark {
+    ArtilleryStrike.ensureFlareTextures(scene);
+    // Хвост на точке удара, горло приподнято. Знак — влево или вправо, чтобы залп не смотрел в одну сторону.
+    // const lift = Phaser.Math.FloatBetween(0.55, 0.95);
+    // const rotation = Math.random() < 0.5 ? -lift : Math.PI + lift;
+    // const tube = scene.add
+    //   .image(x, y, ArtilleryStrike.flareKey)
+    //   .setOrigin(ArtilleryStrike.flareOrigin.x, ArtilleryStrike.flareOrigin.y)
+    //   .setDepth(13)
+    //   .setRotation(rotation);
+    //
+    // const mouth = ArtilleryStrike.flareMouth(x, y, rotation);
+    // const deg = Phaser.Math.RadToDeg(rotation);
+    // const flame = scene.add.particles(mouth.x, mouth.y, puff, {
+    //   lifespan: { min: 140, max: 280 },
+    //   frequency: 28,
+    //   quantity: 2,
+    //   angle: { min: deg - 12, max: deg + 12 },
+    //   speed: { min: 70, max: 150 },
+    //   scale: { start: 0.34, end: 0.85 },
+    //   alpha: { start: 1, end: 0 },
+    //   color: [0xffffff, 0xfff4b0, 0xffa020, 0xff4a10],
+    //   blendMode: Phaser.BlendModes.ADD,
+    //   gravityY: -30,
+    // });
+    // flame.setDepth(15);
+    // const core = scene.add.particles(mouth.x, mouth.y, puff, {
+    //   lifespan: { min: 60, max: 140 },
+    //   frequency: 32,
+    //   quantity: 1,
+    //   angle: { min: deg - 6, max: deg + 6 },
+    //   speed: { min: 24, max: 70 },
+    //   scale: { start: 0.18, end: 0.4 },
+    //   alpha: { start: 1, end: 0.3 },
+    //   color: [0xffffff, 0xfff6c0],
+    //   blendMode: Phaser.BlendModes.ADD,
+    // });
+    // core.setDepth(15);
+    // const alongX = Math.cos(rotation);
+    // const alongY = Math.sin(rotation);
+    const puff = ArtilleryStrike.flarePuffKey;
+    // Розовый столб без ADD: иначе огонь съедает дым.
+    const smoke = scene.add.particles(x, y, puff, {
+      lifespan: { min: 800, max: 1500 },
+      frequency: 42,
+      quantity: 2,
+      speedX: { min: -18, max: 22 },
+      speedY: { min: -64, max: -26 },
+      scale: { start: 0.7, end: 2.3 },
+      alpha: { start: 0.7, end: 0 },
+      color: [0xffc4d0, 0xff7a94, 0xe24e6e, 0xc89098],
+      gravityY: -14,
+    });
+    smoke.setDepth(16);
+
+    let gone = false;
+    return {
+      clear() {
+        if (gone) {
+          return;
+        }
+        gone = true;
+        // tube.destroy();
+        // flame.destroy();
+        // core.destroy();
+        smoke.destroy();
+      },
+    };
+  }
+
   // Светящийся снаряд падает сверху. onImpact — взрыв в точке, куда сел носик.
   // Хлопок батареи к этому моменту уже отзвучал: его играет вызов удара.
   static drop(scene: Phaser.Scene, x: number, y: number, onImpact: () => void): ArtilleryFlight {
@@ -104,72 +186,56 @@ export class ArtilleryStrike {
     };
   }
 
-  // Вспышка, искры и воронка. Воронка гаснет сама через craterMs.
+  // Четыре кадра разрыва и воронка. Воронка гаснет сама через craterMs.
   // Разрыв — artillery_explosion.mp3, свой звук на каждый снаряд.
   static boom(scene: Phaser.Scene, x: number, y: number): void {
     playArtilleryBoom(scene);
-
-    const flash = scene.add
-      .circle(x, y, 16, 0xfff6d0, 1)
-      .setDepth(17)
-      .setBlendMode(Phaser.BlendModes.ADD);
-    const fire = scene.add
-      .circle(x, y, 28, 0xff4a12, 0.95)
-      .setDepth(16)
-      .setBlendMode(Phaser.BlendModes.ADD);
-    scene.tweens.add({
-      targets: flash,
-      scale: 2.8,
-      alpha: 0,
-      duration: 160,
-      onComplete: () => flash.destroy(),
-    });
-    scene.tweens.add({
-      targets: fire,
-      scale: 3.2,
-      alpha: 0,
-      duration: 280,
-      ease: 'Cubic.Out',
-      onComplete: () => fire.destroy(),
-    });
-
-    const ring = scene.add
-      .ellipse(x, y + 4, 28, 12, 0xfff4d0, 0)
-      .setStrokeStyle(3, 0xffe080, 0.95)
-      .setDepth(16)
-      .setBlendMode(Phaser.BlendModes.ADD);
-    scene.tweens.add({
-      targets: ring,
-      scaleX: 5.2,
-      scaleY: 2.4,
-      alpha: 0,
-      duration: 340,
-      ease: 'Cubic.Out',
-      onComplete: () => ring.destroy(),
-    });
-
-    const sparks = scene.add.particles(x, y, 'spark', {
-      lifespan: { min: 220, max: 520 },
-      speed: { min: 50, max: 280 },
-      scale: { start: 1.5, end: 0 },
-      alpha: { start: 1, end: 0 },
-      blendMode: Phaser.BlendModes.ADD,
-      color: [0xffffff, 0xffe090, 0xff4a10],
-      gravityY: 200,
-      emitting: false,
-    });
-    sparks.setDepth(17);
-    sparks.explode(22);
-    scene.time.delayedCall(640, () => {
-      if (sparks.scene) {
-        sparks.destroy();
-      }
-    });
-
+    artilleryBoomAt(scene, x, y);
     placeCrater(scene, x, y, ArtilleryStrike.shop.craterMs);
-
     scene.cameras.main.shake(90, 0.0035);
   }
+
+  // Горло в мировых координатах: локальный вектор крутится вместе со спрайтом (по часовой, ось Y вниз).
+  // private static flareMouth(x: number, y: number, rotation: number): { x: number; y: number } {
+  //   const local = ArtilleryStrike.flareMouthLocal;
+  //   const cos = Math.cos(rotation);
+  //   const sin = Math.sin(rotation);
+  //   return {
+  //     x: x + local.x * cos - local.y * sin,
+  //     y: y + local.x * sin + local.y * cos,
+  //   };
+  // }
+
+  // Трубка факела и мягкое пятно для огня и дыма. Пятно белое: цвет задаёт tint частиц.
+  private static ensureFlareTextures(scene: Phaser.Scene): void {
+    // if (!scene.textures.exists(ArtilleryStrike.flareKey)) {
+    //   bake(scene, ArtilleryStrike.flareKey, 64, 18, (g) => ArtilleryStrike.renderFlare(g));
+    // }
+    if (!scene.textures.exists(ArtilleryStrike.flarePuffKey)) {
+      bake(scene, ArtilleryStrike.flarePuffKey, 32, 32, (g) => {
+        g.fillStyle(0xffffff, 0.14);
+        g.fillCircle(16, 16, 15);
+        g.fillStyle(0xffffff, 0.4);
+        g.fillCircle(16, 16, 9);
+        g.fillStyle(0xffffff, 0.85);
+        g.fillCircle(16, 16, 4);
+      });
+    }
+  }
+
+  // Лежащая трубка: хвост слева, горло справа. Низ кадра садится на землю.
+  // private static renderFlare(g: Phaser.GameObjects.Graphics): void {
+  //   g.fillStyle(0x3a1614);
+  //   g.fillRoundedRect(2, 5, 50, 9, 4);
+  //   g.fillStyle(0x6a3028);
+  //   g.fillRect(8, 6, 38, 3);
+  //   g.fillStyle(0x1a0c0c);
+  //   g.fillCircle(6, 9, 5);
+  //   g.fillStyle(0x140a0a);
+  //   g.fillRoundedRect(46, 3, 12, 13, 3);
+  //   g.fillStyle(0xfff0c0);
+  //   g.fillCircle(56, 9, 2.5);
+  // }
 
   private static randomPoint(minX: number): { x: number; y: number } {
     const field = ArtilleryStrike.field;

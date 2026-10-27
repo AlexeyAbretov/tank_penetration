@@ -3,6 +3,7 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { MachineGun } from '../entities/MachineGun';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank';
+import { preloadArtilleryBoom } from '../gfx/artilleryBoom';
 import { preloadCraters } from '../gfx/craters';
 import { preloadNuke } from '../gfx/nuke';
 import { preloadTankBoom } from '../gfx/tankBoom';
@@ -19,4 +20,5 @@ export const preloadImages = (scene: Phaser.Scene) => {
   GunnerInfantry.preload(scene);
   preloadTankBoom(scene);
   preloadNuke(scene);
+  preloadArtilleryBoom(scene);
 };

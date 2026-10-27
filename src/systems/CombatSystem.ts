@@ -1,7 +1,7 @@
 // Снаряды танка: выстрел, попадания, взрывы, проволока, арт удар, мины, атомный взрыв и контакт с базой.
 
 import Phaser from 'phaser';
-import { ArtilleryStrike, type ArtilleryFlight } from '../entities/ArtilleryStrike';
+import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
@@ -19,6 +19,8 @@ import type { ShopController } from '../controllers/ShopController';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem as Combat } from '../types/CombatSystem';
 
+type ArtillerySpot = { x: number; y: number; mark: ArtilleryMark };
+
 export class CombatSystem implements Combat {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly shells: Phaser.Physics.Arcade.Group;
@@ -30,6 +32,8 @@ export class CombatSystem implements Combat {
   private strikeFromIcon = false;
   private flights: ArtilleryFlight[] = [];
   private salvoTimers: Phaser.Time.TimerEvent[] = [];
+  // Огни всех ещё летящих залпов. Новый залп старые не гасит: каждый тухнет в свой удар.
+  private spots: ArtillerySpot[] = [];
   // Сброс отменяет залп, который ещё ждёт конца хлопка.
   private artilleryToken = 0;
   private minesCooldownMs = 0;
@@ -362,13 +366,14 @@ export class CombatSystem implements Combat {
   // Сразу хлопок. Снаряды — через секунду после того, как он доиграл.
   private launchArtillery(): void {
     const token = this.artilleryToken;
-    const armed = playArtilleryShot(this.scene, () => this.queueShells(token));
+    const spots = this.armSpots();
+    const armed = playArtilleryShot(this.scene, () => this.queueShells(token, spots));
     if (!armed) {
-      this.queueShells(token);
+      this.queueShells(token, spots);
     }
   }
 
-  private queueShells(token: number): void {
+  private queueShells(token: number, spots: ArtillerySpot[]): void {
     if (token !== this.artilleryToken) {
       return;
     }
@@ -377,26 +382,42 @@ export class CombatSystem implements Combat {
       if (token !== this.artilleryToken) {
         return;
       }
-      this.releaseShells();
+      this.releaseShells(spots);
     });
     this.salvoTimers.push(timer);
   }
 
-  private releaseShells(): void {
-    const gap = ArtilleryStrike.shop.gapMs;
-    // Левый край — линия проволоки плюс полчаши. Проволока может быть ещё не куплена.
+  // Три огня этого залпа. Уже горящие от прошлого вызова не трогаем.
+  private armSpots(): ArtillerySpot[] {
     const minX = Math.ceil(BarbedWire.bounds.face + craterReach());
-    ArtilleryStrike.impacts(minX).forEach((point, index) => {
+    const spots = ArtilleryStrike.impacts(minX).map((point) => ({
+      x: point.x,
+      y: point.y,
+      mark: ArtilleryStrike.mark(this.scene, point.x, point.y),
+    }));
+    this.spots.push(...spots);
+    return spots;
+  }
+
+  private releaseShells(spots: ArtillerySpot[]): void {
+    const gap = ArtilleryStrike.shop.gapMs;
+    spots.forEach((spot, index) => {
       const timer = this.scene.time.delayedCall(index * gap, () => {
         this.salvoTimers = this.salvoTimers.filter((item) => item !== timer);
-        const flight = ArtilleryStrike.drop(this.scene, point.x, point.y, () => {
+        const flight = ArtilleryStrike.drop(this.scene, spot.x, spot.y, () => {
           this.flights = this.flights.filter((item) => item !== flight);
-          this.detonateArtillery(point.x, point.y);
+          this.retireSpot(spot);
+          this.detonateArtillery(spot.x, spot.y);
         });
         this.flights.push(flight);
       });
       this.salvoTimers.push(timer);
     });
+  }
+
+  private retireSpot(spot: ArtillerySpot): void {
+    spot.mark.clear();
+    this.spots = this.spots.filter((item) => item !== spot);
   }
 
   private detonateArtillery(x: number, y: number): void {
@@ -467,6 +488,10 @@ export class CombatSystem implements Combat {
       flight.cancel();
     }
     this.flights = [];
+    for (const spot of this.spots) {
+      spot.mark.clear();
+    }
+    this.spots = [];
   }
 
   tick(delta: number, allowFire = true): void {
