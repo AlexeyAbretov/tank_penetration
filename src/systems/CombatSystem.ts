@@ -330,15 +330,17 @@ export class CombatSystem implements Combat {
       if (!unit.active || unit.reachedWall) {
         return;
       }
-      // Тот же зазор до корпуса. Иначе взрыв под бампером не достаёт до якоря, и машина без урона.
-      const gap = this.hullGapX(unit, x);
-      const torso = this.torsoPoint(unit);
-      const nearFeet = Math.hypot(gap, unit.y - y) <= radius;
-      const nearChest = Math.hypot(gap, torso.y - y) <= radius;
-      if (nearFeet || nearChest) {
+      if (this.inBlast(unit, x, y, radius)) {
         this.hurtInfantry(unit, Mines.shop.damage);
       }
     });
+  }
+
+  // Круг до корпуса, не до одной точки торса. Нос пикапа впереди якоря и иначе выпадает из взрыва.
+  private inBlast(unit: Infantry, x: number, y: number, radius: number): boolean {
+    const gap = this.hullGapX(unit, x);
+    const torso = this.torsoPoint(unit);
+    return Math.hypot(gap, unit.y - y) <= radius || Math.hypot(gap, torso.y - y) <= radius;
   }
 
   // 0 — вертикаль точки уже над силуэтом. Иначе расстояние до ближайшего края хитбокса.
@@ -427,8 +429,7 @@ export class CombatSystem implements Combat {
       if (!unit.active || unit.reachedWall) {
         return;
       }
-      const torso = this.torsoPoint(unit);
-      if (Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= radius) {
+      if (this.inBlast(unit, x, y, radius)) {
         this.hurtInfantry(unit, ArtilleryStrike.shop.damage);
       }
     });
