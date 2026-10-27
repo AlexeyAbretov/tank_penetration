@@ -1633,21 +1633,15 @@ export class StudioScene extends Phaser.Scene {
       return;
     }
     if (rig.flash === 'rocket') {
-      const pop = RocketInfantry.flashPop;
-      const at = RocketInfantry.flashOrigin(rig.muzzle.x, rig.muzzle.y, rig.angle, rig.pixel);
-      const flash = this.add.image(at.x, at.y, 'studio-fx-rocket-flash');
-      flash.setOrigin(0, 0.5);
-      flash.setBlendMode(Phaser.BlendModes.ADD);
-      flash.setRotation(rig.angle);
-      flash.setScale(pop.x * rig.pixel, pop.y * rig.pixel);
-      rig.root.add(flash);
-      this.tweens.add({
-        targets: flash,
-        alpha: 0,
-        duration: pop.ms,
-        ease: 'Quad.In',
-        onComplete: () => flash.destroy(),
-      });
+      RocketInfantry.playBackblast(
+        this,
+        rig.root,
+        rig.muzzle.x,
+        rig.muzzle.y,
+        rig.angle,
+        rig.pixel * Infantry.placed.scale,
+        'studio-fx-rocket-flash',
+      );
     }
   }
 

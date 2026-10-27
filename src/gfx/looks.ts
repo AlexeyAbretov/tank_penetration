@@ -15,9 +15,9 @@ export const GUNNER_FLASH_FRAME = { w: 26, h: 18 };
 // Пулемёт суперсолдата. Нос слева, приклад справа: в покое смотрит к танку.
 export const SUPER_MG_FRAME = { w: 58, h: 18 };
 // Труба гранатомёта. Нос слева, раструб справа: в покое смотрит к танку.
-export const LAUNCHER_FRAME = { w: 54, h: 14 };
-// Вспышка у среза трубы. Левый край — дуло, язычок растёт вправо.
-export const ROCKET_FLASH_FRAME = { w: 30, h: 22 };
+export const LAUNCHER_FRAME = { w: 60, h: 11 };
+// Выхлоп за казёнником. Левый край — срез раструба, струя растёт вправо.
+export const ROCKET_FLASH_FRAME = { w: 48, h: 40 };
 // Ракета: носик справа, как у пули, чтобы поворот картинки совпал с углом полёта.
 export const ROCKET_FRAME = { w: 26, h: 10 };
 export const PICKUP_FRAME = { w: 160, h: 80 };

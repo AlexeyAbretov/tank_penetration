@@ -30,17 +30,16 @@ export class RocketInfantry extends RangedEnemy {
     const point = RocketInfantry.muzzleAt(0, 0, RocketInfantry.placed.scale, 0);
     return { x: point.x, y: point.y };
   }
-  // Левый верх трубы внутри кадра солдата 64×80. На стойке картинка садится на x = 0, y = 26.
-  static readonly launcherCut = { x: 0, y: 26 };
+  // Левый верх трубы внутри кадра солдата 64×80. На стойке картинка садится на x = 0, y = 28.
+  static readonly launcherCut = { x: 0, y: 28 };
   // Раструб: ось, вокруг которой труба целится в танк. Откат сдвигает срез к этой точке.
   static readonly breech = { x: 50, y: 31 };
   // Нос боеголовки в кадре солдата. От раструба эта точка уходит влево и крутится вместе с трубой.
   static readonly muzzleTip = { x: 0, y: 31 };
   // Отдача сильнее винтовки: труба тяжелее, удар читается дольше.
   static readonly recoilKick = { x: 8, climb: 0.06, ms: 160 };
-  static readonly flashPop = { x: 0.85, y: 0.8, ms: 110 };
-  // На сколько пикселей текстуры огонь уходит вперёд от носика, чтобы не сесть на боеголовку.
-  static readonly flashLead = 2;
+  // Струя за раструбом: чуть шире трубы, держится дольше вспышки винтовки.
+  static readonly flashPop = { x: 1, y: 0.9, ms: 180 };
   // Реже стрелка и пикапа. Три секунды — пауза между пусками.
   static readonly shotInterval = 3000;
   // Медленнее пули, чтобы за ракетой успевал прочитаться дым.
@@ -217,19 +216,7 @@ export class RocketInfantry extends RangedEnemy {
   }
 
   protected override onFire(x: number, y: number, angle: number): void {
-    const at = RocketInfantry.flashOrigin(x, y, angle, this.scaleX);
-    const flash = this.scene.add.image(at.x, at.y, 'rocketman-flash').setOrigin(0, 0.5).setDepth(16);
-    flash.setRotation(angle);
-    flash.setBlendMode(Phaser.BlendModes.ADD);
-    const pop = RocketInfantry.flashPop;
-    flash.setScale(this.scaleX * pop.x, this.scaleY * pop.y);
-    this.scene.tweens.add({
-      targets: flash,
-      alpha: 0,
-      duration: pop.ms,
-      ease: 'Quad.In',
-      onComplete: () => flash.destroy(),
-    });
+    RocketInfantry.playBackblast(this.scene, null, x, y, angle, this.scaleX, 'rocketman-flash');
   }
 
   private kickLauncher(): void {
@@ -364,13 +351,73 @@ export class RocketInfantry extends RangedEnemy {
     launcher.setRotation(rotation);
   }
 
-  // Точка ядра вспышки: впереди носика по направлению пуска.
-  static flashOrigin(x: number, y: number, angle: number, scale: number): { x: number; y: number } {
-    const ahead = RocketInfantry.flashLead * scale;
+  // Срез раструба и направление струи назад, против полёта ракеты.
+  // x, y — носик. Длина трубы в кадре солдата — ширина картинки гранатомёта.
+  static backblastPose(
+    x: number,
+    y: number,
+    angle: number,
+    scale: number,
+  ): { x: number; y: number; rotation: number } {
+    const rotation = angle + Math.PI;
+    const reach = (LAUNCHER_FRAME.w - 2) * scale;
     return {
-      x: x + Math.cos(angle) * ahead,
-      y: y + Math.sin(angle) * ahead,
+      x: x + Math.cos(rotation) * reach,
+      y: y + Math.sin(rotation) * reach,
+      rotation,
     };
+  }
+
+  // Огонь у среза и клубы, которые уходят назад и поднимаются. parent — контейнер просмотра.
+  static playBackblast(
+    scene: Phaser.Scene,
+    parent: Phaser.GameObjects.Container | null,
+    x: number,
+    y: number,
+    angle: number,
+    scale: number,
+    flashKey: string,
+  ): void {
+    const pose = RocketInfantry.backblastPose(x, y, angle, scale);
+    const pop = RocketInfantry.flashPop;
+    Rocket.ensurePuff(scene);
+    const cos = Math.cos(pose.rotation);
+    const sin = Math.sin(pose.rotation);
+    for (let i = 0; i < 5; i += 1) {
+      const along = (4 + i * 6) * scale;
+      const side = (i % 2 === 0 ? 1 : -1) * (1 + i) * scale;
+      const px = pose.x + cos * along - sin * side;
+      const py = pose.y + sin * along + cos * side;
+      const puff = scene.add.image(px, py, 'smoke-puff').setDepth(11);
+      puff.setScale(0.18 * scale);
+      puff.setAlpha(0.5);
+      puff.setTint(i < 2 ? 0xd2cdc2 : 0x7a766e);
+      parent?.add(puff);
+      scene.tweens.add({
+        targets: puff,
+        x: px + cos * (16 + i * 7) * scale,
+        y: py + sin * (16 + i * 7) * scale - 8 * scale,
+        scale: (0.42 + i * 0.06) * scale,
+        alpha: 0,
+        duration: 320 + i * 80,
+        ease: 'Quad.Out',
+        onComplete: () => puff.destroy(),
+      });
+    }
+    const flash = scene.add.image(pose.x, pose.y, flashKey).setOrigin(0, 0.5).setDepth(12);
+    flash.setRotation(pose.rotation);
+    flash.setBlendMode(Phaser.BlendModes.ADD);
+    flash.setScale(scale * pop.x, scale * pop.y);
+    parent?.add(flash);
+    scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      scaleX: flash.scaleX * 1.2,
+      scaleY: flash.scaleY * 1.45,
+      duration: pop.ms,
+      ease: 'Cubic.Out',
+      onComplete: () => flash.destroy(),
+    });
   }
 
   // Запасное тело, если картинку не загрузили. Рядом лежит труба, а не винтовка.
@@ -389,32 +436,45 @@ export class RocketInfantry extends RangedEnemy {
     g.fillRect(12, 65, 4, 6);
   }
 
+  // Запасной рисунок, если png нет. Ось на y = 3: нос в (0, 3), раструб вокруг x = 50.
   static renderLauncher(g: Phaser.GameObjects.Graphics, look: SoldierLook = ROCKET_LOOK): void {
-    g.fillStyle(look.rifleMetal);
-    g.fillTriangle(0, 8, 14, 3, 14, 13);
     g.fillStyle(look.emblem);
-    g.fillRect(10, 4, 4, 8);
+    g.fillTriangle(0, 3, 18, 1, 18, 5);
     g.fillStyle(look.rifle);
-    g.fillRoundedRect(12, 4, 28, 8, 3);
-    g.fillStyle(look.rifleWoodLight);
-    g.fillRect(16, 6, 12, 2);
-    g.fillStyle(look.rifleMetal);
-    g.fillRoundedRect(36, 3, 12, 10, 2);
+    g.fillRect(16, 1, 38, 5);
     g.fillStyle(look.outline);
-    g.fillRect(20, 1, 3, 4);
+    g.fillRect(30, 0, 4, 2);
     g.fillStyle(look.rifleWood);
-    g.fillRoundedRect(28, 12, 6, 3, 1);
+    g.fillRect(22, 6, 6, 5);
+    g.fillRect(32, 6, 4, 4);
+    g.fillStyle(look.rifleMetal);
+    g.fillRect(54, 0, 6, 7);
   }
 
-  // Левый край — срез трубы, вперёд — вправо. В игре картинку поворачивают по углу полёта.
+  // Левый край — срез раструба, струя вправо. Круги, не трапеции: ядро, языки, редкие искры.
   static renderFlash(g: Phaser.GameObjects.Graphics): void {
     const y = ROCKET_FLASH_FRAME.h / 2;
-    g.fillStyle(0xff4a10, 1);
-    g.fillTriangle(0, y, 16, 2, 10, y);
-    g.fillTriangle(0, y, 16, ROCKET_FLASH_FRAME.h - 2, 10, y);
-    g.fillStyle(0xffaa33, 1);
-    g.fillTriangle(0, y, 28, 5, 28, ROCKET_FLASH_FRAME.h - 5);
-    g.fillStyle(0xfff3c4, 1);
-    g.fillCircle(5, y, 3);
+    const blobs: readonly [number, number, number, number][] = [
+      [34, 2, 5, 0xc42810],
+      [28, -3, 5, 0xe03010],
+      [30, 5, 4, 0xff3a10],
+      [22, -6, 4, 0xff4a10],
+      [24, 6, 4, 0xe83810],
+      [18, 0, 6, 0xff5a14],
+      [14, -4, 4, 0xff6a18],
+      [15, 4, 4, 0xff8a22],
+      [10, -1, 5, 0xffaa33],
+      [9, 3, 4, 0xffc24a],
+      [6, 0, 4, 0xffe080],
+      [40, -2, 2, 0xff6a18],
+      [42, 4, 2, 0xffaa33],
+      [36, -5, 2, 0xffe080],
+    ];
+    for (const [x, dy, radius, color] of blobs) {
+      g.fillStyle(color, 1);
+      g.fillCircle(x, y + dy, radius);
+    }
+    g.fillStyle(0xfff6d0, 1);
+    g.fillCircle(4, y, 2);
   }
 }
