@@ -83,6 +83,13 @@ export type PreviewEntity = {
   paintCorpse?: (g: Phaser.GameObjects.Graphics, paint: Paint) => void;
   // Готовая картинка тела. Если задана, просмотр не рисует труп заново.
   corpseImage?: string;
+  // Размер и опора готового трупа, если он не совпадает с CORPSE_FRAME.
+  corpseTexW?: number;
+  corpseTexH?: number;
+  corpseOriginX?: number;
+  corpseOriginY?: number;
+  // Масштаб трупа в бою. Меньше gameScale, если лежащая картинка крупнее стоящей.
+  corpseScale?: number;
 };
 
 function asPaint(source: object): Paint {
@@ -225,16 +232,26 @@ export const ENTITIES: PreviewEntity[] = [
     frameCount: AssaultInfantry.frameKeys.length,
     animFps: AssaultInfantry.walkFps,
     gameScale: Infantry.placed.scale,
-    originX: Infantry.placed.originX,
-    originY: Infantry.placed.originY,
-    texW: SOLDIER_FRAME.w,
-    texH: SOLDIER_FRAME.h,
+    originX: AssaultInfantry.fit.originX,
+    originY: AssaultInfantry.fit.originY,
+    texW: AssaultInfantry.frame.w,
+    texH: AssaultInfantry.frame.h,
     defaults: asPaint(ASSAULT_LOOK),
     fields: [],
-    hitbox: soldierHit,
+    hitbox: {
+      w: AssaultInfantry.fit.bodyW,
+      h: AssaultInfantry.fit.bodyH,
+      ox: AssaultInfantry.fit.bodyX,
+      oy: AssaultInfantry.fit.bodyY,
+    },
     hpColor: 0xd42a2a,
     death: 'corpse',
     corpseImage: AssaultInfantry.corpseKey,
+    corpseTexW: AssaultInfantry.corpseFrame.w,
+    corpseTexH: AssaultInfantry.corpseFrame.h,
+    corpseOriginX: AssaultInfantry.corpseFit.originX,
+    corpseOriginY: AssaultInfantry.corpseFit.originY,
+    corpseScale: AssaultInfantry.corpseFit.scale,
     bake: (scene, _paint, keys) => {
       AssaultInfantry.frameKeys.forEach((key, i) => copyImage(scene, key, keys[i]));
     },

@@ -12,6 +12,25 @@ import { Infantry } from './Infantry';
 export class AssaultInfantry extends Infantry {
   static readonly walkFps = 9;
   static readonly corpseKey = 'infantry-corpse';
+  // Шесть кадров шага обрезаны по фигуре. Подошва стоит на строке 62.
+  static readonly frame = { w: 53, h: 64 };
+  // Опора и хитбокс этих картинок. Общие числа Infantry рассчитаны на кадр 64×80.
+  static readonly fit = {
+    originX: 35 / 53,
+    originY: 63 / 64,
+    bodyW: 22,
+    bodyH: 52,
+    bodyX: 24,
+    bodyY: 6,
+  };
+  // Лежащее тело шире шага. Низ крови и винтовки — та же земля, что у подошвы.
+  // Рост стоящего — 61 px, длина лежащего — 89 px. Тот же масштаб делает труп крупнее.
+  static readonly corpseFrame = { w: 91, h: 45 };
+  static readonly corpseFit = {
+    originX: 0.5,
+    originY: 44.5 / 45,
+    scale: Infantry.placed.scale * (61 / 89),
+  };
 
   // Контакт → подъём → пронос → контакт другой ноги → подъём → пронос. Последний — труп.
   // Пути в public/. Строки буквальные: singlefile-сборка подменяет их на data:.
@@ -44,7 +63,7 @@ export class AssaultInfantry extends Infantry {
     }
   }
 
-  // Четыре кадра шага и анимация, которая их крутит. Повторный вызов ничего не рисует заново.
+  // Шесть кадров шага и анимация, которая их крутит. Повторный вызов ничего не рисует заново.
   // В бою кадры — картинки из assets/. Фигурный рисунок остаётся, если файл не загрузили.
   static ensureTextures(scene: Phaser.Scene): void {
     const idle = this.frameKeys[0];
@@ -65,11 +84,14 @@ export class AssaultInfantry extends Infantry {
       );
     }
     const frames = this.frameKeys.filter((key) => scene.textures.exists(key));
-    // Картинки рисованные, не пиксель-арт: линейный фильтр меньше «лесенки» при масштабе.
-    for (const key of [...frames, this.corpseKey]) {
+    // Кадры шага — пиксели. Ближний фильтр не размывает их при увеличении.
+    for (const key of frames) {
       if (scene.textures.exists(key)) {
-        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
+    }
+    if (scene.textures.exists(this.corpseKey)) {
+      scene.textures.get(this.corpseKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
     // Анимация живёт в общем менеджере. Собираем заново: порядок кадров мог смениться.
     if (scene.anims.exists('infantry-walk')) {
@@ -86,10 +108,25 @@ export class AssaultInfantry extends Infantry {
   constructor(scene: Phaser.Scene, x: number, y: number, hp: number) {
     // Первый кадр шага и анимация infantry-walk, красная полоска HP.
     super(scene, x, y, hp, AssaultInfantry.frameKeys[0], 'infantry-walk', 0xd42a2a);
+    const fit = AssaultInfantry.fit;
+    this.setOrigin(fit.originX, fit.originY);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setSize(fit.bodyW, fit.bodyH);
+    body.setOffset(fit.bodyX, fit.bodyY);
   }
 
   protected override corpseTexture(): string | null {
     return AssaultInfantry.corpseKey;
+  }
+
+  // После смены картинки опора шага уже не подходит: тело лежит, а не стоит.
+  override kill(): void {
+    const wasAlive = !this.reachedWall;
+    super.kill();
+    if (wasAlive && this.texture.key === AssaultInfantry.corpseKey) {
+      this.setOrigin(AssaultInfantry.corpseFit.originX, AssaultInfantry.corpseFit.originY);
+      this.setScale(AssaultInfantry.corpseFit.scale);
+    }
   }
 
   // До стены доходит живым, поэтому трупа нет: вместо таяния вспышка на корпусе.

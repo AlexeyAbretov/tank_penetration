@@ -307,12 +307,36 @@ export class StudioScene extends Phaser.Scene {
 
   private frameOf(view: ViewState): { w: number; h: number } {
     if (view.death && this.entity.death === 'corpse') {
+      if (this.entity.corpseTexW && this.entity.corpseTexH) {
+        return { w: this.entity.corpseTexW, h: this.entity.corpseTexH };
+      }
       return CORPSE_FRAME;
     }
     if (view.death && this.entity.death === 'nuke') {
       return TANK_WRECK_FRAME;
     }
     return { w: this.entity.texW, h: this.entity.texH };
+  }
+
+  // У готового трупа опора своя: иначе рамка и крест остаются от стоящего солдата.
+  private originOf(view: ViewState): { x: number; y: number } {
+    if (
+      view.death &&
+      this.entity.death === 'corpse' &&
+      this.entity.corpseOriginX != null &&
+      this.entity.corpseOriginY != null
+    ) {
+      return { x: this.entity.corpseOriginX, y: this.entity.corpseOriginY };
+    }
+    return { x: this.entity.originX, y: this.entity.originY };
+  }
+
+  // Труп может быть нарисован крупнее шага. В просмотре его ужимают так же, как в бою.
+  private drawScale(view: ViewState): number {
+    if (view.death && this.entity.corpseScale != null && this.entity.gameScale) {
+      return view.scale * (this.entity.corpseScale / this.entity.gameScale);
+    }
+    return view.scale;
   }
 
   private makeDeath(view: ViewState): Phaser.GameObjects.Container {
@@ -323,7 +347,15 @@ export class StudioScene extends Phaser.Scene {
       return this.makeBombCrater(view);
     }
     if (this.entity.corpseImage) {
-      return this.makeSprite(this.entity.corpseImage, view, false);
+      const root = this.makeSprite(this.entity.corpseImage, view, false);
+      const sprite = root.getAt(0) as Phaser.GameObjects.Sprite;
+      if (this.entity.corpseOriginX != null && this.entity.corpseOriginY != null) {
+        sprite.setOrigin(this.entity.corpseOriginX, this.entity.corpseOriginY);
+      }
+      if (this.entity.corpseScale != null) {
+        sprite.setScale(this.drawScale(view));
+      }
+      return root;
     }
     const wreck = this.entity.death === 'wreck';
     const frame = wreck ? PICKUP_FRAME : CORPSE_FRAME;
@@ -529,9 +561,10 @@ export class StudioScene extends Phaser.Scene {
   private paintSpriteGuides(g: Phaser.GameObjects.Graphics, view: ViewState): void {
     const entity = this.entity;
     const frame = this.frameOf(view);
-    const s = view.scale;
-    const left = -entity.originX * frame.w * s;
-    const top = -entity.originY * frame.h * s;
+    const origin = this.originOf(view);
+    const s = this.drawScale(view);
+    const left = -origin.x * frame.w * s;
+    const top = -origin.y * frame.h * s;
     const width = frame.w * s;
     const height = frame.h * s;
     if (view.bounds) {
@@ -743,11 +776,12 @@ export class StudioScene extends Phaser.Scene {
     }
     const entity = this.entity;
     const frame = this.frameOf(view);
-    const s = view.scale;
-    let left = -entity.originX * frame.w * s;
-    let right = (1 - entity.originX) * frame.w * s;
-    let top = -entity.originY * frame.h * s;
-    let bottom = (1 - entity.originY) * frame.h * s;
+    const origin = this.originOf(view);
+    const s = this.drawScale(view);
+    let left = -origin.x * frame.w * s;
+    let right = (1 - origin.x) * frame.w * s;
+    let top = -origin.y * frame.h * s;
+    let bottom = (1 - origin.y) * frame.h * s;
     if (!view.death && view.hp && entity.hpColor !== undefined) {
       top = Math.min(top, -frame.h * s * 0.95 - 6);
     }
