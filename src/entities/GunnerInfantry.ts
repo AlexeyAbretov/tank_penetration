@@ -1,6 +1,6 @@
 // Стрелок: те же кадры бега, что у штурмовика, но камуфляж сине-серый.
-// До середины поля идёт с винтовкой в кадре. На рубеже встаёт: ствол — отдельная картинка,
-// чтобы при выстреле отъезжать, а кисти оставались на месте.
+// До середины поля идёт с винтовкой в кадре. На рубеже тело без рук,
+// а руки со стволом — одна картинка: она крутится вокруг плеча и отъезжает при выстреле.
 
 import Phaser, { Scene } from 'phaser';
 import {
@@ -24,18 +24,41 @@ export class GunnerInfantry extends RangedEnemy {
   static readonly corpseKey = 'gunner-corpse';
   static readonly aimKey = 'gunner-aim';
   static readonly rifleKey = 'gunner-rifle';
-  static readonly handsKey = 'gunner-hands';
-  // Середина среза относительно точки ног, ствол строго влево. Жёлтая метка и пуля в просмотре.
+  // Кадры шага — холст 51×64, подошва на строке 62.
+  static readonly frame = { w: 51, h: 64 };
+  static readonly fit = {
+    originX: 28 / 51,
+    originY: 63 / 64,
+    bodyW: 18,
+    bodyH: 48,
+    bodyX: 22,
+    bodyY: 10,
+  };
+  // Стойка без рук, 64×64. Подошва на строке 63, опора сразу под ней.
+  static readonly aimFit = {
+    originX: 41 / 64,
+    originY: 1,
+  };
+  // Лежащее тело длиннее роста. 100 px длины к 61 px роста стоящего кадра.
+  static readonly corpseFrame = { w: 105, h: 51 };
+  static readonly corpseFit = {
+    originX: 0.5,
+    originY: 50.5 / 51,
+    scale: Infantry.placed.scale * (61 / 100),
+  };
+  // Середина среза относительно точки ног, ствол строго влево.
   static get muzzleOffset(): { x: number; y: number } {
     const point = GunnerInfantry.muzzleAt(0, 0, Infantry.placed.scale, 0);
     return { x: point.x, y: point.y };
   }
-  // Левый верх винтовки внутри кадра солдата 64×80. Срез картинки бега сидит на x = 5, y = 26.
-  static readonly rifleCut = { x: 5, y: 26 };
-  // Затыльник: ось, вокруг которой винтовка целится в танк. Откат сдвигает срез к этой точке.
-  static readonly breech = { x: 32, y: 31 };
-  // Дульный срез в кадре солдата. От затыльника эта точка уходит влево и крутится вместе с винтовкой.
-  static readonly muzzleTip = { x: 5, y: 31 };
+  // Плечо на кадре стойки. Солдат смотрит влево, спина правее подбородка.
+  static readonly breech = { x: 40, y: 20 };
+  // Картинка рук нарисована крупнее тела. 0.75 оставляет рукав толще плеча, но не ниткой.
+  static readonly armsFit = 0.75;
+  // Дуло в пикселях стойки. Сдвиг (4, 41) − (82, 41) картинки рук, уже умноженный на armsFit.
+  static readonly muzzleTip = { x: 40 + (4 - 82) * GunnerInfantry.armsFit, y: 20 };
+  // Плечо внутри картинки рук: правый край рукава, на высоте ствола.
+  static readonly armsPivot = { x: 82, y: 41 };
   // Откат короче, чем у станка пикапа: винтовка короткая, удар должен читаться и сразу гаснуть.
   static readonly recoilKick = { x: 5, climb: 0.12, ms: 90 };
   // Множитель к масштабу винтовки. 1 — пиксель вспышки совпадает с пикселем ствола, иначе огонь не читается.
@@ -61,9 +84,8 @@ export class GunnerInfantry extends RangedEnemy {
   protected readonly idleTexture = GunnerInfantry.aimKey;
   protected readonly muzzle = GunnerInfantry.muzzleOffset;
 
-  // Винтовка поверх тела. Кисти — ещё выше, чтобы при откате остаться на рукояти.
+  // Руки со стволом поверх тела. Крутятся вокруг плеча.
   private rifle!: Phaser.GameObjects.Image;
-  private hands?: Phaser.GameObjects.Image;
   // x — пиксели текстуры назад вдоль винтовки. climb — добавка к прицелу, подъём дула в радианах.
   private readonly recoil = { x: 0, climb: 0 };
   // Поворот картинки винтовки к танку, без отдачи. Ноль — строго влево.
@@ -80,7 +102,6 @@ export class GunnerInfantry extends RangedEnemy {
     'gunner-5': 'assets/gunner-5.png',
     [GunnerInfantry.aimKey]: 'assets/gunner-aim.png',
     [GunnerInfantry.rifleKey]: 'assets/gunner-rifle.png',
-    [GunnerInfantry.handsKey]: 'assets/gunner-hands.png',
     [GunnerInfantry.corpseKey]: 'assets/gunner-corpse.png',
   } as const;
 
@@ -122,7 +143,13 @@ export class GunnerInfantry extends RangedEnemy {
       bake(scene, 'gunner-flash', GUNNER_FLASH_FRAME.w, GUNNER_FLASH_FRAME.h, (g) => this.renderFlash(g));
     }
     const frames = this.frameKeys.filter((key) => scene.textures.exists(key));
-    for (const key of [...frames, this.aimKey, this.rifleKey, this.handsKey, this.corpseKey, 'gunner-flash']) {
+    for (const key of [...frames, this.aimKey, this.corpseKey]) {
+      if (scene.textures.exists(key)) {
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
+    }
+    // Руки крутятся на любой угол. Ближний фильтр на повороте рвёт ствол, поэтому здесь сглаживание.
+    for (const key of [this.rifleKey, 'gunner-flash']) {
       if (scene.textures.exists(key)) {
         scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
       }
@@ -151,26 +178,33 @@ export class GunnerInfantry extends RangedEnemy {
     super(scene, x, y, hp, GunnerInfantry.frameKeys[0], 'gunner-walk', 0x3a8ad4, shots, fireTarget);
     this.rifle = scene.add.image(x, y, GunnerInfantry.rifleKey);
     this.rifle.setOrigin(
-      (GunnerInfantry.breech.x - GunnerInfantry.rifleCut.x) / GUNNER_RIFLE_FRAME.w,
-      (GunnerInfantry.breech.y - GunnerInfantry.rifleCut.y) / GUNNER_RIFLE_FRAME.h,
+      GunnerInfantry.armsPivot.x / GUNNER_RIFLE_FRAME.w,
+      GunnerInfantry.armsPivot.y / GUNNER_RIFLE_FRAME.h,
     );
     // Та же глубина, что у тела. Картинку добавляем позже, поэтому при равной глубине винтовка сверху.
     this.rifle.setDepth(this.depth);
-    if (scene.textures.exists(GunnerInfantry.handsKey)) {
-      this.hands = scene.add.image(x, y, GunnerInfantry.handsKey);
-      this.hands.setOrigin(this.originX, this.originY);
-      this.hands.setDepth(this.depth);
-    }
+    const fit = GunnerInfantry.fit;
+    this.setOrigin(fit.originX, fit.originY);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setSize(fit.bodyW, fit.bodyH);
+    body.setOffset(fit.bodyX, fit.bodyY);
     this.once('destroy', () => {
       this.scene.tweens.killTweensOf(this.recoil);
       this.rifle.destroy();
-      this.hands?.destroy();
     });
     this.syncRifle();
   }
 
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
+    // Стойка и труп шире кадра шага. Опора каждый кадр сажает подошву на землю.
+    if (this.texture.key === GunnerInfantry.aimKey) {
+      this.setOrigin(GunnerInfantry.aimFit.originX, GunnerInfantry.aimFit.originY);
+    } else if (this.texture.key === GunnerInfantry.corpseKey) {
+      this.setOrigin(GunnerInfantry.corpseFit.originX, GunnerInfantry.corpseFit.originY);
+    } else {
+      this.setOrigin(GunnerInfantry.fit.originX, GunnerInfantry.fit.originY);
+    }
     this.syncRifle();
   }
 
@@ -178,7 +212,17 @@ export class GunnerInfantry extends RangedEnemy {
     return GunnerInfantry.corpseKey;
   }
 
-  // Винтовка и кисти — отдельные спрайты. На трупе ствол уже лежит рядом с телом.
+  // Лежащая картинка длиннее шага, опора стоящего кадра поднимает её над землёй.
+  override kill(): void {
+    const wasAlive = !this.reachedWall;
+    super.kill();
+    if (wasAlive && this.texture.key === GunnerInfantry.corpseKey) {
+      this.setOrigin(GunnerInfantry.corpseFit.originX, GunnerInfantry.corpseFit.originY);
+      this.setScale(GunnerInfantry.corpseFit.scale);
+    }
+  }
+
+  // На трупе ствол уже лежит рядом с телом, отдельная картинка рук не нужна.
   protected override onDie(slain: boolean): void {
     if (!slain) {
       return;
@@ -186,21 +230,14 @@ export class GunnerInfantry extends RangedEnemy {
     if (this.rifle.active) {
       this.rifle.setVisible(false);
     }
-    if (this.hands?.active) {
-      this.hands.setVisible(false);
-    }
   }
 
   override hit(damage?: number): boolean {
     const dead = damage === undefined ? super.hit() : super.hit(damage);
     this.rifle.setTint(0xffccaa);
-    this.hands?.setTint(0xffccaa);
     this.scene.time.delayedCall(70, () => {
       if (this.rifle.active) {
         this.rifle.clearTint();
-      }
-      if (this.hands?.active) {
-        this.hands.clearTint();
       }
     });
     return dead;
@@ -257,12 +294,6 @@ export class GunnerInfantry extends RangedEnemy {
     // На бегу ствол нарисован в кадре. Отдельная картинка нужна только в стойке, иначе стволов два.
     const planted = !this.reachedWall && this.texture.key === this.idleTexture;
     this.rifle.setVisible(planted);
-    if (this.hands?.active) {
-      this.hands.setVisible(planted);
-      this.hands.setPosition(this.x, this.y);
-      this.hands.setScale(this.scaleX, this.scaleY);
-      this.hands.setAlpha(this.alpha);
-    }
     if (!planted) {
       return;
     }
@@ -326,11 +357,12 @@ export class GunnerInfantry extends RangedEnemy {
     return { x: mount.x + tip.x, y: mount.y + tip.y };
   }
 
-  // Приклад на спрайте солдата. anchor — точка ног, scale — масштаб тела.
+  // Плечо на стойке. anchor — точка ног, scale — масштаб тела.
   private static mountPoint(anchorX: number, anchorY: number, scale: number): { x: number; y: number } {
+    const fit = GunnerInfantry.aimFit;
     return {
-      x: anchorX + (GunnerInfantry.breech.x - GunnerInfantry.placed.originX * SOLDIER_FRAME.w) * scale,
-      y: anchorY + (GunnerInfantry.breech.y - GunnerInfantry.placed.originY * SOLDIER_FRAME.h) * scale,
+      x: anchorX + (GunnerInfantry.breech.x - fit.originX * 64) * scale,
+      y: anchorY + (GunnerInfantry.breech.y - fit.originY * 64) * scale,
     };
   }
 
@@ -367,12 +399,12 @@ export class GunnerInfantry extends RangedEnemy {
       scale,
     );
     rifle.setPosition(muzzle.x - tip.x, muzzle.y - tip.y);
-    rifle.setScale(scale);
+    rifle.setScale(scale * GunnerInfantry.armsFit);
     rifle.setRotation(rotation);
   }
 
   static renderRifle(g: Phaser.GameObjects.Graphics, look: SoldierLook = GUNNER_LOOK): void {
-    this.drawRifle(g, look, -GunnerInfantry.rifleCut.x, -GunnerInfantry.rifleCut.y);
+    this.drawRifle(g, look, 4, 41);
   }
 
   // Точка ядра вспышки: впереди дула по направлению выстрела.

@@ -73,7 +73,7 @@ export abstract class RangedEnemy extends Infantry {
       return;
     }
 
-    // Кулдаун тикает только в бою: act не вызывается, когда магазин на паузе.
+    // Кулдаун тикает только в бою: act молчит в магазине и пока часы сцены стоят.
     // Темп тратит паузу быстрее, поэтому на ×3 очередь втрое чаще. Урон пули тот же.
     this.fireCooldown -= delta * enemyHasteOf(this.scene.registry);
     if (this.fireCooldown > 0) {

@@ -89,7 +89,7 @@ export class NuclearExplosion {
   }
 }
 
-// Разрыв в момент, когда бомба села. Студия без этого плеера взрыв не слышит.
+// Разрыв в момент, когда бомба села. Без плеера в registry взрыв молчит.
 export function playNuclearBoom(scene: Phaser.Scene): void {
   const fx = scene.registry.get(REGISTRY_KEY);
   if (fx instanceof NuclearExplosion) {

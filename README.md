@@ -19,7 +19,6 @@ npm run dev
 | --- | --- |
 | `npm run dev` | Игра с горячей перезагрузкой |
 | `npm run debug` | Дебаг-партия: [http://localhost:8080/index.html?debug](http://localhost:8080/index.html?debug) |
-| `npm run studio` | Просмотр спрайтов: [http://localhost:8080/preview.html](http://localhost:8080/preview.html) |
 | `npm run build` | Проверка TypeScript и сборка в `dist/` |
 | `npm run build:html` | Отдельный файл `release/tank-penetration.html`. Его открывают двойным кликом, без сервера |
 | `npm run preview` | Локальный просмотр собранной игры |
@@ -142,7 +141,6 @@ npm run dev
    - `BarbedWire`, `MachineGun`, `ArtilleryStrike` — покупки.
 5. `src/ui/GameHud.ts` — счёт, волна, монеты, полоска HP, баннер, шестерёнка и экран паузы. `SettingsPanel.ts` — окно громкости музыки и эффектов.
 6. `src/gfx/` — цвета, рисование спрайтов и искры. `ensureGameTextures.ts` запекает картинки перед боем.
-7. `preview.html` и `src/preview/` — отдельная страница: те же спрайты крутятся и перекрашиваются без боя. Блок «Звуки» играет те же файлы, что и бой. Выстрел танка, пулемёт, удар пули о броню, пуск ракеты, взрыв ракеты о стену, удар о стену, крик пехоты, взрыв пикапа и гибель базы звучат сами, когда включены «Стрельба» и «Смерть». Запуск — `npm run studio`.
 
 Числа баланса лежат рядом с тем, кто их использует. Состав волны — `EnemyFactory.wave` и поле `debutWave` у врага. Выстрел танка — класс `Tank`. Цены — `ShopPanel`, `BarbedWire.shop`, `MachineGun.shop`, `ArtilleryStrike.shop` и `Tank.shop`.
 

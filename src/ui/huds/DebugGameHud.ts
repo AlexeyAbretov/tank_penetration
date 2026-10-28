@@ -10,6 +10,7 @@ export class DebugGameHud extends GameHud {
       ...super.controlHints(),
       'пробел — пауза без экрана',
       'двойное нажатие — сброс',
+      'A — ещё юнит',
       'N — пропуск волны',
     ];
   }
@@ -26,8 +27,18 @@ export class DebugGameHud extends GameHud {
       .setDepth(51);
 
     // То же имя шлёт DebugQuietPause. Константа ради одной подписи не нужна.
-    scene.events.on('quiet-pause', (on: boolean) => {
+    // Эмиттер сцены переживает перезапуск. Старая подпись после «новой игры»
+    // пишет в уничтоженный текст: updateText падает, и requestAnimationFrame
+    // больше не ставит следующий кадр — пробел паузу уже не снимает.
+    const onQuietPause = (on: boolean): void => {
+      if (!this.debugLabel.scene) {
+        return;
+      }
       this.debugLabel.setText(on ? 'DEBUG  ПАУЗА' : 'DEBUG');
+    };
+    scene.events.on('quiet-pause', onQuietPause);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      scene.events.off('quiet-pause', onQuietPause);
     });
   }
 }

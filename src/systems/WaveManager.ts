@@ -19,13 +19,15 @@ export class WaveManager {
 
   private scene!: Phaser.Scene;
   // Группа, в которую add() кладёт вышедшего врага. По ней же считаются живые.
-  private infantry!: Phaser.Physics.Arcade.Group;
+  // Открыта наследнику: дебаг-пропуск сам убивает тех, кто уже на поле.
+  protected infantry!: Phaser.Physics.Arcade.Group;
   // Та же группа, что у стрелков: сюда они складывают пули.
-  private enemyShots!: Phaser.Physics.Arcade.Group;
+  // Дебаг-пропуск чистит её, чтобы залп не добил базу уже на следующей волне.
+  protected enemyShots!: Phaser.Physics.Arcade.Group;
   // Куда целятся дальнобойные. Сцена отдаёт точку; менеджер класс танка не знает.
   private fireTarget!: WorldPoint;
   // Поражение обрывает отложенные выходы. Иначе враг появится уже на экране «БАЗА РАЗБИТА».
-  private isGameOver!: () => boolean;
+  protected isGameOver!: () => boolean;
   // Сцена открывает магазин. Сам менеджер про покупки не знает.
   private onWaveCleared!: () => void;
   // Запись партии: после старта волны, после зачистки и по ходу спавна её зовёт сцена отдельно.
@@ -34,8 +36,9 @@ export class WaveManager {
   // banner — показать объявление; без него номер обновляется тихо (магазин, середина боя).
   private onWaveBegan!: (wave: number, banner?: { boss: boolean }) => void;
 
-  // Поколение отложенных выходов. Пропуск волны его увеличивает, и старый таймер врага уже не выпускает.
-  private spawnStamp = 0;
+  // Поколение отложенных выходов. Новый заезд увеличивает штамп, и старый таймер врага уже не выпускает.
+  // Наследник тоже может его увеличить, когда отменяет ещё не вышедших.
+  protected spawnStamp = 0;
 
   // Фабрика и размер холста известны до сцены. Группы и колбэки появляются в create(), их ставит bind().
   constructor(
@@ -68,6 +71,10 @@ export class WaveManager {
 
   // После bind. Дебаг-наследник здесь вешает свою клавишу. Обычная партия метод не занимает.
   protected onBound(_scene: Phaser.Scene): void {}
+
+  // Перед списком выходов. Дебаг-наследник здесь подхватывает новое число из поля настроек.
+  // Обычная партия длину посреди баннера не меняет, поэтому метод пустой.
+  protected onRelease(_startIndex: number): void {}
 
   // Снимок для CombatSave. null — волна ещё не началась.
   // В магазине список врагов пустой: они уже уничтожены, а номер волны сохраняется как есть.
@@ -156,19 +163,6 @@ export class WaveManager {
     this.callLater(this.enemies.timing.startDelayMs, () => this.beginNextWave());
   }
 
-  // Пропуск текущей волны. Живые умирают, ещё не вышедшие не появляются.
-  // Магазин не открывается: следующая волна начинается сразу, onWaveCleared не зовётся.
-  // Волна 0 и уже открытый магазин не пропускаются — там нечего зачищать.
-  skipToNext(): void {
-    if (this.isGameOver() || this.wave < 1 || this.awaitingClear) {
-      return;
-    }
-    this.spawnStamp += 1;
-    this.slayLiving();
-    this.clearShots();
-    this.beginNextWave();
-  }
-
   beginNextWave(): void {
     if (this.isGameOver()) {
       return;
@@ -209,7 +203,10 @@ export class WaveManager {
   }
 
   private releaseFrom(startIndex: number): void {
-    const total = this.enemies.count(this.wave);
+    this.onRelease(startIndex);
+    // Очередь уже лежит в remainingToSpawn: onRelease успел её поправить.
+    // Второй запрос к фабрике здесь разошёлся бы с тем, что волна ещё должна выпустить.
+    const total = startIndex + this.remainingToSpawn;
     const gap = this.enemies.spawnGap(this.wave);
 
     for (let i = startIndex; i < total; i += 1) {
@@ -243,16 +240,14 @@ export class WaveManager {
     unit.march();
   }
 
-  private spawnInfantry(index = 0): void {
+  // Наследник дебага зовёт ещё раз: клавиша A кладёт юнита сверх списка волны.
+  protected spawnInfantry(index = 0): void {
     if (this.isGameOver()) {
       return;
     }
 
-    // Шесть горизонтальных дорожек. Случайный сдвиг ±16 px, чтобы строй не был линейкой.
-    const lanes = [176, 248, 320, 392, 464, 536];
-    const y = lanes[Phaser.Math.Between(0, lanes.length - 1)] + Phaser.Math.Between(-16, 16);
-    // Правее края экрана: враг въезжает в кадр, а не появляется уже на поле.
-    const x = this.game.width + 24 + Phaser.Math.Between(0, 70);
+    // Правее края и на свободной дорожке: въезжает в кадр с зазором до уже идущих.
+    const { x, y } = this.entryPoint();
     // index — место в списке волны. Фабрика по нему выбирает вид и здоровье.
     // fireTarget — точка, в которую целятся стрелки; её задала сцена в bind().
     const unit = this.enemies.create(index, {
@@ -267,7 +262,62 @@ export class WaveManager {
     unit.march();
   }
 
-  // Таймер этой волны. Пропуск увеличивает штамп, и вызов от прошлой волны молча сгорает.
+  // Шесть дорожек от верха поля до баннера.
+  // Пока живых не больше дорожек, зазор полный: 118 по вертикали (в шеренге каждая вторая
+  // дорожка, соседние стоят через 72) и 200 по горизонтали. Маленькая волна не слипается в точку.
+  // Дальше зазор сжимается. В толпе корпуса заходят друг на друга, и радиус взрыва достаёт соседа.
+  // Пол 36×32 не даёт двоим встать в один пиксель.
+  private entryPoint(): { x: number; y: number } {
+    const lanes = [176, 248, 320, 392, 464, 536];
+    const baseX = this.game.width + 24;
+    const loose = { x: 200, y: 118 };
+    const tight = { x: 36, y: 32 };
+
+    const others = (this.infantry.getChildren() as WaveUnit[]).filter(
+      (unit) => unit.active && !unit.reachedWall,
+    );
+    // До шестого живого строй редкий. С седьмого зазор сжимается и к десятому доходит до пола.
+    const t = Math.min(1, Math.max(0, others.length - lanes.length) / 4);
+    const sepX = loose.x + (tight.x - loose.x) * t;
+    const sepY = loose.y + (tight.y - loose.y) * t;
+
+    const fits: { x: number; y: number }[] = [];
+    for (const lane of lanes) {
+      const y = lane + Phaser.Math.Between(-8, 8);
+      let x = baseX;
+      for (const unit of others) {
+        const dy = Math.abs(y - unit.y);
+        if (dy >= sepY) {
+          continue;
+        }
+        const share = dy / sepY;
+        const dxNeed = sepX * Math.sqrt(1 - share * share);
+        const minX = unit.x + dxNeed;
+        if (minX > x) {
+          x = minX;
+        }
+      }
+      fits.push({ x, y });
+    }
+
+    let front = fits[0]?.x ?? baseX;
+    for (const fit of fits) {
+      if (fit.x < front) {
+        front = fit.x;
+      }
+    }
+    // Несколько свободных дорожек равноправны: берём любую из передней шеренги.
+    const open = fits.filter((fit) => fit.x <= front + 1);
+    const picked = open[Phaser.Math.Between(0, open.length - 1)] ?? {
+      x: baseX,
+      y: lanes[0] ?? 320,
+    };
+    // В толпе случайный сдвиг короче, иначе он снова разводит уже сжатый строй.
+    const slack = Math.round(36 - 28 * t);
+    return { x: picked.x + Phaser.Math.Between(0, slack), y: picked.y };
+  }
+
+  // Таймер этой волны. Чужой штамп значит, что выход уже отменён.
   private callLater(delay: number, fn: () => void): void {
     const stamp = this.spawnStamp;
     this.scene.time.delayedCall(delay, () => {
@@ -276,24 +326,6 @@ export class WaveManager {
       }
       fn();
     });
-  }
-
-  // Живые падают как убитые: hp в ноль, чтобы остался труп, а не уход «дошёл до стены».
-  private slayLiving(): void {
-    for (const unit of this.infantry.getChildren() as WaveUnit[]) {
-      if (!unit.active || unit.reachedWall) {
-        continue;
-      }
-      unit.hp = 0;
-      unit.kill();
-    }
-  }
-
-  // Пули и ракеты уже в полёте. После пропуска они не добивают базу на баннере следующей волны.
-  private clearShots(): void {
-    for (const shot of [...this.enemyShots.getChildren()]) {
-      shot.destroy();
-    }
   }
 
   // Живые бойцы. active === false — спрайт уже уничтожен. reachedWall — выбыл из волны.

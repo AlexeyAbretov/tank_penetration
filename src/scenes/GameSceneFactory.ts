@@ -22,6 +22,7 @@ import { DebugCombatSystem } from '../systems/DebugCombatSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { DebugGameHud } from '../ui/huds/DebugGameHud';
 import { GameHud } from '../ui/huds/GameHud';
+import { DebugSettingsPanel } from '../ui/settings/DebugSettingsPanel';
 
 export class GameSceneFactory {
   static create(): GameScene {
@@ -36,6 +37,7 @@ export class GameSceneFactory {
         DebugGameHud,
         DebugCombatSystem,
         new PauseStack([new ScreenPause(), new DebugQuietPause()]),
+        DebugSettingsPanel,
       );
     }
 

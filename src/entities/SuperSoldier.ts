@@ -95,8 +95,8 @@ export class SuperSoldier extends Infantry {
 
   static ensureTextures(scene: Scene): void {
     if (!scene.textures.exists('super-0')) {
-      bake(scene, 'super-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => this.drawMarch(g, 0, SUPER_LOOK, false));
-      bake(scene, 'super-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => this.drawMarch(g, 1, SUPER_LOOK, false));
+      bake(scene, 'super-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => this.drawMarch(g, 0, SUPER_LOOK));
+      bake(scene, 'super-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => this.drawMarch(g, 1, SUPER_LOOK));
     }
     if (!scene.textures.exists(this.corpseKey)) {
       bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) => this.drawCorpse(g, SUPER_LOOK));
@@ -455,20 +455,12 @@ export class SuperSoldier extends Infantry {
     gun.setRotation(rotation);
   }
 
-  // Кадр марша для текстуры. withGun = false — тело без пулемёта: в бою ствол рисуется отдельной картинкой.
-  static drawMarch(
-    g: Phaser.GameObjects.Graphics,
-    legPhase: 0 | 1,
-    look: SoldierLook,
-    withGun = true,
-  ): void {
+  // Кадр марша для текстуры. Пулемёт — отдельная картинка, чтобы отдача двигала ствол.
+  static drawMarch(g: Phaser.GameObjects.Graphics, legPhase: 0 | 1, look: SoldierLook): void {
     Infantry.drawSoldier(g, legPhase, look, false);
     g.fillStyle(look.vest);
     g.fillRoundedRect(12, 26, 14, 8, 2);
     g.fillRoundedRect(40, 26, 14, 8, 2);
-    if (withGun) {
-      this.drawGun(g, look, SuperSoldier.gunCut.x, SuperSoldier.gunCut.y);
-    }
   }
 
   static drawCorpse(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {

@@ -25,7 +25,7 @@ export class RocketInfantry extends RangedEnemy {
   static readonly aimKey = 'rocketman-aim';
   static readonly launcherKey = 'rocketman-launcher';
   static readonly handsKey = 'rocketman-hands';
-  // Середина среза относительно точки ног, труба строго влево. Жёлтая метка и ракета в просмотре.
+  // Середина среза относительно точки ног, труба строго влево.
   static get muzzleOffset(): { x: number; y: number } {
     const point = RocketInfantry.muzzleAt(0, 0, RocketInfantry.placed.scale, 0);
     return { x: point.x, y: point.y };
@@ -216,7 +216,7 @@ export class RocketInfantry extends RangedEnemy {
   }
 
   protected override onFire(x: number, y: number, angle: number): void {
-    RocketInfantry.playBackblast(this.scene, null, x, y, angle, this.scaleX, 'rocketman-flash');
+    RocketInfantry.playBackblast(this.scene, x, y, angle, this.scaleX, 'rocketman-flash');
   }
 
   private kickLauncher(): void {
@@ -368,10 +368,9 @@ export class RocketInfantry extends RangedEnemy {
     };
   }
 
-  // Огонь у среза и клубы, которые уходят назад и поднимаются. parent — контейнер просмотра.
+  // Огонь у среза и клубы, которые уходят назад и поднимаются.
   static playBackblast(
     scene: Phaser.Scene,
-    parent: Phaser.GameObjects.Container | null,
     x: number,
     y: number,
     angle: number,
@@ -392,7 +391,6 @@ export class RocketInfantry extends RangedEnemy {
       puff.setScale(0.18 * scale);
       puff.setAlpha(0.5);
       puff.setTint(i < 2 ? 0xd2cdc2 : 0x7a766e);
-      parent?.add(puff);
       scene.tweens.add({
         targets: puff,
         x: px + cos * (16 + i * 7) * scale,
@@ -408,7 +406,6 @@ export class RocketInfantry extends RangedEnemy {
     flash.setRotation(pose.rotation);
     flash.setBlendMode(Phaser.BlendModes.ADD);
     flash.setScale(scale * pop.x, scale * pop.y);
-    parent?.add(flash);
     scene.tweens.add({
       targets: flash,
       alpha: 0,

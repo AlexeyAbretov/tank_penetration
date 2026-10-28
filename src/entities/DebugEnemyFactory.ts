@@ -1,6 +1,7 @@
 // Дебаг-круг волн. Наследует появление юнитов у обычной фабрики и подменяет состав.
-// Волна 1 — три штурмовика, 5 — босс, 6 — снова три штурмовика.
-// Здоровье и скорость всегда как у первого выхода: номер волны их не поднимает.
+// Волна 1 — штурмовики, 5 — босс, 6 — снова штурмовики.
+// Обычных в волне по умолчанию трое. Поле в настройках пишет число в localStorage, потолок 50.
+// Босс остаётся один. Здоровье и скорость всегда как у первого выхода.
 
 import { AssaultInfantry } from './AssaultInfantry';
 import { EnemyFactory } from './EnemyFactory';
@@ -27,7 +28,31 @@ const CYCLE: EnemyKind[] = [
   SuperSoldier,
 ];
 
+// Свой ключ, не ключ партии: «новая игра» стирает бой, а размер волны остаётся.
+const WAVE_COUNT_KEY = 'tank-penetration-wave-count:debug';
+const DEFAULT_REGULAR_COUNT = 3;
+const REGULAR_MAX = 50;
+
 export class DebugEnemyFactory extends EnemyFactory {
+  // Потолок обычной волны. Поле в настройках выше не ставит.
+  // Клавиша A останавливается здесь же и может перейти число из поля.
+  // Ниже одного обычная волна не опускается: пустой выход сразу бы её закрыл.
+  static readonly regularMax = REGULAR_MAX;
+  private static regularCount = readRegularCount();
+
+  static regularCountOf(): number {
+    return this.regularCount;
+  }
+
+  static setRegularCount(count: number): void {
+    const whole = Math.trunc(count);
+    if (!Number.isFinite(whole)) {
+      return;
+    }
+    this.regularCount = Math.min(this.regularMax, Math.max(1, whole));
+    writeRegularCount(this.regularCount);
+  }
+
   // Пауза между выходами не сжимается: следующий круг такой же, как первый.
   static spawnGap(_wave: number): number {
     return this.timing.spawnGap;
@@ -41,7 +66,7 @@ export class DebugEnemyFactory extends EnemyFactory {
     if (wave < 1) {
       return 0;
     }
-    return this.isBossWave(wave) ? 1 : 3;
+    return this.isBossWave(wave) ? 1 : this.regularCount;
   }
 
   static create(_index: number, ctx: SpawnContext): Infantry {
@@ -87,5 +112,29 @@ export class DebugEnemyFactory extends EnemyFactory {
       return SuperSoldier;
     }
     return AssaultInfantry;
+  }
+}
+
+function readRegularCount(): number {
+  try {
+    const raw = localStorage.getItem(WAVE_COUNT_KEY);
+    if (raw === null) {
+      return DEFAULT_REGULAR_COUNT;
+    }
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+      return DEFAULT_REGULAR_COUNT;
+    }
+    return Math.min(REGULAR_MAX, Math.max(1, Math.trunc(value)));
+  } catch {
+    return DEFAULT_REGULAR_COUNT;
+  }
+}
+
+function writeRegularCount(count: number): void {
+  try {
+    localStorage.setItem(WAVE_COUNT_KEY, String(count));
+  } catch {
+    // Приватный режим: число работает, пока открыта вкладка.
   }
 }

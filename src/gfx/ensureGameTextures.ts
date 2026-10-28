@@ -1,5 +1,5 @@
 // Прогрев всех текстур игры. Отдельный файл, чтобы textures.ts не импортировал сущности:
-// сущности сами вызывают bake() из textures.ts, цикл сломает studio.
+// сущности сами вызывают bake() из textures.ts, и общий импорт зациклил бы модули.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';

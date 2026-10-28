@@ -1,0 +1,8 @@
+When generating a Git commit message for this repository, read the whole staged diff. Do not stop after the largest theme.
+
+- First line: the main change, imperative mood, no trailing period.
+- Blank line, then the body.
+- The body names every other distinct change: behavior, assets, config, scripts, and docs. One short sentence each.
+- Files that serve one change stay in one sentence. A file that does something else gets its own sentence.
+- Do not fold the rest of the diff into words like "related", "update", or "refactor" without saying what changed.
+- Write in English.

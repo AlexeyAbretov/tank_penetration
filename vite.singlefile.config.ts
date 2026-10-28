@@ -7,7 +7,7 @@ import path from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
-// Те же пути, что GameScene.load берёт из public/. Студия в эту сборку не входит.
+// Те же пути, что GameScene.load берёт из public/.
 const packedFiles = [
   ['assets/tank-hull.png', 'image/png'],
   ['assets/tank-turret.png', 'image/png'],
@@ -39,7 +39,6 @@ const packedFiles = [
   ['assets/gunner-5.png', 'image/png'],
   ['assets/gunner-aim.png', 'image/png'],
   ['assets/gunner-rifle.png', 'image/png'],
-  ['assets/gunner-hands.png', 'image/png'],
   ['assets/gunner-corpse.png', 'image/png'],
   ['assets/rocketman-0.png', 'image/png'],
   ['assets/rocketman-1.png', 'image/png'],

@@ -104,6 +104,14 @@ export class GameScene extends Phaser.Scene {
       effects: BattleEffects,
     ) => CombatSystem,
     private readonly pauses: PauseStack,
+    // Окно громкости. Дебаг подставляет наследника с полем числа врагов. Обычная партия — само окно.
+    private readonly SettingsView: new (
+      scene: Phaser.Scene,
+      frame: { width: number; height: number },
+      onMusic: (level: number) => void,
+      onEffects: (level: number) => void,
+      onClose: () => void,
+    ) => SettingsPanel = SettingsPanel,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
@@ -130,7 +138,11 @@ export class GameScene extends Phaser.Scene {
     this.settingsOpen = false;
     this.settingsPausedPhysics = false;
     this.pausedEmitters = [];
+    // «Новая игра» с экрана паузы перезапускает сцену, не отпуская часы.
+    // shutdown твинов и глобальных анимаций флаг паузы не сбрасывает.
     this.time.paused = false;
+    this.tweens.resumeAll();
+    this.anims.resumeAll();
     this.persistEnabled = false;
     this.autosaveMs = 0;
     this.defeatShop = false;
@@ -276,7 +288,7 @@ export class GameScene extends Phaser.Scene {
 
     this.music.bind(this);
     this.music.create();
-    this.settings = new SettingsPanel(
+    this.settings = new this.SettingsView(
       this,
       GAME,
       (level) => this.music.setVolume(level),
@@ -521,9 +533,10 @@ export class GameScene extends Phaser.Scene {
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('beforeunload', this.onPageHide);
-    if (this.holdDepth > 0) {
-      this.anims.resumeAll();
-    }
+    // Часы и твины живут дольше сцены: иначе загрузка следующей игры идёт на паузе.
+    this.time.paused = false;
+    this.tweens.resumeAll();
+    this.anims.resumeAll();
     this.music.destroy();
     this.fx?.destroy();
   }

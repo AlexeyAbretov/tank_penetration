@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "debug": "vite --open /index.html?debug",
-    "studio": "vite --open /preview.html",
     "build": "tsc --noEmit && vite build",
     "build:html": "tsc --noEmit && vite build --config vite.singlefile.config.ts",
     "preview": "vite preview"

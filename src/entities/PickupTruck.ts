@@ -282,7 +282,7 @@ export class PickupTruck extends RangedEnemy {
       for (let phase = 0; phase < PickupTruck.wheelFrames; phase += 1) {
         // Без ствола: в бою его рисует отдельный спрайт и двигает при отдаче.
         bake(scene, `pickup-${phase}`, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) =>
-          this.render(g, phase, PICKUP_PAINT, false),
+          this.render(g, phase, PICKUP_PAINT),
         );
       }
     }
@@ -312,7 +312,6 @@ export class PickupTruck extends RangedEnemy {
     g: Phaser.GameObjects.Graphics,
     wheelPhase: number,
     paint: PickupPaint = PICKUP_PAINT,
-    withGun = true,
   ): void {
     // Тень под машиной. Холст 160×80, низ около y = 74.
     g.fillStyle(0x000000, 0.35);
@@ -377,17 +376,10 @@ export class PickupTruck extends RangedEnemy {
     // Упор в кузов. Ствол на высоте рук, выше крыши, носом влево.
     g.fillStyle(paint.mount);
     g.fillRect(100, 20, 6, 14);
-    // В бою ствол живёт отдельно. В просмотре его рисуем прямо на кадре машины.
-    if (withGun) {
-      this.drawBarrel(g, paint, 0, 0);
-    }
 
-    // Голова выше ствола. Кисти на стволе: в бою они едут вместе с оружием, в просмотре рисуются здесь.
+    // Голова выше ствола. Ствол и кисти — отдельная картинка, их двигает отдача.
     g.fillStyle(paint.skin);
     g.fillCircle(120, 13, 5);
-    if (withGun) {
-      this.drawHands(g, paint, 0, 0);
-    }
     g.fillStyle(paint.driver);
     g.fillRoundedRect(112, 2, 16, 9, 3);
     g.fillRect(110, 9, 20, 3);
@@ -543,16 +535,10 @@ export class PickupTruck extends RangedEnemy {
     });
   }
 
-  // Один клуб взрыва. scale увеличивает радиус, скорость и осколки вместе с картинкой в просмотре.
-  static burstAt(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    scale = 1,
-    keys: { spark?: string; muzzle?: string } = {},
-  ): Phaser.GameObjects.GameObject[] {
-    const sparkKey = keys.spark ?? 'spark';
-    const muzzleKey = keys.muzzle ?? 'muzzle';
+  // Один клуб взрыва. scale увеличивает радиус, скорость и осколки.
+  static burstAt(scene: Phaser.Scene, x: number, y: number, scale = 1): void {
+    const sparkKey = 'spark';
+    const muzzleKey = 'muzzle';
     if (!scene.textures.exists(sparkKey)) {
       bake(scene, sparkKey, 12, 12, (g) => {
         g.fillStyle(0xffffff);
@@ -589,7 +575,6 @@ export class PickupTruck extends RangedEnemy {
       },
     });
 
-    const bits: Phaser.GameObjects.Rectangle[] = [];
     for (let i = 0; i < 5; i += 1) {
       const bit = scene.add
         .rectangle(x, y, 10 * scale, 4 * scale, i % 2 === 0 ? 0x3a4a24 : 0x1a1c16)
@@ -605,9 +590,7 @@ export class PickupTruck extends RangedEnemy {
         duration: 460,
         onComplete: () => bit.destroy(),
       });
-      bits.push(bit);
     }
-    return [sparks, fire, core, flash, ...bits];
   }
 
   // Ствол в своих координатах. ox и oy сдвигают рисунок: для текстуры ствола это вырез из кадра машины.

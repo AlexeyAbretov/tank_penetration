@@ -140,8 +140,10 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     }
     // Пока юнит жив и едет, полоска едет вместе с ним.
     this.syncBar();
-    // Мёртвый юнит или открытый магазин (combat === false) — поведение замирает.
-    if (this.reachedWall || this.scene.registry.get('combat') === false) {
+    // Мёртвый юнит, магазин (combat === false) или стоящие часы — поведение замирает.
+    // preUpdate Phaser зовёт до update сцены, поэтому выход из кадра паузы сам стрельбу не гасит.
+    // Иначе стрелок достреливает при замерших твинах, и вспышка остаётся на дуле.
+    if (this.reachedWall || this.scene.time.paused || this.scene.registry.get('combat') === false) {
       return;
     }
     // Наследник здесь решает: просто идти или ещё и стрелять.

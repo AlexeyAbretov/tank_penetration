@@ -162,7 +162,7 @@ export class Tank extends GameObjects.Container {
       layout.gunY - layout.seatY,
     );
   }
-  // Круглая вспышка у дула раздувается и гаснет. Её же показывает просмотр спрайтов.
+  // Круглая вспышка у дула раздувается и гаснет.
   static readonly muzzleFlash = { scale: 1.6, ms: 90 };
 
   static readonly wreckKey = 'tank-wreck';

@@ -111,7 +111,7 @@ export class BoomSounds {
 }
 
 // Хлопок батареи в момент нажатия. onEnded — когда файл доиграл, не когда звук оборвали.
-// Студия рисует картинки без этого плеера — тогда залп молчит и функция возвращает false.
+// Без плеера в registry залп молчит и функция возвращает false.
 export function playArtilleryShot(scene: Phaser.Scene, onEnded?: () => void): boolean {
   const fx = scene.registry.get(REGISTRY_KEY);
   if (fx instanceof BoomSounds) {

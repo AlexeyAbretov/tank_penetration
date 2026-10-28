@@ -17,7 +17,11 @@ type Slider = {
 };
 
 export class SettingsPanel {
-  private readonly container: Phaser.GameObjects.Container;
+  protected container!: Phaser.GameObjects.Container;
+  // Карточка и «Готово» открыты наследнику: дебаг дописывает поле снизу и растит окно вниз.
+  protected card!: Phaser.GameObjects.Rectangle;
+  protected done!: Phaser.GameObjects.Rectangle;
+  protected doneLabel!: Phaser.GameObjects.Text;
   private readonly music: Slider;
   private readonly effects: Slider;
   private dragging: Slider | null = null;
@@ -38,9 +42,9 @@ export class SettingsPanel {
       this.onClose();
     });
 
-    const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96).setStrokeStyle(4, 0xc9a227);
+    this.card = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96).setStrokeStyle(4, 0xc9a227);
     // Глушит клик по затемнению, когда курсор над самой карточкой.
-    panel.setInteractive();
+    this.card.setInteractive();
 
     const title = scene.add
       .text(0, -158, 'НАСТРОЙКИ', {
@@ -73,10 +77,10 @@ export class SettingsPanel {
       scene.input.off('pointerup', onUp);
     });
 
-    const done = scene.add.rectangle(0, 148, 220, 48, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
-    done.setInteractive({ useHandCursor: true });
-    done.on('pointerup', () => this.onClose());
-    const doneLabel = scene.add
+    this.done = scene.add.rectangle(0, 148, 220, 48, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    this.done.setInteractive({ useHandCursor: true });
+    this.done.on('pointerup', () => this.onClose());
+    this.doneLabel = scene.add
       .text(0, 148, 'ГОТОВО', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
@@ -87,14 +91,14 @@ export class SettingsPanel {
     this.container = scene.add
       .container(frame.width / 2, frame.height / 2, [
         dim,
-        panel,
+        this.card,
         title,
         musicLabel,
         effectsLabel,
         ...this.music.nodes,
         ...this.effects.nodes,
-        done,
-        doneLabel,
+        this.done,
+        this.doneLabel,
       ])
       .setDepth(88)
       .setVisible(false);
