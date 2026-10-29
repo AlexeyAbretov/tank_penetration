@@ -1,4 +1,4 @@
-// Обычная пауза: кнопка, Esc и плашка «ПАУЗА». Клик по затемнению или Esc продолжают бой.
+// Обычная пауза: кнопка, Esc и плашка «ПАУЗА». Продолжает бой только Esc.
 
 import type { Pause, PauseEnv } from './PauseStack';
 
@@ -6,7 +6,6 @@ export class ScreenPause implements Pause {
   private env?: PauseEnv;
   private active = false;
   private armed = false;
-  private resumeClick = false;
 
   get blocking(): boolean {
     return this.active;
@@ -20,15 +19,11 @@ export class ScreenPause implements Pause {
     this.env = env;
     this.active = false;
     this.armed = false;
-    this.resumeClick = false;
     env.hud.onPause(() => {
       if (!env.canPause() || this.active) {
         return;
       }
       this.enter();
-    });
-    env.hud.onResume(() => {
-      this.resumeClick = true;
     });
   }
 
@@ -37,19 +32,16 @@ export class ScreenPause implements Pause {
       return;
     }
     if (this.active) {
-      // Первый кадр проглатывает Esc и клик, которыми паузу включили.
+      // Первый кадр проглатывает Esc, которым паузу включили.
       if (!this.armed) {
         this.armed = true;
-        this.resumeClick = false;
         return;
       }
-      if (esc || this.resumeClick) {
+      if (esc) {
         this.exit();
       }
-      this.resumeClick = false;
       return;
     }
-    this.resumeClick = false;
     if (esc && this.env.canPause() && !this.env.blockedAbove()) {
       this.enter();
     }
@@ -80,7 +72,6 @@ export class ScreenPause implements Pause {
     this.env.preemptLower();
     this.active = true;
     this.armed = false;
-    this.resumeClick = false;
     this.env.showPlate(true);
     this.env.coverShop(true);
     this.env.save();
