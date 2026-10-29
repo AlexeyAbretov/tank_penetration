@@ -63,6 +63,11 @@ export class GameHud {
   private newGameRequest?: () => void;
 
   protected readonly statusY = 28;
+  // Ряд плашек у полоски HP. Дебаг ставит свою левее автострельбы тем же шагом.
+  protected readonly plateSize = 40;
+  protected readonly plateGap = 6;
+  protected readonly plateY = 28;
+  protected autoFireX = 0;
   protected readonly statusStyle = {
     fontFamily: 'Cinzel, Georgia, serif',
     fontSize: '18px',
@@ -126,13 +131,13 @@ export class GameHud {
       .setAlpha(0);
 
     // Рамка HP: центр 1128, ширина 280. Иконки стоят сразу слева от неё.
-    const icon = 40;
+    const icon = this.plateSize;
     const hpLeft = 1128 - 140;
     const hasteX = hpLeft - 8 - icon / 2;
-    const pauseX = hasteX - 6 - icon;
-    const settingsX = pauseX - 6 - icon;
-    const autoFireX = settingsX - 6 - icon;
-    const iconY = 28;
+    const pauseX = hasteX - this.plateGap - icon;
+    const settingsX = pauseX - this.plateGap - icon;
+    this.autoFireX = settingsX - this.plateGap - icon;
+    const iconY = this.plateY;
 
     this.hastePlate = scene.add
       .rectangle(hasteX, iconY, icon, icon, 0x3a0c0c)
@@ -173,11 +178,11 @@ export class GameHud {
 
     // Пока автострельба не куплена, плашка не ловит клики: иначе пустое место гасило бы выстрел.
     this.autoFirePlate = scene.add
-      .rectangle(autoFireX, iconY, icon, icon, 0x3a0c0c)
+      .rectangle(this.autoFireX, iconY, icon, icon, 0x3a0c0c)
       .setStrokeStyle(2, 0xc9a227)
       .setDepth(80)
       .setVisible(false);
-    this.autoFireIcon = scene.add.graphics().setPosition(autoFireX, iconY).setDepth(81).setVisible(false);
+    this.autoFireIcon = scene.add.graphics().setPosition(this.autoFireX, iconY).setDepth(81).setVisible(false);
     this.drawAutoFire(false);
     this.autoFirePlate.on('pointerup', () => this.autoFireRequest?.());
 
@@ -439,6 +444,16 @@ export class GameHud {
     return (
       this.autoFirePlate.visible && this.autoFirePlate.getBounds().contains(pointer.worldX, pointer.worldY)
     );
+  }
+
+  // В обычной партии плашки нет. Дебаг перекрывает клик своей кнопкой урона.
+  coversEnemyDamage(_pointer: Phaser.Input.Pointer): boolean {
+    return false;
+  }
+
+  // Та же плашка, на один шаг левее. Дебаг ставит так выключатель урона.
+  protected plateLeftOf(x: number): number {
+    return x - this.plateGap - this.plateSize;
   }
 
   // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
