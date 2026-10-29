@@ -120,6 +120,24 @@ function inlinePackedFiles(): Plugin {
   };
 }
 
+// Live Server ищет в файле первое `</body>` и вставляет перед ним свой <script>.
+// В бандле Phaser эта последовательность стоит внутри строки, не в разметке страницы.
+// Вставка попадает в середину скрипта, и браузер сообщает Invalid or unexpected token.
+// \u003c — тот же символ «<», но букв </body> в тексте скрипта уже нет,
+// поэтому сервер доходит до настоящего закрывающего тега.
+function keepLiveServerOutOfScript(html: string): string {
+  const scriptOpen = '<script>';
+  const openAt = html.indexOf(scriptOpen);
+  const closeAt = html.lastIndexOf('</script>');
+  if (openAt === -1 || closeAt < openAt) {
+    return html;
+  }
+
+  const jsAt = openAt + scriptOpen.length;
+  const js = html.slice(jsAt, closeAt).replace(/<\/body>/gi, (match) => `\\u003c${match.slice(1)}`);
+  return html.slice(0, jsAt) + js + html.slice(closeAt);
+}
+
 // Vite называет страницу index.html по имени входного файла.
 // На релизе нужно другое имя, чтобы скачанный файл было видно среди ассетов.
 function nameReleaseHtml(): Plugin {
@@ -146,11 +164,20 @@ function nameReleaseHtml(): Plugin {
         moduleAt === -1
           ? html
           : html.slice(0, moduleAt) + '<script>' + html.slice(moduleAt + moduleTag.length);
-      const externalScript = /<script\b[^>]*\bsrc=/i.test(classic);
-      const stillModule = classic.includes(moduleTag);
-      const looseFiles = packedFiles.some(([relativePath]) => classic.includes(relativePath));
-      const imageCount = classic.split('data:image/png;base64,').length - 1;
-      const audioCount = classic.split('data:audio/mpeg;base64,').length - 1;
+      const page = keepLiveServerOutOfScript(classic);
+      const scriptOpen = '<script>';
+      const scriptAt = page.indexOf(scriptOpen);
+      const scriptCloseAt = page.lastIndexOf('</script>');
+      const script =
+        scriptAt === -1 || scriptCloseAt < scriptAt
+          ? ''
+          : page.slice(scriptAt + scriptOpen.length, scriptCloseAt);
+      const externalScript = /<script\b[^>]*\bsrc=/i.test(page);
+      const stillModule = page.includes(moduleTag);
+      const looseFiles = packedFiles.some(([relativePath]) => page.includes(relativePath));
+      const imageCount = page.split('data:image/png;base64,').length - 1;
+      const audioCount = page.split('data:audio/mpeg;base64,').length - 1;
+      const bodyInsideScript = /<\/body>/i.test(script);
 
       if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 16) {
         throw new Error(
@@ -158,7 +185,13 @@ function nameReleaseHtml(): Plugin {
         );
       }
 
-      fs.writeFileSync(to, classic);
+      if (bodyInsideScript) {
+        throw new Error(
+          'release/tank-penetration.html содержит </body> внутри скрипта: Live Server вставит туда свой код и сломает страницу',
+        );
+      }
+
+      fs.writeFileSync(to, page);
     },
   };
 }

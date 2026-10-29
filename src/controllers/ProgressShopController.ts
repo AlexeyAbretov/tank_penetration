@@ -28,7 +28,11 @@ export class ProgressShopController {
   bind(scene: Phaser.Scene, onNewGame: () => void): void {
     this.onNewGame = onNewGame;
     this.paused = false;
-    this.panel = new ProgressShopPanel(scene, this, { width: GAME.width, height: GAME.height });
+    this.panel = new ProgressShopPanel(scene, this, GAME);
+  }
+
+  layout(): void {
+    this.panel.layout();
   }
 
   speedLevel(): number {

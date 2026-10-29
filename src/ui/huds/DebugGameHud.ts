@@ -59,6 +59,14 @@ export class DebugGameHud extends GameHud {
     });
   }
 
+  override layout(): void {
+    super.layout();
+    const x = this.plateLeftOf(this.autoFireX);
+    this.enemyDamagePlate.setPosition(x, this.plateY);
+    this.enemyDamageIcon.setPosition(x, this.plateY);
+    this.debugLabel.setX(this.frame.width / 2);
+  }
+
   override coversEnemyDamage(pointer: Phaser.Input.Pointer): boolean {
     return this.enemyDamagePlate.getBounds().contains(pointer.worldX, pointer.worldY);
   }

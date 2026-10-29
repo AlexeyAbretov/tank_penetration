@@ -18,6 +18,7 @@ type Slider = {
 
 export class SettingsPanel {
   protected container!: Phaser.GameObjects.Container;
+  private readonly dim: Phaser.GameObjects.Rectangle;
   // Карточка и «Готово» открыты наследнику: дебаг дописывает поле снизу и растит окно вниз.
   protected card!: Phaser.GameObjects.Rectangle;
   protected done!: Phaser.GameObjects.Rectangle;
@@ -33,7 +34,7 @@ export class SettingsPanel {
     onEffects: (level: number) => void,
     private readonly onClose: () => void,
   ) {
-    const dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
+    this.dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
 
     this.card = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96).setStrokeStyle(4, 0xc9a227);
     // Глушит клик по затемнению, когда курсор над самой карточкой.
@@ -83,7 +84,7 @@ export class SettingsPanel {
 
     this.container = scene.add
       .container(frame.width / 2, frame.height / 2, [
-        dim,
+        this.dim,
         this.card,
         title,
         musicLabel,
@@ -95,6 +96,12 @@ export class SettingsPanel {
       ])
       .setDepth(88)
       .setVisible(false);
+  }
+
+  // Окно стало шире — затемнение и карточка остаются по центру нового поля.
+  layout(): void {
+    this.container.setPosition(this.frame.width / 2, this.frame.height / 2);
+    this.dim.setSize(this.frame.width, this.frame.height);
   }
 
   // Только рисунок. Звук зовёт сцена, когда ползунок реально сдвинули.

@@ -44,6 +44,8 @@ export class ProgressShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly scoreText: Phaser.GameObjects.Text;
+  private readonly dim: Phaser.GameObjects.Rectangle;
+  private readonly screen: { width: number; height: number };
   private readonly offers: Offer[] = [];
 
   constructor(
@@ -51,7 +53,9 @@ export class ProgressShopPanel {
     shop: ProgressShopDelegate,
     screen: { width: number; height: number },
   ) {
-    const dim = scene.add.rectangle(0, 0, screen.width, screen.height, 0x000000, 0.62).setInteractive();
+    this.screen = screen;
+    this.dim = scene.add.rectangle(0, 0, screen.width, screen.height, 0x000000, 0.62).setInteractive();
+    const dim = this.dim;
     const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
     panel.setStrokeStyle(4, 0xc9a227);
 
@@ -81,6 +85,11 @@ export class ProgressShopPanel {
 
     // Выше игрового UI и окна между волнами. Пауза (90) остаётся сверху.
     this.container.setDepth(85).setVisible(false);
+  }
+
+  layout(): void {
+    this.container.setPosition(this.screen.width / 2, this.screen.height / 2);
+    this.dim.setSize(this.screen.width, this.screen.height);
   }
 
   show(view: ProgressShopView): void {

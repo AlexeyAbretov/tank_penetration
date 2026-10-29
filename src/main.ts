@@ -4,8 +4,19 @@
 // Phaser — игровой движок: рисует картинки, считает физику, ловит мышь.
 import Phaser from 'phaser';
 // Размер холста — в gameConfig.ts. Сцену собирает GameSceneFactory.
-import { GAME } from './gameConfig';
+import { GAME, fitGameTo } from './gameConfig';
 import { GameSceneFactory } from './scenes/GameSceneFactory';
+
+function parentBox(): { width: number; height: number } {
+  const parent = document.getElementById('game');
+  return {
+    width: parent?.clientWidth ?? window.innerWidth,
+    height: parent?.clientHeight ?? window.innerHeight,
+  };
+}
+
+const initial = parentBox();
+fitGameTo(initial.width, initial.height);
 
 // Объект настроек, который Phaser читает при старте.
 const config: Phaser.Types.Core.GameConfig = {
@@ -24,7 +35,8 @@ const config: Phaser.Types.Core.GameConfig = {
   // Правый клик не открывает меню браузера поверх игры.
   disableContextMenu: true,
   scale: {
-    // FIT: холст уменьшается или увеличивается, чтобы целиком влезть в окно, без обрезки.
+    // FIT: холст целиком влезает в окно. На широком экране ширина поля уже совпадает с окном,
+    // поэтому чёрных полос слева и справа не остаётся.
     mode: Phaser.Scale.FIT,
     // Холст по центру окна и по горизонтали, и по вертикали.
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -44,5 +56,15 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 // new Phaser.Game создаёт холст и запускает сцену.
-// void говорит TypeScript: результат конструктора нам не нужен, это не ошибка.
-void new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Окно поменяло пропорции — поле снова подгоняется под него.
+const fitWindow = (): void => {
+  const box = parentBox();
+  fitGameTo(box.width, box.height);
+  if (game.scale.width !== GAME.width || game.scale.height !== GAME.height) {
+    game.scale.setGameSize(GAME.width, GAME.height);
+  }
+};
+window.addEventListener('resize', fitWindow);
+window.requestAnimationFrame(fitWindow);

@@ -37,9 +37,15 @@ export class GameHud {
   private readonly waveText: Phaser.GameObjects.Text;
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly tankStatsText: Phaser.GameObjects.Text;
+  private readonly banner: Phaser.GameObjects.Image;
+  private readonly title: Phaser.GameObjects.Text;
+  private readonly hpFrame: Phaser.GameObjects.Image;
+  private readonly hpTrack: Phaser.GameObjects.Rectangle;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
   private readonly waveBanner: Phaser.GameObjects.Text;
   private readonly keysButton: Phaser.GameObjects.Rectangle;
+  private readonly keysMark: Phaser.GameObjects.Text;
+  private readonly keysDim: Phaser.GameObjects.Rectangle;
   private readonly keysOverlay: Phaser.GameObjects.Container;
   private readonly keysPanel: Phaser.GameObjects.Rectangle;
   private readonly keysClose: Phaser.GameObjects.Container;
@@ -50,11 +56,15 @@ export class GameHud {
   private readonly hastePlate: Phaser.GameObjects.Rectangle;
   private readonly hasteIcon: Phaser.GameObjects.Graphics;
   private readonly pausePlate: Phaser.GameObjects.Rectangle;
+  private readonly pauseLeft: Phaser.GameObjects.Rectangle;
+  private readonly pauseRight: Phaser.GameObjects.Rectangle;
   private readonly settingsPlate: Phaser.GameObjects.Rectangle;
+  private readonly settingsGear: Phaser.GameObjects.Graphics;
   private readonly autoFirePlate: Phaser.GameObjects.Rectangle;
   private readonly autoFireIcon: Phaser.GameObjects.Graphics;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
-  private readonly frame: HudFrame;
+  private readonly pauseDim: Phaser.GameObjects.Rectangle;
+  protected readonly frame: HudFrame;
   private maxHp: number;
   private hasteCycle?: () => void;
   private pauseRequest?: () => void;
@@ -79,10 +89,10 @@ export class GameHud {
     this.frame = frame;
     this.maxHp = maxHp;
 
-    scene.add.image(frame.width / 2, 677, 'banner').setDepth(50);
+    this.banner = scene.add.image(frame.width / 2, 677, 'banner').setDepth(50);
 
     // Центр ленты. Список клавиш открывается кнопкой справа, на самой ленте его больше нет.
-    scene.add
+    this.title = scene.add
       .text(frame.width / 2, 677, 'TANK', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '32px',
@@ -130,7 +140,7 @@ export class GameHud {
       .setDepth(60)
       .setAlpha(0);
 
-    // Рамка HP: центр 1128, ширина 280. Иконки стоят сразу слева от неё.
+    // Рамка HP стоит в 152 px от правого края. Иконки — сразу слева от неё.
     const icon = this.plateSize;
     const hpLeft = 1128 - 140;
     const hasteX = hpLeft - 8 - icon / 2;
@@ -155,8 +165,8 @@ export class GameHud {
       .setInteractive({ useHandCursor: true });
     // Обычные прямоугольники, не Graphics: скруглённая заливка узкой полоски
     // сдвигает её низ в сторону.
-    scene.add.rectangle(pauseX - 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
-    scene.add.rectangle(pauseX + 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
+    this.pauseLeft = scene.add.rectangle(pauseX - 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
+    this.pauseRight = scene.add.rectangle(pauseX + 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
     this.pausePlate.on('pointerup', () => {
       this.setKeysOpen(false);
       this.pauseRequest?.();
@@ -169,8 +179,8 @@ export class GameHud {
       .setStrokeStyle(2, 0xc9a227)
       .setDepth(80)
       .setInteractive({ useHandCursor: true });
-    const gear = scene.add.graphics().setPosition(settingsX, iconY).setDepth(81);
-    this.drawGear(gear);
+    this.settingsGear = scene.add.graphics().setPosition(settingsX, iconY).setDepth(81);
+    this.drawGear(this.settingsGear);
     this.settingsPlate.on('pointerup', () => {
       this.setKeysOpen(false);
       this.settingsRequest?.();
@@ -197,7 +207,7 @@ export class GameHud {
       .setStrokeStyle(2, 0xc9a227)
       .setDepth(80)
       .setInteractive({ useHandCursor: true });
-    scene.add
+    this.keysMark = scene.add
       .text(keysX, keysY, '?', {
         fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '24px',
@@ -213,7 +223,7 @@ export class GameHud {
 
     // Выше ленты и магазина (70), ниже поражения (85), настроек (88) и паузы (90).
     // Затемнение слабое: окно само полупрозрачное, поле за ним должно остаться узнаваемым.
-    const dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.28).setInteractive();
+    this.keysDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.28).setInteractive();
     this.keysPanel = scene.add.rectangle(0, 0, 540, 320, 0x3a0c0c, 0.78).setStrokeStyle(3, 0xc9a227);
     this.keysPanel.setInteractive();
     this.keysClose = this.makeKeysClose(scene);
@@ -229,7 +239,7 @@ export class GameHud {
     this.keysRule = scene.add.graphics();
     this.keysOverlay = scene.add
       .container(frame.width / 2, frame.height / 2, [
-        dim,
+        this.keysDim,
         this.keysPanel,
         this.keysTitle,
         this.keysRule,
@@ -239,12 +249,12 @@ export class GameHud {
       .setVisible(false);
     this.layoutKeys();
 
-    scene.add.image(1128, 28, 'hp-frame').setDepth(51);
-    scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
+    this.hpFrame = scene.add.image(1128, 28, 'hp-frame').setDepth(51);
+    this.hpTrack = scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
     this.hpFill = scene.add.rectangle(1018, 28, 236, 10, 0xd42a2a).setOrigin(0, 0.5).setDepth(52);
 
     this.pauseOverlay = scene.add.container(frame.width / 2, frame.height / 2).setDepth(90).setVisible(false);
-    const pauseDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
+    this.pauseDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
     const pauseTitle = scene.add
       .text(0, -70, 'ПАУЗА', {
         fontFamily: 'Cinzel, Georgia, serif',
@@ -277,7 +287,54 @@ export class GameHud {
       useHandCursor: true,
     });
     fresh.on('pointerup', () => this.newGameRequest?.());
-    this.pauseOverlay.add([pauseDim, pauseTitle, pauseHint, fresh]);
+    this.pauseOverlay.add([this.pauseDim, pauseTitle, pauseHint, fresh]);
+    this.placeHud();
+  }
+
+  // Широкое окно сдвигает правый край. Полоска, кнопки и затемнения едут за ним.
+  layout(): void {
+    this.placeHud();
+  }
+
+  private placeHud(): void {
+    const width = this.frame.width;
+    const height = this.frame.height;
+    const icon = this.plateSize;
+    const hpCenter = width - 152;
+    const barLeft = hpCenter - 110;
+    const hpLeft = hpCenter - 140;
+    const hasteX = hpLeft - 8 - icon / 2;
+    const pauseX = hasteX - this.plateGap - icon;
+    const settingsX = pauseX - this.plateGap - icon;
+    this.autoFireX = settingsX - this.plateGap - icon;
+    const y = this.plateY;
+
+    this.banner.setPosition(width / 2, 677).setDisplaySize(width, 86);
+    this.title.setX(width / 2);
+    this.waveBanner.setX(width / 2);
+
+    this.hastePlate.setPosition(hasteX, y);
+    this.hasteIcon.setPosition(hasteX, y);
+    this.pausePlate.setPosition(pauseX, y);
+    this.pauseLeft.setPosition(pauseX - 4, y);
+    this.pauseRight.setPosition(pauseX + 4, y);
+    this.settingsPlate.setPosition(settingsX, y);
+    this.settingsGear.setPosition(settingsX, y);
+    this.autoFirePlate.setPosition(this.autoFireX, y);
+    this.autoFireIcon.setPosition(this.autoFireX, y);
+
+    this.hpFrame.setPosition(hpCenter, 28);
+    this.hpTrack.setPosition(barLeft, 28);
+    this.hpFill.setPosition(barLeft, 28);
+
+    const keysX = width - 56;
+    this.keysButton.setPosition(keysX, 677);
+    this.keysMark.setPosition(keysX, 677);
+
+    this.keysDim.setSize(width, height);
+    this.keysOverlay.setPosition(width / 2, height / 2);
+    this.pauseDim.setSize(width, height);
+    this.pauseOverlay.setPosition(width / 2, height / 2);
   }
 
   setScore(score: number): void {

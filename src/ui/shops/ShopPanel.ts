@@ -63,9 +63,10 @@ export class ShopPanel {
   private readonly listContent: Phaser.GameObjects.Container;
   private readonly track: Phaser.GameObjects.Rectangle;
   private readonly thumb: Phaser.GameObjects.Rectangle;
+  private readonly dim: Phaser.GameObjects.Rectangle;
 
-  private readonly viewLeft: number;
-  private readonly viewTop: number;
+  private viewLeft: number;
+  private viewTop: number;
   private contentHeight = 0;
   private maxScroll = 0;
   private thumbH = 36;
@@ -100,6 +101,7 @@ export class ShopPanel {
     this.listContent.cameraFilter |= scene.cameras.main.id;
 
     const dim = scene.add.rectangle(0, 0, this.screen.width, this.screen.height, 0x000000, 0.62);
+    this.dim = dim;
     const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
     panel.setStrokeStyle(4, 0xc9a227);
 
@@ -187,6 +189,19 @@ export class ShopPanel {
       scene.events.off('update', this.syncListCamera, this);
     });
     this.syncListCamera();
+  }
+
+  // Поле шире 1280 — окно и затемнение остаются по центру, список карточек едет вместе с ним.
+  place(): void {
+    const groupW = VIEW_W + SCROLL_GAP + SCROLL_W;
+    this.viewLeft = this.screen.width / 2 - groupW / 2;
+    this.viewTop = this.screen.height / 2 + VIEW_TOP;
+    this.listCam.setPosition(this.viewLeft, this.viewTop);
+    this.listCam.setScroll(this.viewLeft, this.viewTop);
+    this.listContent.x = this.viewLeft + VIEW_W / 2;
+    this.listContent.y = this.viewTop - this.scroll;
+    this.container.setPosition(this.screen.width / 2, this.screen.height / 2);
+    this.dim.setSize(this.screen.width, this.screen.height);
   }
 
   show(view: ShopView): void {

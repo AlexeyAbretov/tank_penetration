@@ -42,10 +42,10 @@ export class NuclearStrike {
   static readonly cloudMs = nuke.goneMs;
 
   // Середина дорожек. Танк стоит слева, враги въезжают справа — это центр поля, не край экрана.
-  static readonly impact = {
-    x: GAME.width / 2,
-    y: 356,
-  };
+  // Ширина читается в момент удара: на широком окне поле шире 1280.
+  static impactAt(): { x: number; y: number } {
+    return { x: GAME.width / 2, y: 356 };
+  }
 
   // GameScene и студия зовут до create. Иконка по-прежнему рисуется в ensureTextures.
   static preload(scene: Phaser.Scene): void {
@@ -63,7 +63,7 @@ export class NuclearStrike {
 
   // Большая бомба падает из-за верхнего края низом в центр поля. onImpact — взрыв, когда корпус сел.
   static drop(scene: Phaser.Scene, onImpact: () => void): NuclearFlight {
-    const { x, y } = NuclearStrike.impact;
+    const { x, y } = NuclearStrike.impactAt();
     const bomb = scene.add.image(x, -12, NuclearStrike.bombKey).setDepth(20);
     bomb.setOrigin(0.5, 1);
 
@@ -98,7 +98,7 @@ export class NuclearStrike {
   // Гриб на месте удара. Воронка остаётся после того, как облако погасло.
   static boom(scene: Phaser.Scene): void {
     playNuclearBoom(scene);
-    const { x, y } = NuclearStrike.impact;
+    const { x, y } = NuclearStrike.impactAt();
     const scale = NuclearStrike.mushroomScale;
 
     placeCrater(scene, x, y, NuclearStrike.shop.craterMs, {

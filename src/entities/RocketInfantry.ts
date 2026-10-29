@@ -82,7 +82,7 @@ export class RocketInfantry extends RangedEnemy {
   static readonly shotSpeed = 300;
 
   readonly coinReward = 3;
-  // 960 — три четверти поля шириной 1280. Стрелок встаёт на середине, этот дальше от танка.
+  // Три четверти ширины поля. Стрелок встаёт на середине, этот дальше от танка.
   protected readonly holdX = (GAME.width * 3) / 4;
   protected readonly fireDelay = RocketInfantry.shotInterval;
   protected readonly bulletSpeed = RocketInfantry.shotSpeed;

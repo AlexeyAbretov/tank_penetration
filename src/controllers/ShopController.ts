@@ -54,7 +54,7 @@ export class ShopController {
     private readonly onContinue: () => void,
     private readonly onChanged: () => void,
   ) {
-    this.panel = new ShopPanel(scene, this, { width: GAME.width, height: GAME.height });
+    this.panel = new ShopPanel(scene, this, GAME);
   }
 
   // Снимок покупок для сохранения партии. Монеты и номер волны пишет сцена, не этот метод.

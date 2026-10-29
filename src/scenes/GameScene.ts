@@ -81,6 +81,7 @@ export class GameScene extends Phaser.Scene {
   // Классы интерфейса и боя приходят снаружи. Экземпляры создаются в create():
   // restart() конструктор сцены не вызывает, а до create() нет scene.add и текстуры баннера.
   private hud!: GameHud;
+  private field!: Phaser.GameObjects.Image;
 
   constructor(
     private readonly combatSave: CombatSave,
@@ -156,7 +157,8 @@ export class GameScene extends Phaser.Scene {
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
-    this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
+    this.field = this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
+    this.field.setDisplaySize(GAME.width, GAME.height);
     createAmbientEmbers(this);
     this.input.mouse?.disableContextMenu();
 
@@ -351,6 +353,17 @@ export class GameScene extends Phaser.Scene {
     if (document.hidden) {
       this.pauses.onHidden();
     }
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.layoutFrame, this);
+  }
+
+  // Ширина поля изменилась вместе с окном. Фон и окна, которые стоят по центру, едут за ней.
+  private layoutFrame(): void {
+    this.field.setPosition(GAME.width / 2, GAME.height / 2);
+    this.field.setDisplaySize(GAME.width, GAME.height);
+    this.hud.layout();
+    this.settings.layout();
+    this.shop.panel.place();
+    this.progressShop.layout();
   }
 
   // Конец волны. Если в этот момент ещё стоит гриб, панель подождёт, пока облако погаснет.
@@ -533,6 +546,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onShutdown(): void {
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.layoutFrame, this);
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('beforeunload', this.onPageHide);
