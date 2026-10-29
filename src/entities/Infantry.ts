@@ -337,8 +337,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     if (!this.barBg.active) {
       return;
     }
-    // displayHeight учитывает scale. 0.95 высоты вверх от точки ног — примерно над шлемом.
-    const top = this.y - this.displayHeight * 0.95;
+    // Верх картинки — originY доли высоты над точкой ног. Зазор, чтобы полоска не лежала на каске.
+    const top = this.y - this.displayHeight * this.originY - 10;
     const width = this.hpBarWidth;
     this.barBg.setPosition(this.x, top);
     this.barBg.width = width;
