@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Rocket } from '../entities/Rocket';
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
 import type { BattleEffects } from '../sounds/BattleEffects';
