@@ -1,5 +1,5 @@
 // Окно громкости. Бой на это время стоит, музыка играет:
-// ползунок музыки сразу слышно. Клик мимо окна и кнопка «Готово» закрывают его.
+// ползунок музыки сразу слышно. Закрывает его только кнопка «Готово».
 // Второй ползунок — эффекты. Музыку он не трогает.
 
 import Phaser from 'phaser';
@@ -34,13 +34,6 @@ export class SettingsPanel {
     private readonly onClose: () => void,
   ) {
     const dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
-    // Отпускание после перетаскивания ползунка за край окна не должно его закрывать.
-    dim.on('pointerup', () => {
-      if (this.dragging) {
-        return;
-      }
-      this.onClose();
-    });
 
     this.card = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96).setStrokeStyle(4, 0xc9a227);
     // Глушит клик по затемнению, когда курсор над самой карточкой.
