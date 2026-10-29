@@ -2,7 +2,7 @@
 // Пустая запись уже с купленными пулемётом, автострельбой, артиллерией, минами и атомным взрывом.
 // Монеты за них не списываются: магазин просто поднимает флаги через restore.
 
-import { Tank } from '../entities/Tank';
+import { TankDebugBaseHp } from '../entities/Tank/TankDebugBaseHp';
 import { CombatSave, type SavedRun } from '../saves/CombatSave';
 
 const DEBUG_KEY = 'tank-penetration-combat:debug';
@@ -22,12 +22,16 @@ export class DebugCombatSave extends CombatSave {
     return DEBUG_KEY;
   }
 
+  protected hpMax(): number {
+    return TankDebugBaseHp.max;
+  }
+
   protected emptyRun(): SavedRun {
     return {
       version: 1,
       score: 0,
       coins: 0,
-      hp: Tank.baseHp,
+      hp: TankDebugBaseHp.currentOf(),
       haste: 1,
       artilleryCooldownMs: 0,
       minesCooldownMs: 0,

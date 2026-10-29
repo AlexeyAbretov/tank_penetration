@@ -1,7 +1,8 @@
 // Танк игрока, здоровье базы и сценарий поражения.
 
 import Phaser from 'phaser';
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
+import { TankBaseHp } from '../entities/Tank/TankBaseHp';
 import type { GameHud } from '../ui/huds/GameHud';
 import type { TankDeath } from '../sounds/TankDeath';
 
@@ -13,8 +14,15 @@ type DefeatDeps = {
 
 export class PlayerController {
   readonly tank: Tank;
-  private hp = Tank.baseHp;
+  private hp: number;
+  private baseHp: number;
   private gameOver = false;
+  private unwatch = (): void => {};
+
+  // Запас новой партии. Дебаг-наследник подставляет число из настроек.
+  static baseHp(): number {
+    return TankBaseHp.currentOf();
+  }
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -23,7 +31,18 @@ export class PlayerController {
     private readonly onDefeated: () => void,
     private readonly deathSound: TankDeath,
   ) {
+    this.baseHp = (this.constructor as typeof PlayerController).baseHp();
+    this.hp = this.baseHp;
     this.tank = new Tank(scene, Tank.spawn.x, Tank.spawn.y);
+    this.unwatch = this.watchBaseHp();
+    this.tank.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.unwatch();
+    });
+  }
+
+  // Покупка запаса меняет и полоску, и текущее здоровье. Дебаг слушает своё число.
+  protected watchBaseHp(): () => void {
+    return TankBaseHp.watch((hp) => this.setBaseHp(hp));
   }
 
   get isGameOver(): boolean {
@@ -35,14 +54,22 @@ export class PlayerController {
   }
 
   reset(): void {
-    this.hp = Tank.baseHp;
+    this.hp = this.baseHp;
     this.gameOver = false;
     this.hud.setHp(this.hp);
   }
 
   restoreHealth(hp: number): void {
-    this.hp = Math.min(Tank.baseHp, Math.max(1, Math.round(hp)));
+    this.hp = Math.min(this.baseHp, Math.max(1, Math.round(hp)));
     this.gameOver = false;
+    this.hud.setHp(this.hp);
+  }
+
+  // Запас целиком: и потолок полоски, и текущее здоровье.
+  protected setBaseHp(hp: number): void {
+    this.baseHp = hp;
+    this.hp = hp;
+    this.hud.setMaxHp(hp);
     this.hud.setHp(this.hp);
   }
 

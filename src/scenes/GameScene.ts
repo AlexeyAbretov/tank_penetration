@@ -8,7 +8,7 @@ import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
 import { ENEMY_HASTE, GAME, enemyHasteOf } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
@@ -112,6 +112,8 @@ export class GameScene extends Phaser.Scene {
       onEffects: (level: number) => void,
       onClose: () => void,
     ) => SettingsPanel = SettingsPanel,
+    // Игрок. Дебаг подставляет наследника со своим запасом здоровья.
+    private readonly Player: typeof PlayerController = PlayerController,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
@@ -163,7 +165,7 @@ export class GameScene extends Phaser.Scene {
     this.infantry = this.physics.add.group();
 
     // Следующая покупка — ещё одна строка. Порядок слева направо.
-    this.hud = new this.Hud(this, GAME, Tank.baseHp, [
+    this.hud = new this.Hud(this, GAME, this.Player.baseHp(), [
       {
         id: 'artillery',
         texture: ArtilleryStrike.iconKey,
@@ -232,7 +234,7 @@ export class GameScene extends Phaser.Scene {
 
     const fx = new BattleEffects(this);
     this.fx = fx;
-    this.player = new PlayerController(
+    this.player = new this.Player(
       this,
       this.hud,
       {

@@ -9,7 +9,7 @@ import { MachineGun } from '../entities/MachineGun';
 import { Mines, PlantedMine, type MineKeepOut } from '../entities/Mines';
 import { NuclearStrike, type NuclearFlight } from '../entities/NuclearStrike';
 import { PickupTruck } from '../entities/PickupTruck';
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { craterReach } from '../gfx/craters';
 import { createShellBlast } from '../gfx/particles';

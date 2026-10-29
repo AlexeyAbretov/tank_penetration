@@ -3,6 +3,7 @@
 // Дебаг-ветка стоит отдельно. В сборке для игроков isDebugRun() становится false,
 // и дебаг-классы из бандла выпадают.
 
+import { DebugPlayerController } from '../controllers/DebugPlayerController';
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';
 import { EnemyFactory } from '../entities/EnemyFactory';
 import { GAME, isDebugRun } from '../gameConfig';
@@ -38,6 +39,7 @@ export class GameSceneFactory {
         DebugCombatSystem,
         new PauseStack([new ScreenPause(), new DebugQuietPause()]),
         DebugSettingsPanel,
+        DebugPlayerController,
       );
     }
 

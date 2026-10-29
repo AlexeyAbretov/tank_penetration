@@ -4,7 +4,7 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { MachineGun } from '../entities/MachineGun';
 import { NuclearStrike } from '../entities/NuclearStrike';
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
 import { preloadBoom } from '../gfx/boom';
 import { preloadCraters } from '../gfx/craters';
 import { preloadNuke } from '../gfx/nuke';

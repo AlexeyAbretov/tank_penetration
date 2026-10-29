@@ -2,7 +2,7 @@
 
 import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { ProgressShopPanel, type ProgressCardView, type ProgressShopView } from '../ui/shops/ProgressShopPanel';
 import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';

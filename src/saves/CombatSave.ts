@@ -6,7 +6,8 @@ import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { EnemyFactory } from '../entities/EnemyFactory';
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
+import { TankBaseHp } from '../entities/Tank/TankBaseHp';
 import { ENEMY_HASTE, GAME } from '../gameConfig';
 import {
   ENEMY_KINDS,
@@ -63,7 +64,7 @@ export class CombatSave {
       return this.emptyRun();
     }
     try {
-      const parsed = parseRun(JSON.parse(raw));
+      const parsed = parseRun(JSON.parse(raw), this.hpMax());
       if (!parsed) {
         this.clear();
         return this.emptyRun();
@@ -96,13 +97,18 @@ export class CombatSave {
     return CAMPAIGN_KEY;
   }
 
+  // Потолок сохранённого здоровья. Дебаг подставляет свой.
+  protected hpMax(): number {
+    return TankBaseHp.max;
+  }
+
   // Пустого сохранения нет: сцена сама запускает первую волну.
   protected emptyRun(): SavedRun | null {
     return null;
   }
 }
 
-function parseRun(value: unknown): SavedRun | null {
+function parseRun(value: unknown, hpMax: number): SavedRun | null {
   // version отсекает старый формат. Поле из будущего файла тоже не подойдёт: игра его не понимает.
   if (!isRecord(value) || value.version !== 1) {
     return null;
@@ -110,7 +116,7 @@ function parseRun(value: unknown): SavedRun | null {
   const score = requiredInt(value.score, 0, 1_000_000);
   const coins = requiredInt(value.coins, 0, 1_000_000);
   const hp =
-    typeof value.hp === 'number' && value.hp >= 1 ? requiredInt(value.hp, 1, Tank.baseHp) : null;
+    typeof value.hp === 'number' && value.hp >= 1 ? requiredInt(value.hp, 1, hpMax) : null;
   const wave = requiredInt(value.wave, 1, 10_000);
   const phase = value.phase === 'combat' || value.phase === 'shop' ? value.phase : null;
   const shop = parseShop(value.shop);

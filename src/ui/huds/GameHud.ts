@@ -42,6 +42,7 @@ export class GameHud {
   private readonly keysButton: Phaser.GameObjects.Rectangle;
   private readonly keysOverlay: Phaser.GameObjects.Container;
   private readonly keysPanel: Phaser.GameObjects.Rectangle;
+  private readonly keysClose: Phaser.GameObjects.Container;
   private readonly keysTitle: Phaser.GameObjects.Text;
   private readonly keysRule: Phaser.GameObjects.Graphics;
   private keyRows: Phaser.GameObjects.Text[] = [];
@@ -54,12 +55,11 @@ export class GameHud {
   private readonly autoFireIcon: Phaser.GameObjects.Graphics;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
   private readonly frame: HudFrame;
-  private readonly maxHp: number;
+  private maxHp: number;
   private hasteCycle?: () => void;
   private pauseRequest?: () => void;
   private settingsRequest?: () => void;
   private autoFireRequest?: () => void;
-  private resumeRequest?: () => void;
   private newGameRequest?: () => void;
 
   protected readonly statusY = 28;
@@ -209,9 +209,9 @@ export class GameHud {
     // Выше ленты и магазина (70), ниже поражения (85), настроек (88) и паузы (90).
     // Затемнение слабое: окно само полупрозрачное, поле за ним должно остаться узнаваемым.
     const dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.28).setInteractive();
-    dim.on('pointerup', () => this.setKeysOpen(false));
     this.keysPanel = scene.add.rectangle(0, 0, 540, 320, 0x3a0c0c, 0.78).setStrokeStyle(3, 0xc9a227);
     this.keysPanel.setInteractive();
+    this.keysClose = this.makeKeysClose(scene);
     this.keysTitle = scene.add
       .text(0, 0, 'КЛАВИШИ', {
         fontFamily: 'Cinzel, Georgia, serif',
@@ -223,7 +223,13 @@ export class GameHud {
       .setOrigin(0.5);
     this.keysRule = scene.add.graphics();
     this.keysOverlay = scene.add
-      .container(frame.width / 2, frame.height / 2, [dim, this.keysPanel, this.keysTitle, this.keysRule])
+      .container(frame.width / 2, frame.height / 2, [
+        dim,
+        this.keysPanel,
+        this.keysTitle,
+        this.keysRule,
+        this.keysClose,
+      ])
       .setDepth(82)
       .setVisible(false);
     this.layoutKeys();
@@ -234,7 +240,6 @@ export class GameHud {
 
     this.pauseOverlay = scene.add.container(frame.width / 2, frame.height / 2).setDepth(90).setVisible(false);
     const pauseDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
-    pauseDim.on('pointerup', () => this.resumeRequest?.());
     const pauseTitle = scene.add
       .text(0, -70, 'ПАУЗА', {
         fontFamily: 'Cinzel, Georgia, serif',
@@ -245,7 +250,7 @@ export class GameHud {
       })
       .setOrigin(0.5);
     const pauseHint = scene.add
-      .text(0, -8, 'Кликните или Esc, чтобы продолжить', {
+      .text(0, -8, 'Esc, чтобы продолжить', {
         fontFamily: 'Georgia, serif',
         fontSize: '20px',
         color: '#f0dcc0',
@@ -344,10 +349,6 @@ export class GameHud {
     }
     this.autoFirePlate.setFillStyle(enabled ? 0x8a1810 : 0x3a0c0c);
     this.drawAutoFire(enabled);
-  }
-
-  onResume(request: () => void): void {
-    this.resumeRequest = request;
   }
 
   onNewGame(request: () => void): void {
@@ -454,6 +455,10 @@ export class GameHud {
     }
   }
 
+  setMaxHp(maxHp: number): void {
+    this.maxHp = maxHp;
+  }
+
   setHp(hp: number): void {
     this.hpFill.width = 236 * (hp / this.maxHp);
   }
@@ -516,6 +521,7 @@ export class GameHud {
     const h = titleBand + hints.length * rowH + padBottom;
     this.keysPanel.setSize(w, h);
     this.keysTitle.setY(-h / 2 + 34);
+    this.keysClose.setPosition(w / 2 - 28, -h / 2 + 26);
 
     this.keysRule.clear();
     this.keysRule.lineStyle(2, 0xc9a227, 0.9);
@@ -548,6 +554,20 @@ export class GameHud {
       this.keysOverlay.add([keyText, actionText]);
       this.keyRows.push(keyText, actionText);
     });
+  }
+
+  // Крестик в правом верхнем углу карточки. Клик мимо окна её не закрывает.
+  private makeKeysClose(scene: Phaser.Scene): Phaser.GameObjects.Container {
+    const hit = scene.add.rectangle(0, 0, 36, 36, 0x000000, 0.001).setInteractive({ useHandCursor: true });
+    const mark = scene.add
+      .text(0, -1, '×', {
+        fontFamily: 'Cinzel, Georgia, serif',
+        fontSize: '32px',
+        color: '#f3d56a',
+      })
+      .setOrigin(0.5);
+    hit.on('pointerup', () => this.setKeysOpen(false));
+    return scene.add.container(0, 0, [hit, mark]);
   }
 
   // Ряд над баннером, слева направо. index 0 — первая иконка у края поля.

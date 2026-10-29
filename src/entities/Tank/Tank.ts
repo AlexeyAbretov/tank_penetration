@@ -15,9 +15,9 @@ import {
   type MuzzlePaint,
   type ShellPaint,
   type TankPaint,
-} from '../gfx/looks';
-import { tankBoomAt } from '../gfx/tankBoom';
-import { bake } from '../gfx/textures';
+} from '../../gfx/looks';
+import { tankBoomAt } from '../../gfx/tankBoom';
+import { bake } from '../../gfx/textures';
 
 // Прямоугольник части в координатах её родителя, до поворота башни.
 type PartBox = { x: number; y: number; w: number; h: number };
@@ -53,7 +53,6 @@ export class Tank extends GameObjects.Container {
     return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep - progressCut);
   }
   static readonly shellSpeed = 740;
-  static readonly baseHp = 100;
   static readonly blastRadiusPerLevel = 1;
 
   // Точка прицеливания врагов: чуть правее носа танка.

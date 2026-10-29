@@ -1,7 +1,7 @@
 // Улучшения между проигрышами. Партия стирается со смертью базы,
 // а эти уровни и непотраченный score остаются в localStorage.
 
-import { Tank } from '../entities/Tank';
+import { Tank } from '../entities/Tank/Tank';
 
 const CAMPAIGN_KEY = 'tank-penetration-progress:v1';
 const SCORE_MAX = 100_000_000;
