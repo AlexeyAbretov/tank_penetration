@@ -1,6 +1,8 @@
 // Отдельная сборка одного HTML. Обычный vite.config.ts и команды dev, build, preview её не читают.
 // Готовый файл лежит в release/tank-penetration.html и открывается двойным кликом:
 // браузер не ходит за скриптом, картинками танка и музыкой, потому что они уже внутри страницы.
+// npm run build:html:gift — тот же файл, но Vite ставит mode gift, и покупки в обоих магазинах стоят 1.
+// Он называется tank-penetration-gift.html. Релиз на GitHub прикрепляет оба файла.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -140,7 +142,7 @@ function keepLiveServerOutOfScript(html: string): string {
 
 // Vite называет страницу index.html по имени входного файла.
 // На релизе нужно другое имя, чтобы скачанный файл было видно среди ассетов.
-function nameReleaseHtml(): Plugin {
+function nameReleaseHtml(fileName: string): Plugin {
   return {
     name: 'name-release-html',
     apply: 'build',
@@ -151,7 +153,11 @@ function nameReleaseHtml(): Plugin {
         return;
       }
 
-      const to = path.join(directory, 'tank-penetration.html');
+      const to = path.join(directory, fileName);
+      // Повторная подарочная сборка не чистит release/, и старый файл на Windows не даёт переименовать.
+      if (fs.existsSync(to)) {
+        fs.unlinkSync(to);
+      }
       fs.renameSync(from, to);
 
       const html = fs.readFileSync(to, 'utf8');
@@ -181,13 +187,13 @@ function nameReleaseHtml(): Plugin {
 
       if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 16) {
         throw new Error(
-          'release/tank-penetration.html всё ещё зависит от внешнего скрипта, картинок танка или музыки',
+          `release/${fileName} всё ещё зависит от внешнего скрипта, картинок танка или музыки`,
         );
       }
 
       if (bodyInsideScript) {
         throw new Error(
-          'release/tank-penetration.html содержит </body> внутри скрипта: Live Server вставит туда свой код и сломает страницу',
+          `release/${fileName} содержит </body> внутри скрипта: Live Server вставит туда свой код и сломает страницу`,
         );
       }
 
@@ -196,21 +202,27 @@ function nameReleaseHtml(): Plugin {
   };
 }
 
-export default defineConfig({
-  // Картинки и музыку читает плагин выше. Копировать public/ рядом с HTML не нужно:
-  // иначе релиз был бы папкой, а не одним файлом.
-  publicDir: false,
-  base: './',
-  build: {
-    outDir: 'release',
-    emptyOutDir: true,
-    target: 'es2022',
-  },
-  plugins: [
-    inlinePackedFiles(),
-    // Скрипт страницы вшивается в сам HTML. Загрузчик модулей Vite после этого не нужен:
-    // ему нечего догружать, а с диска лишний запрос всё равно бы не прошёл.
-    viteSingleFile({ removeViteModuleLoader: true }),
-    nameReleaseHtml(),
-  ],
+export default defineConfig(({ mode }) => {
+  const gift = mode === 'gift';
+  const fileName = gift ? 'tank-penetration-gift.html' : 'tank-penetration.html';
+
+  return {
+    // Картинки и музыку читает плагин выше. Копировать public/ рядом с HTML не нужно:
+    // иначе релиз был бы папкой, а не одним файлом.
+    publicDir: false,
+    base: './',
+    build: {
+      outDir: 'release',
+      // Обычная сборка чистит release/. Подарочная оставляет tank-penetration.html на месте.
+      emptyOutDir: !gift,
+      target: 'es2022',
+    },
+    plugins: [
+      inlinePackedFiles(),
+      // Скрипт страницы вшивается в сам HTML. Загрузчик модулей Vite после этого не нужен:
+      // ему нечего догружать, а с диска лишний запрос всё равно бы не прошёл.
+      viteSingleFile({ removeViteModuleLoader: true }),
+      nameReleaseHtml(fileName),
+    ],
+  };
 });

@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
+import { shopPrice } from '../shopPrice';
 import { ProgressShopPanel, type ProgressCardView, type ProgressShopView } from '../ui/shops/ProgressShopPanel';
 import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
@@ -114,7 +115,7 @@ export class ProgressShopController {
     if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
-    const cost = ProgressSave.cost(level);
+    const cost = this.price(level);
     if (this.progress.score < cost) {
       return;
     }
@@ -137,7 +138,7 @@ export class ProgressShopController {
 
   private coinsCard(score: number): ProgressCardView {
     const level = this.progress.coins;
-    const price = ProgressSave.cost(level);
+    const price = this.price(level);
     return {
       title: '+1 монета за убийство',
       buy: () => this.buyCoins(),
@@ -150,7 +151,7 @@ export class ProgressShopController {
 
   private damageCard(score: number): ProgressCardView {
     const level = this.progress.damage;
-    const price = ProgressSave.cost(level);
+    const price = this.price(level);
     const now = Infantry.shellDamage + level;
     return {
       title: '+1 урон',
@@ -164,7 +165,7 @@ export class ProgressShopController {
 
   private blastCard(score: number): ProgressCardView {
     const level = this.progress.blast;
-    const price = ProgressSave.cost(level);
+    const price = this.price(level);
     const now = level * Tank.blastRadiusPerLevel;
     const next = (level + 1) * Tank.blastRadiusPerLevel;
     return {
@@ -179,7 +180,7 @@ export class ProgressShopController {
 
   private speedCard(score: number): ProgressCardView {
     const level = this.progress.speed;
-    const price = ProgressSave.cost(level);
+    const price = this.price(level);
     const now = Tank.fireDelayFor(0, level);
     const next = Tank.fireDelayFor(0, level + 1);
     const maxed = level >= Tank.maxProgressSpeedLevel || next >= now;
@@ -192,6 +193,11 @@ export class ProgressShopController {
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
+  }
+
+  // Формула остаётся в ProgressSave. Здесь только подмена для сборки племянника.
+  private price(level: number): number {
+    return shopPrice(ProgressSave.cost(level));
   }
 
   private formatDelay(ms: number): string {

@@ -1,13 +1,14 @@
 {
   "name": "tank-penetration",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "debug": "vite --open /index.html?debug",
     "build": "tsc --noEmit && vite build",
     "build:html": "tsc --noEmit && vite build --config vite.singlefile.config.ts",
+    "build:html:gift": "tsc --noEmit && vite build --config vite.singlefile.config.ts --mode gift",
     "preview": "vite preview"
   },
   "dependencies": {
