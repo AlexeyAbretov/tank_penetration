@@ -48,7 +48,6 @@ const packedFiles = [
   ['assets/rocketman-5.png', 'image/png'],
   ['assets/rocketman-aim.png', 'image/png'],
   ['assets/rocketman-launcher.png', 'image/png'],
-  ['assets/rocketman-hands.png', 'image/png'],
   ['assets/rocketman-corpse.png', 'image/png'],
   ['audio/TRACK_01.mp3', 'audio/mpeg'],
   ['audio/boss.mp3', 'audio/mpeg'],

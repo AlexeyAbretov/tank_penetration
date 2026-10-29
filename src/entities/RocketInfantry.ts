@@ -1,6 +1,6 @@
-// Ракетчик: тот же бег, что у штурмовика, но форма зелёная и в руках РПГ.
-// На марше труба нарисована в кадре. На рубеже он встаёт: труба — отдельная картинка,
-// чтобы при пуске отъезжать, а кисти оставались на рукояти.
+// Ракетчик: на марше труба уже в кадре шага.
+// На рубеже садится на колено без рук, а руки с РПГ — одна картинка.
+// Она крутится вокруг плеча и отъезжает при пуске.
 
 import Phaser, { Scene } from 'phaser';
 import { GAME } from '../gameConfig';
@@ -13,6 +13,7 @@ import {
   type SoldierLook,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
+import { Infantry } from './Infantry';
 import { RangedEnemy } from './RangedEnemy';
 import { Rocket } from './Rocket';
 import type { WorldPoint } from '../types/WorldPoint';
@@ -24,18 +25,53 @@ export class RocketInfantry extends RangedEnemy {
   static readonly corpseKey = 'rocketman-corpse';
   static readonly aimKey = 'rocketman-aim';
   static readonly launcherKey = 'rocketman-launcher';
-  static readonly handsKey = 'rocketman-hands';
+  // Шесть кадров шага, 52×60. Подошва на строке 58, опора сразу под ней.
+  static readonly frame = { w: 52, h: 60 };
+  static readonly fit = {
+    originX: 24 / 52,
+    originY: 59 / 60,
+    bodyW: 18,
+    bodyH: 40,
+    bodyX: 15,
+    bodyY: 18,
+  };
+  // Стойка на колене без рук, 40×61. Подошва на строке 59.
+  static readonly aimFrame = { w: 40, h: 61 };
+  static readonly aimFit = {
+    originX: 20 / 40,
+    originY: 60 / 61,
+    bodyW: 32,
+    bodyH: 44,
+    bodyX: 4,
+    bodyY: 16,
+  };
+  // Лежащее тело длиннее роста. 87 px длины к 57 px роста стоящего кадра.
+  static readonly corpseFrame = { w: 89, h: 47 };
+  static readonly corpseFit = {
+    originX: 0.5,
+    originY: 1,
+    scale: Infantry.placed.scale * (57 / 87),
+  };
   // Середина среза относительно точки ног, труба строго влево.
   static get muzzleOffset(): { x: number; y: number } {
     const point = RocketInfantry.muzzleAt(0, 0, RocketInfantry.placed.scale, 0);
     return { x: point.x, y: point.y };
   }
-  // Левый верх трубы внутри кадра солдата 64×80. На стойке картинка садится на x = 0, y = 28.
-  static readonly launcherCut = { x: 0, y: 28 };
-  // Раструб: ось, вокруг которой труба целится в танк. Откат сдвигает срез к этой точке.
-  static readonly breech = { x: 50, y: 31 };
-  // Нос боеголовки в кадре солдата. От раструба эта точка уходит влево и крутится вместе с трубой.
-  static readonly muzzleTip = { x: 0, y: 31 };
+  // Плечо на кадре стойки. Солдат смотрит влево, спина правее подбородка.
+  // 27 — на 4 пикселя ближе к спине, чем первая посадка: труба не закрывала лицо.
+  // 21 — на 4 пикселя ниже: кисть закрывает обрубок плеча.
+  static readonly breech = { x: 30, y: 21 };
+  // Вырез рук нарисован в том же масштабе, что тело. 1 не меняет толщину рукава.
+  static readonly armsFit = 1;
+  // Нос в пикселях стойки. Сдвиг (1, 7) − (31, 12) картинки рук.
+  static readonly muzzleTip = {
+    x: 30 + (1 - 31) * RocketInfantry.armsFit,
+    y: 21 + (7 - 12) * RocketInfantry.armsFit,
+  };
+  // Плечо внутри картинки рук: верх рукава, под трубой.
+  static readonly armsPivot = { x: 31, y: 12 };
+  // От носа до среза раструба, в пикселях картинки рук. Струя выходит отсюда назад.
+  static readonly tubeSpan = 47;
   // Отдача сильнее винтовки: труба тяжелее, удар читается дольше.
   static readonly recoilKick = { x: 8, climb: 0.06, ms: 160 };
   // Струя за раструбом: чуть шире трубы, держится дольше вспышки винтовки.
@@ -55,12 +91,12 @@ export class RocketInfantry extends RangedEnemy {
   protected readonly idleTexture = RocketInfantry.aimKey;
   protected readonly muzzle = RocketInfantry.muzzleOffset;
 
+  // Руки с трубой поверх тела. Крутятся вокруг плеча.
   private launcher!: Phaser.GameObjects.Image;
-  private hands?: Phaser.GameObjects.Image;
   private readonly recoil = { x: 0, climb: 0 };
   private aim = 0;
 
-  // Шесть кадров бега с трубой, стойка без неё, сама труба и кисти поверх. Труп — последняя картинка.
+  // Шесть кадров бега с трубой, стойка без рук, руки с трубой поверх. Труп — последняя картинка.
   // Пути в public/. Строки буквальные: singlefile-сборка подменяет их на data:.
   static readonly images = {
     'rocketman-0': 'assets/rocketman-0.png',
@@ -71,7 +107,6 @@ export class RocketInfantry extends RangedEnemy {
     'rocketman-5': 'assets/rocketman-5.png',
     [RocketInfantry.aimKey]: 'assets/rocketman-aim.png',
     [RocketInfantry.launcherKey]: 'assets/rocketman-launcher.png',
-    [RocketInfantry.handsKey]: 'assets/rocketman-hands.png',
     [RocketInfantry.corpseKey]: 'assets/rocketman-corpse.png',
   } as const;
 
@@ -114,7 +149,13 @@ export class RocketInfantry extends RangedEnemy {
       );
     }
     const frames = this.frameKeys.filter((key) => scene.textures.exists(key));
-    for (const key of [...frames, this.aimKey, this.launcherKey, this.handsKey, this.corpseKey, 'rocketman-flash']) {
+    for (const key of [...frames, this.aimKey, this.corpseKey]) {
+      if (scene.textures.exists(key)) {
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
+    }
+    // Руки крутятся на любой угол. Ближний фильтр на повороте рвёт трубу, поэтому здесь сглаживание.
+    for (const key of [this.launcherKey, 'rocketman-flash']) {
       if (scene.textures.exists(key)) {
         scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
       }
@@ -142,33 +183,58 @@ export class RocketInfantry extends RangedEnemy {
     super(scene, x, y, hp, RocketInfantry.frameKeys[0], 'rocketman-walk', 0xe07020, shots, fireTarget);
     this.launcher = scene.add.image(x, y, RocketInfantry.launcherKey);
     this.launcher.setOrigin(
-      (RocketInfantry.breech.x - RocketInfantry.launcherCut.x) / LAUNCHER_FRAME.w,
-      (RocketInfantry.breech.y - RocketInfantry.launcherCut.y) / LAUNCHER_FRAME.h,
+      RocketInfantry.armsPivot.x / LAUNCHER_FRAME.w,
+      RocketInfantry.armsPivot.y / LAUNCHER_FRAME.h,
     );
     this.launcher.setDepth(this.depth);
-    if (scene.textures.exists(RocketInfantry.handsKey)) {
-      this.hands = scene.add.image(x, y, RocketInfantry.handsKey);
-      this.hands.setOrigin(this.originX, this.originY);
-      this.hands.setDepth(this.depth);
-    }
+    const fit = RocketInfantry.fit;
+    this.setOrigin(fit.originX, fit.originY);
+    this.applyFit(fit);
     this.once('destroy', () => {
       this.scene.tweens.killTweensOf(this.recoil);
       this.launcher.destroy();
-      this.hands?.destroy();
     });
     this.syncLauncher();
   }
 
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
+    if (this.texture.key === RocketInfantry.aimKey) {
+      this.setOrigin(RocketInfantry.aimFit.originX, RocketInfantry.aimFit.originY);
+      this.applyFit(RocketInfantry.aimFit);
+    } else if (this.texture.key === RocketInfantry.corpseKey) {
+      this.setOrigin(RocketInfantry.corpseFit.originX, RocketInfantry.corpseFit.originY);
+    } else {
+      this.setOrigin(RocketInfantry.fit.originX, RocketInfantry.fit.originY);
+      this.applyFit(RocketInfantry.fit);
+    }
     this.syncLauncher();
+  }
+
+  private applyFit(fit: { bodyW: number; bodyH: number; bodyX: number; bodyY: number }): void {
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    if (!body?.enable) {
+      return;
+    }
+    body.setSize(fit.bodyW, fit.bodyH);
+    body.setOffset(fit.bodyX, fit.bodyY);
   }
 
   protected override corpseTexture(): string | null {
     return RocketInfantry.corpseKey;
   }
 
-  // Труба и кисти — отдельные спрайты. На трупе ствол уже лежит рядом с телом.
+  // Лежащая картинка длиннее шага. Опора стоящего кадра поднимает её над землёй.
+  override kill(): void {
+    const wasAlive = !this.reachedWall;
+    super.kill();
+    if (wasAlive && this.texture.key === RocketInfantry.corpseKey) {
+      this.setOrigin(RocketInfantry.corpseFit.originX, RocketInfantry.corpseFit.originY);
+      this.setScale(RocketInfantry.corpseFit.scale);
+    }
+  }
+
+  // Руки с трубой — отдельный спрайт. На трупе гранатомёт уже лежит рядом с телом.
   protected override onDie(slain: boolean): void {
     if (!slain) {
       return;
@@ -176,21 +242,14 @@ export class RocketInfantry extends RangedEnemy {
     if (this.launcher.active) {
       this.launcher.setVisible(false);
     }
-    if (this.hands?.active) {
-      this.hands.setVisible(false);
-    }
   }
 
   override hit(damage?: number): boolean {
     const dead = damage === undefined ? super.hit() : super.hit(damage);
     this.launcher.setTint(0xffccaa);
-    this.hands?.setTint(0xffccaa);
     this.scene.time.delayedCall(70, () => {
       if (this.launcher.active) {
         this.launcher.clearTint();
-      }
-      if (this.hands?.active) {
-        this.hands.clearTint();
       }
     });
     return dead;
@@ -240,12 +299,6 @@ export class RocketInfantry extends RangedEnemy {
     // На бегу труба нарисована в кадре. Отдельная картинка нужна только в стойке, иначе труб две.
     const planted = !this.reachedWall && this.texture.key === this.idleTexture;
     this.launcher.setVisible(planted);
-    if (this.hands?.active) {
-      this.hands.setVisible(planted);
-      this.hands.setPosition(this.x, this.y);
-      this.hands.setScale(this.scaleX, this.scaleY);
-      this.hands.setAlpha(this.alpha);
-    }
     if (!planted) {
       return;
     }
@@ -309,9 +362,11 @@ export class RocketInfantry extends RangedEnemy {
   }
 
   private static mountPoint(anchorX: number, anchorY: number, scale: number): { x: number; y: number } {
+    const fit = RocketInfantry.aimFit;
+    const frame = RocketInfantry.aimFrame;
     return {
-      x: anchorX + (RocketInfantry.breech.x - RocketInfantry.placed.originX * SOLDIER_FRAME.w) * scale,
-      y: anchorY + (RocketInfantry.breech.y - RocketInfantry.placed.originY * SOLDIER_FRAME.h) * scale,
+      x: anchorX + (RocketInfantry.breech.x - fit.originX * frame.w) * scale,
+      y: anchorY + (RocketInfantry.breech.y - fit.originY * frame.h) * scale,
     };
   }
 
@@ -347,12 +402,12 @@ export class RocketInfantry extends RangedEnemy {
       scale,
     );
     launcher.setPosition(muzzle.x - tip.x, muzzle.y - tip.y);
-    launcher.setScale(scale);
+    launcher.setScale(scale * RocketInfantry.armsFit);
     launcher.setRotation(rotation);
   }
 
   // Срез раструба и направление струи назад, против полёта ракеты.
-  // x, y — носик. Длина трубы в кадре солдата — ширина картинки гранатомёта.
+  // x, y — носик. Длина — от носа до среза на картинке рук.
   static backblastPose(
     x: number,
     y: number,
@@ -360,7 +415,7 @@ export class RocketInfantry extends RangedEnemy {
     scale: number,
   ): { x: number; y: number; rotation: number } {
     const rotation = angle + Math.PI;
-    const reach = (LAUNCHER_FRAME.w - 2) * scale;
+    const reach = RocketInfantry.tubeSpan * scale * RocketInfantry.armsFit;
     return {
       x: x + Math.cos(rotation) * reach,
       y: y + Math.sin(rotation) * reach,
