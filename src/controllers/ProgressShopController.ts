@@ -76,6 +76,7 @@ export class ProgressShopController {
 
   setPaused(paused: boolean): void {
     this.paused = paused;
+    this.panel.setPaused(paused);
   }
 
   closeAndRestart(): void {
@@ -140,10 +141,10 @@ export class ProgressShopController {
     const level = this.progress.coins;
     const price = this.price(level);
     return {
-      title: '+1 монета за убийство',
+      title: '+1 монета',
       buy: () => this.buyCoins(),
-      info: `ур. ${level}   +${level} → +${level + 1} к монетам`,
-      cost: `цена  ${price}`,
+      info: `ур. ${level} · +${level}→+${level + 1}`,
+      cost: this.coin(price),
       open: true,
       canBuy: score >= price,
     };
@@ -156,8 +157,8 @@ export class ProgressShopController {
     return {
       title: '+1 урон',
       buy: () => this.buyDamage(),
-      info: `ур. ${level}   урон ${now} → ${now + 1}`,
-      cost: `цена  ${price}`,
+      info: `ур. ${level} · ${now}→${now + 1}`,
+      cost: this.coin(price),
       open: true,
       canBuy: score >= price,
     };
@@ -169,10 +170,10 @@ export class ProgressShopController {
     const now = level * Tank.blastRadiusPerLevel;
     const next = (level + 1) * Tank.blastRadiusPerLevel;
     return {
-      title: '+1 область взрыва',
+      title: '+1 взрыв',
       buy: () => this.buyBlast(),
-      info: `ур. ${level}   радиус ${now} → ${next}`,
-      cost: `цена  ${price}`,
+      info: `ур. ${level} · ${now}→${next}`,
+      cost: this.coin(price),
       open: true,
       canBuy: score >= price,
     };
@@ -184,12 +185,13 @@ export class ProgressShopController {
     const now = Tank.fireDelayFor(0, level);
     const next = Tank.fireDelayFor(0, level + 1);
     const maxed = level >= Tank.maxProgressSpeedLevel || next >= now;
-    const delay = this.formatDelay(now);
+    const delay = this.formatSeconds(now);
+    const ahead = this.formatSeconds(next);
     return {
-      title: 'Скорость −0.01 с',
+      title: '−0.01 с',
       buy: () => this.buySpeed(),
-      info: maxed ? `ур. ${level}   ${delay} (макс.)` : `ур. ${level}   ${delay} → ${this.formatDelay(next)}`,
-      cost: maxed ? 'максимум' : `цена  ${price}`,
+      info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${ahead}`,
+      cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -200,8 +202,12 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.cost(level));
   }
 
-  private formatDelay(ms: number): string {
-    return `${(ms / 1000).toFixed(2)} с`;
+  private coin(price: number): string {
+    return `¤ ${price}`;
+  }
+
+  private formatSeconds(ms: number): string {
+    return (ms / 1000).toFixed(2);
   }
 
   private isPaused(): boolean {

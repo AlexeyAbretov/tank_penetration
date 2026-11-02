@@ -65,6 +65,15 @@ const packedFiles = [
   ['assets/super-aim.png', 'image/png'],
   ['assets/super-gun.png', 'image/png'],
   ['assets/super-corpse.png', 'image/png'],
+  ['assets/pickup-0.png', 'image/png'],
+  ['assets/pickup-1.png', 'image/png'],
+  ['assets/pickup-2.png', 'image/png'],
+  ['assets/pickup-3.png', 'image/png'],
+  ['assets/pickup-4.png', 'image/png'],
+  ['assets/pickup-5.png', 'image/png'],
+  ['assets/pickup-aim.png', 'image/png'],
+  ['assets/pickup-gun.png', 'image/png'],
+  ['assets/pickup-wreck.png', 'image/png'],
   ['audio/TRACK_01.mp3', 'audio/mpeg'],
   ['audio/boss.mp3', 'audio/mpeg'],
   ['audio/tank_shot.mp3', 'audio/mpeg'],
@@ -81,6 +90,9 @@ const packedFiles = [
   ['audio/impact2.mp3', 'audio/mpeg'],
   ['audio/rocket_shot.mp3', 'audio/mpeg'],
   ['audio/rocket_hit_tank.mp3', 'audio/mpeg'],
+  ['audio/artillery_shot.mp3', 'audio/mpeg'],
+  ['audio/artillery_explosion.mp3', 'audio/mpeg'],
+  ['audio/nuclear_explosion.mp3', 'audio/mpeg'],
 ] as const;
 
 // Phaser сам понимает адрес data: и не ходит за файлом.
@@ -199,7 +211,7 @@ function nameReleaseHtml(fileName: string): Plugin {
       const audioCount = page.split('data:audio/mpeg;base64,').length - 1;
       const bodyInsideScript = /<\/body>/i.test(script);
 
-      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 16) {
+      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 19) {
         throw new Error(
           `release/${fileName} всё ещё зависит от внешнего скрипта, картинок танка или музыки`,
         );

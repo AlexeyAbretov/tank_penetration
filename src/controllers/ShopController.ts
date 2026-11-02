@@ -17,6 +17,10 @@ import { ShopPanel, type ShopCardView, type ShopView } from '../ui/shops/ShopPan
 import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
+// Каталог нижнего ряда. В окне некупленное идёт первым, внутри группы порядок каталога сохраняется.
+const GEAR = ['wire', 'autoFire', 'machineGun', 'artillery', 'mines', 'nuclear'] as const;
+type GearId = (typeof GEAR)[number];
+
 type PermanentBonuses = {
   damage: number;
   blast: number;
@@ -43,6 +47,8 @@ export class ShopController {
   nuclearOwned = false;
   readonly autoFire = new AutoFire();
   shopOpen = false;
+  // Снимок нижнего ряда на время окна. Покупка не двигает карточку до следующего открытия.
+  private gearOrder: GearId[] = [...GEAR];
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
   private paused = false;
 
@@ -111,6 +117,8 @@ export class ShopController {
   }
 
   open(): void {
+    // Нижний ряд: ещё не купленное впереди. Пока окно открыто этот порядок не пересчитывается.
+    this.gearOrder = this.orderedGear();
     this.shopOpen = true;
     // combat читает стрельба танка: в магазине ствол молчит.
     this.scene.registry.set('combat', false);
@@ -304,45 +312,76 @@ export class ShopController {
     const coins = this.economy.getCoins();
     return {
       coins,
-      cards: [
-        this.blastCard(coins),
-        this.damageCard(coins),
-        this.fireRateCard(coins),
-        this.onceCard(
+      stats: [this.damageCard(coins), this.fireRateCard(coins), this.blastCard(coins)],
+      gear: this.gearOrder.map((id) => this.gearCard(id, coins)),
+    };
+  }
+
+  private orderedGear(): GearId[] {
+    const pending: GearId[] = [];
+    const owned: GearId[] = [];
+    for (const id of GEAR) {
+      (this.owns(id) ? owned : pending).push(id);
+    }
+    return pending.concat(owned);
+  }
+
+  private owns(id: GearId): boolean {
+    switch (id) {
+      case 'wire':
+        return this.wireOwned;
+      case 'autoFire':
+        return this.autoFire.isOwned;
+      case 'machineGun':
+        return this.machineGunOwned;
+      case 'artillery':
+        return this.artilleryOwned;
+      case 'mines':
+        return this.minesOwned;
+      case 'nuclear':
+        return this.nuclearOwned;
+    }
+  }
+
+  private gearCard(id: GearId, coins: number): ShopCardView {
+    switch (id) {
+      case 'wire':
+        return this.onceCard(
           'Колючая проволока',
           () => this.buyWire(),
           coins,
           this.wireOwned,
           shopPrice(BarbedWire.shop.cost),
-          'стоит перед танком, от верха до низа',
-          'установлена',
-          'не пускает пехоту · 1 урона / 3 с',
-        ),
-        this.onceCard(
+          'перед танком',
+          'держит пехоту',
+        );
+      case 'autoFire':
+        return this.onceCard(
           'Автострельба',
           () => this.buyAutoFire(),
           coins,
           this.autoFire.isOwned,
           shopPrice(AutoFire.shop.cost),
-          'кнопка слева от шестерёнки — вкл и выкл',
-          'куплено',
-          'не нужно держать ЛКМ',
-        ),
-        this.onceCard(
+          'стреляет сам',
+          'стреляет сам',
+        );
+      case 'machineGun':
+        return this.onceCard(
           'Пулемёт',
           () => this.buyMachineGun(),
           coins,
           this.machineGunOwned,
           shopPrice(MachineGun.shop.cost),
-          'перед люком башни · 1 урона / 3 с',
-          'установлен',
-          'стреляет вдоль прицела башни',
-        ),
-        this.artilleryCard(coins),
-        this.minesCard(coins),
-        this.nuclearCard(coins),
-      ],
-    };
+          '1 урон / 3 с',
+          'вдоль прицела',
+        );
+      case 'artillery':
+        return this.artilleryCard(coins);
+      case 'mines':
+        return this.minesCard(coins);
+      case 'nuclear':
+        return this.nuclearCard(coins);
+    }
   }
 
   private blastCard(coins: number): ShopCardView {
@@ -352,10 +391,11 @@ export class ShopController {
     return {
       title: '+1 область взрыва',
       buy: () => this.buyBlast(),
-      info: `ур. ${this.blastLevel}   радиус ${radius} → ${nextRadius}`,
-      cost: `цена  ${price}`,
+      info: `ур. ${this.blastLevel} · ${radius}→${nextRadius}`,
+      cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
     };
   }
 
@@ -365,26 +405,28 @@ export class ShopController {
     return {
       title: '+1 урон',
       buy: () => this.buyDamage(),
-      info: `ур. ${this.damageLevel}   урон ${now} → ${now + 1}`,
-      cost: `цена  ${price}`,
+      info: `ур. ${this.damageLevel} · ${now}→${now + 1}`,
+      cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
     };
   }
 
   private fireRateCard(coins: number): ShopCardView {
     const level = this.fireRateLevel;
     const price = ShopController.upgradeCost(level);
-    const delay = this.formatDelay(Tank.fireDelayFor(level));
-    const next = this.formatDelay(Tank.fireDelayFor(level + 1));
+    const delay = this.formatSeconds(Tank.fireDelayFor(level));
+    const next = this.formatSeconds(Tank.fireDelayFor(level + 1));
     const maxed = level >= Tank.maxFireRateLevel;
     return {
       title: '−0.02 с перезарядки',
       buy: () => this.buyFireRate(),
-      info: maxed ? `ур. ${level}   ${delay} (макс.)` : `ур. ${level}   ${delay} → ${next}`,
-      cost: maxed ? 'максимум' : `цена  ${price}`,
+      info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${next}`,
+      cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,
+      owned: false,
     };
   }
 
@@ -392,24 +434,25 @@ export class ShopController {
     const offer = ArtilleryStrike.shop;
     const price = shopPrice(offer.cost);
     const reload = offer.cooldownMs / 1000;
-    const crater = offer.craterMs / 1000;
     if (this.artilleryOwned) {
       return {
         title: 'Артиллерийский удар',
         buy: () => this.buyArtillery(),
-        info: `клавиша 1 или иконка · перезарядка ${reload} с`,
-        cost: 'куплено',
+        info: `откат ${reload} с`,
+        cost: '',
         open: false,
         canBuy: false,
+        owned: true,
       };
     }
     return {
       title: 'Артиллерийский удар',
       buy: () => this.buyArtillery(),
-      info: `${offer.shells} снаряда в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 1 или иконка · перезарядка ${reload} с`,
-      cost: `цена  ${price}`,
+      info: `${offer.shells}×${offer.damage} · откат ${reload} с`,
+      cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
     };
   }
 
@@ -417,49 +460,51 @@ export class ShopController {
     const offer = Mines.shop;
     const price = shopPrice(offer.cost);
     const reload = offer.cooldownMs / 1000;
-    const crater = offer.craterMs / 1000;
     if (this.minesOwned) {
       return {
         title: 'Мины',
         buy: () => this.buyMines(),
-        info: `клавиша 2 или иконка · перезарядка ${reload} с`,
-        cost: 'куплено',
+        info: `откат ${reload} с`,
+        cost: '',
         open: false,
         canBuy: false,
+        owned: true,
       };
     }
     return {
       title: 'Мины',
       buy: () => this.buyMines(),
-      info: `${offer.count} мины в случайные точки · ${offer.damage} урона\nвзрыв и воронка ${crater} с · клавиша 2 или иконка · перезарядка ${reload} с`,
-      cost: `цена  ${price}`,
+      info: `${offer.count}×${offer.damage} · откат ${reload} с`,
+      cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
     };
   }
 
   private nuclearCard(coins: number): ShopCardView {
     const offer = NuclearStrike.shop;
     const price = shopPrice(offer.cost);
-    const crater = offer.craterMs / 1000;
     const reload = offer.cooldownMs / 60_000;
     if (this.nuclearOwned) {
       return {
         title: 'Атомный взрыв',
         buy: () => this.buyNuclear(),
-        info: `клавиша 3 или иконка · перезарядка ${reload} мин`,
-        cost: 'куплено',
+        info: `откат ${reload} мин`,
+        cost: '',
         open: false,
         canBuy: false,
+        owned: true,
       };
     }
     return {
       title: 'Атомный взрыв',
       buy: () => this.buyNuclear(),
-      info: `убивает всех на экране\nбомба в центр поля · гриб и воронка ${crater} с\nклавиша 3 или иконка · перезарядка ${reload} мин`,
-      cost: `цена  ${price}`,
+      info: `весь экран · ${reload} мин`,
+      cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
     };
   }
 
@@ -470,16 +515,28 @@ export class ShopController {
     owned: boolean,
     price: number,
     ownedInfo: string,
-    ownedCost: string,
     offerInfo: string,
   ): ShopCardView {
     if (owned) {
-      return { title, buy, info: ownedInfo, cost: ownedCost, open: false, canBuy: false };
+      return { title, buy, info: ownedInfo, cost: '', open: false, canBuy: false, owned: true };
     }
-    return { title, buy, info: offerInfo, cost: `цена  ${price}`, open: true, canBuy: coins >= price };
+    return {
+      title,
+      buy,
+      info: offerInfo,
+      cost: this.coin(price),
+      open: true,
+      canBuy: coins >= price,
+      owned: false,
+    };
   }
 
-  private formatDelay(ms: number): string {
-    return `${(ms / 1000).toFixed(2)} с`;
+  // Знак валюты вместо слова «цена».
+  private coin(price: number): string {
+    return `¤ ${price}`;
+  }
+
+  private formatSeconds(ms: number): string {
+    return (ms / 1000).toFixed(2);
   }
 }
