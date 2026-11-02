@@ -1,14 +1,16 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, арт удар, мины, атомный взрыв и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, арт удар, мины, атомный взрыв и контакт с базой.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
+import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines, PlantedMine, type MineKeepOut } from '../entities/Mines';
 import { NuclearStrike, type NuclearFlight } from '../entities/NuclearStrike';
 import { PickupTruck } from '../entities/PickupTruck';
+import { Rocket } from '../entities/Rocket';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { craterReach } from '../gfx/craters';
@@ -26,6 +28,7 @@ export class CombatSystem implements Combat {
   private readonly shells: Phaser.Physics.Arcade.Group;
   private readonly mgShots: Phaser.Physics.Arcade.Group;
   private mgCooldown = 0;
+  private laserCooldown = 0;
   private artilleryCooldownMs = 0;
   private readonly strikeKeys: Phaser.Input.Keyboard.Key[] = [];
   // Клик по иконке на HUD. Сбрасывается в том же кадре, даже если удар ещё на перезарядке.
@@ -56,6 +59,7 @@ export class CombatSystem implements Combat {
     private readonly tank: Tank,
     private readonly infantry: Phaser.Physics.Arcade.Group,
     private readonly shop: ShopController,
+    private readonly enemyShots: Phaser.Physics.Arcade.Group,
     private readonly callbacks: CombatCallbacks,
     private readonly progressDamage: number,
     private readonly progressBlast: number,
@@ -512,6 +516,7 @@ export class CombatSystem implements Combat {
     this.resolveShellHits();
     this.cleanupShells();
     this.tickMachineGun(delta);
+    this.tickLaser(delta);
     this.resolveMgHits();
     this.cleanupMgShots();
     this.snareOnWire(delta);
@@ -592,6 +597,41 @@ export class CombatSystem implements Combat {
     this.fireMgBullet(shot.x, shot.y, shot.angle);
     this.effects.tankMgShot.play();
     this.mgCooldown = MachineGun.shop.fireIntervalMs;
+  }
+
+  // Раз в 3 секунды сбивает случайную летящую ракету. Без ракеты выстрел не тратится.
+  private tickLaser(delta: number): void {
+    const laser = this.shop.laser;
+    if (!laser) {
+      return;
+    }
+    this.laserCooldown = Math.max(0, this.laserCooldown - delta);
+    if (this.laserCooldown > 0) {
+      return;
+    }
+    const rocket = this.randomRocket();
+    if (!rocket) {
+      return;
+    }
+    const x = rocket.x;
+    const y = rocket.y;
+    laser.fireAt(x, y);
+    rocket.destroy();
+    Rocket.burstAt(this.scene, x, y);
+    this.laserCooldown = LaserDefense.shop.fireIntervalMs;
+  }
+
+  private randomRocket(): Rocket | null {
+    const flying: Rocket[] = [];
+    for (const obj of this.enemyShots.getChildren()) {
+      if (obj instanceof Rocket && obj.active) {
+        flying.push(obj);
+      }
+    }
+    if (flying.length === 0) {
+      return null;
+    }
+    return flying[Phaser.Math.Between(0, flying.length - 1)];
   }
 
   private fireMgBullet(x: number, y: number, angle: number): void {

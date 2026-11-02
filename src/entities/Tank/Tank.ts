@@ -16,6 +16,7 @@ import {
   type ShellPaint,
   type TankPaint,
 } from '../../gfx/looks';
+import { exhaustAt, idleShift } from '../../gfx/engine';
 import { tankBoomAt } from '../../gfx/tankBoom';
 import { bake } from '../../gfx/textures';
 
@@ -256,15 +257,9 @@ export class Tank extends GameObjects.Container {
     this.engine.setPosition(this.x + exhaust.x + shift.x, this.y + exhaust.y + shift.y);
   }
 
-  // Сдвиг корпуса и башни от мотора. gain 1 — сила в бою.
-  // Только целые пиксели: дробный сдвиг перерисовывает повёрнутую башню и она дрожит отдельно от корпуса.
+  // Тот же сдвиг, что у лазера: попадание и картинка делят одну формулу.
   static idleShift(ms: number, gain = 1): { x: number; y: number } {
-    const wobble = ms * 0.028;
-    const amount = Math.max(0, gain);
-    return {
-      x: Math.round((Math.sin(wobble) * 0.4 + Math.sin(wobble * 2.17) * 0.25) * amount),
-      y: Math.round((Math.cos(wobble * 1.31) * 0.4 + Math.sin(wobble * 2.63) * 0.15) * amount),
-    };
+    return idleShift(ms, gain);
   }
 
   private stopEngine(): void {
@@ -671,19 +666,7 @@ export class Tank extends GameObjects.Container {
     y: number,
     scale = 1,
   ): Phaser.GameObjects.Particles.ParticleEmitter {
-    const engine = scene.add.particles(x, y, Tank.puffKey(scene), {
-      lifespan: { min: 900, max: 1600 },
-      frequency: 40,
-      quantity: 2,
-      speed: { min: 12 * scale, max: 30 * scale },
-      angle: { min: -165, max: -105 },
-      scale: { start: 0.4 * scale, end: 1.55 * scale },
-      alpha: { start: 0.72, end: 0 },
-      color: [0xe6e2da, 0xb4aea6, 0x7c766e],
-      gravityY: -18 * scale,
-    });
-    engine.setDepth(26);
-    return engine;
+    return exhaustAt(scene, x, y, scale);
   }
 
   // Главный очаг: студия двигает по нему старый одиночный якорь дыма.

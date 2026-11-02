@@ -27,6 +27,7 @@ export type ShopSave = {
   fireRate: number;
   wire: boolean;
   machineGun: boolean;
+  laser: boolean;
   artillery: boolean;
   mines: boolean;
   nuclear: boolean;
@@ -177,8 +178,9 @@ function parseShop(value: unknown): ShopSave | null {
   const wire = flag(value.wire);
   const machineGun = flag(value.machineGun);
   const artillery = flag(value.artillery);
-  // Старые сохранения не писали мины и атомный взрыв: этих покупок ещё не было.
+  // Старые сохранения не писали мины, атомный взрыв и лазер: этих покупок ещё не было.
   const mines = flag(value.mines) ?? false;
+  const laser = flag(value.laser) ?? false;
   const nuclear = flag(value.nuclear) ?? false;
   const autoFire = flag(value.autoFire);
   // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
@@ -200,6 +202,7 @@ function parseShop(value: unknown): ShopSave | null {
     fireRate,
     wire,
     machineGun,
+    laser,
     artillery,
     mines,
     nuclear,

@@ -99,6 +99,7 @@ export class GameScene extends Phaser.Scene {
       tank: Tank,
       infantry: Phaser.Physics.Arcade.Group,
       shop: ShopController,
+      enemyShots: Phaser.Physics.Arcade.Group,
       callbacks: CombatCallbacks,
       progressDamage: number,
       progressBlast: number,
@@ -276,6 +277,7 @@ export class GameScene extends Phaser.Scene {
       this.player.tank,
       this.infantry,
       this.shop,
+      this.enemyShots,
       {
         onKill: (reward) => this.onEnemyKill(reward),
         onBaseHit: (amount) => this.onBaseHit(amount),

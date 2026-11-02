@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BarbedWire } from '../entities/BarbedWire';
+import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
@@ -23,6 +24,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   ensureCraters(scene);
   Tank.ensureTextures(scene);
   MachineGun.ensureTextures(scene);
+  LaserDefense.ensureTextures(scene);
   BarbedWire.ensureTextures(scene);
   ArtilleryStrike.ensureTextures(scene);
   Mines.ensureTextures(scene);
