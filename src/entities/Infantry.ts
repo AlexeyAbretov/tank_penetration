@@ -5,7 +5,7 @@
 // Суперсолдат наследует Infantry напрямую и бегает по своему циклу.
 
 import Phaser from 'phaser';
-import { enemyHasteOf } from '../gameConfig';
+import { enemyHasteOf, isDebugRun } from '../gameConfig';
 import type { SoldierLook } from '../gfx/looks';
 
 // Цвета лежат в gfx/looks.ts: один набор рисует и штурмовика, и стрелка.
@@ -74,6 +74,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   private readonly barBg: Phaser.GameObjects.Rectangle;
   // Цветная часть полоски. Её ширина уменьшается вместе с hp.
   private readonly barFill: Phaser.GameObjects.Rectangle;
+  // Текущее HP цифрами над полоской. В обычной партии объекта нет.
+  private readonly hpLabel: Phaser.GameObjects.Text | null;
 
   // protected constructor: создать Infantry напрямую нельзя, только через наследника.
   protected constructor(
@@ -121,10 +123,23 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.barBg = scene.add.rectangle(x, y, 30, 5, 0x2a0a0a).setDepth(11);
     // origin (0, 0.5): полоска растёт вправо от левого края, вертикально по центру.
     this.barFill = scene.add.rectangle(x, y, 30, 5, barColor).setOrigin(0, 0.5).setDepth(12);
+    // Цифра только в дебаг-партии. Обводка читается и на небе, и на земле.
+    this.hpLabel = isDebugRun()
+      ? scene.add
+          .text(x, y, String(hp), {
+            fontSize: '13px',
+            color: '#fff4e8',
+            stroke: '#1a0808',
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(13)
+      : null;
     // Когда спрайт уничтожат, полоски сами не исчезнут — у них другой родитель. Убираем их вручную.
     this.once('destroy', () => {
       this.barBg.destroy();
       this.barFill.destroy();
+      this.hpLabel?.destroy();
     });
     // Первый раз ставим полоску над головой сразу, не дожидаясь кадра.
     this.syncBar();
@@ -299,6 +314,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.clearTint();
     this.barBg.setVisible(false);
     this.barFill.setVisible(false);
+    this.hpLabel?.setVisible(false);
 
     const slain = this.hp <= 0;
     this.onDie(slain);
@@ -346,6 +362,14 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.barFill.setPosition(this.x - width / 2, top);
     // При полном HP ширина полоски целиком, при половине — половина, при нуле — 0.
     this.barFill.width = width * (this.hp / this.maxHp);
+    if (this.hpLabel) {
+      // Низ цифры чуть выше полоски, по её центру.
+      this.hpLabel.setPosition(this.x, top - 5);
+      const digits = String(this.hp);
+      if (this.hpLabel.text !== digits) {
+        this.hpLabel.setText(digits);
+      }
+    }
   }
 
   // Один кадр солдата. legPhase 0 и 1 меняют местами ноги, из двух кадров получается шаг.

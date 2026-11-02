@@ -1,7 +1,9 @@
 // Дебаг-круг волн. Наследует появление юнитов у обычной фабрики и подменяет состав.
 // Волна 1 — штурмовики, 5 — босс, 6 — снова штурмовики.
 // Обычных в волне по умолчанию трое. Поле в настройках пишет число в localStorage, потолок 50.
-// Босс остаётся один. Здоровье и скорость всегда как у первого выхода.
+// Босс остаётся один. Здоровье и скорость растут с номером волны.
+// Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
+// Босс толстеет с каждым своим выходом: 5-я волна — первое появление, 10-я — второе.
 
 import { AssaultInfantry } from './AssaultInfantry';
 import { EnemyFactory } from './EnemyFactory';
@@ -73,24 +75,23 @@ export class DebugEnemyFactory extends EnemyFactory {
     return this.spawnUnit(this.kindOn(ctx.wave), ctx);
   }
 
-  // pace из сохранения не применяем: ранг роста в этом режиме всегда 1.
-  // Текущее hp ставим поверх дебютного запаса, чтобы полоска помнила урон.
+  // pace из сохранения не нужен: ранг уже посчитан по номеру волны.
+  // Текущее hp ставим поверх этого запаса, чтобы полоска помнила урон.
   static restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, _pace: number): Infantry {
     const unit = this.spawnUnit(this.kindOfSave(kind), ctx);
     unit.setHealth(hp);
     return unit;
   }
 
-  protected static assaultRank(_wave: number): number {
-    return 1;
+  // Дебют обычной партии здесь не при чём: стрелок выходит на 2-й волне, пикап на 3-й.
+  // Ранг равен номеру волны, поэтому 7-я быстрее и толще 2-й.
+  protected static growthRank(wave: number, _debutWave: number): number {
+    return Math.max(1, wave);
   }
 
-  protected static bossAppearance(_wave: number): number {
-    return 1;
-  }
-
-  protected static growthRank(_wave: number, _debutWave: number): number {
-    return 1;
+  // В круге босс каждый 5-й номер. Запас считает номер появления, не номер волны обычной партии.
+  protected static bossAppearance(wave: number): number {
+    return Math.max(1, Math.floor(wave / CYCLE.length));
   }
 
   private static kindOn(wave: number): EnemyKind {
