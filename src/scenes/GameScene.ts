@@ -686,6 +686,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.setArtilleryCooldown(saved.artilleryCooldownMs);
     this.combat.setMinesCooldown(saved.minesCooldownMs);
     this.combat.setNuclearCooldown(saved.nuclearCooldownMs);
+    this.combat.restoreMines(saved.plantedMines);
     this.registry.set(ENEMY_HASTE.key, saved.haste);
     this.hud.setHaste(saved.haste);
     if (saved.phase === 'shop') {
@@ -724,6 +725,7 @@ export class GameScene extends Phaser.Scene {
       artilleryCooldownMs: Math.round(this.combat.artilleryCooldown),
       minesCooldownMs: Math.round(this.combat.minesCooldown),
       nuclearCooldownMs: Math.round(this.combat.nuclearCooldown),
+      plantedMines: this.combat.captureMines(),
       wave: wave.wave,
       phase: wave.phase,
       spawned: wave.spawned,

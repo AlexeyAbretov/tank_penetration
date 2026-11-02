@@ -1,5 +1,6 @@
 // Партия в localStorage. Обновление и закрытие вкладки поднимают ту же волну,
 // а не новую игру. Снаряды не пишем: после загрузки враги просто стреляют заново.
+// Лежащие мины пишем: иначе поставленный заряд пропадает вместе с вкладкой.
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
@@ -33,6 +34,11 @@ export type ShopSave = {
   autoFireOn: boolean;
 };
 
+export type PlantedMineSave = {
+  x: number;
+  y: number;
+};
+
 export type SavedRun = {
   version: 1;
   score: number;
@@ -46,6 +52,7 @@ export type SavedRun = {
   phase: WavePhase;
   spawned: number;
   enemies: EnemySave[];
+  plantedMines: PlantedMineSave[];
   shop: ShopSave;
 };
 
@@ -132,6 +139,8 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     requiredInt(value.nuclearCooldownMs, 0, NuclearStrike.shop.cooldownMs) ?? 0;
   // В магазине список врагов пустой по смыслу фазы, даже если в JSON они остались.
   const enemies = phase === 'shop' ? [] : parseEnemies(value.enemies);
+  // Старые сохранения не писали лежащие мины: поля просто нет, зарядов на нём не было.
+  const plantedMines = parsePlantedMines(value.plantedMines);
   const spawned =
     phase === 'shop'
       ? 0
@@ -153,6 +162,7 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     phase,
     spawned,
     enemies,
+    plantedMines,
     shop,
   };
 }
@@ -196,6 +206,26 @@ function parseShop(value: unknown): ShopSave | null {
     autoFire,
     autoFireOn: autoFire && autoFireOn,
   };
+}
+
+function parsePlantedMines(value: unknown): PlantedMineSave[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const field = Mines.field;
+  const mines: PlantedMineSave[] = [];
+  for (const entry of value) {
+    if (mines.length >= 48 || !isRecord(entry)) {
+      continue;
+    }
+    const x = finite(entry.x, field.minX, field.maxX);
+    const y = finite(entry.y, field.minY, field.maxY);
+    if (x === null || y === null) {
+      continue;
+    }
+    mines.push({ x: Math.round(x), y: Math.round(y) });
+  }
+  return mines;
 }
 
 function parseEnemies(value: unknown): EnemySave[] {

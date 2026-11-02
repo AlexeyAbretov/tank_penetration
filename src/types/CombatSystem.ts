@@ -13,6 +13,8 @@ export type CombatSystem = {
   requestMines(): void;
   requestNuclear(): void;
   clearProjectiles(): void;
+  captureMines(): { x: number; y: number }[];
+  restoreMines(spots: { x: number; y: number }[]): void;
   setupOverlap(): void;
   tickArtillery(delta: number, canFire: boolean): void;
   tickMines(delta: number, canFire: boolean): void;

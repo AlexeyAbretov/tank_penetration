@@ -26,7 +26,7 @@ export class PlantedMine {
   private readonly body: Phaser.GameObjects.Image;
   private dirt?: Phaser.GameObjects.Particles.ParticleEmitter;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, settled = false) {
     this.x = x;
     this.y = y;
 
@@ -34,11 +34,15 @@ export class PlantedMine {
     // У файла низ корпуса на строке 45. Запасной рисунок 36 px сидит своим низом.
     const originY = frame.height === 48 ? Mines.bodyOriginY : 1;
     this.body = scene.add
-      .image(0, 4, Mines.bodyKey)
+      .image(0, settled ? 0 : 4, Mines.bodyKey)
       .setOrigin(0.5, originY)
-      .setScale(Mines.bodyScale * 0.72, 0.02);
+      .setScale(settled ? Mines.bodyScale : Mines.bodyScale * 0.72, settled ? Mines.bodyScale : 0.02);
 
     this.root = scene.add.container(x, y, [this.body]).setDepth(4);
+    if (settled) {
+      this.armed = true;
+      return;
+    }
 
     scene.tweens.add({
       targets: this.body,
@@ -175,6 +179,11 @@ export class Mines {
 
   static plant(scene: Phaser.Scene, x: number, y: number): PlantedMine {
     return new PlantedMine(scene, x, y);
+  }
+
+  // Уже лежит и взведена. Загрузка партии не проигрывает вылезание из земли заново.
+  static restore(scene: Phaser.Scene, x: number, y: number): PlantedMine {
+    return new PlantedMine(scene, x, y, true);
   }
 
   // Общий разрыв у земли: четыре кадра, звук и тряска.

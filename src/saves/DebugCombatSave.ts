@@ -36,6 +36,7 @@ export class DebugCombatSave extends CombatSave {
       artilleryCooldownMs: 0,
       minesCooldownMs: 0,
       nuclearCooldownMs: 0,
+      plantedMines: [],
       wave: 1,
       phase: 'combat',
       spawned: 0,

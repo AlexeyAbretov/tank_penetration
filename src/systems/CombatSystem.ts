@@ -357,6 +357,17 @@ export class CombatSystem implements Combat {
     return 0;
   }
 
+  captureMines(): { x: number; y: number }[] {
+    return this.mines.map((mine) => ({ x: Math.round(mine.x), y: Math.round(mine.y) }));
+  }
+
+  restoreMines(spots: { x: number; y: number }[]): void {
+    this.clearMines();
+    for (const spot of spots) {
+      this.mines.push(Mines.restore(this.scene, spot.x, spot.y));
+    }
+  }
+
   private clearMines(): void {
     for (const mine of this.mines) {
       mine.destroy();
