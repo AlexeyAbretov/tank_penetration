@@ -23,7 +23,7 @@ export class RocketSalvo extends GameObjects.Container {
 
   static readonly shop = {
     cost: 1000,
-    fireIntervalMs: 3000,
+    fireIntervalMs: 5000,
     rockets: 3,
     damage: 20,
     blastRadius: 74,
