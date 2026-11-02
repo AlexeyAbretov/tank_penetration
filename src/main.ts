@@ -7,7 +7,7 @@ import Phaser from 'phaser';
 import { GAME, fitGameTo } from './gameConfig';
 import { GameSceneFactory } from './scenes/GameSceneFactory';
 import { installClipVolumes } from './sounds/clipVolume';
-import { installGameFont } from './ui/gameFont';
+import { installGameFont, loadGameFont } from './ui/gameFont';
 
 function parentBox(): { width: number; height: number } {
   const parent = document.getElementById('game');
@@ -57,20 +57,26 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [GameSceneFactory.create()],
 };
 
-// До холста: узлы громкости создаются внутри new Phaser.Game.
-installClipVolumes();
-// До первых надписей: пустое семейство шрифта становится Russo One.
-installGameFont();
-// new Phaser.Game создаёт холст и запускает сцену.
-const game = new Phaser.Game(config);
+void startGame();
 
-// Окно поменяло пропорции — поле снова подгоняется под него.
-const fitWindow = (): void => {
-  const box = parentBox();
-  fitGameTo(box.width, box.height);
-  if (game.scale.width !== GAME.width || game.scale.height !== GAME.height) {
-    game.scale.setGameSize(GAME.width, GAME.height);
-  }
-};
-window.addEventListener('resize', fitWindow);
-window.requestAnimationFrame(fitWindow);
+async function startGame(): Promise<void> {
+  // До холста: узлы громкости создаются внутри new Phaser.Game.
+  installClipVolumes();
+  // До первых надписей: пустое семейство становится Russo One, и файл шрифта уже загружен.
+  // Иначе телефон рисует системным шрифтом и не меняет его, когда файл доезжает.
+  installGameFont();
+  await loadGameFont();
+  // new Phaser.Game создаёт холст и запускает сцену.
+  const game = new Phaser.Game(config);
+
+  // Окно поменяло пропорции — поле снова подгоняется под него.
+  const fitWindow = (): void => {
+    const box = parentBox();
+    fitGameTo(box.width, box.height);
+    if (game.scale.width !== GAME.width || game.scale.height !== GAME.height) {
+      game.scale.setGameSize(GAME.width, GAME.height);
+    }
+  };
+  window.addEventListener('resize', fitWindow);
+  window.requestAnimationFrame(fitWindow);
+}

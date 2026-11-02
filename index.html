@@ -8,14 +8,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Текст вкладки браузера. -->
     <title>Tank Penetration</title>
-    <!-- Заранее устанавливаем соединение со шрифтовым сервером Google, чтобы шрифт приехал быстрее. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Russo One — военный шрифт с кириллицей. Им пишутся все надписи игры. -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap"
-      rel="stylesheet"
-    />
     <style>
       /* Страница на весь экран, без белых полей браузера. */
       html,
@@ -27,7 +19,8 @@
         height: 100dvh;
         /* Почти чёрный фон вокруг холста, если игра не занимает всё окно. */
         background: #090505;
-        /* Надписи вне холста: поле числа в дебаге. Холст Phaser этот шрифт не берёт. */
+        /* Надписи вне холста: поле числа в дебаге. Холст Phaser этот шрифт не берёт.
+           Сам файл шрифта подключает gameFont.ts до старта игры. */
         font-family: "Russo One", Impact, sans-serif;
         /* Страница не скроллится: игра на весь экран. */
         overflow: hidden;

@@ -96,6 +96,9 @@ const packedFiles = [
   ['audio/artillery_shot.mp3', 'audio/mpeg'],
   ['audio/artillery_explosion.mp3', 'audio/mpeg'],
   ['audio/nuclear_explosion.mp3', 'audio/mpeg'],
+  ['fonts/russo-one-cyrillic.woff2', 'font/woff2'],
+  ['fonts/russo-one-latin-ext.woff2', 'font/woff2'],
+  ['fonts/russo-one-latin.woff2', 'font/woff2'],
 ] as const;
 
 // Phaser сам понимает адрес data: и не ходит за файлом.
@@ -212,11 +215,22 @@ function nameReleaseHtml(fileName: string): Plugin {
       const looseFiles = packedFiles.some(([relativePath]) => page.includes(relativePath));
       const imageCount = page.split('data:image/png;base64,').length - 1;
       const audioCount = page.split('data:audio/mpeg;base64,').length - 1;
+      const fontCount = page.split('data:font/woff2;base64,').length - 1;
+      const googleFont = page.includes('fonts.googleapis.com') || page.includes('fonts.gstatic.com');
       const bodyInsideScript = /<\/body>/i.test(script);
 
-      if (moduleAt === -1 || externalScript || stillModule || looseFiles || imageCount < 4 || audioCount < 19) {
+      if (
+        moduleAt === -1 ||
+        externalScript ||
+        stillModule ||
+        looseFiles ||
+        googleFont ||
+        imageCount < 4 ||
+        audioCount < 19 ||
+        fontCount < 3
+      ) {
         throw new Error(
-          `release/${fileName} всё ещё зависит от внешнего скрипта, картинок танка или музыки`,
+          `release/${fileName} всё ещё зависит от внешнего скрипта, картинок танка, музыки или шрифта`,
         );
       }
 
