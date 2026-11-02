@@ -246,7 +246,7 @@ export class WaveManager {
       return;
     }
 
-    // Правее края и на свободной дорожке: въезжает в кадр с зазором до уже идущих.
+    // Правее края и со сдвигом от уже идущих: въезжает в кадр, не повторяя их линию.
     const { x, y } = this.entryPoint();
     // index — место в списке волны. Фабрика по нему выбирает вид и здоровье.
     // fireTarget — точка, в которую целятся стрелки; её задала сцена в bind().
@@ -262,13 +262,14 @@ export class WaveManager {
     unit.march();
   }
 
-  // Шесть дорожек от верха поля до баннера.
-  // Пока живых не больше дорожек, зазор полный: 118 по вертикали (в шеренге каждая вторая
-  // дорожка, соседние стоят через 72) и 200 по горизонтали. Маленькая волна не слипается в точку.
+  // Полоса от верха поля до баннера. Дорожек нет: новый встаёт в середину
+  // промежутка между уже идущими, то есть со сдвигом от их линий.
+  // Пока живых не больше шести, зазор полный: 118 по вертикали и 200 по горизонтали.
   // Дальше зазор сжимается. В толпе корпуса заходят друг на друга, и радиус взрыва достаёт соседа.
   // Пол 36×32 не даёт двоим встать в один пиксель.
   private entryPoint(): { x: number; y: number } {
-    const lanes = [176, 248, 320, 392, 464, 536];
+    const yMin = 168;
+    const yMax = 544;
     const baseX = this.game.width + 24;
     const loose = { x: 200, y: 118 };
     const tight = { x: 36, y: 32 };
@@ -277,27 +278,44 @@ export class WaveManager {
       (unit) => unit.active && !unit.reachedWall,
     );
     // До шестого живого строй редкий. С седьмого зазор сжимается и к десятому доходит до пола.
-    const t = Math.min(1, Math.max(0, others.length - lanes.length) / 4);
+    const t = Math.min(1, Math.max(0, others.length - 6) / 4);
     const sepX = loose.x + (tight.x - loose.x) * t;
     const sepY = loose.y + (tight.y - loose.y) * t;
 
-    const fits: { x: number; y: number }[] = [];
-    for (const lane of lanes) {
-      const y = lane + Phaser.Math.Between(-8, 8);
+    if (others.length === 0) {
+      return {
+        x: baseX + Phaser.Math.Between(0, 36),
+        y: Phaser.Math.Between(yMin, yMax),
+      };
+    }
+
+    const marks = [yMin, yMax, ...others.map((unit) => unit.y)].sort((a, b) => a - b);
+    const fits: { x: number; y: number; room: number }[] = [];
+    for (let i = 0; i < marks.length - 1; i += 1) {
+      const top = marks[i];
+      const bottom = marks[i + 1];
+      if (top === undefined || bottom === undefined || bottom <= yMin || top >= yMax) {
+        continue;
+      }
+      if (bottom - top < 1) {
+        continue;
+      }
+      const y = Phaser.Math.Clamp((top + bottom) / 2, yMin, yMax);
+      let room = yMax - yMin;
       let x = baseX;
       for (const unit of others) {
         const dy = Math.abs(y - unit.y);
+        room = Math.min(room, dy);
         if (dy >= sepY) {
           continue;
         }
         const share = dy / sepY;
-        const dxNeed = sepX * Math.sqrt(1 - share * share);
-        const minX = unit.x + dxNeed;
+        const minX = unit.x + sepX * Math.sqrt(1 - share * share);
         if (minX > x) {
           x = minX;
         }
       }
-      fits.push({ x, y });
+      fits.push({ x, y, room });
     }
 
     let front = fits[0]?.x ?? baseX;
@@ -306,15 +324,26 @@ export class WaveManager {
         front = fit.x;
       }
     }
-    // Несколько свободных дорожек равноправны: берём любую из передней шеренги.
-    const open = fits.filter((fit) => fit.x <= front + 1);
-    const picked = open[Phaser.Math.Between(0, open.length - 1)] ?? {
+    // Передняя шеренга равноправна по X. Из неё берём больший сдвиг от уже идущих.
+    const open = fits.filter((fit) => fit.x <= front + 24);
+    let bestRoom = -1;
+    for (const fit of open) {
+      if (fit.room > bestRoom) {
+        bestRoom = fit.room;
+      }
+    }
+    const shifted = open.filter((fit) => fit.room >= bestRoom - 16);
+    const picked = shifted[Phaser.Math.Between(0, shifted.length - 1)] ?? {
       x: baseX,
-      y: lanes[0] ?? 320,
+      y: (yMin + yMax) / 2,
     };
-    // В толпе случайный сдвиг короче, иначе он снова разводит уже сжатый строй.
+    // В толпе случайный добор короче, иначе он снова разводит уже сжатый строй.
     const slack = Math.round(36 - 28 * t);
-    return { x: picked.x + Phaser.Math.Between(0, slack), y: picked.y };
+    const jitter = Math.min(8, Math.round(picked.room / 4));
+    return {
+      x: picked.x + Phaser.Math.Between(0, slack),
+      y: Phaser.Math.Clamp(Math.round(picked.y) + Phaser.Math.Between(-jitter, jitter), yMin, yMax),
+    };
   }
 
   // Таймер этой волны. Чужой штамп значит, что выход уже отменён.
