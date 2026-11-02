@@ -267,6 +267,15 @@ export class Tank extends GameObjects.Container {
     this.engine = undefined;
   }
 
+  // Верх картинки в мире: середина корпуса, макушка башни. Цифра урона стартует отсюда.
+  topPoint(): { x: number; y: number } {
+    const layout = Tank.layout;
+    return {
+      x: this.x + layout.hullX,
+      y: this.y + layout.seatY - layout.turretOriginY * TANK_TURRET_FRAME.h,
+    };
+  }
+
   // Попала ли точка (пуля) в корпус, башню или ствол. Пустота между ними не считается.
   // Башня и ствол крутятся вместе с прицелом, ствол ещё отъезжает при откате.
   // Мёртвый танк пуль уже не ловит: на его месте только обломки.

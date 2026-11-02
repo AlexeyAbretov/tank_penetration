@@ -3,6 +3,8 @@
 import Phaser from 'phaser';
 import { Tank } from '../entities/Tank/Tank';
 import { TankBaseHp } from '../entities/Tank/TankBaseHp';
+import { isDebugRun } from '../gameConfig';
+import { floatDamage } from '../gfx/damageFloat';
 import type { GameHud } from '../ui/huds/GameHud';
 import type { TankDeath } from '../sounds/TankDeath';
 
@@ -82,7 +84,15 @@ export class PlayerController {
     if (this.gameOver) {
       return;
     }
+    const before = this.hp;
     this.hp = Math.max(0, this.hp - amount);
+    // В дебаге над башней всплывает нанесённое число, как у пехоты.
+    // Танк и выхлоп рисуются выше цифр пехоты, поэтому у брони свой слой.
+    if (isDebugRun() && before > this.hp) {
+      const shown = amount < 10_000 ? amount : before - this.hp;
+      const top = this.tank.topPoint();
+      floatDamage(this.scene, top.x, top.y, shown, 32);
+    }
     this.hud.setHp(this.hp);
     if (this.hp <= 0) {
       this.defeat();

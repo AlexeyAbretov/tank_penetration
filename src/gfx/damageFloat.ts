@@ -9,7 +9,14 @@ const RISE_MS = 1400;
 const FADE_MS = 450;
 
 // headY — верх картинки. Цифра стартует выше полоски здоровья и запаса.
-export function floatDamage(scene: Phaser.Scene, x: number, headY: number, damage: number): void {
+// depth — слой. У пехоты хватает 16, танк рисуется выше и передаёт свой.
+export function floatDamage(
+  scene: Phaser.Scene,
+  x: number,
+  headY: number,
+  damage: number,
+  depth = 16,
+): void {
   const label = scene.add
     .text(x + Phaser.Math.Between(-10, 10), headY - 36 - Phaser.Math.Between(0, 12), String(damage), {
       fontSize: '16px',
@@ -18,7 +25,7 @@ export function floatDamage(scene: Phaser.Scene, x: number, headY: number, damag
       strokeThickness: 3,
     })
     .setOrigin(0.5, 1)
-    .setDepth(16);
+    .setDepth(depth);
 
   scene.tweens.add({
     targets: label,
