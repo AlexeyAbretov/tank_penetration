@@ -366,6 +366,14 @@ export class ShopController {
     return this.paused;
   }
 
+  // Окно уже открыто: подпись и серые кнопки читают новое число монет.
+  refreshCoins(): void {
+    if (!this.shopOpen) {
+      return;
+    }
+    this.panel.refresh(this.view());
+  }
+
   private refresh(): void {
     this.hud.setCoins(this.economy.getCoins());
     this.syncTankStats();

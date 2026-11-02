@@ -20,6 +20,22 @@ export class LaserDefense extends GameObjects.Container {
     minFlightMs: 200,
   };
 
+  // Очередь из магазина после проигрыша. Без покупок один луч, каждая покупка добавляет ещё один.
+  static readonly shotMin = 1;
+  static readonly shotMax = 3;
+  // Пауза между лучами одной очереди. Одиночный выстрел её не ждёт.
+  // Дольше вспышки луча, чтобы выстрелы не слипались в один.
+  static readonly burstGap = 180;
+
+  static get maxShotLevel(): number {
+    return LaserDefense.shotMax - LaserDefense.shotMin;
+  }
+
+  static shotCount(level: number): number {
+    const extra = Math.max(0, Math.round(level));
+    return Math.min(LaserDefense.shotMax, LaserDefense.shotMin + extra);
+  }
+
   // Ось — ноль контейнера, это пятка линзы на крыше. belowBelly опускает пятку ниже днища танка.
   static readonly mount = { belowBelly: 100 };
 

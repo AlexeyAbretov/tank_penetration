@@ -1,6 +1,7 @@
 // Улучшения между проигрышами. Партия стирается со смертью базы,
 // а эти уровни и непотраченный score остаются в localStorage.
 
+import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank/Tank';
 
@@ -22,6 +23,8 @@ export type SavedProgress = {
   bullets: number;
   // Сколько раз докуплен урон пули пулемёта. 0 — базовый урон пули.
   mgDamage: number;
+  // Сколько раз докуплен луч лазера. 0 — один луч, 2 — три. Цена — общая, 500 + 500 × уровень.
+  laserShots: number;
 };
 
 export class ProgressSave {
@@ -65,6 +68,7 @@ export class ProgressSave {
     progress.speed = 0;
     progress.bullets = 0;
     progress.mgDamage = 0;
+    progress.laserShots = 0;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
   }
@@ -94,6 +98,7 @@ export class ProgressSave {
       speed: 0,
       bullets: 0,
       mgDamage: 0,
+      laserShots: 0,
     };
   }
 
@@ -138,6 +143,7 @@ function parseProgress(value: unknown): SavedProgress | null {
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    laserShots: requiredInt(value.laserShots, 0, LaserDefense.maxShotLevel) ?? 0,
   };
 }
 

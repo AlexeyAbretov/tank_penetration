@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
+import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
@@ -11,7 +12,7 @@ import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;
 
-type Stat = 'coins' | 'damage' | 'blast' | 'speed' | 'bullets' | 'mgDamage';
+type Stat = 'coins' | 'damage' | 'blast' | 'speed' | 'bullets' | 'mgDamage' | 'laserShots';
 
 export class ProgressShopController {
   // Панель живёт только пока жива сцена. restart() её уничтожает, bind() собирает заново.
@@ -61,6 +62,10 @@ export class ProgressShopController {
     return this.progress.mgDamage;
   }
 
+  laserShotCount(): number {
+    return LaserDefense.shotCount(this.progress.laserShots);
+  }
+
   isAwaitingShop(): boolean {
     return this.progress.awaitingShop;
   }
@@ -77,6 +82,14 @@ export class ProgressShopController {
     this.progress.score = Math.min(SCORE_MAX, this.progress.score + gained);
     this.progress.awaitingShop = true;
     this.progressSave.save(this.progress);
+  }
+
+  // Дебаг досыпает очки, пока витрина открыта. Иначе кнопки остаются по старому числу.
+  addScore(amount: number): void {
+    const gained = Math.max(0, Math.round(amount));
+    this.progress.score = Math.min(SCORE_MAX, this.progress.score + gained);
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
   }
 
   open(): void {
@@ -125,6 +138,10 @@ export class ProgressShopController {
     this.buy('mgDamage');
   }
 
+  private buyLaserShots(): void {
+    this.buy('laserShots');
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -134,6 +151,9 @@ export class ProgressShopController {
       return;
     }
     if (stat === 'bullets' && level >= MachineGun.maxBulletLevel) {
+      return;
+    }
+    if (stat === 'laserShots' && level >= LaserDefense.maxShotLevel) {
       return;
     }
     const cost = this.costFor(stat, level);
@@ -160,6 +180,7 @@ export class ProgressShopController {
         this.speedCard(score),
         this.bulletsCard(score),
         this.mgDamageCard(score),
+        this.laserCard(score),
       ],
     };
   }
@@ -233,6 +254,22 @@ export class ProgressShopController {
     return {
       title: '+1 пуля',
       buy: () => this.buyBullets(),
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private laserCard(score: number): ProgressCardView {
+    const level = this.progress.laserShots;
+    const price = this.price(level);
+    const now = LaserDefense.shotCount(level);
+    const next = LaserDefense.shotCount(level + 1);
+    const maxed = level >= LaserDefense.maxShotLevel;
+    return {
+      title: '+1 луч',
+      buy: () => this.buyLaserShots(),
       info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,

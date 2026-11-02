@@ -33,6 +33,8 @@ export class CombatSystem implements Combat {
   // Сколько пуль ещё осталось в текущей очереди. 0 — очередь не начата.
   private mgBurstLeft = 0;
   private laserCooldown = 0;
+  // Сколько лучей ещё осталось в текущей очереди. 0 — очередь не начата.
+  private laserBurstLeft = 0;
   private salvoCooldown = 0;
   private artilleryCooldownMs = 0;
   private readonly strikeKeys: Phaser.Input.Keyboard.Key[] = [];
@@ -70,6 +72,7 @@ export class CombatSystem implements Combat {
     private readonly progressBlast: number,
     private readonly mgBullets: number,
     private readonly progressMgDamage: number,
+    private readonly laserShots: number,
     private readonly effects: BattleEffects,
   ) {
     this.blast = createShellBlast(scene);
@@ -626,7 +629,9 @@ export class CombatSystem implements Combat {
     this.mgCooldown = this.mgBurstLeft > 0 ? MachineGun.burstGap : MachineGun.shop.fireIntervalMs;
   }
 
-  // Раз в 3 секунды сбивает случайную ракету, которая уже летит minFlightMs. Свежий пуск выстрел не тратит.
+  // Очередь лучей. Между лучами короткая пауза, после последнего — 3 секунды.
+  // Каждый луч берёт другую ракету, которая уже летит minFlightMs: предыдущая уже сбита.
+  // Пока очередь не начата, пустое небо перезарядку не тратит. Пустой слот уже начатой очереди проходит молча.
   private tickLaser(delta: number): void {
     const laser = this.shop.laser;
     if (!laser) {
@@ -637,9 +642,20 @@ export class CombatSystem implements Combat {
       return;
     }
     const rocket = this.randomRocket();
-    if (!rocket) {
-      return;
+    if (this.laserBurstLeft <= 0) {
+      if (!rocket) {
+        return;
+      }
+      this.laserBurstLeft = this.laserShots;
     }
+    if (rocket) {
+      this.shootLaser(laser, rocket);
+    }
+    this.laserBurstLeft -= 1;
+    this.laserCooldown = this.laserBurstLeft > 0 ? LaserDefense.burstGap : LaserDefense.shop.fireIntervalMs;
+  }
+
+  private shootLaser(laser: LaserDefense, rocket: Rocket): void {
     const x = rocket.x;
     const y = rocket.y;
     laser.fireAt(x, y);
@@ -647,7 +663,6 @@ export class CombatSystem implements Combat {
     rocket.destroy();
     airBurstAt(this.scene, x, y);
     this.effects.rocketBurst.play();
-    this.laserCooldown = LaserDefense.shop.fireIntervalMs;
   }
 
   // Раз в 3 секунды три ракеты в случайные точки. Дуга и огонь в шахтах — у установки.

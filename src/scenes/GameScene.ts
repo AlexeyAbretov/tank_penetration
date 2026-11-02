@@ -9,7 +9,7 @@ import { Infantry } from '../entities/Infantry';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
-import { ENEMY_HASTE, GAME, enemyHasteOf } from '../gameConfig';
+import { ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleEffects } from '../sounds/BattleEffects';
@@ -69,6 +69,8 @@ export class GameScene extends Phaser.Scene {
   private hasteKey?: Phaser.Input.Keyboard.Key;
   private hasteNumpad?: Phaser.Input.Keyboard.Key;
   private pauseKey?: Phaser.Input.Keyboard.Key;
+  // Дебаг: M досыпает очки и монеты. В обычной партии клавиши нет.
+  private fundsKey?: Phaser.Input.Keyboard.Key;
   // false до конца create() и в момент гибели, чтобы оборванная партия не записалась поверх стирания.
   private persistEnabled = false;
   // Сколько миллисекунд прошло с прошлой автозаписи. Порог — в touchAutosave.
@@ -105,6 +107,7 @@ export class GameScene extends Phaser.Scene {
       progressBlast: number,
       mgBullets: number,
       progressMgDamage: number,
+      laserShots: number,
       effects: BattleEffects,
     ) => CombatSystem,
     private readonly pauses: PauseStack,
@@ -231,6 +234,9 @@ export class GameScene extends Phaser.Scene {
       this.hasteKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS);
       this.hasteNumpad = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD);
       this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+      if (isDebugRun()) {
+        this.fundsKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+      }
     }
     this.events.once('shutdown', this.onShutdown, this);
 
@@ -288,6 +294,7 @@ export class GameScene extends Phaser.Scene {
       this.progressShop.blastBonus(),
       this.progressShop.bulletCount(),
       this.progressShop.mgDamageBonus(),
+      this.progressShop.laserShotCount(),
       fx,
     );
     // Пересечения снарядов танка с пехотой. Без этого выстрел пролетает сквозь спрайт.
@@ -390,6 +397,11 @@ export class GameScene extends Phaser.Scene {
 
   // Кадр боя. delta — миллисекунды с прошлого кадра, его забирают системы.
   update(_time: number, delta: number): void {
+    // Раньше магазинов и паузы: иначе M молчит, пока витрина открыта.
+    if (this.fundsPressed()) {
+      this.grantDebugFunds();
+    }
+
     // Поражение и магазин очков живут своими кнопками. Кадр боя им не нужен.
     if (this.player.isGameOver || this.defeatShop) {
       return;
@@ -593,6 +605,24 @@ export class GameScene extends Phaser.Scene {
 
   private pausePressed(): boolean {
     return this.pauseKey !== undefined && Phaser.Input.Keyboard.JustDown(this.pauseKey);
+  }
+
+  private fundsPressed(): boolean {
+    return this.fundsKey !== undefined && Phaser.Input.Keyboard.JustDown(this.fundsKey);
+  }
+
+  // 100 очков и 100 монет. Магазин между волнами тратит монеты, магазин после гибели — накопленные очки.
+  private grantDebugFunds(): void {
+    if (this.defeatShop) {
+      this.progressShop.addScore(100);
+      return;
+    }
+    this.score += 100;
+    this.coins += 100;
+    this.hud.setScore(this.score);
+    this.hud.setCoins(this.coins);
+    this.shop.refreshCoins();
+    this.writeSave();
   }
 
   private cycleEnemyHaste(): void {
