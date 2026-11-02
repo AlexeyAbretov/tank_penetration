@@ -1,4 +1,5 @@
-// Пикап: крупная машина. Едет быстрее солдат, встаёт на том же рубеже и стреляет чаще.
+// Пикап: крупная машина. Едет быстрее солдат и встаёт на том же рубеже.
+// Очередь из пяти пуль, потом три секунды тишины.
 // Урон пули меньше, чем у стрелка, но здоровье выше и награда больше.
 
 import Phaser from 'phaser';
@@ -34,8 +35,11 @@ export class PickupTruck extends RangedEnemy {
   };
   // Родителю поле нужно, выстрел его не читает: дуло считает shotPose.
   static readonly muzzleOffset = { x: -80, y: -40 };
-  // Почти непрерывная очередь: пауза 280 мс. Пули слабее винтовки, но их много.
-  static readonly shotInterval = 280;
+  // Пять пуль подряд, затем пауза. Пауза между патронами чуть длиннее отдачи,
+  // чтобы вспышка успевала погаснуть и очередь не слипалась в одну.
+  static readonly burstCount = 5;
+  static readonly burstGap = 150;
+  static readonly shotInterval = 3000;
   static readonly shotSpeed = 520;
   // Откат: пиксели текстуры назад и подъём дула. Потом ствол возвращается за ms.
   // Ствол на картинке короткий, длинный откат уводил бы казённик в солдата.
@@ -60,6 +64,8 @@ export class PickupTruck extends RangedEnemy {
   override readonly hitRadius: number = 86;
   protected readonly holdX = 640;
   protected readonly fireDelay = PickupTruck.shotInterval;
+  protected override readonly burstCount = PickupTruck.burstCount;
+  protected override readonly burstGap = PickupTruck.burstGap;
   protected readonly bulletSpeed = PickupTruck.shotSpeed;
   // Слабее винтовки стрелка, но выстрелов много.
   protected readonly shotDamage = 2;

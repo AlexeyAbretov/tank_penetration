@@ -11,8 +11,12 @@ import type { WorldPoint } from '../types/WorldPoint';
 export abstract class RangedEnemy extends Infantry {
   // Координата X, до которой юнит идёт. Дальше останавливается и стреляет.
   protected abstract readonly holdX: number;
-  // Пауза между выстрелами, миллисекунды.
+  // Пауза между выстрелами, миллисекунды. Для очереди — пауза после последней пули.
   protected abstract readonly fireDelay: number;
+  // Сколько пуль подряд. 1 — одиночный выстрел, между ними только fireDelay.
+  protected readonly burstCount = 1;
+  // Пауза между пулями одной очереди. Одиночный выстрел это число не читает.
+  protected readonly burstGap = 0;
   // Скорость пули, пиксели в секунду.
   protected abstract readonly bulletSpeed: number;
   // Урон одной пули по базе.
@@ -34,6 +38,8 @@ export abstract class RangedEnemy extends Infantry {
   private shooting = false;
   // Сколько миллисекунд осталось до следующего выстрела. Стартовые 350 — короткая задержка после остановки.
   private fireCooldown = 350;
+  // Сколько пуль ещё осталось в текущей очереди. 0 — очередь не начата, ждём паузу.
+  private burstLeft = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -79,8 +85,13 @@ export abstract class RangedEnemy extends Infantry {
     if (this.fireCooldown > 0) {
       return;
     }
-    // Списываем интервал сразу, до выстрела, чтобы следующий ждал полную паузу.
-    this.fireCooldown = this.fireDelay;
+    if (this.burstLeft <= 0) {
+      this.burstLeft = this.burstCount;
+    }
+    this.burstLeft -= 1;
+    // Списываем интервал сразу, до выстрела. Между патронами очереди пауза короткая.
+    // После последнего — полная, до следующей очереди.
+    this.fireCooldown = this.burstLeft > 0 ? this.burstGap : this.fireDelay;
     this.fire();
   }
 
