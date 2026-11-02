@@ -634,8 +634,10 @@ export class CombatSystem implements Combat {
     const x = rocket.x;
     const y = rocket.y;
     laser.fireAt(x, y);
+    this.effects.laserShot.play();
     rocket.destroy();
     airBurstAt(this.scene, x, y);
+    this.effects.rocketBurst.play();
     this.laserCooldown = LaserDefense.shop.fireIntervalMs;
   }
 

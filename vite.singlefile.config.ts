@@ -82,6 +82,7 @@ const packedFiles = [
   ['audio/boss.mp3', 'audio/mpeg'],
   ['audio/tank_shot.mp3', 'audio/mpeg'],
   ['audio/tank_mg_shot.mp3', 'audio/mpeg'],
+  ['audio/laserSmall_000.ogg', 'audio/ogg'],
   ['audio/gunner_shot.mp3', 'audio/mpeg'],
   ['audio/bullet_hit_tank.mp3', 'audio/mpeg'],
   ['audio/tank_dead.mp3', 'audio/mpeg'],
@@ -94,6 +95,7 @@ const packedFiles = [
   ['audio/impact2.mp3', 'audio/mpeg'],
   ['audio/rocket_shot.mp3', 'audio/mpeg'],
   ['audio/rocket_hit_tank.mp3', 'audio/mpeg'],
+  ['audio/rocket_burst.mp3', 'audio/mpeg'],
   ['audio/artillery_shot.mp3', 'audio/mpeg'],
   ['audio/artillery_explosion.mp3', 'audio/mpeg'],
   ['audio/nuclear_explosion.mp3', 'audio/mpeg'],
@@ -215,7 +217,10 @@ function nameReleaseHtml(fileName: string): Plugin {
       const stillModule = page.includes(moduleTag);
       const looseFiles = packedFiles.some(([relativePath]) => page.includes(relativePath));
       const imageCount = page.split('data:image/png;base64,').length - 1;
-      const audioCount = page.split('data:audio/mpeg;base64,').length - 1;
+      const audioCount =
+        page.split('data:audio/mpeg;base64,').length -
+        1 +
+        (page.split('data:audio/ogg;base64,').length - 1);
       const fontCount = page.split('data:font/woff2;base64,').length - 1;
       const googleFont = page.includes('fonts.googleapis.com') || page.includes('fonts.gstatic.com');
       const bodyInsideScript = /<\/body>/i.test(script);
@@ -227,7 +232,7 @@ function nameReleaseHtml(fileName: string): Plugin {
         looseFiles ||
         googleFont ||
         imageCount < 4 ||
-        audioCount < 19 ||
+        audioCount < 20 ||
         fontCount < 3
       ) {
         throw new Error(

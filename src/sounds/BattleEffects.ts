@@ -12,8 +12,10 @@ import { EffectsVolume } from './EffectsVolume';
 import { GunnerShot } from './GunnerShot';
 import { ImpactSounds } from './ImpactSounds';
 import { InfantryDeath } from './InfantryDeath';
+import { LaserShot } from './LaserShot';
 import { NuclearExplosion } from './NuclearExplosion';
 import { PickupExplosion } from './PickupExplosion';
+import { RocketBurst } from './RocketBurst';
 import { RocketSounds } from './RocketSounds';
 import { TankDeath } from './TankDeath';
 import { TankMgShot } from './TankMgShot';
@@ -29,6 +31,8 @@ type EffectClip = {
 export class BattleEffects {
   readonly tankShot: TankShot;
   readonly tankMgShot: TankMgShot;
+  readonly laserShot: LaserShot;
+  readonly rocketBurst: RocketBurst;
   readonly gunnerShot: GunnerShot;
   readonly bulletHit: BulletHitTank;
   readonly rocketSounds: RocketSounds;
@@ -46,6 +50,8 @@ export class BattleEffects {
     this.gain = new EffectsVolume();
     this.tankShot = new TankShot(scene, this.gain);
     this.tankMgShot = new TankMgShot(scene, this.gain);
+    this.laserShot = new LaserShot(scene, this.gain);
+    this.rocketBurst = new RocketBurst(scene, this.gain);
     this.gunnerShot = new GunnerShot(scene, this.gain);
     this.bulletHit = new BulletHitTank(scene, this.gain);
     this.rocketSounds = new RocketSounds(scene, this.gain);
@@ -60,6 +66,8 @@ export class BattleEffects {
     this.clips = [
       this.tankShot,
       this.tankMgShot,
+      this.laserShot,
+      this.rocketBurst,
       this.gunnerShot,
       this.bulletHit,
       this.rocketSounds,
