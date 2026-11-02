@@ -807,7 +807,7 @@ export class GameHud {
     }
   }
 
-  // Та же пластина, что у кнопки клавиш: тёмный металл, толстая латунь, заклёпки.
+  // Та же пластина, что у кнопки клавиш: тёмный металл, толстая латунь, пробоины по углам.
   protected drawMetalPlate(g: Phaser.GameObjects.Graphics): void {
     const size = 40;
     const left = -size / 2;
@@ -820,18 +820,20 @@ export class GameHud {
     g.fillStyle(0x2a261f, 1);
     g.fillRect(left + 6, top + 6, size - 12, size - 12);
 
-    const rivet = (x: number, y: number): void => {
-      g.fillStyle(0x2a2010, 1);
-      g.fillCircle(x, y, 4);
-      g.fillStyle(0xf0d56a, 1);
-      g.fillCircle(x, y, 2);
-      g.fillStyle(0xfff6d0, 1);
-      g.fillCircle(x - 1, y - 1, 1.2);
+    const bulletHole = (x: number, y: number): void => {
+      g.fillStyle(0x4a4336, 1);
+      g.fillCircle(x + 0.5, y + 0.6, 3.3);
+      g.fillStyle(0x8a7a56, 1);
+      g.fillCircle(x - 0.6, y - 0.7, 2.3);
+      g.fillStyle(0x12100c, 1);
+      g.fillCircle(x + 0.3, y + 0.3, 1.7);
+      g.fillStyle(0x050403, 1);
+      g.fillCircle(x + 0.6, y + 0.7, 1);
     };
-    rivet(left + 7, top + 7);
-    rivet(left + size - 7, top + 7);
-    rivet(left + 7, top + size - 7);
-    rivet(left + size - 7, top + size - 7);
+    bulletHole(left + 7, top + 7);
+    bulletHole(left + size - 7, top + 7);
+    bulletHole(left + 7, top + size - 7);
+    bulletHole(left + size - 7, top + size - 7);
   }
 
   // Сплошной обод и короткие зубцы. Лучи из центра читались как штурвал.
