@@ -1,9 +1,10 @@
 // Дебаг-круг волн. Наследует появление юнитов у обычной фабрики и подменяет состав.
-// Волна 1 — штурмовики, 5 — босс, 6 — снова штурмовики.
+// Круг из шести волн. 1–4 — один вид: штурмовик, стрелок, пикап, ракетчик.
+// 5-я — все эти виды по одному, без босса. 6-я — босс. Дальше круг сначала: 11 и 12, 17 и 18.
 // Обычных в волне по умолчанию трое. Поле в настройках пишет число в localStorage, потолок 50.
-// Босс остаётся один. Здоровье и скорость растут с номером волны.
+// Смешанная волна и босс это число не читают. Здоровье и скорость растут с номером волны.
 // Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
-// Босс толстеет и бьёт больнее с каждым своим выходом: 5-я волна — первое появление, 10-я — второе.
+// Босс толстеет и бьёт больнее с каждым своим выходом: 6-я волна — первое появление, 12-я — второе.
 
 import { AssaultInfantry } from './AssaultInfantry';
 import { EnemyFactory } from './EnemyFactory';
@@ -22,12 +23,12 @@ type EnemyKind =
   | typeof RocketInfantry
   | typeof SuperSoldier;
 
-const CYCLE: EnemyKind[] = [
+// Виды смешанной волны и круг обычных волн. Суперсолдат сюда не входит: он только на 6-й.
+const REGULAR: EnemyKind[] = [
   AssaultInfantry,
   GunnerInfantry,
   PickupTruck,
   RocketInfantry,
-  SuperSoldier,
 ];
 
 // Свой ключ, не ключ партии: «новая игра» стирает бой, а размер волны остаётся.
@@ -61,27 +62,38 @@ export class DebugEnemyFactory extends EnemyFactory {
   }
 
   static isBossWave(wave: number): boolean {
-    return wave > 0 && this.kindOn(wave) === SuperSoldier;
+    return wave > 0 && wave % 6 === 0;
+  }
+
+  // 5, 11, 17… Волна перед боссом в том же круге из шести.
+  static isMixedWave(wave: number): boolean {
+    return wave > 0 && wave % 6 === 5;
   }
 
   static count(wave: number): number {
     if (wave < 1) {
       return 0;
     }
-    return this.isBossWave(wave) ? 1 : this.regularCount;
+    if (this.isBossWave(wave)) {
+      return 1;
+    }
+    if (this.isMixedWave(wave)) {
+      return REGULAR.length;
+    }
+    return this.regularCount;
   }
 
-  // Монеты одного юнита этой волны. У волны один вид, поэтому номер в очереди не важен.
-  // Пропуск платит эту сумму тем, кто ещё не вышел, и спрайт для них не создаёт.
-  static coinReward(wave: number): number {
+  // Монеты юнита на этом месте очереди. У обычной волны и у босса вид один, номер не важен.
+  // В смешанной у каждого места свой вид. Пропуск платит сумму и спрайт для них не создаёт.
+  static coinReward(wave: number, index = 0): number {
     if (wave < 1) {
       return 0;
     }
-    return this.kindOn(wave).coinReward;
+    return this.kindAt(wave, index).coinReward;
   }
 
-  static create(_index: number, ctx: SpawnContext): Infantry {
-    return this.spawnUnit(this.kindOn(ctx.wave), ctx);
+  static create(index: number, ctx: SpawnContext): Infantry {
+    return this.spawnUnit(this.kindAt(ctx.wave, index), ctx);
   }
 
   // pace из сохранения не нужен: ранг уже посчитан по номеру волны.
@@ -98,14 +110,22 @@ export class DebugEnemyFactory extends EnemyFactory {
     return Math.max(1, wave);
   }
 
-  // В круге босс каждый 5-й номер. Запас считает номер появления, не номер волны обычной партии.
+  // Босс выходит на 6, 12, 18… Запас считает номер появления, не номер волны обычной партии.
   protected static bossAppearance(wave: number): number {
-    return Math.max(1, Math.floor(wave / CYCLE.length));
+    return Math.max(1, Math.floor(wave / 6));
   }
 
-  private static kindOn(wave: number): EnemyKind {
-    const slot = (Math.max(1, wave) - 1) % CYCLE.length;
-    return CYCLE[slot] ?? AssaultInfantry;
+  // Обычная волна — один из первых четырёх слотов круга.
+  // Смешанная отдаёт вид по месту в очереди. Добавка с клавиши A идёт по тому же списку.
+  private static kindAt(wave: number, index: number): EnemyKind {
+    if (this.isBossWave(wave)) {
+      return SuperSoldier;
+    }
+    if (this.isMixedWave(wave)) {
+      return REGULAR[index % REGULAR.length] ?? AssaultInfantry;
+    }
+    const slot = (Math.max(1, wave) - 1) % 6;
+    return REGULAR[slot] ?? AssaultInfantry;
   }
 
   private static kindOfSave(kind: EnemySaveKind): EnemyKind {
