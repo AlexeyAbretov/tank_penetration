@@ -15,6 +15,8 @@ export class LaserDefense extends GameObjects.Container {
   static readonly shop = {
     cost: 1000,
     fireIntervalMs: 3000,
+    // Свежий пуск лазер не берёт: ракета успевает отойти от ракетчика.
+    minFlightMs: 200,
   };
 
   // Ось — ноль контейнера, это пятка линзы на крыше. belowBelly опускает пятку ниже днища танка.

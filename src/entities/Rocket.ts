@@ -10,6 +10,8 @@ export class Rocket extends EnemyShot {
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
   // Пауза до следующего клуба. След — это точки позади ракеты, а не облако, которое едет вместе с ней.
   private puffMs = 0;
+  // scene.time.now в момент launch. До пуска ракеты в воздухе ещё нет.
+  private launchedAt = 0;
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists('enemy-rocket')) {
@@ -57,6 +59,16 @@ export class Rocket extends EnemyShot {
   // Свой хлопок из rocket_shot.mp3. Винтовочный выстрел ракете не подходит.
   protected override reportShot(): void {
     playRocketLaunch(this.scene);
+  }
+
+  override launch(angle: number, speed: number): this {
+    this.launchedAt = this.scene.time.now;
+    return super.launch(angle, speed);
+  }
+
+  // Сколько миллисекунд ракета уже летит. Часы сцены: пауза это время не двигает.
+  flownMs(now: number): number {
+    return Math.max(0, now - this.launchedAt);
   }
 
   // Клубы остаются там, где ракета уже пролетела, и гаснут сами.

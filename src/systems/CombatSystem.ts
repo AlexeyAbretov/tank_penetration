@@ -13,6 +13,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { Rocket } from '../entities/Rocket';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
+import { airBurstAt } from '../gfx/airBurst';
 import { craterReach } from '../gfx/craters';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from '../sounds/BoomSounds';
@@ -599,7 +600,7 @@ export class CombatSystem implements Combat {
     this.mgCooldown = MachineGun.shop.fireIntervalMs;
   }
 
-  // Раз в 3 секунды сбивает случайную летящую ракету. Без ракеты выстрел не тратится.
+  // Раз в 3 секунды сбивает случайную ракету, которая уже летит minFlightMs. Свежий пуск выстрел не тратит.
   private tickLaser(delta: number): void {
     const laser = this.shop.laser;
     if (!laser) {
@@ -617,14 +618,14 @@ export class CombatSystem implements Combat {
     const y = rocket.y;
     laser.fireAt(x, y);
     rocket.destroy();
-    Rocket.burstAt(this.scene, x, y);
+    airBurstAt(this.scene, x, y);
     this.laserCooldown = LaserDefense.shop.fireIntervalMs;
   }
 
   private randomRocket(): Rocket | null {
     const flying: Rocket[] = [];
     for (const obj of this.enemyShots.getChildren()) {
-      if (obj instanceof Rocket && obj.active) {
+      if (obj instanceof Rocket && obj.active && obj.flownMs(this.scene.time.now) >= LaserDefense.shop.minFlightMs) {
         flying.push(obj);
       }
     }

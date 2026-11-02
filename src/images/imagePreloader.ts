@@ -11,6 +11,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 import { GameHud } from '../ui/huds/GameHud';
+import { preloadAirBurst } from '../gfx/airBurst';
 import { preloadBoom } from '../gfx/boom';
 import { preloadCraters } from '../gfx/craters';
 import { preloadNuke } from '../gfx/nuke';
@@ -37,4 +38,5 @@ export const preloadImages = (scene: Phaser.Scene) => {
   preloadTankBoom(scene);
   preloadNuke(scene);
   preloadBoom(scene);
+  preloadAirBurst(scene);
 };
