@@ -68,7 +68,8 @@ export class GunnerInfantry extends RangedEnemy {
   static readonly flashLead = 2;
 
   // Дороже штурмовика: убивать стрелка выгоднее.
-  readonly coinReward = 2;
+  static readonly coinReward = 2;
+  readonly coinReward = GunnerInfantry.coinReward;
   // Выстрел раз в 1.5 секунды.
   static readonly shotInterval = 1500;
   // Медленнее пули пикапа, но урон выше.
@@ -78,7 +79,7 @@ export class GunnerInfantry extends RangedEnemy {
   protected readonly holdX = 640;
   protected readonly fireDelay = GunnerInfantry.shotInterval;
   protected readonly bulletSpeed = GunnerInfantry.shotSpeed;
-  // Один выстрел снимает 8 HP базы из 100.
+  // База выстрела. Прибавку волны добавляет предок.
   protected readonly shotDamage = 8;
   // Стойка стрельбы: тело без винтовки. Пока идёт, в кадрах шага ствол уже нарисован.
   protected readonly idleTexture = GunnerInfantry.aimKey;

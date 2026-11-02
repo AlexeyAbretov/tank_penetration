@@ -112,19 +112,22 @@ export class EnemyFactory {
   private static spawnSaved(kind: EnemySaveKind, ctx: SpawnContext, rankHp: number): Infantry {
     const { scene, x, y, shots, fireTarget } = ctx;
     if (kind === 'super') {
-      const hp = SuperSoldier.hpForAppearance(SuperSoldier.appearanceOn(ctx.wave));
-      return new SuperSoldier(scene, x, y, hp, shots, fireTarget);
+      const appearance = SuperSoldier.appearanceOn(ctx.wave);
+      const hp = SuperSoldier.hpForAppearance(appearance);
+      return new SuperSoldier(scene, x, y, hp, shots, fireTarget, appearance);
     }
+    let unit: Infantry;
     if (kind === 'assault') {
-      return new AssaultInfantry(scene, x, y, rankHp);
+      unit = new AssaultInfantry(scene, x, y, rankHp);
+    } else if (kind === 'gunner') {
+      unit = new GunnerInfantry(scene, x, y, rankHp, shots, fireTarget);
+    } else if (kind === 'truck') {
+      unit = new PickupTruck(scene, x, y, rankHp, shots, fireTarget);
+    } else {
+      unit = new RocketInfantry(scene, x, y, rankHp, shots, fireTarget);
     }
-    if (kind === 'gunner') {
-      return new GunnerInfantry(scene, x, y, rankHp, shots, fireTarget);
-    }
-    if (kind === 'truck') {
-      return new PickupTruck(scene, x, y, rankHp, shots, fireTarget);
-    }
-    return new RocketInfantry(scene, x, y, rankHp, shots, fireTarget);
+    unit.setDamageWave(ctx.wave);
+    return unit;
   }
 
   private static debutWave(kind: EnemyKind): number {
@@ -142,14 +145,16 @@ export class EnemyFactory {
 
   // Здоровье и ранг скорости. Штурмовик растёт от номера волны.
   // Остальные на своей первой волне получают ранг 1, дальше +1 за волну.
-  // Суперсолдат: первый выход всегда 100, дальше +500 за каждое следующее появление. Скорость остаётся на ранге 1.
+  // Суперсолдат: первый выход всегда 100 здоровья и 1 урона, дальше +500 и +1 за каждое следующее появление. Скорость остаётся на ранге 1.
+  // Остальные прибавляют 1 урона каждые 10 волн: на 10-й уже +1, на 20-й +2.
   // Дебаг-наследник считает ранг по номеру своей волны, без дебюта обычной партии.
   protected static spawnUnit(kind: EnemyKind, ctx: SpawnContext): Infantry {
     const { scene, x, y, wave, shots, fireTarget } = ctx;
 
     if (kind === SuperSoldier) {
-      const hp = SuperSoldier.hpForAppearance(this.bossAppearance(wave));
-      const unit = new SuperSoldier(scene, x, y, hp, shots, fireTarget);
+      const appearance = this.bossAppearance(wave);
+      const hp = SuperSoldier.hpForAppearance(appearance);
+      const unit = new SuperSoldier(scene, x, y, hp, shots, fireTarget, appearance);
       unit.setPaceWave(1);
       return unit;
     }
@@ -157,27 +162,30 @@ export class EnemyFactory {
     if (kind === AssaultInfantry) {
       const rank = this.assaultRank(wave);
       const unit = new AssaultInfantry(scene, x, y, Infantry.waveHp(rank));
-      unit.setPaceWave(rank);
-      return unit;
+      return this.arm(unit, wave, rank);
     }
 
     if (kind === GunnerInfantry) {
       const rank = this.growthRank(wave, GunnerInfantry.debutWave);
       const unit = new GunnerInfantry(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
-      unit.setPaceWave(rank);
-      return unit;
+      return this.arm(unit, wave, rank);
     }
 
     if (kind === PickupTruck) {
       const rank = this.growthRank(wave, PickupTruck.debutWave);
       const unit = new PickupTruck(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
-      unit.setPaceWave(rank);
-      return unit;
+      return this.arm(unit, wave, rank);
     }
 
     const rank = this.growthRank(wave, RocketInfantry.debutWave);
     const unit = new RocketInfantry(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
-    unit.setPaceWave(rank);
+    return this.arm(unit, wave, rank);
+  }
+
+  // Скорость от ранга, урон от номера волны: дебют стрелка на 3-й не откладывает прибавку.
+  private static arm(unit: Infantry, wave: number, pace: number): Infantry {
+    unit.setPaceWave(pace);
+    unit.setDamageWave(wave);
     return unit;
   }
 

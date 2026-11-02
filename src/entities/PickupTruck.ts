@@ -57,7 +57,8 @@ export class PickupTruck extends RangedEnemy {
   // Пламя на капоте обломков. Отсюда поднимается дым.
   static readonly flame = { x: 26, y: 30 };
 
-  readonly coinReward = 3;
+  static readonly coinReward = 3;
+  readonly coinReward = PickupTruck.coinReward;
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
   // Зона попадания шире солдатской (46): снаряд задевает машину с большего расстояния.
   // override: у родителя Infantry это поле уже есть, здесь мы задаём своё значение.
@@ -67,7 +68,7 @@ export class PickupTruck extends RangedEnemy {
   protected override readonly burstCount = PickupTruck.burstCount;
   protected override readonly burstGap = PickupTruck.burstGap;
   protected readonly bulletSpeed = PickupTruck.shotSpeed;
-  // Слабее винтовки стрелка, но выстрелов много.
+  // Слабее винтовки стрелка, но выстрелов много. Прибавку волны добавляет предок.
   protected readonly shotDamage = 2;
   // На рубеже кузов без пулемёта. Пока едет, ствол уже нарисован в кадрах колёс.
   protected readonly idleTexture = 'pickup-aim';

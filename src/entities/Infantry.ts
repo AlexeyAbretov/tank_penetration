@@ -63,6 +63,22 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Насколько близко снаряд должен подлететь к торсу, чтобы засчитать попадание.
   // У пикапа это поле переопределено и больше, потому что машина крупнее солдата.
   readonly hitRadius: number = Infantry.shellHitRadius;
+  // Сколько раз урон уже вырос: каждые 10 волн +1. Волна 9 даёт 0, 10 — 1, 20 — 2.
+  private damageSteps = 0;
+
+  // Фабрика зовёт сразу после создания. Босс считает урон сам, по номеру появления.
+  setDamageWave(wave: number): void {
+    this.damageSteps = Math.max(0, Math.floor(wave / 10));
+  }
+
+  protected extraDamage(): number {
+    return this.damageSteps;
+  }
+
+  // Урон касанием. contactDamage — база наследника, сверху шаг каждых 10 волн.
+  touchDamage(): number {
+    return this.contactDamage + this.extraDamage();
+  }
 
   // Центр круга попадания. Снаряд и пуля пулемёта меряют расстояние до этой точки.
   hitCenter(): { x: number; y: number } {

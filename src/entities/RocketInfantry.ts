@@ -81,11 +81,13 @@ export class RocketInfantry extends RangedEnemy {
   // Медленнее пули, чтобы за ракетой успевал прочитаться дым.
   static readonly shotSpeed = 300;
 
-  readonly coinReward = 3;
+  static readonly coinReward = 3;
+  readonly coinReward = RocketInfantry.coinReward;
   // Три четверти ширины поля. Стрелок встаёт на середине, этот дальше от танка.
   protected readonly holdX = (GAME.width * 3) / 4;
   protected readonly fireDelay = RocketInfantry.shotInterval;
   protected readonly bulletSpeed = RocketInfantry.shotSpeed;
+  // База ракеты. Прибавку волны добавляет предок.
   protected readonly shotDamage = 3;
   // Стойка пуска: тело без трубы. Пока идёт, в кадрах шага труба уже нарисована.
   protected readonly idleTexture = RocketInfantry.aimKey;
@@ -256,7 +258,7 @@ export class RocketInfantry extends RangedEnemy {
   }
 
   protected override spawnShot(x: number, y: number, angle: number): void {
-    const rocket = new Rocket(this.scene, x, y, this.shotDamage);
+    const rocket = new Rocket(this.scene, x, y, this.shotHit());
     this.shots.add(rocket);
     rocket.launch(angle, this.bulletSpeed);
   }

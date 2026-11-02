@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
+import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
@@ -10,7 +11,7 @@ import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;
 
-type Stat = 'coins' | 'damage' | 'blast' | 'speed';
+type Stat = 'coins' | 'damage' | 'blast' | 'speed' | 'bullets' | 'mgDamage';
 
 export class ProgressShopController {
   // Панель живёт только пока жива сцена. restart() её уничтожает, bind() собирает заново.
@@ -50,6 +51,14 @@ export class ProgressShopController {
 
   coinBonus(): number {
     return this.progress.coins;
+  }
+
+  bulletCount(): number {
+    return MachineGun.bulletCount(this.progress.bullets);
+  }
+
+  mgDamageBonus(): number {
+    return this.progress.mgDamage;
   }
 
   isAwaitingShop(): boolean {
@@ -108,6 +117,14 @@ export class ProgressShopController {
     this.buy('speed');
   }
 
+  private buyBullets(): void {
+    this.buy('bullets');
+  }
+
+  private buyMgDamage(): void {
+    this.buy('mgDamage');
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -116,7 +133,10 @@ export class ProgressShopController {
     if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
-    const cost = this.price(level);
+    if (stat === 'bullets' && level >= MachineGun.maxBulletLevel) {
+      return;
+    }
+    const cost = this.costFor(stat, level);
     if (this.progress.score < cost) {
       return;
     }
@@ -133,7 +153,14 @@ export class ProgressShopController {
     const score = this.progress.score;
     return {
       score,
-      cards: [this.coinsCard(score), this.damageCard(score), this.blastCard(score), this.speedCard(score)],
+      cards: [
+        this.coinsCard(score),
+        this.damageCard(score),
+        this.blastCard(score),
+        this.speedCard(score),
+        this.bulletsCard(score),
+        this.mgDamageCard(score),
+      ],
     };
   }
 
@@ -197,9 +224,57 @@ export class ProgressShopController {
     };
   }
 
+  private bulletsCard(score: number): ProgressCardView {
+    const level = this.progress.bullets;
+    const price = this.bulletPrice(level);
+    const now = MachineGun.bulletCount(level);
+    const next = MachineGun.bulletCount(level + 1);
+    const maxed = level >= MachineGun.maxBulletLevel;
+    return {
+      title: '+1 пуля',
+      buy: () => this.buyBullets(),
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private mgDamageCard(score: number): ProgressCardView {
+    const level = this.progress.mgDamage;
+    const price = this.mgDamagePrice(level);
+    const now = MachineGun.shop.damage + level;
+    return {
+      title: '+1 урон пули',
+      buy: () => this.buyMgDamage(),
+      info: `ур. ${level} · ${now}→${now + 1}`,
+      cost: this.coin(price),
+      open: true,
+      canBuy: score >= price,
+    };
+  }
+
   // Формула остаётся в ProgressSave. Здесь только подмена для сборки племянника.
   private price(level: number): number {
     return shopPrice(ProgressSave.cost(level));
+  }
+
+  private bulletPrice(level: number): number {
+    return shopPrice(ProgressSave.bulletCost(level));
+  }
+
+  private mgDamagePrice(level: number): number {
+    return shopPrice(ProgressSave.mgDamageCost(level));
+  }
+
+  private costFor(stat: Stat, level: number): number {
+    if (stat === 'bullets') {
+      return this.bulletPrice(level);
+    }
+    if (stat === 'mgDamage') {
+      return this.mgDamagePrice(level);
+    }
+    return this.price(level);
   }
 
   private coin(price: number): string {

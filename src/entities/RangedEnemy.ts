@@ -114,9 +114,14 @@ export abstract class RangedEnemy extends Infantry {
     this.onFire(shot.x, shot.y, shot.angle);
   }
 
+  // Урон пули. shotDamage — база наследника, сверху шаг каждых 10 волн.
+  protected shotHit(): number {
+    return this.shotDamage + this.extraDamage();
+  }
+
   // Обычная пуля. Ракетчик подменяет это своей ракетой.
   protected spawnShot(x: number, y: number, angle: number): void {
-    const bullet = new EnemyShot(this.scene, x, y, this.shotDamage);
+    const bullet = new EnemyShot(this.scene, x, y, this.shotHit());
     this.shots.add(bullet);
     bullet.launch(angle, this.bulletSpeed);
   }

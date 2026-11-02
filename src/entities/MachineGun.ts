@@ -22,6 +22,21 @@ export class MachineGun extends GameObjects.Container {
     bulletSpeed: 720,
   };
 
+  // Очередь из магазина после проигрыша. Без покупок одна пуля, каждая покупка добавляет ещё одну.
+  static readonly bulletMin = 1;
+  static readonly bulletMax = 10;
+  // Пауза между пулями одной очереди. Одиночный выстрел её не ждёт.
+  static readonly burstGap = 100;
+
+  static get maxBulletLevel(): number {
+    return MachineGun.bulletMax - MachineGun.bulletMin;
+  }
+
+  static bulletCount(level: number): number {
+    const extra = Math.max(0, Math.round(level));
+    return Math.min(MachineGun.bulletMax, MachineGun.bulletMin + extra);
+  }
+
   // Цапфа на оси ствола. Пятка опоры стоит на крыше башни, ближе к пушке.
   static readonly layout = {
     x: 26,

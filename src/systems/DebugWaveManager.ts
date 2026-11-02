@@ -1,4 +1,5 @@
 // Дебаг-волны. N убивает живых и сразу открывает следующую, без магазина.
+// Очки и монеты приходят как за убийство: и тем, кто уже на поле, и тем, кто ещё не вышел.
 // A добавляет в текущую волну ещё одного обычного юнита того же вида.
 // Поле размера эту добавку не держит: потолок волны — 50, босс остаётся один.
 // Пока баннер висит, поле ещё меняет длину очереди. Уже поставленные сверх неё остаются.
@@ -77,9 +78,27 @@ export class DebugWaveManager extends WaveManager {
     }
     // Старый таймер выхода молча сгорает: штамп волны уже другой.
     this.spawnStamp += 1;
+    this.payAsKilled();
     this.slayLiving();
     this.clearShots();
     this.beginNextWave();
+  }
+
+  // Та же награда, что у попадания: сцена сама прибавляет очки, монеты вида и постоянную прибавку.
+  // Уже убитые и дошедшие до базы здесь не считаются. Невышедшие берут монеты вида волны.
+  private payAsKilled(): void {
+    // Пока висит баннер, поле настроек ещё меняет длину. Платим за ту очередь, что вышла бы сейчас.
+    this.pullCount();
+    for (const unit of this.infantry.getChildren() as WaveUnit[]) {
+      if (!unit.active || unit.reachedWall) {
+        continue;
+      }
+      this.onKill(unit.coinReward);
+    }
+    const reward = DebugEnemyFactory.coinReward(this.wave);
+    for (let i = 0; i < this.remainingToSpawn; i += 1) {
+      this.onKill(reward);
+    }
   }
 
   // hp в ноль, чтобы остался труп, а не уход «дошёл до стены».

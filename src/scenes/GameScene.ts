@@ -103,6 +103,8 @@ export class GameScene extends Phaser.Scene {
       callbacks: CombatCallbacks,
       progressDamage: number,
       progressBlast: number,
+      mgBullets: number,
+      progressMgDamage: number,
       effects: BattleEffects,
     ) => CombatSystem,
     private readonly pauses: PauseStack,
@@ -284,6 +286,8 @@ export class GameScene extends Phaser.Scene {
       },
       this.progressShop.damageBonus(),
       this.progressShop.blastBonus(),
+      this.progressShop.bulletCount(),
+      this.progressShop.mgDamageBonus(),
       fx,
     );
     // Пересечения снарядов танка с пехотой. Без этого выстрел пролетает сквозь спрайт.
@@ -319,6 +323,7 @@ export class GameScene extends Phaser.Scene {
         }
         this.music.playForWave(wave);
       },
+      (reward) => this.onEnemyKill(reward),
     );
 
     this.projectiles = new ProjectileSystem(

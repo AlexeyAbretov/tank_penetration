@@ -49,11 +49,12 @@ export class AssaultInfantry extends Infantry {
     Object.keys(AssaultInfantry.images) as (keyof typeof AssaultInfantry.images)[]
   ).filter((key) => key !== AssaultInfantry.corpseKey);
 
-  // Убийство даёт 1 монету.
-  readonly coinReward = 1;
+  // Убийство даёт 1 монету. Статическое поле читает пропуск волны, не создавая спрайт.
+  static readonly coinReward = 1;
+  readonly coinReward = AssaultInfantry.coinReward;
   // Доходит до стены, в отличие от стрелков.
   readonly reachesBase = true;
-  // Столько здоровья базы снимает один дошедший солдат.
+  // Столько здоровья базы снимает один дошедший солдат. Прибавку волны добавляет предок.
   readonly contactDamage = 12;
 
   // GameScene и студия зовут до create.

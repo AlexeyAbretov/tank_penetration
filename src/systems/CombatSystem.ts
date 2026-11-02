@@ -30,6 +30,8 @@ export class CombatSystem implements Combat {
   private readonly shells: Phaser.Physics.Arcade.Group;
   private readonly mgShots: Phaser.Physics.Arcade.Group;
   private mgCooldown = 0;
+  // Сколько пуль ещё осталось в текущей очереди. 0 — очередь не начата.
+  private mgBurstLeft = 0;
   private laserCooldown = 0;
   private salvoCooldown = 0;
   private artilleryCooldownMs = 0;
@@ -66,6 +68,8 @@ export class CombatSystem implements Combat {
     private readonly callbacks: CombatCallbacks,
     private readonly progressDamage: number,
     private readonly progressBlast: number,
+    private readonly mgBullets: number,
+    private readonly progressMgDamage: number,
     private readonly effects: BattleEffects,
   ) {
     this.blast = createShellBlast(scene);
@@ -142,6 +146,7 @@ export class CombatSystem implements Combat {
     this.nuclearFromIcon = false;
     this.shells.clear(true, true);
     this.mgShots.clear(true, true);
+    this.mgBurstLeft = 0;
     this.cancelArtillery();
     this.cancelNuclear();
     this.clearMines();
@@ -592,6 +597,7 @@ export class CombatSystem implements Combat {
     });
   }
 
+  // Очередь вдоль ствола. Между пулями короткая пауза, после последней — 3 секунды.
   private tickMachineGun(delta: number): void {
     const mg = this.shop.machineGun;
     if (!mg) {
@@ -601,10 +607,14 @@ export class CombatSystem implements Combat {
     if (this.mgCooldown > 0) {
       return;
     }
+    if (this.mgBurstLeft <= 0) {
+      this.mgBurstLeft = this.mgBullets;
+    }
+    this.mgBurstLeft -= 1;
     const shot = mg.muzzle();
     this.fireMgBullet(shot.x, shot.y, shot.angle);
     this.effects.tankMgShot.play();
-    this.mgCooldown = MachineGun.shop.fireIntervalMs;
+    this.mgCooldown = this.mgBurstLeft > 0 ? MachineGun.burstGap : MachineGun.shop.fireIntervalMs;
   }
 
   // Раз в 3 секунды сбивает случайную ракету, которая уже летит minFlightMs. Свежий пуск выстрел не тратит.
@@ -701,7 +711,7 @@ export class CombatSystem implements Combat {
           bullet.destroy();
           // Пуля долетела до круга попадания.
           this.effects.impacts.play();
-          this.hurtInfantry(unit, MachineGun.shop.damage);
+          this.hurtInfantry(unit, this.mgDamage());
           break;
         }
       }
@@ -795,11 +805,15 @@ export class CombatSystem implements Combat {
       this.effects.assaultExplosion.play();
     }
     unit.kill();
-    this.callbacks.onBaseHit(unit.contactDamage);
+    this.callbacks.onBaseHit(unit.touchDamage());
   }
 
   private shellDamage(): number {
     return Infantry.shellDamage + this.shop.damageLevel + this.progressDamage;
+  }
+
+  private mgDamage(): number {
+    return MachineGun.shop.damage + this.progressMgDamage;
   }
 
   private blastRadius(): number {

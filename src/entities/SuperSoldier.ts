@@ -39,6 +39,14 @@ export class SuperSoldier extends Infantry {
     const extra = Math.max(0, appearance - 1);
     return this.baseHp + extra * this.hpPerAppearance;
   }
+
+  // Первая пуля снимает shotDamage. Каждый следующий выход прибавляет damagePerAppearance.
+  // Второй босс бьёт на 2, третий — на 3.
+  static damageForAppearance(appearance: number): number {
+    const extra = Math.max(0, appearance - 1);
+    return this.shotDamage + extra * this.damagePerAppearance;
+  }
+
   // Фигура на кадре уже около 120 px. 1.2 оставляет босса крупнее стрелка
   // и примерно того роста, что давал старый кадр 80 px при масштабе 2.
   static readonly scale = 1.2;
@@ -80,7 +88,9 @@ export class SuperSoldier extends Infantry {
   static readonly burstCount = 5;
   // Пауза между патронами очереди. Пять выстрелов укладываются в полсекунды.
   static readonly burstGap = 100;
+  // Урон одной пули на первом выходе. Дальше damageForAppearance прибавляет шаг за появление.
   static readonly shotDamage = 1;
+  static readonly damagePerAppearance = 1;
   static readonly shotSpeed = 640;
   static readonly moveSpeed = 220;
   // Прямоугольник, внутри которого он выбирает точку. Левый край правее танка и проволоки.
@@ -110,7 +120,8 @@ export class SuperSoldier extends Infantry {
     return { x: point.x, y: point.y };
   }
 
-  readonly coinReward = 10;
+  static readonly coinReward = 10;
+  readonly coinReward = SuperSoldier.coinReward;
   // false: WaveManager и проволока не ждут, что он дойдёт до стены.
   readonly reachesBase = false;
   readonly contactDamage = 0;
@@ -132,6 +143,8 @@ export class SuperSoldier extends Infantry {
     return this.shellRadius();
   }
 
+  // Урон одной пули этого выхода. Считается по номеру появления и дальше не меняется.
+  private readonly bulletDamage: number;
   // Пулемёт — отдельная картинка. Так отдача двигает ствол, а тело остаётся на месте.
   private gun!: Phaser.GameObjects.Image;
   // Насколько ствол сейчас отъехал назад и задрался. Твин возвращает оба числа к нулю.
@@ -224,8 +237,10 @@ export class SuperSoldier extends Infantry {
     hp: number,
     shots: Phaser.Physics.Arcade.Group,
     fireTarget: WorldPoint,
+    appearance = 1,
   ) {
     super(scene, x, y, hp, 'super-0', 'super-walk', 0xff3348);
+    this.bulletDamage = SuperSoldier.damageForAppearance(appearance);
     this.setScale(SuperSoldier.scale);
     // Полоска HP у предка узкая. После super её можно расширить и сразу перерисовать.
     this.hpBarWidth = 54;
@@ -446,7 +461,7 @@ export class SuperSoldier extends Infantry {
     this.kickGun();
     const shot = SuperSoldier.muzzleAt(this.x, this.y, this.scaleX, this.aim, this.recoil);
     // Пуля — отдельный спрайт в общей группе сцены. Урон зашит в неё, а не в босса.
-    const bullet = new EnemyShot(this.scene, shot.x, shot.y, SuperSoldier.shotDamage);
+    const bullet = new EnemyShot(this.scene, shot.x, shot.y, this.bulletDamage);
     this.shots.add(bullet);
     bullet.launch(shot.angle, SuperSoldier.shotSpeed);
     this.flashAt(shot.x, shot.y, shot.angle);

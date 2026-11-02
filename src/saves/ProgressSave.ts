@@ -1,11 +1,14 @@
 // Улучшения между проигрышами. Партия стирается со смертью базы,
 // а эти уровни и непотраченный score остаются в localStorage.
 
+import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank/Tank';
 
 const CAMPAIGN_KEY = 'tank-penetration-progress:v1';
 const SCORE_MAX = 100_000_000;
 const LEVEL_MAX = 500;
+// Потолка в магазине нет. Число только держит запись в целом.
+const MG_DAMAGE_LEVEL_MAX = 1_000_000;
 
 export type SavedProgress = {
   version: 1;
@@ -15,6 +18,10 @@ export type SavedProgress = {
   damage: number;
   blast: number;
   speed: number;
+  // Сколько раз докуплена пуля пулемёта. 0 — одна пуля, 9 — десять.
+  bullets: number;
+  // Сколько раз докуплен урон пули пулемёта. 0 — базовый урон пули.
+  mgDamage: number;
 };
 
 export class ProgressSave {
@@ -25,6 +32,18 @@ export class ProgressSave {
   // 500, 1000, 1500, …
   static cost(level: number): number {
     return 500 + Math.max(0, level) * 500;
+  }
+
+  // Первая дополнительная пуля стоит 100. Каждая следующая — на 100 × уже купленный уровень дороже:
+  // 100, 200, 300, …
+  static bulletCost(level: number): number {
+    return 100 + Math.max(0, level) * 100;
+  }
+
+  // Первая прибавка урона пули стоит 300. Каждая следующая — на 300 × уже купленный уровень дороже:
+  // 300, 600, 900, …
+  static mgDamageCost(level: number): number {
+    return 300 + Math.max(0, level) * 300;
   }
 
   load(): SavedProgress {
@@ -44,6 +63,8 @@ export class ProgressSave {
     progress.damage = 0;
     progress.blast = 0;
     progress.speed = 0;
+    progress.bullets = 0;
+    progress.mgDamage = 0;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
   }
@@ -71,6 +92,8 @@ export class ProgressSave {
       damage: 0,
       blast: 0,
       speed: 0,
+      bullets: 0,
+      mgDamage: 0,
     };
   }
 
@@ -113,6 +136,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     damage: requiredInt(value.damage, 0, LEVEL_MAX) ?? 0,
     blast: requiredInt(value.blast, 0, LEVEL_MAX) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
+    bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
+    mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
   };
 }
 

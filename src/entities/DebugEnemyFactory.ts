@@ -3,7 +3,7 @@
 // Обычных в волне по умолчанию трое. Поле в настройках пишет число в localStorage, потолок 50.
 // Босс остаётся один. Здоровье и скорость растут с номером волны.
 // Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
-// Босс толстеет с каждым своим выходом: 5-я волна — первое появление, 10-я — второе.
+// Босс толстеет и бьёт больнее с каждым своим выходом: 5-я волна — первое появление, 10-я — второе.
 
 import { AssaultInfantry } from './AssaultInfantry';
 import { EnemyFactory } from './EnemyFactory';
@@ -69,6 +69,15 @@ export class DebugEnemyFactory extends EnemyFactory {
       return 0;
     }
     return this.isBossWave(wave) ? 1 : this.regularCount;
+  }
+
+  // Монеты одного юнита этой волны. У волны один вид, поэтому номер в очереди не важен.
+  // Пропуск платит эту сумму тем, кто ещё не вышел, и спрайт для них не создаёт.
+  static coinReward(wave: number): number {
+    if (wave < 1) {
+      return 0;
+    }
+    return this.kindOn(wave).coinReward;
   }
 
   static create(_index: number, ctx: SpawnContext): Infantry {
