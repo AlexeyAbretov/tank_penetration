@@ -3,6 +3,7 @@
 // Второй ползунок — эффекты. Музыку он не трогает.
 
 import Phaser from 'phaser';
+import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 
 const PANEL_W = 520;
 const PANEL_H = 400;
@@ -21,7 +22,9 @@ export class SettingsPanel {
   private readonly dim: Phaser.GameObjects.Rectangle;
   // Карточка и «Готово» открыты наследнику: дебаг дописывает поле снизу и растит окно вниз.
   protected card!: Phaser.GameObjects.Rectangle;
+  protected cardFace!: Phaser.GameObjects.Graphics;
   protected done!: Phaser.GameObjects.Rectangle;
+  protected doneFace!: Phaser.GameObjects.Graphics;
   protected doneLabel!: Phaser.GameObjects.Text;
   private readonly music: Slider;
   private readonly effects: Slider;
@@ -36,19 +39,23 @@ export class SettingsPanel {
   ) {
     this.dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
 
-    this.card = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96).setStrokeStyle(4, 0xc9a227);
+    // Прямоугольник только ловит клик. Рисунок едет за ним, когда дебаг растит окно вниз.
+    this.card = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x000000, 0);
     // Глушит клик по затемнению, когда курсор над самой карточкой.
     this.card.setInteractive();
+    this.cardFace = scene.add.graphics();
+    this.paintCard();
 
     const title = scene.add
       .text(0, -158, 'НАСТРОЙКИ', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '40px',
-        color: '#f3d56a',
-        stroke: '#4a1208',
+        color: fieldInk,
+        stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
+    const rule = scene.add.graphics();
+    paintFieldRule(rule, -124, 180);
 
     const musicLabel = label(scene, -100, 'Громкость музыки');
     const effectsLabel = label(scene, 20, 'Громкость эффектов');
@@ -71,26 +78,30 @@ export class SettingsPanel {
       scene.input.off('pointerup', onUp);
     });
 
-    this.done = scene.add.rectangle(0, 148, 220, 48, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    this.doneFace = scene.add.graphics().setPosition(0, 148);
+    paintOrderBar(this.doneFace, 220, 48);
+    this.done = scene.add.rectangle(0, 148, 220, 48, 0x000000, 0);
     this.done.setInteractive({ useHandCursor: true });
     this.done.on('pointerup', () => this.onClose());
     this.doneLabel = scene.add
       .text(0, 148, 'ГОТОВО', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
-        color: '#f3d56a',
+        color: fieldInk,
       })
       .setOrigin(0.5);
 
     this.container = scene.add
       .container(frame.width / 2, frame.height / 2, [
         this.dim,
+        this.cardFace,
         this.card,
         title,
+        rule,
         musicLabel,
         effectsLabel,
         ...this.music.nodes,
         ...this.effects.nodes,
+        this.doneFace,
         this.done,
         this.doneLabel,
       ])
@@ -118,19 +129,24 @@ export class SettingsPanel {
     this.container.setVisible(open);
   }
 
+  // Карточка сдвинулась или выросла — скобы рисуются заново по её размеру.
+  protected paintCard(): void {
+    paintFieldPlate(this.cardFace, this.card.width, this.card.height);
+    this.cardFace.setPosition(this.card.x, this.card.y);
+  }
+
   private makeSlider(
     scene: Phaser.Scene,
     y: number,
     onChange: (level: number) => void,
   ): Slider {
-    const track = scene.add.rectangle(0, y, TRACK_W, 8, 0x2a0a0a);
-    const fill = scene.add.rectangle(-TRACK_W / 2, y, 0, 8, 0xc9a227).setOrigin(0, 0.5);
-    const thumb = scene.add.circle(-TRACK_W / 2, y, 11, 0xf0d56a).setStrokeStyle(2, 0x4a1208);
+    const track = scene.add.rectangle(0, y, TRACK_W, 8, 0x161c12);
+    const fill = scene.add.rectangle(-TRACK_W / 2, y, 0, 8, 0x8a7848).setOrigin(0, 0.5);
+    const thumb = scene.add.circle(-TRACK_W / 2, y, 11, 0xc4a15a).setStrokeStyle(2, 0x1a2214);
     const valueText = scene.add
       .text(TRACK_W / 2 + 48, y, '0%', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '22px',
-        color: '#f3d56a',
+        color: fieldInk,
       })
       .setOrigin(0.5);
 
@@ -168,9 +184,8 @@ export class SettingsPanel {
 function label(scene: Phaser.Scene, y: number, text: string): Phaser.GameObjects.Text {
   return scene.add
     .text(0, y, text, {
-      fontFamily: 'Georgia, serif',
       fontSize: '22px',
-      color: '#f0dcc0',
+      color: fieldPaper,
     })
     .setOrigin(0.5);
 }

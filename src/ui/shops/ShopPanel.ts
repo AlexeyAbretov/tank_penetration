@@ -3,6 +3,14 @@
 // Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
+import {
+  fieldInk,
+  fieldInkStroke,
+  fieldMuted,
+  fieldPaper,
+  paintFieldPlate,
+  paintOrderBar,
+} from '../militaryDialog';
 
 export type ShopCardView = {
   title: string;
@@ -102,38 +110,38 @@ export class ShopPanel {
 
     const dim = scene.add.rectangle(0, 0, this.screen.width, this.screen.height, 0x000000, 0.62);
     this.dim = dim;
-    const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
-    panel.setStrokeStyle(4, 0xc9a227);
+    const panel = scene.add.graphics();
+    paintFieldPlate(panel, PANEL_W, PANEL_H);
 
     const title = scene.add
       .text(0, -274, 'МАГАЗИН', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '40px',
-        color: '#f3d56a',
-        stroke: '#4a1208',
+        color: fieldInk,
+        stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
 
     this.coinsText = scene.add
       .text(0, -230, 'Монеты  0', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '22px',
-        color: '#f0dcc0',
+        color: fieldPaper,
       })
       .setOrigin(0.5);
 
     const scrollX = -groupW / 2 + VIEW_W + SCROLL_GAP + SCROLL_W / 2;
-    this.track = scene.add.rectangle(scrollX, VIEW_TOP + VIEW_H / 2, SCROLL_W, VIEW_H, 0x2a1010);
+    this.track = scene.add.rectangle(scrollX, VIEW_TOP + VIEW_H / 2, SCROLL_W, VIEW_H, 0x161c12);
     this.thumb = scene.add
-      .rectangle(scrollX, VIEW_TOP + this.thumbH / 2, SCROLL_W, this.thumbH, 0xf0d56a)
+      .rectangle(scrollX, VIEW_TOP + this.thumbH / 2, SCROLL_W, this.thumbH, 0x8a7848)
       .setInteractive({ useHandCursor: true, draggable: true });
     scene.input.setDraggable(this.thumb);
     this.thumb.on('drag', (pointer: Phaser.Input.Pointer) => this.dragThumb(pointer));
     this.track.setVisible(false);
     this.thumb.setVisible(false);
 
-    const next = scene.add.rectangle(0, 262, 280, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const nextFace = scene.add.graphics().setPosition(0, 262);
+    paintOrderBar(nextFace, 280, 52);
+    const next = scene.add.rectangle(0, 262, 280, 52, 0x000000, 0);
     next.setInteractive({ useHandCursor: true });
     next.on('pointerup', () => {
       if (!this.blocked()) {
@@ -142,9 +150,8 @@ export class ShopPanel {
     });
     const nextLabel = scene.add
       .text(0, 262, 'СЛЕДУЮЩАЯ ВОЛНА', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
-        color: '#f3d56a',
+        color: fieldInk,
       })
       .setOrigin(0.5);
 
@@ -155,6 +162,7 @@ export class ShopPanel {
       this.coinsText,
       this.track,
       this.thumb,
+      nextFace,
       next,
       nextLabel,
     ]);
@@ -285,8 +293,8 @@ export class ShopPanel {
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
     const top = CONTENT_PAD + index * (CARD_H + CARD_GAP);
     const card = scene.add
-      .rectangle(0, top + CARD_H / 2, CARD_W, CARD_H, 0x5a1210)
-      .setStrokeStyle(2, 0xf0d56a);
+      .rectangle(0, top + CARD_H / 2, CARD_W, CARD_H, 0x343e2a)
+      .setStrokeStyle(2, 0x6e6848);
     card.setInteractive({ useHandCursor: true });
     card.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.blocked()) {
@@ -298,26 +306,23 @@ export class ShopPanel {
 
     const title = scene.add
       .text(-CARD_W / 2 + 22, top + 16, label, {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
-        color: '#f3d56a',
+        color: fieldInk,
         wordWrap: { width: TITLE_WRAP, useAdvancedWrap: true },
       })
       .setOrigin(0, 0);
     const info = scene.add
       .text(-CARD_W / 2 + 22, top + 50, '', {
-        fontFamily: 'Georgia, serif',
         fontSize: '16px',
-        color: '#f0dcc0',
+        color: fieldPaper,
         wordWrap: { width: INFO_WRAP, useAdvancedWrap: true },
         lineSpacing: 4,
       })
       .setOrigin(0, 0);
     const cost = scene.add
       .text(CARD_W / 2 - 22, top + 16, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
-        color: '#f3d56a',
+        color: fieldInk,
         align: 'right',
       })
       .setOrigin(1, 0);
@@ -399,8 +404,8 @@ export class ShopPanel {
     offer.info.setText(card.info);
     offer.cost.setText(card.cost);
     if (!card.open) {
-      offer.card.setFillStyle(0x3d2a12);
-      offer.cost.setColor('#f3d56a');
+      offer.card.setFillStyle(0x2c3224);
+      offer.cost.setColor(fieldInk);
       offer.card.disableInteractive();
       return;
     }
@@ -411,7 +416,7 @@ export class ShopPanel {
   }
 
   private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {
-    card.setFillStyle(canBuy ? 0x5a1210 : 0x2a1010);
-    cost.setColor(canBuy ? '#f3d56a' : '#8a6a4a');
+    card.setFillStyle(canBuy ? 0x3a4630 : 0x242a1c);
+    cost.setColor(canBuy ? fieldInk : fieldMuted);
   }
 }

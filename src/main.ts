@@ -7,6 +7,7 @@ import Phaser from 'phaser';
 import { GAME, fitGameTo } from './gameConfig';
 import { GameSceneFactory } from './scenes/GameSceneFactory';
 import { installClipVolumes } from './sounds/clipVolume';
+import { installGameFont } from './ui/gameFont';
 
 function parentBox(): { width: number; height: number } {
   const parent = document.getElementById('game');
@@ -58,6 +59,8 @@ const config: Phaser.Types.Core.GameConfig = {
 
 // До холста: узлы громкости создаются внутри new Phaser.Game.
 installClipVolumes();
+// До первых надписей: пустое семейство шрифта становится Russo One.
+installGameFont();
 // new Phaser.Game создаёт холст и запускает сцену.
 const game = new Phaser.Game(config);
 

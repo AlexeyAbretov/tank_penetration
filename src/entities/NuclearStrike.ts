@@ -16,6 +16,8 @@ export type NuclearFlight = {
 export class NuclearStrike {
   static readonly iconKey = 'nuclear-icon';
   static readonly bombKey = 'nuclear-bomb';
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly iconPath = 'assets/nuclear-icon.png';
   static readonly iconRadius = 30;
 
   // Путь в public/. Строка буквальная: singlefile-сборка подменяет её на data:.
@@ -47,13 +49,18 @@ export class NuclearStrike {
     return { x: GAME.width / 2, y: 356 };
   }
 
-  // GameScene и студия зовут до create. Иконка по-прежнему рисуется в ensureTextures.
+  // GameScene и студия зовут до create. Нет файла — иконка рисуется в ensureTextures.
   static preload(scene: Phaser.Scene): void {
     scene.load.image(NuclearStrike.bombKey, NuclearStrike.imagePath);
+    if (!scene.textures.exists(NuclearStrike.iconKey)) {
+      scene.load.image(NuclearStrike.iconKey, NuclearStrike.iconPath);
+    }
   }
 
   static ensureTextures(scene: Phaser.Scene): void {
-    if (!scene.textures.exists(NuclearStrike.iconKey)) {
+    if (scene.textures.exists(NuclearStrike.iconKey)) {
+      scene.textures.get(NuclearStrike.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    } else {
       bake(scene, NuclearStrike.iconKey, 64, 64, (g) => NuclearStrike.renderIcon(g));
     }
     if (scene.textures.exists(NuclearStrike.bombKey)) {

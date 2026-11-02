@@ -104,6 +104,8 @@ export class PlantedMine {
 
 export class Mines {
   static readonly iconKey = 'mine-icon';
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly iconPath = 'assets/mine-icon.png';
   static readonly bodyKey = 'mine-body';
   static readonly clodKey = 'mine-clod';
   static readonly iconRadius = 30;
@@ -135,14 +137,18 @@ export class Mines {
   };
 
   static preload(scene: Phaser.Scene): void {
-    if (scene.textures.exists(Mines.bodyKey)) {
-      return;
+    if (!scene.textures.exists(Mines.bodyKey)) {
+      scene.load.image(Mines.bodyKey, Mines.imagePath);
     }
-    scene.load.image(Mines.bodyKey, Mines.imagePath);
+    if (!scene.textures.exists(Mines.iconKey)) {
+      scene.load.image(Mines.iconKey, Mines.iconPath);
+    }
   }
 
   static ensureTextures(scene: Phaser.Scene): void {
-    if (!scene.textures.exists(Mines.iconKey)) {
+    if (scene.textures.exists(Mines.iconKey)) {
+      scene.textures.get(Mines.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    } else {
       bake(scene, Mines.iconKey, 64, 64, (g) => Mines.renderIcon(g));
     }
     if (scene.textures.exists(Mines.bodyKey)) {

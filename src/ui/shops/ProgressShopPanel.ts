@@ -2,6 +2,15 @@
 // Покупки и тексты карточек приходят из контроллера: окно их список не знает.
 
 import Phaser from 'phaser';
+import {
+  fieldInk,
+  fieldInkStroke,
+  fieldMuted,
+  fieldPaper,
+  paintFieldPlate,
+  paintFieldRule,
+  paintOrderBar,
+} from '../militaryDialog';
 
 export type ProgressCardView = {
   title: string;
@@ -56,28 +65,34 @@ export class ProgressShopPanel {
     this.screen = screen;
     this.dim = scene.add.rectangle(0, 0, screen.width, screen.height, 0x000000, 0.62).setInteractive();
     const dim = this.dim;
-    const panel = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x3a0c0c, 0.96);
-    panel.setStrokeStyle(4, 0xc9a227);
+    const panel = scene.add.graphics();
+    paintFieldPlate(panel, PANEL_W, PANEL_H);
+    const rule = scene.add.graphics();
+    paintFieldRule(rule, -274, 220);
 
     const title = scene.add
       .text(0, -304, 'БАЗА РАЗБИТА', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '40px',
-        color: '#f3d56a',
-        stroke: '#4a1208',
+        color: fieldInk,
+        stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
 
     this.scoreText = scene.add
       .text(0, -256, 'SCORE  0', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '22px',
-        color: '#f0dcc0',
+        color: fieldPaper,
       })
       .setOrigin(0.5);
 
-    this.container = scene.add.container(screen.width / 2, screen.height / 2, [dim, panel, title, this.scoreText]);
+    this.container = scene.add.container(screen.width / 2, screen.height / 2, [
+      dim,
+      panel,
+      rule,
+      title,
+      this.scoreText,
+    ]);
 
     const fresh = this.makeButton(scene, -155, 286, 290, 'НОВАЯ ИГРА', () => shop.wipeAndRestart());
     const next = this.makeButton(scene, 155, 286, 290, 'В БОЙ', () => shop.closeAndRestart());
@@ -127,27 +142,24 @@ export class ProgressShopPanel {
   private makeOffer(scene: Phaser.Scene, index: number, label: string, buy: () => void): Offer {
     const top = CARD_TOP + index * (CARD_H + CARD_GAP);
     const hit = scene.add.container(0, top + CARD_H / 2);
-    const card = scene.add.rectangle(0, 0, CARD_W, CARD_H, 0x5a1210).setStrokeStyle(2, 0xf0d56a);
+    const card = scene.add.rectangle(0, 0, CARD_W, CARD_H, 0x343e2a).setStrokeStyle(2, 0x6e6848);
     const title = scene.add
       .text(-CARD_W / 2 + 22, -CARD_H / 2 + 14, label, {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
-        color: '#f3d56a',
+        color: fieldInk,
         wordWrap: { width: CARD_W - 190, useAdvancedWrap: true },
       })
       .setOrigin(0, 0);
     const info = scene.add
       .text(-CARD_W / 2 + 22, -CARD_H / 2 + 48, '', {
-        fontFamily: 'Georgia, serif',
         fontSize: '16px',
-        color: '#f0dcc0',
+        color: fieldPaper,
       })
       .setOrigin(0, 0);
     const cost = scene.add
       .text(CARD_W / 2 - 22, -CARD_H / 2 + 14, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '20px',
-        color: '#f3d56a',
+        color: fieldInk,
         align: 'right',
       })
       .setOrigin(1, 0);
@@ -173,15 +185,15 @@ export class ProgressShopPanel {
     fire: () => void,
   ): Phaser.GameObjects.Container {
     const button = scene.add.container(x, y);
-    const bg = scene.add.rectangle(0, 0, w, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const face = scene.add.graphics();
+    paintOrderBar(face, w, 52);
     const text = scene.add
       .text(0, 0, label, {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
-        color: '#f3d56a',
+        color: fieldInk,
       })
       .setOrigin(0.5);
-    button.add([bg, text]);
+    button.add([face, text]);
     this.arm(button, w, 52, () => {
       if (this.container.visible) {
         fire();
@@ -205,8 +217,8 @@ export class ProgressShopPanel {
     offer.info.setText(card.info);
     offer.cost.setText(card.cost);
     if (!card.open) {
-      offer.card.setFillStyle(0x3d2a12);
-      offer.cost.setColor('#f3d56a');
+      offer.card.setFillStyle(0x2c3224);
+      offer.cost.setColor(fieldInk);
       offer.hit.disableInteractive();
       return;
     }
@@ -217,7 +229,7 @@ export class ProgressShopPanel {
   }
 
   private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {
-    card.setFillStyle(canBuy ? 0x5a1210 : 0x2a1010);
-    cost.setColor(canBuy ? '#f3d56a' : '#8a6a4a');
+    card.setFillStyle(canBuy ? 0x3a4630 : 0x242a1c);
+    cost.setColor(canBuy ? fieldInk : fieldMuted);
   }
 }

@@ -46,7 +46,7 @@ function mulberry32(seed: number): () => number {
 
 // Фон и элементы интерфейса. Картинки сущностей сцена просит у их классов.
 // Поле боя может уже лежать в загрузчике (фото травы). Тогда фигурный фон не затирает его,
-// а искры и лента всё равно пекутся: раньше вся функция пропускалась вместе с ними.
+// а искры всё равно пекутся: раньше вся функция пропускалась вместе с ними.
 export function createTextures(scene: Phaser.Scene): void {
   if (scene.textures.exists('battlefield')) {
     scene.textures.get('battlefield').setFilter(Phaser.Textures.FilterMode.LINEAR);
@@ -55,9 +55,6 @@ export function createTextures(scene: Phaser.Scene): void {
   }
   if (!scene.textures.exists('spark')) {
     createParticles(scene);
-  }
-  if (!scene.textures.exists('banner')) {
-    createBanner(scene);
   }
   if (!scene.textures.exists('hp-frame')) {
     createHpFrame(scene);
@@ -168,45 +165,17 @@ function createParticles(scene: Phaser.Scene): void {
   });
 }
 
-// Нижняя лента интерфейса на всю ширину экрана.
-function createBanner(scene: Phaser.Scene): void {
-  bake(scene, 'banner', 1280, 86, (g) => {
-    // Две красные полосы: тёмная подложка и более яркая середина.
-    g.fillStyle(0x5a0c0c);
-    g.fillRect(0, 8, 1280, 78);
-    g.fillStyle(0x8a1810);
-    g.fillRect(0, 14, 1280, 62);
-
-    // Двойная золотая рамка. strokeRect(x, y, ширина, высота) обводит прямоугольник, не заливает.
-    g.lineStyle(6, 0xc9a227, 1);
-    g.strokeRect(8, 10, 1264, 70);
-    g.lineStyle(2, 0xf0d56a, 1);
-    g.strokeRect(16, 16, 1248, 58);
-
-    // Золотые точки по верхнему и нижнему краю, шаг 48 пикселей.
-    for (let x = 40; x < 1240; x += 48) {
-      g.fillStyle(0xf0d56a);
-      g.fillCircle(x, 12, 3);
-      g.fillCircle(x, 78, 3);
-    }
-  });
-}
-
-// Рамка полоски HP базы. Сама красная заливка здоровья рисуется в сцене отдельным прямоугольником.
+// Рамка полоски HP базы. Сама заливка здоровья рисуется в сцене отдельным прямоугольником.
 function createHpFrame(scene: Phaser.Scene): void {
   bake(scene, 'hp-frame', 280, 28, (g) => {
-    // Тёмный жёлоб, в который ляжет полоска.
-    g.fillStyle(0x1a1a1e);
-    g.fillRoundedRect(0, 4, 280, 20, 8);
-    g.lineStyle(2, 0x8a8680, 1);
-    g.strokeRoundedRect(0, 4, 280, 20, 8);
-    // Маленький треугольник-«стрелка» справа сверху, чисто украшение.
-    g.fillStyle(0xa11a1a);
-    g.fillTriangle(268, 0, 280, 14, 256, 14);
-    // Круглый индикатор слева: тёмное кольцо и красная точка.
-    g.fillStyle(0x6a1212);
+    // Латунный кожух и тёмный жёлоб. Полоска ложится внутрь, кружок слева остаётся снаружи.
+    g.fillStyle(0x6e6240, 1);
+    g.fillRect(22, 2, 252, 24);
+    g.fillStyle(0x1a2214, 1);
+    g.fillRect(26, 6, 244, 16);
+    g.fillStyle(0xc4a15a, 1);
     g.fillCircle(12, 14, 8);
-    g.fillStyle(0xe04040);
+    g.fillStyle(0x3a4630, 1);
     g.fillCircle(12, 14, 4);
   });
 }

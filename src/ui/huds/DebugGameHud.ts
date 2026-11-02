@@ -5,6 +5,7 @@ import { GameHud, type HudAbility, type HudFrame } from './GameHud';
 export class DebugGameHud extends GameHud {
   private readonly debugLabel: Phaser.GameObjects.Text;
   private readonly enemyDamagePlate: Phaser.GameObjects.Rectangle;
+  private readonly enemyDamageFace: Phaser.GameObjects.Graphics;
   private readonly enemyDamageIcon: Phaser.GameObjects.Graphics;
 
   // Дебаг-клавиши только в окне списка. Верхняя плашка остаётся статусом партии.
@@ -48,10 +49,11 @@ export class DebugGameHud extends GameHud {
     // Сразу левее автострельбы. Та же глубина: между волнами плашка остаётся над магазином.
     const x = this.plateLeftOf(this.autoFireX);
     this.enemyDamagePlate = scene.add
-      .rectangle(x, this.plateY, this.plateSize, this.plateSize, 0x3a0c0c)
-      .setStrokeStyle(2, 0xc9a227)
+      .rectangle(x, this.plateY, this.plateSize, this.plateSize, 0x000000, 0)
       .setDepth(80)
       .setInteractive({ useHandCursor: true });
+    this.enemyDamageFace = scene.add.graphics().setPosition(x, this.plateY).setDepth(80);
+    this.drawMetalPlate(this.enemyDamageFace);
     this.enemyDamageIcon = scene.add.graphics().setPosition(x, this.plateY).setDepth(81);
     this.paintEnemyDamage(EnemyDamage.isEnabled);
     this.enemyDamagePlate.on('pointerup', () => {
@@ -63,6 +65,7 @@ export class DebugGameHud extends GameHud {
     super.layout();
     const x = this.plateLeftOf(this.autoFireX);
     this.enemyDamagePlate.setPosition(x, this.plateY);
+    this.enemyDamageFace.setPosition(x, this.plateY);
     this.enemyDamageIcon.setPosition(x, this.plateY);
     this.debugLabel.setX(this.frame.width / 2);
   }
@@ -72,7 +75,6 @@ export class DebugGameHud extends GameHud {
   }
 
   private paintEnemyDamage(on: boolean): void {
-    this.enemyDamagePlate.setFillStyle(on ? 0x8a1810 : 0x3a0c0c);
     this.drawEnemyDamage(on);
   }
 

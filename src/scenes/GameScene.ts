@@ -171,7 +171,6 @@ export class GameScene extends Phaser.Scene {
       {
         id: 'artillery',
         texture: ArtilleryStrike.iconKey,
-        keyLabel: '1',
         hint: '1 — удар',
         cooldownMs: ArtilleryStrike.shop.cooldownMs,
         iconRadius: ArtilleryStrike.iconRadius,
@@ -179,7 +178,6 @@ export class GameScene extends Phaser.Scene {
       {
         id: 'mines',
         texture: Mines.iconKey,
-        keyLabel: '2',
         hint: '2 — мины',
         cooldownMs: Mines.shop.cooldownMs,
         iconRadius: Mines.iconRadius,
@@ -187,7 +185,6 @@ export class GameScene extends Phaser.Scene {
       {
         id: 'nuclear',
         texture: NuclearStrike.iconKey,
-        keyLabel: '3',
         hint: '3 — атом',
         cooldownMs: NuclearStrike.shop.cooldownMs,
         iconRadius: NuclearStrike.iconRadius,

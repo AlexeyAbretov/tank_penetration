@@ -18,6 +18,8 @@ export type ArtilleryMark = {
 export class ArtilleryStrike {
   static readonly iconKey = 'artillery-icon';
   static readonly shellKey = 'artillery-shell';
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly iconPath = 'assets/artillery-icon.png';
   // private static readonly flareKey = 'artillery-flare';
   private static readonly flarePuffKey = 'artillery-flare-puff';
   // Радиус круга на иконке. Затемнение перезарядки рисуется чуть уже, чтобы золотой обод оставался виден.
@@ -43,8 +45,17 @@ export class ArtilleryStrike {
     maxY: 540,
   };
 
+  static preload(scene: Phaser.Scene): void {
+    if (scene.textures.exists(ArtilleryStrike.iconKey)) {
+      return;
+    }
+    scene.load.image(ArtilleryStrike.iconKey, ArtilleryStrike.iconPath);
+  }
+
   static ensureTextures(scene: Phaser.Scene): void {
-    if (!scene.textures.exists(ArtilleryStrike.iconKey)) {
+    if (scene.textures.exists(ArtilleryStrike.iconKey)) {
+      scene.textures.get(ArtilleryStrike.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    } else {
       bake(scene, ArtilleryStrike.iconKey, 64, 64, (g) => ArtilleryStrike.renderIcon(g));
     }
     if (!scene.textures.exists(ArtilleryStrike.shellKey)) {

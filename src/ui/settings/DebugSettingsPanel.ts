@@ -38,7 +38,9 @@ export class DebugSettingsPanel extends SettingsPanel {
     this.scene = scene;
     this.view = frame;
     this.extendCardDown(CARD_EXTRA);
+    this.paintCard();
     this.done.y = DONE_Y;
+    this.doneFace.y = DONE_Y;
     this.doneLabel.y = DONE_Y;
 
     this.container.add(this.caption(scene, WAVE_Y, FIELD_W, 'Обычных в волне'));
@@ -100,9 +102,8 @@ export class DebugSettingsPanel extends SettingsPanel {
   private caption(scene: Phaser.Scene, y: number, fieldW: number, text: string): Phaser.GameObjects.Text {
     return scene.add
       .text(FIELD_X + FIELD_W / 2 - fieldW - 16, y, text, {
-        fontFamily: 'Georgia, serif',
         fontSize: '22px',
-        color: '#f0dcc0',
+        color: '#d4ccb8',
       })
       .setOrigin(1, 0.5);
   }
@@ -132,11 +133,10 @@ export class DebugSettingsPanel extends SettingsPanel {
     style.display = 'none';
     style.margin = '0';
     style.padding = '0 8px';
-    style.border = '2px solid #c9a227';
+    style.border = '2px solid #6e6240';
     style.borderRadius = '2px';
-    style.background = '#2a0a0a';
-    style.color = '#f3d56a';
-    style.fontFamily = 'Georgia, serif';
+    style.background = '#1a2214';
+    style.color = '#e6d7a8';
     style.textAlign = 'center';
     style.outline = 'none';
     style.zIndex = '40';

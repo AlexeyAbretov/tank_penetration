@@ -1,6 +1,8 @@
 // Счёт, полоска HP, баннер волны и окно клавиш. Плашка поражения — магазин между проигрышами.
 
 import Phaser from 'phaser';
+import { bake } from '../../gfx/textures';
+import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 
 // Размер холста и линия баннера. Сцена передаёт их сама, HUD не читает gameConfig.
 export type HudFrame = {
@@ -13,7 +15,6 @@ export type HudFrame = {
 export type HudAbility = {
   id: string;
   texture: string;
-  keyLabel: string;
   hint: string;
   cooldownMs: number;
   iconRadius: number;
@@ -23,8 +24,10 @@ export type HudAbility = {
 type AbilityIcon = {
   id: string;
   root: Phaser.GameObjects.Container;
+  glow: Phaser.GameObjects.Image;
   sweep: Phaser.GameObjects.Graphics;
   time: Phaser.GameObjects.Text;
+  lit: boolean;
   owned: boolean;
   hint: string;
   cooldownMs: number;
@@ -33,34 +36,74 @@ type AbilityIcon = {
 };
 
 export class GameHud {
+  // Ключ текстуры ленты. Путь к файлу — только в preload, строка буквальная для singlefile.
+  static readonly bannerKey = 'banner';
+
+  // Качает плитку ленты. Сам загрузчик сцены этот путь не знает.
+  static preload(scene: Phaser.Scene): void {
+    if (scene.textures.exists(GameHud.bannerKey)) {
+      return;
+    }
+    scene.load.image(GameHud.bannerKey, 'assets/banner.png');
+  }
+
+  // Фильтр ближайшего пикселя, чтобы плитка не мылилась. Нет файла — красная лента из фигур.
+  static ensureTextures(scene: Phaser.Scene): void {
+    if (scene.textures.exists(GameHud.bannerKey)) {
+      scene.textures.get(GameHud.bannerKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      return;
+    }
+    bake(scene, GameHud.bannerKey, 1280, 86, (g) => {
+      g.fillStyle(0x5a0c0c);
+      g.fillRect(0, 8, 1280, 78);
+      g.fillStyle(0x8a1810);
+      g.fillRect(0, 14, 1280, 62);
+      g.lineStyle(6, 0xc9a227, 1);
+      g.strokeRect(8, 10, 1264, 70);
+      g.lineStyle(2, 0xf0d56a, 1);
+      g.strokeRect(16, 16, 1248, 58);
+      for (let x = 40; x < 1240; x += 48) {
+        g.fillStyle(0xf0d56a);
+        g.fillCircle(x, 12, 3);
+        g.fillCircle(x, 78, 3);
+      }
+    });
+  }
+
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waveText: Phaser.GameObjects.Text;
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly tankStatsText: Phaser.GameObjects.Text;
-  private readonly banner: Phaser.GameObjects.Image;
+  private readonly banner: Phaser.GameObjects.TileSprite;
   private readonly title: Phaser.GameObjects.Text;
   private readonly hpFrame: Phaser.GameObjects.Image;
   private readonly hpTrack: Phaser.GameObjects.Rectangle;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
   private readonly waveBanner: Phaser.GameObjects.Text;
   private readonly keysButton: Phaser.GameObjects.Rectangle;
+  private readonly keysFace: Phaser.GameObjects.Graphics;
   private readonly keysMark: Phaser.GameObjects.Text;
   private readonly keysDim: Phaser.GameObjects.Rectangle;
   private readonly keysOverlay: Phaser.GameObjects.Container;
   private readonly keysPanel: Phaser.GameObjects.Rectangle;
+  private readonly keysPlate: Phaser.GameObjects.Graphics;
   private readonly keysClose: Phaser.GameObjects.Container;
   private readonly keysTitle: Phaser.GameObjects.Text;
   private readonly keysRule: Phaser.GameObjects.Graphics;
   private keyRows: Phaser.GameObjects.Text[] = [];
   private readonly abilities: AbilityIcon[];
   private readonly hastePlate: Phaser.GameObjects.Rectangle;
+  private readonly hasteFace: Phaser.GameObjects.Graphics;
   private readonly hasteIcon: Phaser.GameObjects.Graphics;
   private readonly pausePlate: Phaser.GameObjects.Rectangle;
+  private readonly pauseFace: Phaser.GameObjects.Graphics;
   private readonly pauseLeft: Phaser.GameObjects.Rectangle;
   private readonly pauseRight: Phaser.GameObjects.Rectangle;
   private readonly settingsPlate: Phaser.GameObjects.Rectangle;
+  private readonly settingsFace: Phaser.GameObjects.Graphics;
   private readonly settingsGear: Phaser.GameObjects.Graphics;
   private readonly autoFirePlate: Phaser.GameObjects.Rectangle;
+  private readonly autoFireFace: Phaser.GameObjects.Graphics;
   private readonly autoFireIcon: Phaser.GameObjects.Graphics;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
   private readonly pauseDim: Phaser.GameObjects.Rectangle;
@@ -79,7 +122,6 @@ export class GameHud {
   protected readonly plateY = 28;
   protected autoFireX = 0;
   protected readonly statusStyle = {
-    fontFamily: 'Cinzel, Georgia, serif',
     fontSize: '18px',
     stroke: '#2a0a08',
     strokeThickness: 4,
@@ -89,12 +131,17 @@ export class GameHud {
     this.frame = frame;
     this.maxHp = maxHp;
 
-    this.banner = scene.add.image(frame.width / 2, 677, 'banner').setDepth(50);
+    GameHud.ensureTextures(scene);
+    this.banner = scene.add
+      .tileSprite(frame.width / 2, 677, frame.width, 86, GameHud.bannerKey)
+      .setOrigin(0.5)
+      .setDepth(50);
+    // Высота картинки становится высотой ленты, пиксель остаётся квадратным.
+    this.banner.setTileScale(86 / this.banner.frame.height);
 
     // Центр ленты. Список клавиш открывается кнопкой справа, на самой ленте его больше нет.
     this.title = scene.add
-      .text(frame.width / 2, 677, 'TANK', {
-        fontFamily: 'Cinzel, Georgia, serif',
+      .text(frame.width / 2, 677, 'TANK PENETRATION', {
         fontSize: '32px',
         color: '#f3d56a',
         stroke: '#4a1208',
@@ -119,7 +166,6 @@ export class GameHud {
 
     this.tankStatsText = scene.add
       .text(28, 56, '', {
-        fontFamily: 'Georgia, serif',
         fontSize: '16px',
         color: '#e8c48a',
         stroke: '#2a0a08',
@@ -130,7 +176,6 @@ export class GameHud {
 
     this.waveBanner = scene.add
       .text(frame.width / 2, 120, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '56px',
         color: '#f3d56a',
         stroke: '#4a1208',
@@ -150,19 +195,21 @@ export class GameHud {
     const iconY = this.plateY;
 
     this.hastePlate = scene.add
-      .rectangle(hasteX, iconY, icon, icon, 0x3a0c0c)
-      .setStrokeStyle(2, 0xc9a227)
+      .rectangle(hasteX, iconY, icon, icon, 0x000000, 0)
       .setDepth(53)
       .setInteractive({ useHandCursor: true });
+    this.hasteFace = scene.add.graphics().setPosition(hasteX, iconY).setDepth(53);
+    this.drawMetalPlate(this.hasteFace);
     this.hasteIcon = scene.add.graphics().setPosition(hasteX, iconY).setDepth(54);
     this.drawSpeedometer(1);
     this.hastePlate.on('pointerup', () => this.hasteCycle?.());
 
     this.pausePlate = scene.add
-      .rectangle(pauseX, iconY, icon, icon, 0x3a0c0c)
-      .setStrokeStyle(2, 0xc9a227)
+      .rectangle(pauseX, iconY, icon, icon, 0x000000, 0)
       .setDepth(53)
       .setInteractive({ useHandCursor: true });
+    this.pauseFace = scene.add.graphics().setPosition(pauseX, iconY).setDepth(53);
+    this.drawMetalPlate(this.pauseFace);
     // Обычные прямоугольники, не Graphics: скруглённая заливка узкой полоски
     // сдвигает её низ в сторону.
     this.pauseLeft = scene.add.rectangle(pauseX - 4, iconY, 4, 16, 0xf0d56a).setDepth(54);
@@ -175,10 +222,11 @@ export class GameHud {
     // Выше магазина (глубина 70), но ниже окна настроек (88), паузы (90) и экрана поражения (85).
     // Иначе шестерёнка и кнопка автострельбы пропадают под затемнением между волнами.
     this.settingsPlate = scene.add
-      .rectangle(settingsX, iconY, icon, icon, 0x3a0c0c)
-      .setStrokeStyle(2, 0xc9a227)
+      .rectangle(settingsX, iconY, icon, icon, 0x000000, 0)
       .setDepth(80)
       .setInteractive({ useHandCursor: true });
+    this.settingsFace = scene.add.graphics().setPosition(settingsX, iconY).setDepth(80);
+    this.drawMetalPlate(this.settingsFace);
     this.settingsGear = scene.add.graphics().setPosition(settingsX, iconY).setDepth(81);
     this.drawGear(this.settingsGear);
     this.settingsPlate.on('pointerup', () => {
@@ -188,10 +236,11 @@ export class GameHud {
 
     // Пока автострельба не куплена, плашка не ловит клики: иначе пустое место гасило бы выстрел.
     this.autoFirePlate = scene.add
-      .rectangle(this.autoFireX, iconY, icon, icon, 0x3a0c0c)
-      .setStrokeStyle(2, 0xc9a227)
+      .rectangle(this.autoFireX, iconY, icon, icon, 0x000000, 0)
       .setDepth(80)
       .setVisible(false);
+    this.autoFireFace = scene.add.graphics().setPosition(this.autoFireX, iconY).setDepth(80).setVisible(false);
+    this.drawMetalPlate(this.autoFireFace);
     this.autoFireIcon = scene.add.graphics().setPosition(this.autoFireX, iconY).setDepth(81).setVisible(false);
     this.drawAutoFire(false);
     this.autoFirePlate.on('pointerup', () => this.autoFireRequest?.());
@@ -199,22 +248,22 @@ export class GameHud {
     // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
     this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
 
-    // Справа на ленте, внутри золотой рамки. Заливка чуть прозрачная: красное поле под кнопкой остаётся видно.
+    // Справа на ленте. Прямоугольник только ловит клик: рисунок — отдельная пластина.
     const keysX = frame.width - 56;
     const keysY = 677;
     this.keysButton = scene.add
-      .rectangle(keysX, keysY, 40, 40, 0x3a0c0c, 0.72)
-      .setStrokeStyle(2, 0xc9a227)
+      .rectangle(keysX, keysY, 40, 40, 0x000000, 0)
       .setDepth(80)
       .setInteractive({ useHandCursor: true });
+    this.keysFace = scene.add.graphics().setPosition(keysX, keysY).setDepth(81);
+    this.drawMetalPlate(this.keysFace);
     this.keysMark = scene.add
       .text(keysX, keysY, '?', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '24px',
-        color: '#f3d56a',
+        color: '#f0d56a',
       })
       .setOrigin(0.5)
-      .setDepth(81);
+      .setDepth(82);
     this.keysButton.on('pointerup', () => {
       if (!this.keysOverlay.visible) {
         this.setKeysOpen(true);
@@ -224,15 +273,16 @@ export class GameHud {
     // Выше ленты и магазина (70), ниже поражения (85), настроек (88) и паузы (90).
     // Затемнение слабое: окно само полупрозрачное, поле за ним должно остаться узнаваемым.
     this.keysDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.28).setInteractive();
-    this.keysPanel = scene.add.rectangle(0, 0, 540, 320, 0x3a0c0c, 0.78).setStrokeStyle(3, 0xc9a227);
+    // Прямоугольник только ловит клик. Рисунок — полевая карточка, её высота меняется со списком.
+    this.keysPanel = scene.add.rectangle(0, 0, 540, 320, 0x000000, 0);
     this.keysPanel.setInteractive();
+    this.keysPlate = scene.add.graphics();
     this.keysClose = this.makeKeysClose(scene);
     this.keysTitle = scene.add
       .text(0, 0, 'КЛАВИШИ', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '32px',
-        color: '#f3d56a',
-        stroke: '#4a1208',
+        color: fieldInk,
+        stroke: fieldInkStroke,
         strokeThickness: 5,
       })
       .setOrigin(0.5);
@@ -240,6 +290,7 @@ export class GameHud {
     this.keysOverlay = scene.add
       .container(frame.width / 2, frame.height / 2, [
         this.keysDim,
+        this.keysPlate,
         this.keysPanel,
         this.keysTitle,
         this.keysRule,
@@ -250,44 +301,46 @@ export class GameHud {
     this.layoutKeys();
 
     this.hpFrame = scene.add.image(1128, 28, 'hp-frame').setDepth(51);
-    this.hpTrack = scene.add.rectangle(1018, 28, 236, 10, 0x2a0a0a).setOrigin(0, 0.5).setDepth(51);
-    this.hpFill = scene.add.rectangle(1018, 28, 236, 10, 0xd42a2a).setOrigin(0, 0.5).setDepth(52);
+    this.hpTrack = scene.add.rectangle(1018, 28, 236, 10, 0x1a2214).setOrigin(0, 0.5).setDepth(51);
+    this.hpFill = scene.add.rectangle(1018, 28, 236, 10, 0xc4a15a).setOrigin(0, 0.5).setDepth(52);
 
     this.pauseOverlay = scene.add.container(frame.width / 2, frame.height / 2).setDepth(90).setVisible(false);
     this.pauseDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
+    const pausePlate = scene.add.graphics().setPosition(0, 8);
+    paintFieldPlate(pausePlate, 520, 250);
+    const pauseRule = scene.add.graphics();
+    paintFieldRule(pauseRule, -32, 180);
     const pauseTitle = scene.add
       .text(0, -70, 'ПАУЗА', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '48px',
-        color: '#f3d56a',
-        stroke: '#4a1208',
+        color: fieldInk,
+        stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
     const pauseHint = scene.add
       .text(0, -8, 'Esc, чтобы продолжить', {
-        fontFamily: 'Georgia, serif',
         fontSize: '20px',
-        color: '#f0dcc0',
+        color: fieldPaper,
       })
       .setOrigin(0.5);
     const fresh = scene.add.container(0, 78);
-    const freshBg = scene.add.rectangle(0, 0, 300, 52, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
+    const freshFace = scene.add.graphics();
+    paintOrderBar(freshFace, 300, 52);
     const freshLabel = scene.add
       .text(0, 0, 'НОВАЯ ИГРА', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '18px',
-        color: '#f3d56a',
+        color: fieldInk,
       })
       .setOrigin(0.5);
-    fresh.add([freshBg, freshLabel]);
+    fresh.add([freshFace, freshLabel]);
     fresh.setInteractive({
       hitArea: new Phaser.Geom.Rectangle(-150, -26, 300, 52),
       hitAreaCallback: Phaser.Geom.Rectangle.Contains,
       useHandCursor: true,
     });
     fresh.on('pointerup', () => this.newGameRequest?.());
-    this.pauseOverlay.add([this.pauseDim, pauseTitle, pauseHint, fresh]);
+    this.pauseOverlay.add([this.pauseDim, pausePlate, pauseRule, pauseTitle, pauseHint, fresh]);
     this.placeHud();
   }
 
@@ -309,18 +362,23 @@ export class GameHud {
     this.autoFireX = settingsX - this.plateGap - icon;
     const y = this.plateY;
 
-    this.banner.setPosition(width / 2, 677).setDisplaySize(width, 86);
+    // setSize удлиняет ленту. setDisplaySize растянул бы саму плитку.
+    this.banner.setPosition(width / 2, 677).setSize(width, 86);
     this.title.setX(width / 2);
     this.waveBanner.setX(width / 2);
 
     this.hastePlate.setPosition(hasteX, y);
+    this.hasteFace.setPosition(hasteX, y);
     this.hasteIcon.setPosition(hasteX, y);
     this.pausePlate.setPosition(pauseX, y);
+    this.pauseFace.setPosition(pauseX, y);
     this.pauseLeft.setPosition(pauseX - 4, y);
     this.pauseRight.setPosition(pauseX + 4, y);
     this.settingsPlate.setPosition(settingsX, y);
+    this.settingsFace.setPosition(settingsX, y);
     this.settingsGear.setPosition(settingsX, y);
     this.autoFirePlate.setPosition(this.autoFireX, y);
+    this.autoFireFace.setPosition(this.autoFireX, y);
     this.autoFireIcon.setPosition(this.autoFireX, y);
 
     this.hpFrame.setPosition(hpCenter, 28);
@@ -329,6 +387,7 @@ export class GameHud {
 
     const keysX = width - 56;
     this.keysButton.setPosition(keysX, 677);
+    this.keysFace.setPosition(keysX, 677);
     this.keysMark.setPosition(keysX, 677);
 
     this.keysDim.setSize(width, height);
@@ -396,9 +455,10 @@ export class GameHud {
     }
   }
 
-  // Кнопка появляется после покупки. Красная плашка — режим включён, тёмная — выключен.
+  // Кнопка появляется после покупки. Очередь яркая, когда режим включён.
   setAutoFireToggle(owned: boolean, enabled: boolean): void {
     this.autoFirePlate.setVisible(owned);
+    this.autoFireFace.setVisible(owned);
     this.autoFireIcon.setVisible(owned);
     if (!owned) {
       if (this.autoFirePlate.input?.enabled) {
@@ -409,7 +469,6 @@ export class GameHud {
     if (!this.autoFirePlate.input?.enabled) {
       this.autoFirePlate.setInteractive({ useHandCursor: true });
     }
-    this.autoFirePlate.setFillStyle(enabled ? 0x8a1810 : 0x3a0c0c);
     this.drawAutoFire(enabled);
   }
 
@@ -430,7 +489,6 @@ export class GameHud {
   }
 
   setHaste(multiplier: number): void {
-    this.hastePlate.setFillStyle(multiplier > 1 ? 0x8a1810 : 0x3a0c0c);
     this.drawSpeedometer(multiplier);
   }
 
@@ -592,29 +650,24 @@ export class GameHud {
     const w = 540;
     const h = titleBand + hints.length * rowH + padBottom;
     this.keysPanel.setSize(w, h);
+    paintFieldPlate(this.keysPlate, w, h, 0.88);
     this.keysTitle.setY(-h / 2 + 34);
-    this.keysClose.setPosition(w / 2 - 28, -h / 2 + 26);
+    this.keysClose.setPosition(w / 2 - 40, -h / 2 + 38);
 
     this.keysRule.clear();
-    this.keysRule.lineStyle(2, 0xc9a227, 0.9);
-    const ruleY = -h / 2 + 58;
-    this.keysRule.beginPath();
-    this.keysRule.moveTo(-w / 2 + 28, ruleY);
-    this.keysRule.lineTo(w / 2 - 28, ruleY);
-    this.keysRule.strokePath();
+    paintFieldRule(this.keysRule, -h / 2 + 58, w / 2 - 28);
 
     const scene = this.keysTitle.scene;
     const keyX = -w / 2 + 40;
     const actionX = -w / 2 + 248;
     const firstY = -h / 2 + titleBand + rowH / 2;
     const keyStyle = {
-      fontFamily: 'Georgia, serif',
       fontSize: '20px',
-      color: '#f3d56a',
-      stroke: '#2a0a08',
+      color: fieldInk,
+      stroke: fieldInkStroke,
       strokeThickness: 3,
     };
-    const actionStyle = { ...keyStyle, color: '#f0dcc0' };
+    const actionStyle = { ...keyStyle, color: fieldPaper };
 
     hints.forEach((line, index) => {
       const parts = line.split(' — ');
@@ -633,9 +686,8 @@ export class GameHud {
     const hit = scene.add.rectangle(0, 0, 36, 36, 0x000000, 0.001).setInteractive({ useHandCursor: true });
     const mark = scene.add
       .text(0, -1, '×', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '32px',
-        color: '#f3d56a',
+        color: fieldInk,
       })
       .setOrigin(0.5);
     hit.on('pointerup', () => this.setKeysOpen(false));
@@ -645,33 +697,28 @@ export class GameHud {
   // Ряд над баннером, слева направо. index 0 — первая иконка у края поля.
   private makeAbility(scene: Phaser.Scene, index: number, spec: HudAbility): AbilityIcon {
     const glyph = scene.add.image(0, 0, spec.texture);
+    // Вторая копия в сложении светлит только готовую кнопку. На перезарядке её нет.
+    const glow = scene.add.image(0, 0, spec.texture).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5).setVisible(false);
     const sweep = scene.add.graphics();
     const time = scene.add
       .text(0, 2, '', {
-        fontFamily: 'Cinzel, Georgia, serif',
         fontSize: '22px',
         color: '#f3d56a',
         stroke: '#2a0a08',
         strokeThickness: 4,
       })
       .setOrigin(0.5);
-    const badge = scene.add.circle(20, 20, 10, 0x8a1810).setStrokeStyle(2, 0xf0d56a);
-    const key = scene.add
-      .text(20, 20, spec.keyLabel, {
-        fontFamily: 'Cinzel, Georgia, serif',
-        fontSize: '14px',
-        color: '#f3d56a',
-      })
-      .setOrigin(0.5);
     const root = scene.add
-      .container(56 + index * 88, this.frame.bannerY - 48, [glyph, sweep, time, badge, key])
+      .container(56 + index * 88, this.frame.bannerY - 48, [glyph, glow, sweep, time])
       .setDepth(53)
       .setVisible(false);
     const icon: AbilityIcon = {
       id: spec.id,
       root,
+      glow,
       sweep,
       time,
+      lit: false,
       owned: false,
       hint: spec.hint,
       cooldownMs: spec.cooldownMs,
@@ -717,6 +764,11 @@ export class GameHud {
     }
 
     const cooling = cooldownMs > 0;
+    const lit = !cooling;
+    if (icon.lit !== lit) {
+      icon.lit = lit;
+      icon.glow.setVisible(lit);
+    }
     // Дольше минуты три цифры секунд не влезают в кружок, поэтому 3:00.
     const label = cooling ? this.cooldownLabel(cooldownMs) : '';
     if (icon.time.text !== label) {
@@ -755,6 +807,33 @@ export class GameHud {
     }
   }
 
+  // Та же пластина, что у кнопки клавиш: тёмный металл, толстая латунь, заклёпки.
+  protected drawMetalPlate(g: Phaser.GameObjects.Graphics): void {
+    const size = 40;
+    const left = -size / 2;
+    const top = -size / 2;
+
+    g.fillStyle(0xc4a15a, 1);
+    g.fillRect(left, top, size, size);
+    g.fillStyle(0x1a1814, 1);
+    g.fillRect(left + 3, top + 3, size - 6, size - 6);
+    g.fillStyle(0x2a261f, 1);
+    g.fillRect(left + 6, top + 6, size - 12, size - 12);
+
+    const rivet = (x: number, y: number): void => {
+      g.fillStyle(0x2a2010, 1);
+      g.fillCircle(x, y, 4);
+      g.fillStyle(0xf0d56a, 1);
+      g.fillCircle(x, y, 2);
+      g.fillStyle(0xfff6d0, 1);
+      g.fillCircle(x - 1, y - 1, 1.2);
+    };
+    rivet(left + 7, top + 7);
+    rivet(left + size - 7, top + 7);
+    rivet(left + 7, top + size - 7);
+    rivet(left + size - 7, top + size - 7);
+  }
+
   // Сплошной обод и короткие зубцы. Лучи из центра читались как штурвал.
   // Дырку заливаем цветом плашки: у Graphics нет выреза в контуре.
   private drawGear(g: Phaser.GameObjects.Graphics): void {
@@ -786,7 +865,7 @@ export class GameHud {
     }
     g.closePath();
     g.fillPath();
-    g.fillStyle(0x3a0c0c, 1);
+    g.fillStyle(0x2a261f, 1);
     g.fillCircle(0, 0, 3.4);
     g.lineStyle(1.5, 0xf0d56a, 1);
     g.strokeCircle(0, 0, 3.4);
