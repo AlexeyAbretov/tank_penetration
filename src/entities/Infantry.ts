@@ -6,6 +6,7 @@
 
 import Phaser from 'phaser';
 import { enemyHasteOf, isDebugRun } from '../gameConfig';
+import { floatDamage } from '../gfx/damageFloat';
 import type { SoldierLook } from '../gfx/looks';
 
 // Цвета лежат в gfx/looks.ts: один набор рисует и штурмовика, и стрелка.
@@ -62,6 +63,22 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Насколько близко снаряд должен подлететь к торсу, чтобы засчитать попадание.
   // У пикапа это поле переопределено и больше, потому что машина крупнее солдата.
   readonly hitRadius: number = Infantry.shellHitRadius;
+
+  // Центр круга попадания. Снаряд и пуля пулемёта меряют расстояние до этой точки.
+  hitCenter(): { x: number; y: number } {
+    return { x: this.x, y: this.y - this.displayHeight * 0.42 };
+  }
+
+  // Радиус круга для снаряда танка.
+  shellRadius(): number {
+    return this.hitRadius;
+  }
+
+  // Пуля пулемёта мельче снаряда и берёт только ближнюю к торсу часть круга.
+  mgReach(): number {
+    return this.shellRadius() * 0.55;
+  }
+
   // Ранг роста скорости. У штурмовика это номер волны.
   // У стрелка и пикапа на волне появления равен 1, дальше растёт по одной за волну.
   protected paceWave = 1;
@@ -250,8 +267,16 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Наносит урон. Возвращает true, если после удара здоровья не осталось — сцена тогда вызовет kill.
   // wire: удар колючки. У него своя красная вспышка, не бледный оттенок снаряда.
   hit(damage: number = Infantry.shellDamage, wire = false): boolean {
+    const before = this.hp;
     // Ниже нуля здоровье не опускаем.
     this.hp = Math.max(0, this.hp - damage);
+    // В дебаге над макушкой всплывает нанесённое число. Ядерный залп передаёт миллион:
+    // на экран идёт столько, сколько здоровья реально сняли.
+    if (isDebugRun() && before > this.hp) {
+      const shown = damage < 10_000 ? damage : before - this.hp;
+      const head = this.y - this.displayHeight * this.originY;
+      floatDamage(this.scene, this.x, head, shown);
+    }
     if (wire && this.hp > 0) {
       this.blinkWire();
     } else if (!wire) {

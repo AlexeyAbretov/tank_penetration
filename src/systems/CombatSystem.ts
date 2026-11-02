@@ -58,9 +58,9 @@ export class CombatSystem implements Combat {
   private nuclearCloudUntil = 0;
 
   constructor(
-    private readonly scene: Phaser.Scene,
+    protected readonly scene: Phaser.Scene,
     private readonly tank: Tank,
-    private readonly infantry: Phaser.Physics.Arcade.Group,
+    protected readonly infantry: Phaser.Physics.Arcade.Group,
     private readonly shop: ShopController,
     private readonly enemyShots: Phaser.Physics.Arcade.Group,
     private readonly callbacks: CombatCallbacks,
@@ -86,7 +86,11 @@ export class CombatSystem implements Combat {
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_THREE),
       );
     }
+    // Дебаг-наследник здесь включает рамки хитбоксов. В обычной партии метод пуст.
+    this.afterConstruct();
   }
+
+  protected afterConstruct(): void {}
 
   get artilleryCooldown(): number {
     return this.artilleryCooldownMs;
@@ -692,10 +696,10 @@ export class CombatSystem implements Combat {
         if (!unit.active || unit.reachedWall) {
           continue;
         }
-        const torso = this.torsoPoint(unit);
-        if (Phaser.Math.Distance.Between(bullet.x, bullet.y, torso.x, torso.y) <= unit.hitRadius * 0.55) {
+        const center = unit.hitCenter();
+        if (Phaser.Math.Distance.Between(bullet.x, bullet.y, center.x, center.y) <= unit.mgReach()) {
           bullet.destroy();
-          // Тот же удар, что у снаряда: пуля долетела до солдата.
+          // Пуля долетела до круга попадания.
           this.effects.impacts.play();
           this.hurtInfantry(unit, MachineGun.shop.damage);
           break;
@@ -754,8 +758,8 @@ export class CombatSystem implements Combat {
   }
 
   private shellHitsUnit(shell: Phaser.Physics.Arcade.Image, unit: Infantry): boolean {
-    const torso = this.torsoPoint(unit);
-    return Phaser.Math.Distance.Between(shell.x, shell.y, torso.x, torso.y) <= unit.hitRadius;
+    const center = unit.hitCenter();
+    return Phaser.Math.Distance.Between(shell.x, shell.y, center.x, center.y) <= unit.shellRadius();
   }
 
   private torsoPoint(unit: Infantry): { x: number; y: number } {

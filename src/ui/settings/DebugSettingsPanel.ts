@@ -3,24 +3,28 @@
 // Босс-волна это поле не читает: там по-прежнему один суперсолдат.
 // Клавиша A добавляет юнита в идущую волну и этим числом не ограничена.
 // Здоровье танка пишется в localStorage в том же закрытии, что и кнопка «Готово».
+// Хитбокс переключается сразу: рамка на поле гаснет, не дожидаясь «Готово».
 
 import Phaser from 'phaser';
+import { Hitboxes } from '../../debug/Hitboxes';
 import { TankDebugBaseHp } from '../../entities/Tank/TankDebugBaseHp';
 import { DebugEnemyFactory } from '../../entities/DebugEnemyFactory';
 import { SettingsPanel } from './SettingsPanel';
 
 const FIELD_X = 156;
-const WAVE_Y = 132;
-const HP_Y = 196;
+const WAVE_Y = 120;
+const HP_Y = 172;
+const HITBOX_Y = 224;
 const FIELD_W = 88;
 const HP_W = 112;
 const FIELD_H = 40;
 const CARD_EXTRA = 128;
-const DONE_Y = 264;
+const DONE_Y = 280;
 
 export class DebugSettingsPanel extends SettingsPanel {
   private readonly field: HTMLInputElement;
   private readonly hpField: HTMLInputElement;
+  private readonly hitboxLabel: Phaser.GameObjects.Text;
   private readonly scene: Phaser.Scene;
   private readonly view: { width: number; height: number };
 
@@ -66,6 +70,25 @@ export class DebugSettingsPanel extends SettingsPanel {
 
     this.placeFields();
 
+    this.container.add(this.caption(scene, HITBOX_Y, HP_W, 'Хитбокс'));
+    const hitX = FIELD_X + FIELD_W / 2 - HP_W / 2;
+    const hitbox = scene.add
+      .rectangle(hitX, HITBOX_Y, HP_W, FIELD_H, 0x1a2214)
+      .setStrokeStyle(2, 0x6e6240)
+      .setInteractive({ useHandCursor: true });
+    this.hitboxLabel = scene.add
+      .text(hitX, HITBOX_Y, '', {
+        fontSize: '22px',
+        color: '#e6d7a8',
+      })
+      .setOrigin(0.5);
+    this.paintHitbox();
+    hitbox.on('pointerup', () => {
+      Hitboxes.toggle();
+      this.paintHitbox();
+    });
+    this.container.add([hitbox, this.hitboxLabel]);
+
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.placeFields, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.scale.off(Phaser.Scale.Events.RESIZE, this.placeFields, this);
@@ -85,6 +108,7 @@ export class DebugSettingsPanel extends SettingsPanel {
     if (open) {
       this.field.value = String(DebugEnemyFactory.regularCountOf());
       this.hpField.value = String(TankDebugBaseHp.currentOf());
+      this.paintHitbox();
       this.placeFields();
     } else {
       this.field.blur();
@@ -193,6 +217,12 @@ export class DebugSettingsPanel extends SettingsPanel {
     const count = this.readCount();
     DebugEnemyFactory.setRegularCount(count ?? DebugEnemyFactory.regularCountOf());
     this.field.value = String(DebugEnemyFactory.regularCountOf());
+  }
+
+  private paintHitbox(): void {
+    const on = Hitboxes.isEnabled;
+    this.hitboxLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    this.hitboxLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
   }
 
   private commitHp(): void {

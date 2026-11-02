@@ -1,6 +1,7 @@
 // Дебаг-бой. Те же выстрелы, но двойное нажатие кнопки способности сбрасывает перезарядку.
 // Второе нажатие за короткое окно удар не вызывает. После сброса окно пустое.
 
+import { HitboxOverlay } from '../debug/HitboxOverlay';
 import { CombatSystem } from './CombatSystem';
 
 const DOUBLE_MS = 400;
@@ -13,6 +14,10 @@ export class DebugCombatSystem extends CombatSystem {
     mines: -1,
     nuclear: -1,
   };
+
+  protected override afterConstruct(): void {
+    new HitboxOverlay(this.scene, this.infantry);
+  }
 
   protected override useArtillery(canFire: boolean): void {
     if (this.resetsCooldown('artillery', this.artilleryCooldown > 0)) {

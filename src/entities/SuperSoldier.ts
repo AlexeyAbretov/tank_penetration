@@ -114,8 +114,23 @@ export class SuperSoldier extends Infantry {
   // false: WaveManager и проволока не ждут, что он дойдёт до стены.
   readonly reachesBase = false;
   readonly contactDamage = 0;
-  // Снаряд танка попадает в крупный торс с большего расстояния, чем в обычного солдата.
-  readonly hitRadius = 64;
+  // Запас над макушкой, в пикселях поля. Край каски тогда внутри круга.
+  private static readonly crownPad = 8;
+
+  // Круг между каской и подошвой. Общий центр на 0.42 роста оставляет шлем снаружи.
+  override hitCenter(): { x: number; y: number } {
+    const crown = this.y - this.displayHeight * this.originY;
+    return { x: this.x, y: (crown + this.y) / 2 };
+  }
+
+  override shellRadius(): number {
+    return this.displayHeight * this.originY * 0.5 + SuperSoldier.crownPad;
+  }
+
+  // Тот же круг, что у снаряда. Тесный торс до каски не достаёт, и пуля проходит сквозь шлем.
+  override mgReach(): number {
+    return this.shellRadius();
+  }
 
   // Пулемёт — отдельная картинка. Так отдача двигает ствол, а тело остаётся на месте.
   private gun!: Phaser.GameObjects.Image;
