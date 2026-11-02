@@ -5,6 +5,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
 import { MachineGun } from '../entities/MachineGun';
+import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 import { preloadBoom } from '../gfx/boom';
@@ -21,6 +22,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   preloadCraters(scene);
   MachineGun.preload(scene);
   NuclearStrike.preload(scene);
+  Mines.preload(scene);
   AssaultInfantry.preload(scene);
   GunnerInfantry.preload(scene);
   PickupTruck.preload(scene);

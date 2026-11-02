@@ -21,6 +21,7 @@ const packedFiles = [
   ['assets/nuke-boom.png', 'image/png'],
   ['assets/artillery-boom.png', 'image/png'],
   ['assets/nuclear-bomb.png', 'image/png'],
+  ['assets/mine-body.png', 'image/png'],
   ['assets/artillery-crater-0.png', 'image/png'],
   ['assets/artillery-crater-1.png', 'image/png'],
   ['assets/artillery-crater-2.png', 'image/png'],

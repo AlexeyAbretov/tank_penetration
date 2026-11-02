@@ -16,9 +16,6 @@ export type MineKeepOut = {
   maxY: number;
 };
 
-// Лампа над крышкой. Текстура корпуса якорится низом, поэтому точка выше нуля контейнера.
-const LAMP_Y = -30;
-
 export class PlantedMine {
   readonly x: number;
   readonly y: number;
@@ -26,35 +23,27 @@ export class PlantedMine {
   private armed = false;
   private gone = false;
   private readonly root: Phaser.GameObjects.Container;
-  private readonly hole: Phaser.GameObjects.Ellipse;
   private readonly body: Phaser.GameObjects.Image;
-  private readonly lamps: Phaser.GameObjects.Arc[];
   private dirt?: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.x = x;
     this.y = y;
 
-    // Яма на месте ещё до корпуса: заряд вылезает из неё, а не появляется в воздухе.
-    this.hole = scene.add.ellipse(0, 2, 34, 12, 0x140804, 0.9).setScale(0.35, 0.45);
-    this.body = scene.add.image(0, 6, Mines.bodyKey).setOrigin(0.5, 1).setScale(0.72, 0.02);
-    const lamp = scene.add.circle(0, LAMP_Y, 3.6, 0xff2a18, 0);
-    const core = scene.add.circle(0, LAMP_Y, 1.6, 0xfff0c0, 0);
-    this.lamps = [lamp, core];
+    const frame = scene.textures.get(Mines.bodyKey).get();
+    // У файла низ корпуса на строке 45. Запасной рисунок 36 px сидит своим низом.
+    const originY = frame.height === 48 ? Mines.bodyOriginY : 1;
+    this.body = scene.add
+      .image(0, 4, Mines.bodyKey)
+      .setOrigin(0.5, originY)
+      .setScale(Mines.bodyScale * 0.72, 0.02);
 
-    this.root = scene.add.container(x, y, [this.hole, this.body, lamp, core]).setDepth(4);
+    this.root = scene.add.container(x, y, [this.body]).setDepth(4);
 
-    scene.tweens.add({
-      targets: this.hole,
-      scaleX: 1,
-      scaleY: 1,
-      duration: 180,
-      ease: 'Quad.Out',
-    });
     scene.tweens.add({
       targets: this.body,
-      scaleX: 1,
-      scaleY: 1,
+      scaleX: Mines.bodyScale,
+      scaleY: Mines.bodyScale,
       y: 0,
       delay: Phaser.Math.Between(40, 160),
       duration: 460,
@@ -88,7 +77,7 @@ export class PlantedMine {
     this.armed = false;
     const scene = this.root.scene;
     if (scene) {
-      scene.tweens.killTweensOf([this.hole, this.body, ...this.lamps]);
+      scene.tweens.killTweensOf(this.body);
     }
     this.releaseDirt();
     this.root.destroy();
@@ -99,16 +88,6 @@ export class PlantedMine {
       return;
     }
     this.armed = true;
-    for (const lamp of this.lamps) {
-      lamp.setAlpha(1);
-    }
-    this.root.scene.tweens.add({
-      targets: this.lamps,
-      alpha: 0.15,
-      duration: 260,
-      yoyo: true,
-      repeat: -1,
-    });
   }
 
   private releaseDirt(): void {
@@ -124,8 +103,13 @@ export class Mines {
   static readonly bodyKey = 'mine-body';
   static readonly clodKey = 'mine-clod';
   static readonly iconRadius = 30;
-  // Половина корпуса. Отступ, чтобы картинка не легла на танк, проволоку и чужую мину.
-  static readonly footprint = 18;
+  // Холст 64×48. Корпус занимает строки 21..44, строка 45 — линия земли.
+  static readonly bodyOriginY = 45 / 48;
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly imagePath = 'assets/mine-body.png';
+  // На поле корпус вдвое меньше холста. Половина этой ширины — отступ от танка, проволоки и чужой мины.
+  static readonly bodyScale = 0.5;
+  static readonly footprint = 13;
 
   static readonly shop = {
     cost: 100,
@@ -146,11 +130,20 @@ export class Mines {
     maxY: 540,
   };
 
+  static preload(scene: Phaser.Scene): void {
+    if (scene.textures.exists(Mines.bodyKey)) {
+      return;
+    }
+    scene.load.image(Mines.bodyKey, Mines.imagePath);
+  }
+
   static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists(Mines.iconKey)) {
       bake(scene, Mines.iconKey, 64, 64, (g) => Mines.renderIcon(g));
     }
-    if (!scene.textures.exists(Mines.bodyKey)) {
+    if (scene.textures.exists(Mines.bodyKey)) {
+      scene.textures.get(Mines.bodyKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    } else {
       bake(scene, Mines.bodyKey, 48, 36, (g) => Mines.renderBody(g));
     }
     if (!scene.textures.exists(Mines.clodKey)) {
