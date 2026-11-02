@@ -6,6 +6,7 @@ import Phaser from 'phaser';
 // Размер холста — в gameConfig.ts. Сцену собирает GameSceneFactory.
 import { GAME, fitGameTo } from './gameConfig';
 import { GameSceneFactory } from './scenes/GameSceneFactory';
+import { installClipVolumes } from './sounds/clipVolume';
 
 function parentBox(): { width: number; height: number } {
   const parent = document.getElementById('game');
@@ -55,6 +56,8 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [GameSceneFactory.create()],
 };
 
+// До холста: узлы громкости создаются внутри new Phaser.Game.
+installClipVolumes();
 // new Phaser.Game создаёт холст и запускает сцену.
 const game = new Phaser.Game(config);
 
