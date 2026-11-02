@@ -1,6 +1,7 @@
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
+import { PickupTruck } from '../entities/PickupTruck';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
 import { MachineGun } from '../entities/MachineGun';
@@ -22,6 +23,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   NuclearStrike.preload(scene);
   AssaultInfantry.preload(scene);
   GunnerInfantry.preload(scene);
+  PickupTruck.preload(scene);
   RocketInfantry.preload(scene);
   SuperSoldier.preload(scene);
   preloadTankBoom(scene);
