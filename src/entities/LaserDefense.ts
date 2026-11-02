@@ -2,6 +2,7 @@
 
 import Phaser, { GameObjects } from 'phaser';
 import { exhaustAt, idleShift } from '../gfx/engine';
+import { paintQuiet } from '../gfx/looks';
 
 export class LaserDefense extends GameObjects.Container {
   static readonly hullKey = 'laser-hull';
@@ -92,6 +93,17 @@ export class LaserDefense extends GameObjects.Container {
     for (const [key, path] of Object.entries(this.images)) {
       scene.load.image(key, path);
     }
+  }
+
+  // Корпус или башня. Прямоугольник чуть шире повёрнутой башни: клик по лучу не нужен.
+  containsPoint(x: number, y: number): boolean {
+    return this.hull.getBounds().contains(x, y) || this.turret.getBounds().contains(x, y);
+  }
+
+  // Серые корпус и башня, пока луч выключен.
+  setQuiet(quiet: boolean): void {
+    paintQuiet(this.hull, quiet);
+    paintQuiet(this.turret, quiet);
   }
 
   static ensureTextures(scene: Phaser.Scene): void {

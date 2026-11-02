@@ -61,9 +61,9 @@ export class CombatSystem implements Combat {
 
   constructor(
     protected readonly scene: Phaser.Scene,
-    private readonly tank: Tank,
+    protected readonly tank: Tank,
     protected readonly infantry: Phaser.Physics.Arcade.Group,
-    private readonly shop: ShopController,
+    protected readonly shop: ShopController,
     private readonly enemyShots: Phaser.Physics.Arcade.Group,
     private readonly callbacks: CombatCallbacks,
     private readonly progressDamage: number,
@@ -169,7 +169,16 @@ export class CombatSystem implements Combat {
     );
   }
 
+  // Дебаг глушит пушку с пулемётом, лазер или РСЗО. В обычной партии все стреляют.
+  protected weaponLive(kind: 'tank' | 'laser' | 'salvo'): boolean {
+    const live = { tank: true, laser: true, salvo: true };
+    return live[kind];
+  }
+
   shoot(): void {
+    if (!this.weaponLive('tank')) {
+      return;
+    }
     const shot = this.tank.tryFire();
     if (shot) {
       this.fireShell(shot.x, shot.y, shot.angle);
@@ -178,7 +187,7 @@ export class CombatSystem implements Combat {
   }
 
   // ЛКМ и автострельба — здесь, чтобы сцена не знала про покупки магазина.
-  handleFireInput(pointer: Phaser.Input.Pointer): void {
+  protected handleFireInput(pointer: Phaser.Input.Pointer): void {
     if (this.shop.autoFire.enabled || pointer.leftButtonDown()) {
       this.shoot();
     }
@@ -604,7 +613,7 @@ export class CombatSystem implements Combat {
       return;
     }
     this.mgCooldown = Math.max(0, this.mgCooldown - delta);
-    if (this.mgCooldown > 0) {
+    if (this.mgCooldown > 0 || !this.weaponLive('tank')) {
       return;
     }
     if (this.mgBurstLeft <= 0) {
@@ -624,7 +633,7 @@ export class CombatSystem implements Combat {
       return;
     }
     this.laserCooldown = Math.max(0, this.laserCooldown - delta);
-    if (this.laserCooldown > 0) {
+    if (this.laserCooldown > 0 || !this.weaponLive('laser')) {
       return;
     }
     const rocket = this.randomRocket();
@@ -648,7 +657,7 @@ export class CombatSystem implements Combat {
       return;
     }
     this.salvoCooldown = Math.max(0, this.salvoCooldown - delta);
-    if (this.salvoCooldown > 0) {
+    if (this.salvoCooldown > 0 || !this.weaponLive('salvo')) {
       return;
     }
     salvo.fire(RocketSalvo.impacts(), (x, y) => this.detonateSalvo(x, y));

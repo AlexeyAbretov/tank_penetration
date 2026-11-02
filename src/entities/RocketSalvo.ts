@@ -3,6 +3,7 @@
 import Phaser, { GameObjects } from 'phaser';
 import { GAME } from '../gameConfig';
 import { exhaustAt, idleShift, trailAt } from '../gfx/engine';
+import { paintQuiet } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { playRocketLaunch } from '../sounds/RocketSounds';
 
@@ -88,6 +89,16 @@ export class RocketSalvo extends GameObjects.Container {
 
   static preload(scene: Phaser.Scene): void {
     scene.load.image(RocketSalvo.hullKey, RocketSalvo.imagePath);
+  }
+
+  // Картинка установки, без летящих ракет.
+  containsPoint(x: number, y: number): boolean {
+    return this.hull.getBounds().contains(x, y);
+  }
+
+  // Серый корпус, пока залп выключен.
+  setQuiet(quiet: boolean): void {
+    paintQuiet(this.hull, quiet);
   }
 
   static ensureTextures(scene: Phaser.Scene): void {

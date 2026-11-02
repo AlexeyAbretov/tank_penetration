@@ -14,9 +14,9 @@ const REGISTRY_KEY = 'rocketSounds';
 
 // Оба файла записаны почти на полную громкость.
 // 0.6 — громче винтовки (0.4), не громче пушки (0.65): ракеты редкие, но пушка остаётся главным выстрелом.
-// 0.72 — как взрыв пикапа: попадание в свою броню слышнее щелчка пули (0.5).
+// 0.4 — как разрыв снаряда. Попадание в броню короткое и иначе перекрывает выстрел пушки.
 const LAUNCH_GAIN = 0.6;
-const HIT_GAIN = 0.72;
+const HIT_GAIN = 0.2;
 
 type Clip = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
 

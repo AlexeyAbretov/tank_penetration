@@ -5,6 +5,7 @@ import {
   BULLET_FRAME,
   MG_BULLET_PAINT,
   MG_MOUNT_FRAME,
+  paintQuiet,
   type BulletPaint,
 } from '../gfx/looks';
 import { bake } from '../gfx/textures';
@@ -56,6 +57,11 @@ export class MachineGun extends GameObjects.Container {
     this.barrel = scene.add.image(0, 0, MachineGun.barrelKey);
     this.barrel.setOrigin(mount.originX, mount.originY);
     this.add(this.barrel);
+  }
+
+  // Серый ствол, пока очередь выключена.
+  setQuiet(quiet: boolean): void {
+    paintQuiet(this.barrel, quiet);
   }
 
   // Прямоугольник картинки в координатах башни. Просмотр и попадания берут одно и то же.

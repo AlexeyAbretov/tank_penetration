@@ -5,6 +5,7 @@ import Phaser, { GameObjects } from 'phaser';
 import {
   MUZZLE_FRAME,
   MUZZLE_PAINT,
+  paintQuiet,
   SHELL_FRAME,
   SHELL_PAINT,
   TANK_GUN_FRAME,
@@ -185,6 +186,7 @@ export class Tank extends GameObjects.Container {
   // Башня и ствол внутри. Крутится целиком, откат двигает только ствол.
   private readonly aim: Phaser.GameObjects.Container;
   private readonly hull: Phaser.GameObjects.Image;
+  private readonly turret: Phaser.GameObjects.Image;
   private readonly gun: Phaser.GameObjects.Image;
   // После гибели корпус уже спрятан, повторный die ничего не делает.
   private dead = false;
@@ -211,12 +213,12 @@ export class Tank extends GameObjects.Container {
     this.hull = scene.add.image(layout.hullX, layout.hullY, 'tank-hull');
     // Ось на днище башни. Дети заданы относительно неё, поэтому при наклоне низ стоит на месте.
     this.aim = scene.add.container(layout.seatX, layout.seatY);
-    const turret = scene.add.image(layout.turretX - layout.seatX, layout.turretY - layout.seatY, 'tank-turret');
-    turret.setOrigin(layout.turretOriginX, layout.turretOriginY);
+    this.turret = scene.add.image(layout.turretX - layout.seatX, layout.turretY - layout.seatY, 'tank-turret');
+    this.turret.setOrigin(layout.turretOriginX, layout.turretOriginY);
     this.gun = scene.add.image(layout.gunX - layout.seatX, layout.gunY - layout.seatY, 'tank-gun');
     this.gun.setOrigin(layout.gunOriginX, layout.gunOriginY);
     // Ствол последним: маска на нём перекрывает лоб башни.
-    this.aim.add([turret, this.gun]);
+    this.aim.add([this.turret, this.gun]);
 
     this.add([this.hull, this.aim]);
     scene.add.existing(this);
@@ -297,6 +299,16 @@ export class Tank extends GameObjects.Container {
       return true;
     }
     return this.turretHits.some((box) => Tank.inBox(aim.x, aim.y, box));
+  }
+
+  // Серый корпус, башня и ствол. Пулемёт на башне красится отдельно: это другой объект.
+  setQuiet(quiet: boolean): void {
+    if (this.dead) {
+      return;
+    }
+    paintQuiet(this.hull, quiet);
+    paintQuiet(this.turret, quiet);
+    paintQuiet(this.gun, quiet);
   }
 
   // Наводит башню и ствол на точку, обычно на курсор.

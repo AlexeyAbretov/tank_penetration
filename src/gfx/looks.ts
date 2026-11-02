@@ -260,3 +260,19 @@ export const MG_BULLET_PAINT = {
   body: 0xc9e86a,
   tip: 0xf8ffd0,
 } satisfies BulletPaint;
+
+// Серый тинт выключенной стрельбы: машина на месте, только приглушена.
+export const QUIET_TINT = 0x8aa0b4;
+
+type Tintable = {
+  setTint(tint: number): unknown;
+  clearTint(): unknown;
+};
+
+export function paintQuiet(image: Tintable, quiet: boolean): void {
+  if (quiet) {
+    image.setTint(QUIET_TINT);
+    return;
+  }
+  image.clearTint();
+}
