@@ -1,4 +1,4 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, арт удар, мины, атомный взрыв и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, РСЗО, арт удар, мины, атомный взрыв и контакт с базой.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
@@ -11,6 +11,7 @@ import { Mines, PlantedMine, type MineKeepOut } from '../entities/Mines';
 import { NuclearStrike, type NuclearFlight } from '../entities/NuclearStrike';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Rocket } from '../entities/Rocket';
+import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { airBurstAt } from '../gfx/airBurst';
@@ -30,6 +31,7 @@ export class CombatSystem implements Combat {
   private readonly mgShots: Phaser.Physics.Arcade.Group;
   private mgCooldown = 0;
   private laserCooldown = 0;
+  private salvoCooldown = 0;
   private artilleryCooldownMs = 0;
   private readonly strikeKeys: Phaser.Input.Keyboard.Key[] = [];
   // Клик по иконке на HUD. Сбрасывается в том же кадре, даже если удар ещё на перезарядке.
@@ -518,6 +520,7 @@ export class CombatSystem implements Combat {
     this.cleanupShells();
     this.tickMachineGun(delta);
     this.tickLaser(delta);
+    this.tickSalvo(delta);
     this.resolveMgHits();
     this.cleanupMgShots();
     this.snareOnWire(delta);
@@ -620,6 +623,34 @@ export class CombatSystem implements Combat {
     rocket.destroy();
     airBurstAt(this.scene, x, y);
     this.laserCooldown = LaserDefense.shop.fireIntervalMs;
+  }
+
+  // Раз в 3 секунды три ракеты в случайные точки. Дуга и огонь в шахтах — у установки.
+  private tickSalvo(delta: number): void {
+    const salvo = this.shop.salvo;
+    if (!salvo) {
+      return;
+    }
+    this.salvoCooldown = Math.max(0, this.salvoCooldown - delta);
+    if (this.salvoCooldown > 0) {
+      return;
+    }
+    salvo.fire(RocketSalvo.impacts(), (x, y) => this.detonateSalvo(x, y));
+    this.salvoCooldown = RocketSalvo.shop.fireIntervalMs;
+  }
+
+  // Тот же разрыв, что у артиллерии: кадры, воронка, звук и тряска камеры.
+  private detonateSalvo(x: number, y: number): void {
+    ArtilleryStrike.boom(this.scene, x, y);
+    const radius = RocketSalvo.shop.blastRadius;
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (!unit.active || unit.reachedWall) {
+        return;
+      }
+      if (this.inBlast(unit, x, y, radius)) {
+        this.hurtInfantry(unit, RocketSalvo.shop.damage);
+      }
+    });
   }
 
   private randomRocket(): Rocket | null {

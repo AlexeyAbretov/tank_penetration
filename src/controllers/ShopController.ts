@@ -11,6 +11,7 @@ import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
+import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
@@ -19,7 +20,7 @@ import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
 // Каталог нижнего ряда. В окне некупленное идёт первым, внутри группы порядок каталога сохраняется.
-const GEAR = ['wire', 'autoFire', 'machineGun', 'laser', 'artillery', 'mines', 'nuclear'] as const;
+const GEAR = ['wire', 'autoFire', 'machineGun', 'laser', 'salvo', 'artillery', 'mines', 'nuclear'] as const;
 type GearId = (typeof GEAR)[number];
 
 type PermanentBonuses = {
@@ -45,6 +46,8 @@ export class ShopController {
   machineGun?: MachineGun;
   laserOwned = false;
   laser?: LaserDefense;
+  salvoOwned = false;
+  salvo?: RocketSalvo;
   artilleryOwned = false;
   minesOwned = false;
   nuclearOwned = false;
@@ -76,6 +79,7 @@ export class ShopController {
       wire: this.wireOwned,
       machineGun: this.machineGunOwned,
       laser: this.laserOwned,
+      salvo: this.salvoOwned,
       artillery: this.artilleryOwned,
       mines: this.minesOwned,
       nuclear: this.nuclearOwned,
@@ -103,6 +107,10 @@ export class ShopController {
     if (saved.laser) {
       this.laser = this.installLaser();
     }
+    this.salvoOwned = saved.salvo;
+    if (saved.salvo) {
+      this.salvo = this.installSalvo();
+    }
     this.artilleryOwned = saved.artillery;
     this.minesOwned = saved.mines;
     this.nuclearOwned = saved.nuclear;
@@ -116,6 +124,7 @@ export class ShopController {
     this.wireOwned = false;
     this.machineGunOwned = false;
     this.laserOwned = false;
+    this.salvoOwned = false;
     this.artilleryOwned = false;
     this.minesOwned = false;
     this.nuclearOwned = false;
@@ -123,6 +132,7 @@ export class ShopController {
     this.wire = undefined;
     this.machineGun = undefined;
     this.laser = undefined;
+    this.salvo = undefined;
     this.shopOpen = false;
   }
 
@@ -265,6 +275,20 @@ export class ShopController {
     return gun;
   }
 
+  // Установка над крышей танка. Стрельбу по таймеру считает CombatSystem.
+  buySalvo(): void {
+    const cost = shopPrice(RocketSalvo.shop.cost);
+    if (this.isPaused() || this.salvoOwned || this.economy.getCoins() < cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.salvoOwned = true;
+    this.salvo = this.installSalvo();
+    this.refresh();
+  }
+
   // Корпус ниже днища танка, башня смотрит вправо. Танк рисуется поверх стыка.
   private installLaser(): LaserDefense {
     const hull = Tank.hullBox();
@@ -273,6 +297,18 @@ export class ShopController {
     this.tank.add(laser);
     this.tank.sendToBack(laser);
     return laser;
+  }
+
+  // Колёса выше крыши танка. Картинка рисуется поверх башни: машина стоит в воздухе над ней.
+  private installSalvo(): RocketSalvo {
+    const hull = Tank.hullBox();
+    const salvo = new RocketSalvo(this.scene);
+    salvo.setPosition(
+      hull.x + hull.w / 2,
+      hull.y - RocketSalvo.mount.aboveRoof - RocketSalvo.layout.wheelY,
+    );
+    this.tank.add(salvo);
+    return salvo;
   }
 
   // Открывает клавишу 1. Залп и перезарядку считает CombatSystem.
@@ -370,6 +406,8 @@ export class ShopController {
         return this.machineGunOwned;
       case 'laser':
         return this.laserOwned;
+      case 'salvo':
+        return this.salvoOwned;
       case 'artillery':
         return this.artilleryOwned;
       case 'mines':
@@ -420,6 +458,16 @@ export class ShopController {
           shopPrice(LaserDefense.shop.cost),
           'ракета / 3 с',
           'сбивает РПГ',
+        );
+      case 'salvo':
+        return this.onceCard(
+          'РСЗО',
+          () => this.buySalvo(),
+          coins,
+          this.salvoOwned,
+          shopPrice(RocketSalvo.shop.cost),
+          '3 ракеты / 3 с',
+          'залп по полю',
         );
       case 'artillery':
         return this.artilleryCard(coins);

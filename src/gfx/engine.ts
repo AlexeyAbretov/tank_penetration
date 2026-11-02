@@ -16,26 +16,43 @@ export function idleShift(ms: number, gain = 1): { x: number; y: number } {
   };
 }
 
-// Редкий серый выхлоп назад и вверх. Машина смотрит вправо, корма слева.
+// Редкий серый выхлоп. По умолчанию назад и вверх: машина смотрит вправо, корма слева.
+// southwest — струя на юго-запад, вниз и назад.
 export function exhaustAt(
   scene: Phaser.Scene,
   x: number,
   y: number,
   scale = 1,
+  southwest = false,
 ): Phaser.GameObjects.Particles.ParticleEmitter {
   const engine = scene.add.particles(x, y, puffKey(scene), {
     lifespan: { min: 900, max: 1600 },
     frequency: 40,
     quantity: 2,
     speed: { min: 12 * scale, max: 30 * scale },
-    angle: { min: -165, max: -105 },
+    angle: southwest ? { min: 105, max: 165 } : { min: -165, max: -105 },
     scale: { start: 0.4 * scale, end: 1.55 * scale },
     alpha: { start: 0.72, end: 0 },
     color: [0xe6e2da, 0xb4aea6, 0x7c766e],
-    gravityY: -18 * scale,
+    gravityY: (southwest ? 18 : -18) * scale,
   });
   engine.setDepth(26);
   return engine;
+}
+
+// След летящей ракеты. Эмиттер стоит в нуле: клуб кладётся в точку позади носика и там гаснет.
+export function trailAt(scene: Phaser.Scene): Phaser.GameObjects.Particles.ParticleEmitter {
+  const smoke = scene.add.particles(0, 0, puffKey(scene), {
+    lifespan: { min: 380, max: 720 },
+    speed: { min: 8, max: 24 },
+    angle: { min: 0, max: 360 },
+    scale: { start: 0.45, end: 1.35 },
+    alpha: { start: 0.8, end: 0 },
+    color: [0xffe0c0, 0xe4e0d8, 0x9a968e],
+    emitting: false,
+  });
+  smoke.setDepth(13);
+  return smoke;
 }
 
 function puffKey(scene: Phaser.Scene): string {

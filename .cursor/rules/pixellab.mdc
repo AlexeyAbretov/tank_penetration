@@ -1,0 +1,15 @@
+---
+description: Pixflux устарел, промпт PixelLab сверять с текущей докой
+alwaysApply: true
+---
+
+# PixelLab: Pixflux устарел
+
+Pixflux не предлагать. Не ссылаться на его страницу доки и не заполнять его поля: negative description, guidance weight, init image этой модели.
+
+Перед промптом для PixelLab открыть текущую доку и взять инструмент и поля оттуда:
+
+- https://www.pixellab.ai/llms.txt
+- https://api.pixellab.ai/v2/llms.txt
+
+Имя инструмента писать так, как оно называется в этой доке сейчас. Название из старого чата не переносить.

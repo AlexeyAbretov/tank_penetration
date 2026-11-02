@@ -1,6 +1,7 @@
 // Ракета ракетчика: летит медленнее пули, тянет за собой дым и взрывается о броню.
 
 import Phaser from 'phaser';
+import { trailAt } from '../gfx/engine';
 import { ROCKET_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { playRocketLaunch } from '../sounds/RocketSounds';
@@ -43,7 +44,7 @@ export class Rocket extends EnemyShot {
   constructor(scene: Phaser.Scene, x: number, y: number, damage: number) {
     super(scene, x, y, damage, 'enemy-rocket');
     this.setScale(1.8);
-    this.smoke = Rocket.trailAt(scene);
+    this.smoke = trailAt(scene);
     const follow = () => {
       if (this.active) {
         this.driftSmoke();
@@ -124,23 +125,6 @@ export class Rocket extends EnemyShot {
       g.fillStyle(0xffffff, 0.75);
       g.fillCircle(16, 16, 4);
     });
-  }
-
-  // Эмиттер в (0, 0): emitParticleAt прибавляет точку к позиции эмиттера.
-  // Если поставить его на ракету, клуб сложится с её координатой и уйдёт за край поля.
-  static trailAt(scene: Phaser.Scene): Phaser.GameObjects.Particles.ParticleEmitter {
-    this.ensurePuff(scene);
-    const smoke = scene.add.particles(0, 0, 'smoke-puff', {
-      lifespan: { min: 380, max: 720 },
-      speed: { min: 8, max: 24 },
-      angle: { min: 0, max: 360 },
-      scale: { start: 0.45, end: 1.35 },
-      alpha: { start: 0.8, end: 0 },
-      color: [0xffe0c0, 0xe4e0d8, 0x9a968e],
-      emitting: false,
-    });
-    smoke.setDepth(13);
-    return smoke;
   }
 
   // Короткий взрыв в точке попадания. Меньше гибели пикапа: вспышка и горсть искр.
