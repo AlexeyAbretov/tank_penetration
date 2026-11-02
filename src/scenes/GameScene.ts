@@ -340,7 +340,10 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('pagehide', this.onPageHide);
     window.addEventListener('beforeunload', this.onPageHide);
     this.pauses.attach(this, this.hud, keyboard ?? null, {
-      canPause: () => !this.settingsOpen && !this.player.isGameOver && !this.defeatShop,
+      // Магазин между волнами уже остановил поле. Пауза поверх карточек не нужна.
+      // Магазин очков закрыт флагом defeatShop.
+      canPause: () =>
+        !this.settingsOpen && !this.player.isGameOver && !this.defeatShop && !this.shop.shopOpen,
       acquire: () => this.acquireClock(),
       release: () => this.releaseClock(),
       save: () => this.writeSave(),
