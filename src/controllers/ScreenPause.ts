@@ -1,4 +1,4 @@
-// Обычная пауза: кнопка, Esc и плашка «ПАУЗА». Продолжает бой только Esc.
+// Обычная пауза: кнопка, Esc и плашка «ПАУЗА». Продолжает бой Esc и крестик.
 
 import type { Pause, PauseEnv } from './PauseStack';
 
@@ -24,6 +24,12 @@ export class ScreenPause implements Pause {
         return;
       }
       this.enter();
+    });
+    env.hud.onResume(() => {
+      if (!this.active) {
+        return;
+      }
+      this.exit();
     });
   }
 

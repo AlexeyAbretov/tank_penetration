@@ -111,6 +111,7 @@ export class GameHud {
   private maxHp: number;
   private hasteCycle?: () => void;
   private pauseRequest?: () => void;
+  private resumeRequest?: () => void;
   private settingsRequest?: () => void;
   private autoFireRequest?: () => void;
   private newGameRequest?: () => void;
@@ -306,8 +307,11 @@ export class GameHud {
 
     this.pauseOverlay = scene.add.container(frame.width / 2, frame.height / 2).setDepth(90).setVisible(false);
     this.pauseDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
-    const pausePlate = scene.add.graphics().setPosition(0, 8);
-    paintFieldPlate(pausePlate, 520, 250);
+    const pauseW = 520;
+    const pauseH = 250;
+    const pausePlateY = 8;
+    const pausePlate = scene.add.graphics().setPosition(0, pausePlateY);
+    paintFieldPlate(pausePlate, pauseW, pauseH);
     const pauseRule = scene.add.graphics();
     paintFieldRule(pauseRule, -32, 180);
     const pauseTitle = scene.add
@@ -340,7 +344,10 @@ export class GameHud {
       useHandCursor: true,
     });
     fresh.on('pointerup', () => this.newGameRequest?.());
-    this.pauseOverlay.add([this.pauseDim, pausePlate, pauseRule, pauseTitle, pauseHint, fresh]);
+    // На телефоне нет Esc. Крестик продолжает бой, «Новая игра» его не заменяет.
+    const pauseClose = this.makeCornerClose(scene, () => this.resumeRequest?.());
+    pauseClose.setPosition(pauseW / 2 - 40, pausePlateY - pauseH / 2 + 38);
+    this.pauseOverlay.add([this.pauseDim, pausePlate, pauseRule, pauseTitle, pauseHint, fresh, pauseClose]);
     this.placeHud();
   }
 
@@ -438,6 +445,10 @@ export class GameHud {
 
   onPause(request: () => void): void {
     this.pauseRequest = request;
+  }
+
+  onResume(request: () => void): void {
+    this.resumeRequest = request;
   }
 
   onSettings(request: () => void): void {
@@ -683,14 +694,19 @@ export class GameHud {
 
   // Крестик в правом верхнем углу карточки. Клик мимо окна её не закрывает.
   private makeKeysClose(scene: Phaser.Scene): Phaser.GameObjects.Container {
-    const hit = scene.add.rectangle(0, 0, 36, 36, 0x000000, 0.001).setInteractive({ useHandCursor: true });
+    return this.makeCornerClose(scene, () => this.setKeysOpen(false));
+  }
+
+  // Та же метка, что у окна клавиш. Зона шире глифа: на телефоне в 36 px трудно попасть.
+  private makeCornerClose(scene: Phaser.Scene, onClose: () => void): Phaser.GameObjects.Container {
+    const hit = scene.add.rectangle(0, 0, 48, 48, 0x000000, 0.001).setInteractive({ useHandCursor: true });
     const mark = scene.add
       .text(0, -1, '×', {
         fontSize: '32px',
         color: fieldInk,
       })
       .setOrigin(0.5);
-    hit.on('pointerup', () => this.setKeysOpen(false));
+    hit.on('pointerup', () => onClose());
     return scene.add.container(0, 0, [hit, mark]);
   }
 
