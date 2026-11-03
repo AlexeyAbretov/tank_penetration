@@ -99,11 +99,21 @@ export class PlayerController {
     }
     this.hud.setHp(this.hp);
     if (this.hp <= 0) {
-      this.defeat();
+      this.defeat(false);
     }
   }
 
-  private defeat(): void {
+  // F в дебаге. Та же гибель, но полоска уже на нуле и магазин очков без паузы на взрыв.
+  forfeit(): void {
+    if (this.gameOver) {
+      return;
+    }
+    this.hp = 0;
+    this.hud.setHp(this.hp);
+    this.defeat(true);
+  }
+
+  private defeat(shopAtOnce: boolean): void {
     this.gameOver = true;
     this.scene.registry.set('combat', false);
     this.scene.physics.world.pause();
@@ -115,6 +125,10 @@ export class PlayerController {
     this.deathSound.play();
     this.tank.die();
     this.scene.cameras.main.shake(680, 0.014);
+    if (shopAtOnce) {
+      this.onDefeated();
+      return;
+    }
     this.scene.time.delayedCall(PlayerController.defeatShopDelayMs, () => {
       this.onDefeated();
     });

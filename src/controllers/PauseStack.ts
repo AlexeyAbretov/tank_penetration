@@ -90,4 +90,11 @@ export class PauseStack {
       pause.onHidden();
     }
   }
+
+  // Быстрый проигрыш снимает паузу: иначе магазин очков открывается замершим.
+  yieldAll(): void {
+    for (const pause of this.pauses) {
+      pause.yield();
+    }
+  }
 }

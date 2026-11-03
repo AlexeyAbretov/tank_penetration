@@ -72,6 +72,8 @@ export class GameScene extends Phaser.Scene {
   private pauseKey?: Phaser.Input.Keyboard.Key;
   // Дебаг: M досыпает очки и монеты. В обычной партии клавиши нет.
   private fundsKey?: Phaser.Input.Keyboard.Key;
+  // Дебаг: F сразу проигрывает партию и открывает магазин очков.
+  private forfeitKey?: Phaser.Input.Keyboard.Key;
   // false до конца create() и в момент гибели, чтобы оборванная партия не записалась поверх стирания.
   private persistEnabled = false;
   // Сколько миллисекунд прошло с прошлой автозаписи. Порог — в touchAutosave.
@@ -238,6 +240,7 @@ export class GameScene extends Phaser.Scene {
       this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
       if (isDebugRun()) {
         this.fundsKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+        this.forfeitKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
       }
     }
     this.events.once('shutdown', this.onShutdown, this);
@@ -398,9 +401,12 @@ export class GameScene extends Phaser.Scene {
 
   // Кадр боя. delta — миллисекунды с прошлого кадра, его забирают системы.
   update(_time: number, delta: number): void {
-    // Раньше магазинов и паузы: иначе M молчит, пока витрина открыта.
+    // Раньше магазинов и паузы: иначе M и F молчат, пока витрина открыта.
     if (this.fundsPressed()) {
       this.grantDebugFunds();
+    }
+    if (this.forfeitPressed()) {
+      this.forfeitRun();
     }
 
     // Поражение и магазин очков живут своими кнопками. Кадр боя им не нужен.
@@ -609,6 +615,23 @@ export class GameScene extends Phaser.Scene {
 
   private fundsPressed(): boolean {
     return this.fundsKey !== undefined && Phaser.Input.Keyboard.JustDown(this.fundsKey);
+  }
+
+  private forfeitPressed(): boolean {
+    return this.forfeitKey !== undefined && Phaser.Input.Keyboard.JustDown(this.forfeitKey);
+  }
+
+  // Обычная гибель без паузы на взрыв: хп 0, очки в копилку, партия стёрта, магазин очков.
+  private forfeitRun(): void {
+    if (this.player.isGameOver || this.defeatShop) {
+      return;
+    }
+    this.pauses.yieldAll();
+    // Сначала запрещаем запись, потом стираем партию. Иначе writeSave успеет положить труп боя обратно.
+    this.persistEnabled = false;
+    this.progressShop.bank(this.score);
+    this.combatSave.clear();
+    this.player.forfeit();
   }
 
   // 100 очков и 100 монет. Магазин между волнами тратит монеты, магазин после гибели — накопленные очки.
