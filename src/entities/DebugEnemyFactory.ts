@@ -5,6 +5,7 @@
 // Смешанная волна и босс это число не читают. Здоровье и скорость растут с номером волны.
 // Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
 // Босс толстеет и бьёт больнее с каждым своим выходом: 6-я волна — первое появление, 12-я — второе.
+// Число на поле то же, что в партии: три выхода на одном составе, потолок пять. Появление здесь — волна / 6.
 
 import { AssaultInfantry } from './AssaultInfantry';
 import { EnemyFactory } from './EnemyFactory';
@@ -75,7 +76,7 @@ export class DebugEnemyFactory extends EnemyFactory {
       return 0;
     }
     if (this.isBossWave(wave)) {
-      return 1;
+      return this.bossCount(wave);
     }
     if (this.isMixedWave(wave)) {
       return REGULAR.length;

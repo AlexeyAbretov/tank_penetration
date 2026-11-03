@@ -53,17 +53,36 @@ export class EnemyFactory {
     startDelayMs: 700,
   };
 
+  static readonly boss = {
+    // Сколько своих выходов состав держит одно число, прежде чем выйдет ещё один.
+    // У партии это 10–30-я — один, 40–60-я — двое, дальше тем же шагом.
+    hold: 3,
+    // Дальше новые тела не добавляются. Запас и урон продолжают расти с номером появления.
+    maxCount: 5,
+  };
+
   // 28 мс короче за каждую волну после первой, но не ниже minGap.
   static spawnGap(wave: number): number {
     const steps = Math.max(0, wave - 1);
     return Math.max(this.timing.minGap, this.timing.spawnGap - steps * 28);
   }
 
-  // 10, 20, 30… На экран выходит только суперсолдат.
-  // Внутри roster более поздняя волна этот номер всё равно проигрывает,
-  // чтобы дебют ракетчика на 10-й не потерялся.
+  // 10, 20, 30… На экран выходят только суперсолдаты.
+  // Сколько — считает bossCount. Внутри roster более поздняя волна этот номер
+  // всё равно проигрывает, чтобы дебют ракетчика на 10-й не потерялся.
   static isBossWave(wave: number): boolean {
     return wave > 0 && wave % 10 === 0;
+  }
+
+  // На обычной волне ноль. На босс-волне — от одного до boss.maxCount.
+  // Номер появления даёт bossAppearance: у партии это волна / 10, у дебага — свой.
+  // Три первых выхода дают одного, следующие три — двоих, и так до потолка.
+  static bossCount(wave: number): number {
+    if (!this.isBossWave(wave)) {
+      return 0;
+    }
+    const step = Math.floor((this.bossAppearance(wave) - 1) / this.boss.hold);
+    return Math.min(this.boss.maxCount, 1 + step);
   }
 
   // Длина списка. WaveManager сравнивает её с тем, сколько врагов уже вышло.
@@ -207,10 +226,16 @@ export class EnemyFactory {
     if (wave < 1) {
       return [];
     }
-    // Босс подменяет весь отряд. Расчёт волны 11 и дальше всё равно дойдёт до номера 10
+    // Боссы подменяют весь отряд. Сколько их — bossCount.
+    // Расчёт волны 11 и дальше всё равно дойдёт до номера 10
     // в цикле ниже, поэтому дебют ракетчика на босс-волне в поздний отряд попадает.
     if (this.isBossWave(wave)) {
-      return [SuperSoldier];
+      const bosses: EnemyKind[] = [];
+      const total = this.bossCount(wave);
+      for (let i = 0; i < total; i += 1) {
+        bosses.push(SuperSoldier);
+      }
+      return bosses;
     }
 
     const { startCount, infantryRampUntil, stepEvery, maxCount } = EnemyFactory.wave;
