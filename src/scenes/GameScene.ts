@@ -10,6 +10,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 import { ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
+import { boom } from '../gfx/boom';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
 import { BattleEffects } from '../sounds/BattleEffects';
@@ -383,13 +384,10 @@ export class GameScene extends Phaser.Scene {
     this.progressShop.layout();
   }
 
-  // Конец волны. Если в этот момент ещё стоит гриб, панель подождёт, пока облако погаснет.
+  // Конец волны. Панель выходит, когда последний разрыв доиграл.
+  // Гриб, если он ещё стоит дольше разрыва, держит её до своего конца.
   private openWaveShop(): void {
-    const wait = this.combat.nuclearCloudLeft();
-    if (wait <= 0) {
-      this.shop.open();
-      return;
-    }
+    const wait = Math.max(boom.goneMs, this.combat.nuclearCloudLeft());
     this.time.delayedCall(wait, () => {
       if (this.player.isGameOver || this.defeatShop || this.shop.shopOpen) {
         return;
@@ -686,7 +684,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.hideKeys();
     this.closeSettings();
     this.music.stop();
-    // Взрыв базы доигрывает сам: к этому моменту от файла остаётся короткий хвост.
+    // Остальные звуки боя здесь уже не нужны. Взрыв базы этот вызов не обрывает.
     this.fx?.stop();
     this.persistEnabled = false;
     if (this.shop.shopOpen) {

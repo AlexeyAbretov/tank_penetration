@@ -94,7 +94,7 @@ export class BattleEffects {
     }
   }
 
-  // Гибель базы. Взрыв базы не обрываем: он как раз в этот момент доигрывает.
+  // Гибель базы. Взрыв базы не входит в clips и этим вызовом не обрывается.
   stop(): void {
     for (const clip of this.clips) {
       clip.stop();

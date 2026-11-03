@@ -15,6 +15,10 @@ type DefeatDeps = {
 };
 
 export class PlayerController {
+  // Гибель базы: спрайт взрыва короче, огонь и дым над обломками держатся дольше.
+  // Магазин очков выходит, когда это уже можно рассмотреть.
+  private static readonly defeatShopDelayMs = 2400;
+
   readonly tank: Tank;
   private hp: number;
   private baseHp: number;
@@ -111,7 +115,7 @@ export class PlayerController {
     this.deathSound.play();
     this.tank.die();
     this.scene.cameras.main.shake(680, 0.014);
-    this.scene.time.delayedCall(1300, () => {
+    this.scene.time.delayedCall(PlayerController.defeatShopDelayMs, () => {
       this.onDefeated();
     });
   }
