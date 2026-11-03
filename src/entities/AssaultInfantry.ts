@@ -5,8 +5,10 @@
 // Phaser нужен из-за типа Scene.
 import Phaser from 'phaser';
 import { contactBlast } from '../gfx/contactBlast';
+import { frameBits, type GibCut } from '../gfx/gibs';
 import { ASSAULT_LOOK, CORPSE_FRAME, SOLDIER_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
+import type { WorldPoint } from '../types/WorldPoint';
 import { Infantry } from './Infantry';
 
 export class AssaultInfantry extends Infantry {
@@ -31,6 +33,13 @@ export class AssaultInfantry extends Infantry {
     originY: 44.5 / 45,
     scale: Infantry.placed.scale * (61 / 89),
   };
+  // Каска, ствол, гимнастёрка и ноги кадра infantry-0. Ствол отдельно: он торчит влево из груди.
+  static readonly blastCuts: readonly GibCut[] = [
+    { x: 28, y: 2, w: 17, h: 12 },
+    { x: 1, y: 13, w: 15, h: 7 },
+    { x: 16, y: 16, w: 32, h: 25 },
+    { x: 22, y: 39, w: 25, h: 24 },
+  ];
 
   // Контакт → подъём → пронос → контакт другой ноги → подъём → пронос. Последний — труп.
   // Пути в public/. Строки буквальные: singlefile-сборка подменяет их на data:.
@@ -120,11 +129,28 @@ export class AssaultInfantry extends Infantry {
     return AssaultInfantry.corpseKey;
   }
 
+  // Режем первый кадр шага: на остальных ноги стоят в другом месте, и прямоугольник снимет воздух.
+  protected override blastBits() {
+    const frame = AssaultInfantry.frame;
+    const fit = AssaultInfantry.fit;
+    return frameBits(this.scene, {
+      key: AssaultInfantry.frameKeys[0],
+      cuts: AssaultInfantry.blastCuts,
+      frameW: frame.w,
+      frameH: frame.h,
+      originX: fit.originX,
+      originY: fit.originY,
+      scale: this.scaleX,
+      x: this.x,
+      y: this.y,
+    });
+  }
+
   // После смены картинки опора шага уже не подходит: тело лежит, а не стоит.
-  override kill(): void {
+  override kill(blastAt?: WorldPoint): void {
     const wasAlive = !this.reachedWall;
-    super.kill();
-    if (wasAlive && this.texture.key === AssaultInfantry.corpseKey) {
+    super.kill(blastAt);
+    if (wasAlive && this.active && this.texture.key === AssaultInfantry.corpseKey) {
       this.setOrigin(AssaultInfantry.corpseFit.originX, AssaultInfantry.corpseFit.originY);
       this.setScale(AssaultInfantry.corpseFit.scale);
     }

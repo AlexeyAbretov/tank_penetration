@@ -224,6 +224,12 @@ export class PickupTruck extends RangedEnemy {
     });
   }
 
+  protected override pinDepth(): void {
+    if (this.gun?.active) {
+      this.gun.setDepth(this.depth);
+    }
+  }
+
   private syncGun(): void {
     if (!this.gun.active) {
       return;

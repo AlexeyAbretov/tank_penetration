@@ -5,9 +5,11 @@
 // Суперсолдат наследует Infantry напрямую и бегает по своему циклу.
 
 import Phaser from 'phaser';
-import { enemyHasteOf, isDebugRun } from '../gameConfig';
+import { enemyHasteOf, GAME, isDebugRun } from '../gameConfig';
 import { floatDamage } from '../gfx/damageFloat';
+import { scatterGibs, type GibBit } from '../gfx/gibs';
 import type { SoldierLook } from '../gfx/looks';
+import type { WorldPoint } from '../types/WorldPoint';
 
 // Цвета лежат в gfx/looks.ts: один набор рисует и штурмовика, и стрелка.
 export type { SoldierLook };
@@ -131,8 +133,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.hp = hp;
 
     const placed = Infantry.placed;
-    // depth 10: враги рисуются поверх земли (0) и искр (2), но под снарядами (15) и танком (25).
-    this.setDepth(10);
+    // Глубина от ноги: нижний на экране ближе и рисуется поверх верхнего.
+    // Живые остаются под проволокой (13) и пулями (14).
+    this.setDepth(Infantry.layerFor(y, false));
     // Точка «ног»: картинка стоит на координате (x, y) почти нижним краем, чуть выше центра по X.
     this.setOrigin(placed.originX, placed.originY);
     // Спрайт солдата нарисован мелким (64×80), на поле его увеличиваем.
@@ -187,6 +190,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
       this.anims.timeScale = enemyHasteOf(this.scene.registry);
     }
     // Пока юнит жив и едет, полоска едет вместе с ним.
+    // Глубина и на паузе: босс меняет дорожку, и дальний не должен остаться поверх ближнего.
+    this.placeDepth();
     this.syncBar();
     // Мёртвый юнит, магазин (combat === false) или стоящие часы — поведение замирает.
     // preUpdate Phaser зовёт до update сцены, поэтому выход из кадра паузы сам стрельбу не гасит.
@@ -332,19 +337,28 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     return null;
   }
 
+  // Куски кадра, если добила мина, артиллерия или залп. null — ложится целиком.
+  // Пикап возвращает null: у него свои обломки, не части солдата.
+  protected blastBits(): GibBit[] | null {
+    return null;
+  }
+
   // Момент снятия с поля, до смены картинки. Стрелок здесь прячет отдельную винтовку.
   // _slain: true, если здоровье уже кончилось. Дошедший до стены живым передаёт false.
   protected onDie(_slain: boolean): void {}
 
   // Уход с поля: остановка и погасшая полоска.
   // Убитый юнит с картинкой останков остаётся на поле. У кого её нет — сжимается и тает.
+  // blastAt — центр разрыва. Пехота с кусками разлетается, спрайт тела уходит на следующем кадре.
   // Имя kill совпадает с методом Sprite, поэтому сцена вызывает именно эту версию.
-  kill(): void {
+  kill(blastAt?: WorldPoint): void {
     // Повторный вызов (снаряд ещё касается тела) не должен запускать второй таймер.
     if (this.reachedWall) {
       return;
     }
     this.reachedWall = true;
+    // Сразу под живых. Следующий кадр уточнит слой по ноге, но уже не перекроет идущего.
+    this.placeDepth();
     const body = this.body as Phaser.Physics.Arcade.Body | null;
     // Скорость в ноль и тело выключено: снаряды пролетают труп, не взрываясь о него.
     body?.stop();
@@ -360,11 +374,22 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
 
     const slain = this.hp <= 0;
     this.onDie(slain);
+    const bits = slain && blastAt ? this.blastBits() : null;
+    if (blastAt && bits && bits.length > 0) {
+      scatterGibs(this.scene, bits, blastAt, { x: this.x, y: this.y }, Infantry.corpseMs, this.scaleX);
+      // Прятать сразу: целый кадр не должен стоять рядом с уже полетевшими кусками.
+      // Уничтожать в этом же обходе пехоты нельзя: группа пропустит следующего солдата.
+      this.setVisible(false);
+      this.scene.time.delayedCall(0, () => {
+        if (this.active) {
+          this.destroy();
+        }
+      });
+      return;
+    }
     const corpse = slain ? this.corpseTexture() : null;
     if (corpse) {
       this.setTexture(corpse);
-      // Ниже живых солдат (глубина 10), чтобы идущие наступали на тела, а не прятались под ними.
-      this.setDepth(8);
       this.scene.time.delayedCall(Infantry.corpseMs, () => {
         if (this.active) {
           this.destroy();
@@ -412,7 +437,27 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
         this.hpLabel.setText(digits);
       }
     }
+    // Чуть выше своего тела, но ниже юнита на соседней дорожке: зазор дорожек больше этой добавки.
+    this.barBg.setDepth(this.depth + 0.02);
+    this.barFill.setDepth(this.depth + 0.03);
+    this.hpLabel?.setDepth(this.depth + 0.04);
   }
+
+  // Живой: 9…12.8. Труп: 8…8.9, ниже любого живого.
+  private static layerFor(y: number, slain: boolean): number {
+    const t = Phaser.Math.Clamp(y / GAME.height, 0, 1);
+    return slain ? 8 + t * 0.9 : 9 + t * 3.8;
+  }
+
+  // Тело и отдельная картинка оружия. Оружие добавляет наследник: у предка его нет.
+  private placeDepth(): void {
+    this.setDepth(Infantry.layerFor(this.y, this.reachedWall));
+    this.pinDepth();
+  }
+
+  // Винтовка, труба, пулемёт и ствол пикапа. Та же глубина, что у тела, и список сцены
+  // оставляет их поверх своего корпуса: картинку добавляли позже.
+  protected pinDepth(): void {}
 
   // Один кадр солдата. legPhase 0 и 1 меняют местами ноги, из двух кадров получается шаг.
   // Тип 0 | 1 запрещает передать любое другое число.

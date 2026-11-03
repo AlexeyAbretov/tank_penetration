@@ -24,6 +24,7 @@ import type { BattleEffects } from '../sounds/BattleEffects';
 import type { ShopController } from '../controllers/ShopController';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem as Combat } from '../types/CombatSystem';
+import type { WorldPoint } from '../types/WorldPoint';
 
 type ArtillerySpot = { x: number; y: number; mark: ArtilleryMark };
 
@@ -401,7 +402,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, Mines.shop.damage + this.shop.minesDamageLevel);
+        this.hurtInfantry(unit, Mines.shop.damage + this.shop.minesDamageLevel, false, { x, y });
       }
     });
   }
@@ -511,7 +512,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, ArtilleryStrike.shop.damage + this.shop.artilleryDamageLevel);
+        this.hurtInfantry(unit, ArtilleryStrike.shop.damage + this.shop.artilleryDamageLevel, false, { x, y });
       }
     });
   }
@@ -982,7 +983,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, RocketSalvo.shop.damage + this.shop.salvoDamageLevel);
+        this.hurtInfantry(unit, RocketSalvo.shop.damage + this.shop.salvoDamageLevel, false, { x, y });
       }
     });
   }
@@ -1099,10 +1100,13 @@ export class CombatSystem implements Combat {
     };
   }
 
+  // blastAt — центр мины, артиллерии или залпа. Пуля, огонь и проволока точку не передают:
+  // от них солдат ложится целиком.
   private hurtInfantry(
     unit: Infantry,
     damage = this.shellDamage(),
     wire = false,
+    blastAt?: WorldPoint,
   ): void {
     if (unit.hit(damage, wire)) {
       this.callbacks.onKill(unit.coinReward);
@@ -1113,7 +1117,7 @@ export class CombatSystem implements Combat {
       } else {
         this.effects.infantryDeath.play();
       }
-      unit.kill();
+      unit.kill(blastAt);
     }
   }
 

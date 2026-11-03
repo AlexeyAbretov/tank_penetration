@@ -4,6 +4,7 @@
 
 import Phaser, { Scene } from 'phaser';
 import { GAME } from '../gameConfig';
+import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
 import {
   CORPSE_FRAME,
   LAUNCHER_FRAME,
@@ -45,6 +46,19 @@ export class RocketInfantry extends RangedEnemy {
     bodyX: 4,
     bodyY: 16,
   };
+  // Каска, труба на плече, торс и ноги кадра rocketman-0. Труба шире каски и лежит отдельным куском.
+  static readonly walkCuts: readonly GibCut[] = [
+    { x: 15, y: 2, w: 16, h: 7 },
+    { x: 8, y: 6, w: 38, h: 14 },
+    { x: 14, y: 19, w: 20, h: 22 },
+    { x: 12, y: 40, w: 21, h: 19 },
+  ];
+  // Стойка на колене. Руки с трубой в этот кадр не входят.
+  static readonly aimCuts: readonly GibCut[] = [
+    { x: 8, y: 1, w: 18, h: 16 },
+    { x: 10, y: 16, w: 19, h: 23 },
+    { x: 1, y: 38, w: 38, h: 22 },
+  ];
   // Лежащее тело длиннее роста. 87 px длины к 57 px роста стоящего кадра.
   static readonly corpseFrame = { w: 89, h: 47 };
   static readonly corpseFit = {
@@ -226,11 +240,36 @@ export class RocketInfantry extends RangedEnemy {
     return RocketInfantry.corpseKey;
   }
 
+  // На марше труба нарисована в кадре шага. На рубеже тело стоит на колене, а труба — отдельная картинка.
+  protected override blastBits() {
+    const aiming = this.texture.key === RocketInfantry.aimKey;
+    const frame = aiming ? RocketInfantry.aimFrame : RocketInfantry.frame;
+    const fit = aiming ? RocketInfantry.aimFit : RocketInfantry.fit;
+    const bits = frameBits(this.scene, {
+      key: aiming ? RocketInfantry.aimKey : RocketInfantry.frameKeys[0],
+      cuts: aiming ? RocketInfantry.aimCuts : RocketInfantry.walkCuts,
+      frameW: frame.w,
+      frameH: frame.h,
+      originX: fit.originX,
+      originY: fit.originY,
+      scale: this.scaleX,
+      x: this.x,
+      y: this.y,
+    });
+    if (!bits) {
+      return null;
+    }
+    if (aiming && this.launcher.active) {
+      bits.push(imageBit(this.launcher));
+    }
+    return bits;
+  }
+
   // Лежащая картинка длиннее шага. Опора стоящего кадра поднимает её над землёй.
-  override kill(): void {
+  override kill(blastAt?: WorldPoint): void {
     const wasAlive = !this.reachedWall;
-    super.kill();
-    if (wasAlive && this.texture.key === RocketInfantry.corpseKey) {
+    super.kill(blastAt);
+    if (wasAlive && this.active && this.texture.key === RocketInfantry.corpseKey) {
       this.setOrigin(RocketInfantry.corpseFit.originX, RocketInfantry.corpseFit.originY);
       this.setScale(RocketInfantry.corpseFit.scale);
     }
@@ -292,6 +331,12 @@ export class RocketInfantry extends RangedEnemy {
       duration: kick.ms,
       ease: 'Quad.Out',
     });
+  }
+
+  protected override pinDepth(): void {
+    if (this.launcher?.active) {
+      this.launcher.setDepth(this.depth);
+    }
   }
 
   private syncLauncher(): void {

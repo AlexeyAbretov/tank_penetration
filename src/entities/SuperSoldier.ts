@@ -6,6 +6,7 @@
 
 import Phaser, { Scene } from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
+import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
 import {
   CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
@@ -75,6 +76,12 @@ export class SuperSoldier extends Infantry {
     bodyX: 8,
     bodyY: 20,
   };
+  // Каска, броня и ноги стойки. Пулемёт в этот кадр не входит: рука со стволом летит своей картинкой.
+  static readonly blastCuts: readonly GibCut[] = [
+    { x: 5, y: 0, w: 27, h: 18 },
+    { x: 5, y: 18, w: 45, h: 54 },
+    { x: 0, y: 70, w: 37, h: 48 },
+  ];
   // Лежащее тело вместе с пулемётом. Низ картинки — земля.
   static readonly corpseFrame = { w: 128, h: 94 };
   static readonly corpseFit = {
@@ -277,13 +284,39 @@ export class SuperSoldier extends Infantry {
     this.syncGun();
   }
 
-  override kill(): void {
+  override kill(blastAt?: WorldPoint): void {
     const wasAlive = !this.reachedWall;
-    super.kill();
-    if (wasAlive && this.texture.key === SuperSoldier.corpseKey) {
+    super.kill(blastAt);
+    if (wasAlive && this.active && this.texture.key === SuperSoldier.corpseKey) {
       const fit = SuperSoldier.corpseFit;
       this.setOrigin(fit.originX, fit.originY);
     }
+  }
+
+  // Тело берём со стойки: на бегу ствол нарисован поперёк груди и прямоугольником не отделяется.
+  // Пока босс бежит, картинка руки спрятана и смотрит влево. На очереди она уже наведена.
+  protected override blastBits() {
+    const frame = SuperSoldier.aimFrame;
+    const fit = SuperSoldier.aimFit;
+    const bits = frameBits(this.scene, {
+      key: SuperSoldier.aimKey,
+      cuts: SuperSoldier.blastCuts,
+      frameW: frame.w,
+      frameH: frame.h,
+      originX: fit.originX,
+      originY: fit.originY,
+      scale: this.scaleX,
+      x: this.x,
+      y: this.y,
+    });
+    if (!bits || !this.gun.active) {
+      return bits;
+    }
+    if (this.texture.key !== SuperSoldier.aimKey) {
+      SuperSoldier.poseGun(this.gun, this.x, this.y, this.scaleX, 0, { x: 0, climb: 0 });
+    }
+    bits.push(imageBit(this.gun));
+    return bits;
   }
 
   // Волна только что выпустила босса. Сразу выбирает точку и бежит, стойки на месте нет.
@@ -494,6 +527,12 @@ export class SuperSoldier extends Infantry {
       ease: 'Quad.In',
       onComplete: () => flash.destroy(),
     });
+  }
+
+  protected override pinDepth(): void {
+    if (this.gun?.active) {
+      this.gun.setDepth(this.depth);
+    }
   }
 
   private syncGun(): void {

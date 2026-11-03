@@ -3,6 +3,7 @@
 // а руки со стволом — одна картинка: она крутится вокруг плеча и отъезжает при выстреле.
 
 import Phaser, { Scene } from 'phaser';
+import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
 import {
   CORPSE_FRAME,
   GUNNER_FLASH_FRAME,
@@ -35,10 +36,17 @@ export class GunnerInfantry extends RangedEnemy {
     bodyY: 10,
   };
   // Стойка без рук, 64×64. Подошва на строке 63, опора сразу под ней.
+  static readonly aimFrame = { w: 64, h: 64 };
   static readonly aimFit = {
     originX: 41 / 64,
     originY: 1,
   };
+  // Каска, гимнастёрка и ноги стойки. Винтовка в этот кадр не входит: она летит своей картинкой.
+  static readonly blastCuts: readonly GibCut[] = [
+    { x: 22, y: 1, w: 18, h: 16 },
+    { x: 18, y: 16, w: 31, h: 26 },
+    { x: 15, y: 40, w: 32, h: 24 },
+  ];
   // Лежащее тело длиннее роста. 100 px длины к 61 px роста стоящего кадра.
   static readonly corpseFrame = { w: 105, h: 51 };
   static readonly corpseFit = {
@@ -213,11 +221,37 @@ export class GunnerInfantry extends RangedEnemy {
     return GunnerInfantry.corpseKey;
   }
 
+  // Тело берём со стойки: в кадре шага ствол нарисован по диагонали и прямоугольником не отделяется.
+  // На бегу картинка рук спрятана, поэтому сажаем её в низкую изготовку и уже её кидаем.
+  protected override blastBits() {
+    const frame = GunnerInfantry.aimFrame;
+    const fit = GunnerInfantry.aimFit;
+    const bits = frameBits(this.scene, {
+      key: GunnerInfantry.aimKey,
+      cuts: GunnerInfantry.blastCuts,
+      frameW: frame.w,
+      frameH: frame.h,
+      originX: fit.originX,
+      originY: fit.originY,
+      scale: this.scaleX,
+      x: this.x,
+      y: this.y,
+    });
+    if (!bits || !this.rifle.active) {
+      return bits;
+    }
+    if (this.texture.key !== GunnerInfantry.aimKey) {
+      GunnerInfantry.poseRifle(this.rifle, this.x, this.y, this.scaleX, 0.45, { x: 0, climb: 0 });
+    }
+    bits.push(imageBit(this.rifle));
+    return bits;
+  }
+
   // Лежащая картинка длиннее шага, опора стоящего кадра поднимает её над землёй.
-  override kill(): void {
+  override kill(blastAt?: WorldPoint): void {
     const wasAlive = !this.reachedWall;
-    super.kill();
-    if (wasAlive && this.texture.key === GunnerInfantry.corpseKey) {
+    super.kill(blastAt);
+    if (wasAlive && this.active && this.texture.key === GunnerInfantry.corpseKey) {
       this.setOrigin(GunnerInfantry.corpseFit.originX, GunnerInfantry.corpseFit.originY);
       this.setScale(GunnerInfantry.corpseFit.scale);
     }
@@ -286,6 +320,12 @@ export class GunnerInfantry extends RangedEnemy {
       duration: kick.ms,
       ease: 'Quad.Out',
     });
+  }
+
+  protected override pinDepth(): void {
+    if (this.rifle?.active) {
+      this.rifle.setDepth(this.depth);
+    }
   }
 
   private syncRifle(): void {

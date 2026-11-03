@@ -60,10 +60,10 @@ export abstract class RangedEnemy extends Infantry {
   }
 
   // override: заменяем kill родителя, но всё равно вызываем его через super.
-  override kill(): void {
+  override kill(blastAt?: WorldPoint): void {
     // Чтобы труп не выстрелил на последнем кадре, пока идёт анимация исчезновения.
     this.shooting = false;
-    super.kill();
+    super.kill(blastAt);
   }
 
   // Каждый кадр, пока идёт бой. delta — время с прошлого кадра в миллисекундах.
