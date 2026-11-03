@@ -28,27 +28,35 @@ export class Tank extends GameObjects.Container {
   static readonly spawn = { x: 76, y: 360 };
   static readonly baseFireDelay = 1000;
   static readonly minFireDelay = 200;
+  // Прогресс-магазин снимает перезарядку только до 0.50 с.
+  static readonly minProgressFireDelay = 500;
   static readonly fireRateStep = 20;
   // Постоянная скорость из магазина между проигрышами: −0.01 с за уровень.
   static readonly progressSpeedStepMs = 10;
   static progressSpeedLevel = 0;
 
   static get maxProgressSpeedLevel(): number {
-    return (Tank.baseFireDelay - Tank.minFireDelay) / Tank.progressSpeedStepMs;
+    return (Tank.baseFireDelay - Tank.minProgressFireDelay) / Tank.progressSpeedStepMs;
   }
 
   static setProgressSpeedLevel(level: number): void {
     Tank.progressSpeedLevel = Math.min(Tank.maxProgressSpeedLevel, Math.max(0, Math.round(level)));
   }
 
-  // Магазин между волнами упирается в тот же пол 0.20 с, что и постоянная скорость.
+  // Прогресс не уводит перезарядку ниже 0.50 с, даже если в сохранении уровень выше нового потолка.
+  private static progressCutMs(progressSpeed: number): number {
+    const cut = Math.max(0, Math.round(progressSpeed)) * Tank.progressSpeedStepMs;
+    return Math.min(cut, Tank.baseFireDelay - Tank.minProgressFireDelay);
+  }
+
+  // Магазин между волнами добивает остаток до 0.20 с. Прогресс сам останавливается на 0.50 с.
   static get maxFireRateLevel(): number {
-    const room = Tank.baseFireDelay - Tank.progressSpeedLevel * Tank.progressSpeedStepMs - Tank.minFireDelay;
+    const room = Tank.baseFireDelay - Tank.progressCutMs(Tank.progressSpeedLevel) - Tank.minFireDelay;
     return Math.max(0, Math.floor(room / Tank.fireRateStep));
   }
 
   static fireDelayFor(level: number, progressSpeed = Tank.progressSpeedLevel): number {
-    const progressCut = Math.max(0, Math.round(progressSpeed)) * Tank.progressSpeedStepMs;
+    const progressCut = Tank.progressCutMs(progressSpeed);
     const room = Tank.baseFireDelay - progressCut - Tank.minFireDelay;
     const maxShop = Math.max(0, Math.floor(room / Tank.fireRateStep));
     const capped = Math.min(Math.max(0, Math.round(level)), maxShop);
