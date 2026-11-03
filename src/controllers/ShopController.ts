@@ -483,9 +483,10 @@ export class ShopController {
     this.onChanged();
   }
 
-  // Первая покупка уровня стоит 3. Каждая следующая — на 2 дороже.
+  // Первая покупка уровня стоит 3. Каждая следующая — на 15% дороже:
+  // 3, 3, 4, 5, 5, 6, … К 20-му уровню около 50, к 30-му около 200.
   private static upgradeCost(level: number): number {
-    return shopPrice(3 + level * 2);
+    return shopPrice(Math.round(3 * 1.15 ** Math.max(0, level)));
   }
 
   // На карточке уровень партии и прогресса — одно число. От него же цена.
