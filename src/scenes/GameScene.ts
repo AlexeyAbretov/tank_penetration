@@ -161,6 +161,7 @@ export class GameScene extends Phaser.Scene {
       this.scene.restart();
     });
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
+    Tank.setProgressBlastLevel(this.progressShop.blastBonus());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
     this.field = this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);

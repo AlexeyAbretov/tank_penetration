@@ -58,9 +58,23 @@ export class Tank extends GameObjects.Container {
   // Радиус взрыва снаряда без покупок. Уровень магазина и прогресса прибавляет blastRadiusPerLevel.
   static readonly baseBlastRadius = 10;
   static readonly blastRadiusPerLevel = 1;
+  // Сумма уровней магазина и прогресса не выше 100. Прогресс сам не выше 50.
+  static readonly maxBlastLevel = 100;
+  static readonly maxProgressBlastLevel = 50;
+  static progressBlastLevel = 0;
+
+  static setProgressBlastLevel(level: number): void {
+    Tank.progressBlastLevel = Math.min(Tank.maxProgressBlastLevel, Math.max(0, Math.round(level)));
+  }
+
+  // Магазин между волнами добивает остаток до общего потолка.
+  static get maxShopBlastLevel(): number {
+    return Math.max(0, Tank.maxBlastLevel - Tank.progressBlastLevel);
+  }
 
   static blastRadiusFor(level: number): number {
-    return Tank.baseBlastRadius + level * Tank.blastRadiusPerLevel;
+    const capped = Math.min(Math.max(0, Math.round(level)), Tank.maxBlastLevel);
+    return Tank.baseBlastRadius + capped * Tank.blastRadiusPerLevel;
   }
 
   // Точка прицеливания врагов: чуть правее носа танка.

@@ -195,7 +195,7 @@ function parseShop(value: unknown): ShopSave | null {
   if (!isRecord(value)) {
     return null;
   }
-  const blast = requiredInt(value.blast, 0, 500);
+  const blast = requiredInt(value.blast, 0, Tank.maxShopBlastLevel);
   const damage = requiredInt(value.damage, 0, 500);
   const fireRate = requiredInt(value.fireRate, 0, Tank.maxFireRateLevel);
   const wire = flag(value.wire);

@@ -160,6 +160,9 @@ export class ProgressShopController {
       return;
     }
     const level = this.progress[stat];
+    if (stat === 'blast' && level >= Tank.maxProgressBlastLevel) {
+      return;
+    }
     if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
@@ -177,6 +180,9 @@ export class ProgressShopController {
     this.progress[stat] += 1;
     if (stat === 'speed') {
       Tank.setProgressSpeedLevel(this.progress.speed);
+    }
+    if (stat === 'blast') {
+      Tank.setProgressBlastLevel(this.progress.blast);
     }
     this.progressSave.save(this.progress);
     this.panel.refresh(this.view());
@@ -244,13 +250,14 @@ export class ProgressShopController {
     const price = this.price(level);
     const now = Tank.blastRadiusFor(level);
     const next = Tank.blastRadiusFor(level + 1);
+    const maxed = level >= Tank.maxProgressBlastLevel;
     return {
       title: '+1 взрыв',
       buy: () => this.buyBlast(),
-      info: `ур. ${level} · ${now}→${next}`,
-      cost: this.coin(price),
-      open: true,
-      canBuy: score >= price,
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
     };
   }
 

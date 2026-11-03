@@ -105,7 +105,7 @@ export class ShopController {
 
   // Покупки уже оплачены в прошлой сессии: монеты не списываем, вещи сразу ставим на поле.
   restore(saved: ShopSave): void {
-    this.blastLevel = saved.blast;
+    this.blastLevel = Math.min(saved.blast, Tank.maxShopBlastLevel);
     this.damageLevel = saved.damage;
     this.fireRateLevel = Math.min(saved.fireRate, Tank.maxFireRateLevel);
     this.tank.setFireRateLevel(this.fireRateLevel);
@@ -195,12 +195,13 @@ export class ShopController {
     this.onContinue();
   }
 
-  // +1 к радиусу взрыва. Цена растёт от текущего уровня.
+  // +1 к радиусу взрыва. Вместе с прогрессом не выше Tank.maxBlastLevel.
+  // Цена считается от уже купленного уровня, включая прогресс.
   buyBlast(): void {
-    if (this.isPaused()) {
+    if (this.isPaused() || this.blastOfferLevel() >= Tank.maxBlastLevel) {
       return;
     }
-    const cost = ShopController.upgradeCost(this.blastLevel);
+    const cost = ShopController.upgradeCost(this.blastOfferLevel());
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -208,12 +209,12 @@ export class ShopController {
     this.refresh();
   }
 
-  // +1 к урону снаряда танка. Складывается с постоянной прибавкой, которую передала сцена.
+  // +1 к урону снаряда танка. Цена считается от уже купленного уровня, включая прогресс.
   buyDamage(): void {
     if (this.isPaused()) {
       return;
     }
-    const cost = ShopController.upgradeCost(this.damageLevel);
+    const cost = ShopController.upgradeCost(this.damageOfferLevel());
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -222,11 +223,12 @@ export class ShopController {
   }
 
   // Короче пауза между выстрелами. Выше Tank.maxFireRateLevel уровень не поднимается.
+  // Цена считается от уже купленного уровня, включая прогресс.
   buyFireRate(): void {
     if (this.isPaused() || this.fireRateLevel >= Tank.maxFireRateLevel) {
       return;
     }
-    const cost = ShopController.upgradeCost(this.fireRateLevel);
+    const cost = ShopController.upgradeCost(this.fireRateOfferLevel());
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -411,10 +413,11 @@ export class ShopController {
   }
 
   // +1 к пуле. Пока ствола нет, уровень не растёт: прибавка не к чему.
+  // Цена — от суммы с прогрессом, в сохранение пишется только покупка партии.
   buyMgDamage(): void {
     this.buyDamageLevel(this.machineGunOwned, this.mgDamageLevel, (level) => {
       this.mgDamageLevel = level;
-    });
+    }, this.mgDamageOfferLevel());
   }
 
   buyWireDamage(): void {
@@ -485,6 +488,23 @@ export class ShopController {
     return shopPrice(3 + level * 2);
   }
 
+  // На карточке уровень партии и прогресса — одно число. От него же цена.
+  private blastOfferLevel(): number {
+    return this.blastLevel + this.bonuses.blast;
+  }
+
+  private damageOfferLevel(): number {
+    return this.damageLevel + this.bonuses.damage;
+  }
+
+  private fireRateOfferLevel(): number {
+    return this.fireRateLevel + Tank.progressSpeedLevel;
+  }
+
+  private mgDamageOfferLevel(): number {
+    return this.mgDamageLevel + this.bonuses.mg;
+  }
+
   private view(): ShopView {
     const coins = this.economy.getCoins();
     return {
@@ -499,7 +519,7 @@ export class ShopController {
         this.tab('gun', 'Пулемёт', [
           this.gearCard('machineGun', coins),
           this.weaponDamageCard(
-            this.mgDamageLevel,
+            this.mgDamageOfferLevel(),
             this.mgDamageNow(),
             () => this.buyMgDamage(),
             coins,
@@ -616,11 +636,16 @@ export class ShopController {
     };
   }
 
-  private buyDamageLevel(unlocked: boolean, level: number, put: (level: number) => void): void {
+  private buyDamageLevel(
+    unlocked: boolean,
+    level: number,
+    put: (level: number) => void,
+    priceLevel = level,
+  ): void {
     if (this.isPaused() || !unlocked) {
       return;
     }
-    const cost = ShopController.upgradeCost(level);
+    const cost = ShopController.upgradeCost(priceLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -700,27 +725,30 @@ export class ShopController {
   }
 
   private blastCard(coins: number): ShopCardView {
-    const price = ShopController.upgradeCost(this.blastLevel);
-    const radius = Tank.blastRadiusFor(this.blastLevel + this.bonuses.blast);
-    const nextRadius = Tank.blastRadiusFor(this.blastLevel + 1 + this.bonuses.blast);
+    const level = this.blastOfferLevel();
+    const price = ShopController.upgradeCost(level);
+    const radius = Tank.blastRadiusFor(level);
+    const nextRadius = Tank.blastRadiusFor(level + 1);
+    const maxed = level >= Tank.maxBlastLevel;
     return {
       title: '+1 область взрыва',
       buy: () => this.buyBlast(),
-      info: `ур. ${this.blastLevel} · ${radius}→${nextRadius}`,
-      cost: this.coin(price),
-      open: true,
-      canBuy: coins >= price,
+      info: maxed ? `ур. ${level} · ${radius}` : `ур. ${level} · ${radius}→${nextRadius}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
       owned: false,
     };
   }
 
   private damageCard(coins: number): ShopCardView {
-    const price = ShopController.upgradeCost(this.damageLevel);
-    const now = Infantry.shellDamage + this.damageLevel + this.bonuses.damage;
+    const level = this.damageOfferLevel();
+    const price = ShopController.upgradeCost(level);
+    const now = Infantry.shellDamage + level;
     return {
       title: '+1 урон',
       buy: () => this.buyDamage(),
-      info: `ур. ${this.damageLevel} · ${now}→${now + 1}`,
+      info: `ур. ${level} · ${now}→${now + 1}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
@@ -729,11 +757,11 @@ export class ShopController {
   }
 
   private fireRateCard(coins: number): ShopCardView {
-    const level = this.fireRateLevel;
+    const level = this.fireRateOfferLevel();
     const price = ShopController.upgradeCost(level);
-    const delay = this.formatSeconds(Tank.fireDelayFor(level));
-    const next = this.formatSeconds(Tank.fireDelayFor(level + 1));
-    const maxed = level >= Tank.maxFireRateLevel;
+    const delay = this.formatSeconds(Tank.fireDelayFor(this.fireRateLevel));
+    const next = this.formatSeconds(Tank.fireDelayFor(this.fireRateLevel + 1));
+    const maxed = this.fireRateLevel >= Tank.maxFireRateLevel;
     return {
       title: '−0.02 с перезарядки',
       buy: () => this.buyFireRate(),

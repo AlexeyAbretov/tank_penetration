@@ -74,6 +74,7 @@ export class ProgressSave {
     progress.laserShots = 0;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
+    Tank.setProgressBlastLevel(0);
   }
 
   save(data: SavedProgress): void {
@@ -144,7 +145,7 @@ function parseProgress(value: unknown): SavedProgress | null {
     coins: requiredInt(value.coins, 0, LEVEL_MAX) ?? 0,
     points: requiredInt(value.points, 0, LEVEL_MAX) ?? 0,
     damage: requiredInt(value.damage, 0, LEVEL_MAX) ?? 0,
-    blast: requiredInt(value.blast, 0, LEVEL_MAX) ?? 0,
+    blast: requiredInt(value.blast, 0, Tank.maxProgressBlastLevel) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
