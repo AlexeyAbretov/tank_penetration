@@ -6,6 +6,7 @@ import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { AutoFire } from '../entities/AutoFire';
 import { BarbedWire } from '../entities/BarbedWire';
+import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
@@ -20,7 +21,7 @@ import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
 // Каталог нижнего ряда. В окне некупленное идёт первым, внутри группы порядок каталога сохраняется.
-const GEAR = ['wire', 'autoFire', 'machineGun', 'laser', 'salvo', 'artillery', 'mines', 'nuclear'] as const;
+const GEAR = ['wire', 'autoFire', 'machineGun', 'laser', 'flame', 'salvo', 'artillery', 'mines', 'nuclear'] as const;
 type GearId = (typeof GEAR)[number];
 
 type PermanentBonuses = {
@@ -46,6 +47,8 @@ export class ShopController {
   machineGun?: MachineGun;
   laserOwned = false;
   laser?: LaserDefense;
+  flameOwned = false;
+  flame?: FlameTank;
   salvoOwned = false;
   salvo?: RocketSalvo;
   artilleryOwned = false;
@@ -79,6 +82,7 @@ export class ShopController {
       wire: this.wireOwned,
       machineGun: this.machineGunOwned,
       laser: this.laserOwned,
+      flame: this.flameOwned,
       salvo: this.salvoOwned,
       artillery: this.artilleryOwned,
       mines: this.minesOwned,
@@ -107,6 +111,10 @@ export class ShopController {
     if (saved.laser) {
       this.laser = this.installLaser();
     }
+    this.flameOwned = saved.flame;
+    if (saved.flame) {
+      this.flame = this.installFlame();
+    }
     this.salvoOwned = saved.salvo;
     if (saved.salvo) {
       this.salvo = this.installSalvo();
@@ -124,6 +132,7 @@ export class ShopController {
     this.wireOwned = false;
     this.machineGunOwned = false;
     this.laserOwned = false;
+    this.flameOwned = false;
     this.salvoOwned = false;
     this.artilleryOwned = false;
     this.minesOwned = false;
@@ -132,6 +141,7 @@ export class ShopController {
     this.wire = undefined;
     this.machineGun = undefined;
     this.laser = undefined;
+    this.flame = undefined;
     this.salvo = undefined;
     this.shopOpen = false;
   }
@@ -268,6 +278,20 @@ export class ShopController {
     this.refresh();
   }
 
+  // Машина между крышей танка и РСЗО. Струю по таймеру считает CombatSystem.
+  buyFlame(): void {
+    const cost = shopPrice(FlameTank.shop.cost);
+    if (this.isPaused() || this.flameOwned || this.economy.getCoins() < cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.flameOwned = true;
+    this.flame = this.installFlame();
+    this.refresh();
+  }
+
   // Ствол садится на башню здесь, при покупке.
   private installMachineGun(): MachineGun {
     const gun = new MachineGun(this.scene);
@@ -297,6 +321,21 @@ export class ShopController {
     this.tank.add(laser);
     this.tank.sendToBack(laser);
     return laser;
+  }
+
+  // Гусеницы выше крыши танка и ниже колёс РСЗО. РСЗО остаётся верхним слоем.
+  private installFlame(): FlameTank {
+    const hull = Tank.hullBox();
+    const flame = new FlameTank(this.scene);
+    flame.setPosition(
+      hull.x + hull.w / 2,
+      hull.y - FlameTank.mount.aboveRoof - FlameTank.layout.trackY,
+    );
+    this.tank.add(flame);
+    if (this.salvo) {
+      this.tank.bringToTop(this.salvo);
+    }
+    return flame;
   }
 
   // Колёса выше крыши танка. Картинка рисуется поверх башни: машина стоит в воздухе над ней.
@@ -414,6 +453,8 @@ export class ShopController {
         return this.machineGunOwned;
       case 'laser':
         return this.laserOwned;
+      case 'flame':
+        return this.flameOwned;
       case 'salvo':
         return this.salvoOwned;
       case 'artillery':
@@ -466,6 +507,16 @@ export class ShopController {
           shopPrice(LaserDefense.shop.cost),
           'ракета / 3 с',
           'сбивает РПГ',
+        );
+      case 'flame':
+        return this.onceCard(
+          'Огнемёт',
+          () => this.buyFlame(),
+          coins,
+          this.flameOwned,
+          shopPrice(FlameTank.shop.cost),
+          'струя / 10 с',
+          'четверть поля',
         );
       case 'salvo':
         return this.onceCard(

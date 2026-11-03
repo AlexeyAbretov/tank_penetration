@@ -1,6 +1,6 @@
 // Дебаг-бой. Те же выстрелы, но двойное нажатие кнопки способности сбрасывает перезарядку.
 // Второе нажатие за короткое окно удар не вызывает. После сброса окно пустое.
-// Двойной щелчок по РСЗО, лазеру или танку глушит и снова включает их стрельбу.
+// Двойной щелчок по РСЗО, огнемёту, лазеру или танку глушит и снова включает их стрельбу.
 // У танка вместе с пушкой замолкает пулемёт. Щелчок по машине сам выстрел не даёт.
 
 import Phaser from 'phaser';
@@ -10,7 +10,7 @@ import { CombatSystem } from './CombatSystem';
 const DOUBLE_MS = 400;
 
 type AbilityTap = 'artillery' | 'mines' | 'nuclear';
-type WeaponTap = 'tank' | 'laser' | 'salvo';
+type WeaponTap = 'tank' | 'laser' | 'flame' | 'salvo';
 
 export class DebugCombatSystem extends CombatSystem {
   private readonly tappedAt: Record<AbilityTap, number> = {
@@ -21,12 +21,14 @@ export class DebugCombatSystem extends CombatSystem {
   private readonly weaponAt: Record<WeaponTap, number> = {
     tank: -1,
     laser: -1,
+    flame: -1,
     salvo: -1,
   };
   // true — эта стрельба молчит. Пушка и пулемёт делят один флаг танка.
   private readonly silenced: Record<WeaponTap, boolean> = {
     tank: false,
     laser: false,
+    flame: false,
     salvo: false,
   };
   // Зажатая кнопка началась на машине: пока её не отпустили, ЛКМ не стреляет.
@@ -55,6 +57,7 @@ export class DebugCombatSystem extends CombatSystem {
     this.tank.setQuiet(this.silenced.tank);
     this.shop.machineGun?.setQuiet(this.silenced.tank);
     this.shop.laser?.setQuiet(this.silenced.laser);
+    this.shop.flame?.setQuiet(this.silenced.flame);
     this.shop.salvo?.setQuiet(this.silenced.salvo);
   }
 
@@ -90,11 +93,15 @@ export class DebugCombatSystem extends CombatSystem {
     }
   }
 
-  // РСЗО рисуется над танком, лазер — под ним. Сначала верхняя установка, потом корпус, потом лазер.
+  // РСЗО выше всех, огнемёт между ней и танком, лазер — под корпусом.
   private weaponUnder(x: number, y: number): WeaponTap | null {
     const salvo = this.shop.salvo;
     if (salvo?.visible && salvo.containsPoint(x, y)) {
       return 'salvo';
+    }
+    const flame = this.shop.flame;
+    if (flame?.visible && flame.containsPoint(x, y)) {
+      return 'flame';
     }
     if (this.tank.containsPoint(x, y)) {
       return 'tank';

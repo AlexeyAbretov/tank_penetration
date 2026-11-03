@@ -28,6 +28,7 @@ export type ShopSave = {
   wire: boolean;
   machineGun: boolean;
   laser: boolean;
+  flame: boolean;
   salvo: boolean;
   artillery: boolean;
   mines: boolean;
@@ -182,6 +183,8 @@ function parseShop(value: unknown): ShopSave | null {
   // Старые сохранения не писали мины, атомный взрыв и лазер: этих покупок ещё не было.
   const mines = flag(value.mines) ?? false;
   const laser = flag(value.laser) ?? false;
+  // Старые сохранения не писали огнемёт: этой покупки ещё не было.
+  const flame = flag(value.flame) ?? false;
   // Старые сохранения не писали РСЗО: этой покупки ещё не было.
   const salvo = flag(value.salvo) ?? false;
   const nuclear = flag(value.nuclear) ?? false;
@@ -206,6 +209,7 @@ function parseShop(value: unknown): ShopSave | null {
     wire,
     machineGun,
     laser,
+    flame,
     salvo,
     artillery,
     mines,

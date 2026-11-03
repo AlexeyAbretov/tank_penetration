@@ -1,9 +1,10 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, РСЗО, арт удар, мины, атомный взрыв и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, мины, атомный взрыв и контакт с базой.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
+import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
@@ -16,6 +17,7 @@ import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { airBurstAt } from '../gfx/airBurst';
 import { craterReach } from '../gfx/craters';
+import { clearBurns, ignite, inPatch, inStream, placeCampfires, syncFlameStream, tickBurns } from '../gfx/flame';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from '../sounds/BoomSounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
@@ -24,6 +26,30 @@ import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem as Combat } from '../types/CombatSystem';
 
 type ArtillerySpot = { x: number; y: number; mark: ArtilleryMark };
+
+type FlamePoint = { x: number; y: number };
+
+type FlameSweep = {
+  elapsed: number;
+  from: number;
+  to: number;
+  // Сколько костров дуги уже поставлено. Следующий встаёт, когда струя доходит до его места.
+  placed: number;
+  jets: Phaser.GameObjects.Sprite[];
+  hit: Set<Infantry>;
+};
+
+type FlameMark = {
+  point: FlamePoint;
+  fire: Phaser.GameObjects.Sprite;
+};
+
+type FlamePatch = {
+  marks: FlameMark[];
+  hit: Set<Infantry>;
+  // Общий остаток всей дуги. Пока струя идёт, поле пустое и костры не стареют.
+  left?: number;
+};
 
 export class CombatSystem implements Combat {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -36,6 +62,10 @@ export class CombatSystem implements Combat {
   // Сколько лучей ещё осталось в текущей очереди. 0 — очередь не начата.
   private laserBurstLeft = 0;
   private salvoCooldown = 0;
+  private flameCooldown = 0;
+  private flameAngle = 0;
+  private flameSweep?: FlameSweep;
+  private flamePatch?: FlamePatch;
   private artilleryCooldownMs = 0;
   private readonly strikeKeys: Phaser.Input.Keyboard.Key[] = [];
   // Клик по иконке на HUD. Сбрасывается в том же кадре, даже если удар ещё на перезарядке.
@@ -153,6 +183,8 @@ export class CombatSystem implements Combat {
     this.cancelArtillery();
     this.cancelNuclear();
     this.clearMines();
+    this.stopFlame();
+    clearBurns();
   }
 
   setupOverlap(): void {
@@ -172,9 +204,9 @@ export class CombatSystem implements Combat {
     );
   }
 
-  // Дебаг глушит пушку с пулемётом, лазер или РСЗО. В обычной партии все стреляют.
-  protected weaponLive(kind: 'tank' | 'laser' | 'salvo'): boolean {
-    const live = { tank: true, laser: true, salvo: true };
+  // Дебаг глушит пушку с пулемётом, лазер, огнемёт или РСЗО. В обычной партии все стреляют.
+  protected weaponLive(kind: 'tank' | 'laser' | 'flame' | 'salvo'): boolean {
+    const live = { tank: true, laser: true, flame: true, salvo: true };
     return live[kind];
   }
 
@@ -541,6 +573,7 @@ export class CombatSystem implements Combat {
     this.cleanupShells();
     this.tickMachineGun(delta);
     this.tickLaser(delta);
+    this.tickFlame(delta);
     this.tickSalvo(delta);
     this.resolveMgHits();
     this.cleanupMgShots();
@@ -663,6 +696,183 @@ export class CombatSystem implements Combat {
     rocket.destroy();
     airBurstAt(this.scene, x, y);
     this.effects.rocketBurst.play();
+  }
+
+  // Раз в 10 секунд башня ведёт струю сверху вниз на четверть длины поля.
+  // Струя бьёт один раз и поджигает картинку. Костры дуги гаснут вместе через две секунды, сжимаясь к основанию.
+  private tickFlame(delta: number): void {
+    tickBurns(this.scene, delta);
+    const flame = this.shop.flame;
+    if (!flame) {
+      this.stopFlame();
+      return;
+    }
+    this.flameCooldown = Math.max(0, this.flameCooldown - delta);
+    if (this.flameSweep) {
+      this.advanceSweep(flame, delta);
+    } else {
+      this.easeAim(flame, delta);
+      if (this.flameCooldown <= 0 && this.weaponLive('flame')) {
+        this.flameCooldown = FlameTank.shop.fireIntervalMs;
+        this.beginSweep(flame);
+      }
+    }
+    this.tickPatch(delta);
+  }
+
+  private beginSweep(flame: FlameTank): void {
+    const length = GAME.width * FlameTank.shop.reach;
+    const muzzle = flame.muzzle();
+    const from = this.aimAt(muzzle.y, length, 16);
+    const to = this.aimAt(muzzle.y, length, GAME.bannerY - 8);
+    this.clearPatch();
+    this.flameSweep = { elapsed: 0, from, to, placed: 0, jets: [], hit: new Set() };
+    this.advanceSweep(flame, 0);
+  }
+
+  private advanceSweep(flame: FlameTank, delta: number): void {
+    const sweep = this.flameSweep;
+    if (!sweep) {
+      return;
+    }
+    sweep.elapsed += delta;
+    const span = Math.max(1, FlameTank.shop.sweepMs);
+    const along = Math.min(1, sweep.elapsed / span);
+    this.dropFires(flame, sweep, along);
+    const angle = Phaser.Math.Linear(sweep.from, sweep.to, along);
+    this.flameAngle = angle;
+    flame.setAim(angle);
+    const from = flame.muzzle();
+    const to = this.flameTip(from, angle);
+    const length = GAME.width * FlameTank.shop.reach;
+    sweep.jets = syncFlameStream(this.scene, sweep.jets, from, angle, length);
+    this.scorchStream(from, to, sweep.hit);
+    if (along < 1) {
+      return;
+    }
+    sweep.jets.forEach((jet) => jet.destroy());
+    this.flameSweep = undefined;
+  }
+
+  // Костёр встаёт на конце струи в момент, когда она доходит до этой точки дуги.
+  private dropFires(flame: FlameTank, sweep: FlameSweep, along: number): void {
+    const steps = 12;
+    while (sweep.placed <= steps && along >= sweep.placed / steps) {
+      const angle = Phaser.Math.Linear(sweep.from, sweep.to, sweep.placed / steps);
+      flame.setAim(angle);
+      const tip = this.flameTip(flame.muzzle(), angle);
+      const [fire] = placeCampfires(this.scene, [tip], sweep.placed);
+      if (fire) {
+        if (!this.flamePatch) {
+          this.flamePatch = { marks: [], hit: new Set() };
+        }
+        this.flamePatch.marks.push({ point: tip, fire });
+      }
+      sweep.placed += 1;
+    }
+  }
+
+  private tickPatch(delta: number): void {
+    const patch = this.flamePatch;
+    if (!patch) {
+      return;
+    }
+    if (this.flameSweep) {
+      this.scorchPatch(patch);
+      return;
+    }
+    if (patch.left === undefined) {
+      patch.left = FlameTank.shop.patchMs + FlameTank.shop.patchFadeMs;
+    }
+    patch.left -= delta;
+    if (patch.left <= 0) {
+      this.clearPatch();
+      return;
+    }
+    const fade = FlameTank.shop.patchFadeMs;
+    const scale = patch.left >= fade ? 1 : patch.left / fade;
+    for (const mark of patch.marks) {
+      mark.fire.setScale(scale);
+    }
+    if (patch.left >= fade) {
+      this.scorchPatch(patch);
+    }
+  }
+
+  private easeAim(flame: FlameTank, delta: number): void {
+    const step = (delta / 1000) * 2.4;
+    if (this.flameAngle > 0) {
+      this.flameAngle = Math.max(0, this.flameAngle - step);
+    } else if (this.flameAngle < 0) {
+      this.flameAngle = Math.min(0, this.flameAngle + step);
+    }
+    flame.setAim(this.flameAngle);
+  }
+
+  private scorchStream(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    hit: Set<Infantry>,
+  ): void {
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (!this.flameTarget(unit) || hit.has(unit)) {
+        continue;
+      }
+      const center = unit.hitCenter();
+      if (!inStream(center.x, center.y, from, to)) {
+        continue;
+      }
+      hit.add(unit);
+      this.hurtInfantry(unit, FlameTank.shop.streamDamage);
+      if (unit.active) {
+        ignite(this.scene, unit, FlameTank.shop.burnMs);
+      }
+    }
+  }
+
+  private scorchPatch(patch: FlamePatch): void {
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (!this.flameTarget(unit) || patch.hit.has(unit)) {
+        continue;
+      }
+      const center = unit.hitCenter();
+      if (!inPatch(center.x, center.y, patch.marks.map((mark) => mark.point))) {
+        continue;
+      }
+      patch.hit.add(unit);
+      this.hurtInfantry(unit, FlameTank.shop.patchDamage);
+    }
+  }
+
+  private flameTarget(unit: Infantry): boolean {
+    return unit.active && !unit.reachedWall;
+  }
+
+  private flameTip(from: { x: number; y: number }, angle: number): { x: number; y: number } {
+    const length = GAME.width * FlameTank.shop.reach;
+    return {
+      x: from.x + Math.cos(angle) * length,
+      y: from.y + Math.sin(angle) * length,
+    };
+  }
+
+  private aimAt(muzzleY: number, length: number, y: number): number {
+    const dy = Phaser.Math.Clamp(y - muzzleY, -length, length);
+    const angle = Math.asin(dy / Math.max(length, 1));
+    return Phaser.Math.Clamp(angle, -FlameTank.aimLimit, FlameTank.aimLimit);
+  }
+
+  private clearPatch(): void {
+    this.flamePatch?.marks.forEach((mark) => mark.fire.destroy());
+    this.flamePatch = undefined;
+  }
+
+  private stopFlame(): void {
+    this.flameSweep?.jets.forEach((jet) => jet.destroy());
+    this.flameSweep = undefined;
+    this.clearPatch();
+    this.flameAngle = 0;
+    this.shop.flame?.setAim(0);
   }
 
   // Раз в 3 секунды три ракеты в случайные точки. Дуга и огонь в шахтах — у установки.
