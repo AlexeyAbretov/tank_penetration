@@ -447,7 +447,7 @@ export class CombatSystem implements Combat {
     this.mines = [];
   }
 
-  // Сразу хлопок. Снаряды — через секунду после того, как он доиграл.
+  // Сразу хлопок. Снаряды падают, когда он доиграл: пауза afterShotMs сейчас нулевая.
   private launchArtillery(): void {
     const token = this.artilleryToken;
     const spots = this.armSpots();
@@ -960,7 +960,7 @@ export class CombatSystem implements Combat {
     this.shop.flame?.setAim(0);
   }
 
-  // Раз в 3 секунды три ракеты в случайные точки. Дуга и огонь в шахтах — у установки.
+  // Раз в fireIntervalMs три ракеты в случайные точки. Сейчас это 5 с. Дуга и огонь в шахтах — у установки.
   private tickSalvo(delta: number): void {
     const salvo = this.shop.salvo;
     if (!salvo) {

@@ -713,7 +713,7 @@ export class ShopController {
           coins,
           this.salvoOwned,
           shopPrice(RocketSalvo.shop.cost),
-          '3 ракеты / 3 с',
+          `3 ракеты / ${RocketSalvo.shop.fireIntervalMs / 1000} с`,
           'залп по полю',
         );
       case 'artillery':
