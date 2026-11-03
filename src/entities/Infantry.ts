@@ -223,8 +223,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
 
   // Даёт скорость влево. Чем выше ранг роста, тем быстрее шаг.
   march(): void {
-    // База 36 + 4 за ранг + случайные 0..10, чтобы юниты одной волны не шли строем с одной скоростью.
-    const speed = 36 + this.paceWave * 4 + Phaser.Math.Between(0, 10);
+    // База 38 + 2 за ранг + случайные 0..10, чтобы юниты одной волны не шли строем с одной скоростью.
+    // На первом ранге это те же 40..50. Дальше шаг короче, и поздняя волна не переходит на бег.
+    const speed = 38 + this.paceWave * 2 + Phaser.Math.Between(0, 10);
     this.marchAt(speed);
   }
 

@@ -321,8 +321,9 @@ export class PickupTruck extends RangedEnemy {
   }
 
   // Своя скорость: родительский march для пехоты слишком медленный.
+  // База 82 + 2 за ранг + случайные 0..8. На первом ранге те же 84..92, шаг как у пехоты.
   override march(): void {
-    const speed = 78 + this.paceWave * 6 + Phaser.Math.Between(0, 8);
+    const speed = 82 + this.paceWave * 2 + Phaser.Math.Between(0, 8);
     this.marchAt(speed);
   }
 
