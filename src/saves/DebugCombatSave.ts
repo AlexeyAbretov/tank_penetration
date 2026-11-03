@@ -60,6 +60,12 @@ export class DebugCombatSave extends CombatSave {
         nuclear: true,
         autoFire: true,
         autoFireOn: true,
+        mgDamage: 0,
+        wireDamage: 0,
+        flameDamage: 0,
+        salvoDamage: 0,
+        artilleryDamage: 0,
+        minesDamage: 0,
       },
     };
   }

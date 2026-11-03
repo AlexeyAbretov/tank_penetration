@@ -401,7 +401,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, Mines.shop.damage);
+        this.hurtInfantry(unit, Mines.shop.damage + this.shop.minesDamageLevel);
       }
     });
   }
@@ -511,7 +511,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, ArtilleryStrike.shop.damage);
+        this.hurtInfantry(unit, ArtilleryStrike.shop.damage + this.shop.artilleryDamageLevel);
       }
     });
   }
@@ -906,7 +906,7 @@ export class CombatSystem implements Combat {
         continue;
       }
       hit.add(unit);
-      this.hurtInfantry(unit, FlameTank.shop.streamDamage);
+      this.hurtInfantry(unit, FlameTank.shop.streamDamage + this.shop.flameDamageLevel);
       if (unit.active) {
         ignite(this.scene, unit, FlameTank.shop.burnMs);
       }
@@ -923,7 +923,7 @@ export class CombatSystem implements Combat {
         continue;
       }
       patch.hit.add(unit);
-      this.hurtInfantry(unit, FlameTank.shop.patchDamage);
+      this.hurtInfantry(unit, FlameTank.shop.patchDamage + this.shop.flameDamageLevel);
     }
   }
 
@@ -982,7 +982,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, RocketSalvo.shop.damage);
+        this.hurtInfantry(unit, RocketSalvo.shop.damage + this.shop.salvoDamageLevel);
       }
     });
   }
@@ -1057,7 +1057,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (unit.snare(BarbedWire.bounds.face, delta, BarbedWire.shop.hurtIntervalMs)) {
-        this.hurtInfantry(unit, BarbedWire.shop.damage, true);
+        this.hurtInfantry(unit, BarbedWire.shop.damage + this.shop.wireDamageLevel, true);
       }
     });
   }
@@ -1133,7 +1133,7 @@ export class CombatSystem implements Combat {
   }
 
   private mgDamage(): number {
-    return MachineGun.shop.damage + this.progressMgDamage;
+    return MachineGun.shop.damage + this.shop.mgDamageLevel + this.progressMgDamage;
   }
 
   private blastRadius(): number {

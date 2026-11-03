@@ -1,5 +1,5 @@
-// Магазин между волнами: сверху уровни танка, снизу разовые покупки.
-// У каждой полки своя камера и свой горизонтальный скролл.
+// Магазин между волнами: слева закладки, справа карточки выбранной.
+// В полке четыре карточки и меньше, поэтому отдельной камеры и скролла нет.
 // Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
@@ -17,18 +17,23 @@ export type ShopCardView = {
   title: string;
   info: string;
   cost: string;
-  // false — клик не покупает: уровень максимальный или вещь уже взята.
+  // false — клик не покупает: уровень максимальный, вещь уже взята или сначала нужна установка.
   open: boolean;
   canBuy: boolean;
-  // Нижний ряд: галочка вместо слов «куплено» и «установлена».
+  // Галочка вместо слов «куплено» и «установлена».
   owned: boolean;
   buy: () => void;
 };
 
+export type ShopTabView = {
+  id: string;
+  label: string;
+  cards: ShopCardView[];
+};
+
 export type ShopView = {
   coins: number;
-  stats: ShopCardView[];
-  gear: ShopCardView[];
+  tabs: ShopTabView[];
 };
 
 // «Следующая волна». Сами покупки приходят в карточке: окно их список не знает.
@@ -36,30 +41,27 @@ export type ShopDelegate = {
   closeAndContinue(): void;
 };
 
-const PANEL_W = 800;
+const PANEL_W = 980;
 const PANEL_H = 680;
 
-const VIEW_W = 750;
-const CARD_W = 224;
-const CARD_H = 86;
-const CARD_GAP = 12;
-const PAD = 12;
-// В колонке две карточки. Четыре пикселя сверху и снизу — запас под обводку.
-const COLS_ROWS = 2;
-const VIEW_H = CARD_H * COLS_ROWS + CARD_GAP + 4;
-const TRACK = 8;
-const TRACK_GAP = 6;
-const ROW_GAP = 16;
+const SIDE = 22;
+const TAB_W = 250;
+const TAB_H = 46;
+const TAB_GAP = 6;
+const CONTENT_TOP = -220;
+const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
 
-const TOP_BAND = -228;
-const TOP_TRACK_Y = TOP_BAND + VIEW_H + TRACK_GAP + TRACK / 2;
-const BOTTOM_BAND = TOP_TRACK_Y + TRACK / 2 + ROW_GAP;
-const BOTTOM_TRACK_Y = BOTTOM_BAND + VIEW_H + TRACK_GAP + TRACK / 2;
+const CARD_GAP_X = 16;
+const CARD_W = PANEL_W - SIDE * 2 - TAB_W - CARD_GAP_X;
+const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
+const CARD_H = 92;
+const CARD_GAP = 10;
+const CARD_SLOTS = 4;
 
-const TITLE_Y = -300;
-const COINS_Y = -256;
-const RULE_Y = (TOP_TRACK_Y + TRACK / 2 + BOTTOM_BAND) / 2;
-const BUTTON_Y = 286;
+const TITLE_Y = -302;
+const COINS_Y = -258;
+const RULE_Y = -238;
+const BUTTON_Y = 292;
 
 const BRASS = 0xc4a15a;
 
@@ -73,49 +75,47 @@ type Offer = {
   open: boolean;
 };
 
-type Row = {
-  cam: Phaser.Cameras.Scene2D.Camera;
-  content: Phaser.GameObjects.Container;
-  track: Phaser.GameObjects.Rectangle;
-  thumb: Phaser.GameObjects.Rectangle;
-  offers: Offer[];
-  band: number;
-  viewLeft: number;
-  viewTop: number;
-  scroll: number;
-  maxScroll: number;
-  thumbW: number;
+type Tab = {
+  id: string;
+  face: Phaser.GameObjects.Graphics;
+  hit: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
 };
 
 export class ShopPanel {
-  // Шапка, рамка, ползунки и кнопка. Карточки сюда не входят: их рисуют две камеры.
   readonly container: Phaser.GameObjects.Container;
 
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly dim: Phaser.GameObjects.Rectangle;
-  private readonly statsRow: Row;
-  private readonly gearRow: Row;
+  private readonly offers: Offer[];
+  private readonly tabs: Tab[] = [];
 
-  private listShown = false;
   private paused = false;
-  private drag: { x: number; scroll: number; moved: boolean; row: Row } | null = null;
-  private pressedCard: Phaser.GameObjects.Rectangle | null = null;
+  private cardsCovered = false;
+  private selected = '';
+  private tabKey = '';
+  private lastView: ShopView | null = null;
+  private lastCards: ShopCardView[] = [];
 
   constructor(
     scene: Phaser.Scene,
     shop: ShopDelegate,
     private readonly screen: { width: number; height: number },
   ) {
-    this.statsRow = this.createRow(scene, TOP_BAND, TOP_TRACK_Y);
-    this.gearRow = this.createRow(scene, BOTTOM_BAND, BOTTOM_TRACK_Y);
-
     this.dim = scene.add.rectangle(0, 0, this.screen.width, this.screen.height, 0x000000, 0.62);
     const panel = scene.add.graphics();
     paintFieldPlate(panel, PANEL_W, PANEL_H);
-    const statsWell = scene.add.rectangle(0, TOP_BAND + VIEW_H / 2, VIEW_W, VIEW_H, 0x12170e);
-    const gearWell = scene.add.rectangle(0, BOTTOM_BAND + VIEW_H / 2, VIEW_W, VIEW_H, 0x12170e);
+    const wellTop = CONTENT_TOP - 8;
+    const wellBottom = BUTTON_Y - 26 - 14;
+    const well = scene.add.rectangle(
+      CARD_X,
+      (wellTop + wellBottom) / 2,
+      CARD_W + 16,
+      wellBottom - wellTop,
+      0x12170e,
+    );
     const rule = scene.add.graphics();
-    paintFieldRule(rule, RULE_Y, VIEW_W / 2 - 8);
+    paintFieldRule(rule, RULE_Y, PANEL_W / 2 - 36);
 
     const title = scene.add
       .text(0, TITLE_Y, 'МАГАЗИН', {
@@ -133,6 +133,8 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
 
+    this.offers = Array.from({ length: CARD_SLOTS }, (_, index) => this.makeOffer(scene, index));
+
     const nextFace = scene.add.graphics().setPosition(0, BUTTON_Y);
     paintOrderBar(nextFace, 280, 52);
     const next = scene.add.rectangle(0, BUTTON_Y, 280, 52, 0x000000, 0);
@@ -149,351 +151,197 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
 
+    const offerNodes = this.offers.flatMap((offer) => [
+      offer.card,
+      offer.title,
+      offer.info,
+      offer.cost,
+      offer.mark,
+    ]);
     this.container = scene.add.container(this.screen.width / 2, this.screen.height / 2, [
       this.dim,
       panel,
-      statsWell,
-      gearWell,
+      well,
       rule,
       title,
       this.coinsText,
-      this.statsRow.track,
-      this.statsRow.thumb,
-      this.gearRow.track,
-      this.gearRow.thumb,
+      ...offerNodes,
       nextFace,
       next,
       nextLabel,
     ]);
-    // Выше игрового UI (51–60), ниже плашки поражения (80).
+    // Выше игрового UI (51–60), ниже плашки поражения (80) и паузы (90).
     this.container.setDepth(70).setVisible(false);
-    this.statsRow.content.setDepth(71);
-    this.gearRow.content.setDepth(71);
-
-    const onMove = (pointer: Phaser.Input.Pointer) => {
-      if (!this.blocked()) {
-        this.dragList(pointer);
-      }
-    };
-    const onUp = () => {
-      this.drag = null;
-      this.pressedCard = null;
-    };
-    const onWheel = (
-      pointer: Phaser.Input.Pointer,
-      _over: Phaser.GameObjects.GameObject[],
-      dx: number,
-      dy: number,
-    ) => {
-      if (this.blocked() || !this.listShown || !this.container.visible) {
-        return;
-      }
-      const row = this.rowAt(pointer);
-      if (!row) {
-        return;
-      }
-      const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-      this.setScroll(row, row.scroll + delta * 0.55);
-    };
-    scene.input.on('pointermove', onMove);
-    scene.input.on('pointerup', onUp);
-    scene.input.on('wheel', onWheel);
-
-    // Пока магазин открыт, новые объекты сцены (проволока, пулемёт) не должны попасть в окно полки.
-    // Сцена при перезапуске та же, поэтому подписки снимаем на shutdown, иначе старый обработчик
-    // трогает уже уничтоженный список карточек и обрывает игровой цикл.
-    scene.events.on('update', this.syncListCamera, this);
-    scene.events.once('shutdown', () => {
-      scene.events.off('update', this.syncListCamera, this);
-      scene.input.off('pointermove', onMove);
-      scene.input.off('pointerup', onUp);
-      scene.input.off('wheel', onWheel);
-    });
     this.place();
-    this.syncListCamera();
   }
 
-  // Поле шире 1280 — окно и затемнение остаются по центру, полки едут вместе с ним.
+  // Поле шире 1280 — окно и затемнение остаются по центру.
   place(): void {
-    const viewLeft = this.screen.width / 2 - VIEW_W / 2;
-    this.placeRow(this.statsRow, viewLeft);
-    this.placeRow(this.gearRow, viewLeft);
     this.container.setPosition(this.screen.width / 2, this.screen.height / 2);
     this.dim.setSize(this.screen.width, this.screen.height);
   }
 
   show(view: ShopView): void {
-    this.listShown = true;
+    this.selected = view.tabs[0]?.id ?? '';
     this.refresh(view);
-    this.setScroll(this.statsRow, 0);
-    this.setScroll(this.gearRow, 0);
-    this.syncListCamera();
     this.container.setVisible(true);
-    this.showRow(this.statsRow, true);
-    this.showRow(this.gearRow, true);
   }
 
   hide(): void {
-    this.drag = null;
-    this.pressedCard = null;
-    this.listShown = false;
     this.container.setVisible(false);
-    this.showRow(this.statsRow, false);
-    this.showRow(this.gearRow, false);
   }
 
   setPaused(paused: boolean): void {
     this.paused = paused;
   }
 
-  // Камеры полок рисуются поверх основной и стирают центр экрана.
-  // Пока игра на паузе, прячем их, иначе плашка «ПАУЗА» пропадает над карточками.
-  coverForPause(paused: boolean): void {
-    if (!this.container.visible) {
-      return;
-    }
-    this.listShown = !paused;
-    this.showRow(this.statsRow, this.listShown);
-    this.showRow(this.gearRow, this.listShown);
+  // Отдельной камеры нет: плашка паузы и так выше панели. Карточки прячем, чтобы они не торчали по бокам.
+  coverForPause(covered: boolean): void {
+    this.cardsCovered = covered;
+    this.applyOffers();
   }
 
   refresh(view: ShopView): void {
+    this.lastView = view;
     this.coinsText.setText(`Монеты  ${view.coins}`);
-    this.syncRow(this.statsRow, view.stats);
-    this.syncRow(this.gearRow, view.gear);
+    this.syncTabs(view.tabs);
   }
 
-  private createRow(scene: Phaser.Scene, band: number, trackY: number): Row {
-    const cam = scene.cameras.add(0, 0, VIEW_W, VIEW_H);
-    cam.roundPixels = true;
-    cam.setVisible(false);
-
-    const content = scene.add.container(0, 0);
-    content.cameraFilter |= scene.cameras.main.id;
-    content.setVisible(false);
-
-    const track = scene.add.rectangle(0, trackY, VIEW_W, TRACK, 0x161c12);
-    const thumb = scene.add
-      .rectangle(0, trackY, 36, TRACK, 0x8a7848)
-      .setInteractive({ useHandCursor: true, draggable: true });
-    scene.input.setDraggable(thumb);
-    track.setVisible(false);
-    thumb.setVisible(false);
-
-    const row: Row = {
-      cam,
-      content,
-      track,
-      thumb,
-      offers: [],
-      band,
-      viewLeft: 0,
-      viewTop: 0,
-      scroll: 0,
-      maxScroll: 0,
-      thumbW: 36,
-    };
-    thumb.on('drag', (pointer: Phaser.Input.Pointer) => {
-      if (!this.blocked() && this.listShown) {
-        this.dragThumb(row, pointer);
-      }
-    });
-    return row;
-  }
-
-  private placeRow(row: Row, viewLeft: number): void {
-    row.viewLeft = viewLeft;
-    row.viewTop = this.screen.height / 2 + row.band;
-    row.cam.setPosition(row.viewLeft, row.viewTop);
-    row.cam.setScroll(row.viewLeft, row.viewTop);
-    row.content.setPosition(row.viewLeft - row.scroll, row.viewTop + VIEW_H / 2);
-  }
-
-  private showRow(row: Row, shown: boolean): void {
-    row.cam.setVisible(shown);
-    row.content.setVisible(shown);
-    this.applyChrome(row);
-  }
-
-  private syncRow(row: Row, cards: ShopCardView[]): void {
-    if (row.offers.length !== cards.length) {
-      for (const offer of row.offers) {
-        offer.card.destroy();
-        offer.title.destroy();
-        offer.info.destroy();
-        offer.cost.destroy();
-        offer.mark.destroy();
-      }
-      row.offers.length = 0;
-      const scene = row.content.scene;
-      cards.forEach((card, index) => {
-        row.offers.push(this.makeOffer(scene, row, index, card.buy));
+  private syncTabs(tabs: ShopTabView[]): void {
+    const key = tabs.map((tab) => tab.id).join('\0');
+    if (key !== this.tabKey) {
+      this.destroyTabs();
+      this.tabKey = key;
+      tabs.forEach((tab, index) => {
+        this.tabs.push(this.makeTab(tab.id, tab.label, index));
       });
-      this.layout(row);
+    } else {
+      tabs.forEach((tab, index) => {
+        this.tabs[index]?.label.setText(tab.label);
+      });
     }
-    for (let i = 0; i < cards.length; i += 1) {
-      this.paint(row.offers[i], cards[i]);
+    if (!tabs.some((tab) => tab.id === this.selected)) {
+      this.selected = tabs[0]?.id ?? '';
     }
+    for (const tab of this.tabs) {
+      this.paintTab(tab, tab.id === this.selected);
+    }
+    const current = tabs.find((tab) => tab.id === this.selected);
+    this.lastCards = current?.cards ?? [];
+    this.applyOffers();
   }
 
-  private layout(row: Row): void {
-    const cols = Math.ceil(row.offers.length / COLS_ROWS);
-    const gaps = Math.max(0, cols - 1);
-    const contentWidth = PAD * 2 + cols * CARD_W + gaps * CARD_GAP;
-    row.maxScroll = Math.max(0, contentWidth - VIEW_W);
-    const span = Math.max(contentWidth, 1);
-    row.thumbW = Math.min(VIEW_W, Math.max(36, Math.round((VIEW_W * VIEW_W) / span)));
-    row.thumb.setSize(row.thumbW, TRACK);
-    this.setScroll(row, row.scroll);
-    this.applyChrome(row);
-  }
-
-  private applyChrome(row: Row): void {
-    const scroll = this.listShown && row.maxScroll > 0;
-    row.track.setVisible(scroll);
-    row.thumb.setVisible(scroll);
-  }
-
-  private makeOffer(scene: Phaser.Scene, row: Row, index: number, buy: () => void): Offer {
-    const col = Math.floor(index / COLS_ROWS);
-    const slot = index % COLS_ROWS;
-    const x = PAD + col * (CARD_W + CARD_GAP) + CARD_W / 2;
-    const y = (slot - (COLS_ROWS - 1) / 2) * (CARD_H + CARD_GAP);
-    const card = scene.add.rectangle(x, y, CARD_W, CARD_H, 0x343e2a).setStrokeStyle(2, 0x6e6848);
-    card.setInteractive({ useHandCursor: true });
-    const title = scene.add
-      .text(x, y - CARD_H / 2 + 10, '', {
+  private makeTab(id: string, label: string, index: number): Tab {
+    const scene = this.container.scene;
+    const y = CONTENT_TOP + TAB_H / 2 + index * (TAB_H + TAB_GAP);
+    const face = scene.add.graphics().setPosition(TAB_X, y);
+    const hit = scene.add.rectangle(TAB_X, y, TAB_W, TAB_H, 0x000000, 0);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', () => {
+      if (this.blocked() || this.selected === id || !this.lastView) {
+        return;
+      }
+      this.selected = id;
+      this.refresh(this.lastView);
+    });
+    const text = scene.add
+      .text(TAB_X - TAB_W / 2 + 18, y, label, {
         fontSize: '16px',
+        color: fieldPaper,
+      })
+      .setOrigin(0, 0.5);
+    this.container.add([face, hit, text]);
+    return { id, face, hit, label: text };
+  }
+
+  private paintTab(tab: Tab, selected: boolean): void {
+    const g = tab.face;
+    g.clear();
+    const left = -TAB_W / 2;
+    const top = -TAB_H / 2;
+    g.fillStyle(selected ? 0x6e6240 : 0x3e4634, 1);
+    g.fillRect(left, top, TAB_W, TAB_H);
+    g.fillStyle(selected ? 0x3a4630 : 0x1e2618, 1);
+    g.fillRect(left + 3, top + 3, TAB_W - 6, TAB_H - 6);
+    if (selected) {
+      g.fillStyle(BRASS, 1);
+      g.fillRect(left + 3, top + 3, 5, TAB_H - 6);
+    }
+    tab.label.setColor(selected ? fieldInk : fieldPaper);
+  }
+
+  private destroyTabs(): void {
+    for (const tab of this.tabs) {
+      tab.face.destroy();
+      tab.hit.destroy();
+      tab.label.destroy();
+    }
+    this.tabs.length = 0;
+  }
+
+  private applyOffers(): void {
+    for (let i = 0; i < this.offers.length; i += 1) {
+      const card = this.lastCards[i];
+      const shown = !this.cardsCovered && card !== undefined;
+      this.setOfferShown(this.offers[i], shown);
+      if (shown && card) {
+        this.paint(this.offers[i], card);
+      }
+    }
+  }
+
+  private setOfferShown(offer: Offer, shown: boolean): void {
+    offer.card.setVisible(shown);
+    offer.title.setVisible(shown);
+    offer.info.setVisible(shown);
+    offer.cost.setVisible(shown);
+    offer.mark.setVisible(shown);
+    if (!shown) {
+      offer.card.disableInteractive();
+      return;
+    }
+    offer.card.setInteractive({ useHandCursor: true });
+  }
+
+  private makeOffer(scene: Phaser.Scene, index: number): Offer {
+    const y = CONTENT_TOP + CARD_H / 2 + index * (CARD_H + CARD_GAP);
+    const card = scene.add.rectangle(CARD_X, y, CARD_W, CARD_H, 0x343e2a).setStrokeStyle(2, 0x6e6848);
+    const title = scene.add
+      .text(CARD_X, y - CARD_H / 2 + 12, '', {
+        fontSize: '18px',
         color: fieldInk,
         align: 'center',
       })
       .setOrigin(0.5, 0);
     const info = scene.add
-      .text(x, y + 2, '', {
-        fontSize: '14px',
+      .text(CARD_X, y + 4, '', {
+        fontSize: '16px',
         color: fieldPaper,
         align: 'center',
       })
       .setOrigin(0.5);
     const cost = scene.add
-      .text(x, y + CARD_H / 2 - 8, '', {
-        fontSize: '16px',
+      .text(CARD_X, y + CARD_H / 2 - 10, '', {
+        fontSize: '18px',
         color: fieldInk,
         align: 'center',
       })
       .setOrigin(0.5, 1);
-    const mark = scene.add.graphics().setPosition(x - CARD_W / 2 + 22, y + CARD_H / 2 - 22);
+    const mark = scene.add.graphics().setPosition(CARD_X - CARD_W / 2 + 28, y + CARD_H / 2 - 26);
     paintOwnedMark(mark);
-    mark.setVisible(false);
-
-    row.content.add([card, title, info, cost, mark]);
-    const offer: Offer = { card, title, info, cost, mark, buy, open: true };
-    card.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // Карточка за краем камеры всё ещё ловит клик: мир шире окна полки.
-      if (this.blocked() || !this.listShown || !this.inView(row, pointer)) {
-        return;
-      }
-      this.pressedCard = card;
-      this.drag = { x: pointer.x, scroll: row.scroll, moved: false, row };
-    });
-    // Короткое нажатие покупает. Сдвиг полки — это уже скролл, не покупка.
-    card.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (
-        this.blocked() ||
-        !this.listShown ||
-        this.pressedCard !== card ||
-        this.drag?.moved ||
-        !offer.open
-      ) {
-        return;
-      }
-      if (!this.inView(row, pointer)) {
+    const offer: Offer = { card, title, info, cost, mark, buy: () => undefined, open: false };
+    card.on('pointerup', () => {
+      if (this.blocked() || !offer.open) {
         return;
       }
       offer.buy();
     });
+    this.setOfferShown(offer, false);
     return offer;
   }
 
   private blocked(): boolean {
-    return this.paused;
-  }
-
-  private dragList(pointer: Phaser.Input.Pointer): void {
-    if (!this.drag || !pointer.isDown) {
-      return;
-    }
-    const dx = pointer.x - this.drag.x;
-    if (Math.abs(dx) > 8) {
-      this.drag.moved = true;
-    }
-    if (this.drag.moved) {
-      this.setScroll(this.drag.row, this.drag.scroll - dx);
-    }
-  }
-
-  private dragThumb(row: Row, pointer: Phaser.Input.Pointer): void {
-    const screenLeft = this.screen.width / 2 - VIEW_W / 2;
-    const travel = VIEW_W - row.thumbW;
-    const half = row.thumbW / 2;
-    const center = Phaser.Math.Clamp(pointer.x, screenLeft + half, screenLeft + travel + half);
-    const t = travel > 0 ? (center - (screenLeft + half)) / travel : 0;
-    this.setScroll(row, t * row.maxScroll);
-  }
-
-  private setScroll(row: Row, value: number): void {
-    row.scroll = Phaser.Math.Clamp(value, 0, row.maxScroll);
-    row.content.x = row.viewLeft - row.scroll;
-    const travel = VIEW_W - row.thumbW;
-    const t = row.maxScroll > 0 ? row.scroll / row.maxScroll : 0;
-    row.thumb.x = -VIEW_W / 2 + row.thumbW / 2 + travel * t;
-  }
-
-  private rowAt(pointer: Phaser.Input.Pointer): Row | null {
-    if (this.overRow(this.statsRow, pointer)) {
-      return this.statsRow;
-    }
-    if (this.overRow(this.gearRow, pointer)) {
-      return this.gearRow;
-    }
-    return null;
-  }
-
-  private overRow(row: Row, pointer: Phaser.Input.Pointer): boolean {
-    const bottom = row.viewTop + VIEW_H + TRACK_GAP + TRACK;
-    return (
-      pointer.x >= row.viewLeft &&
-      pointer.x <= row.viewLeft + VIEW_W &&
-      pointer.y >= row.viewTop &&
-      pointer.y <= bottom
-    );
-  }
-
-  private inView(row: Row, pointer: Phaser.Input.Pointer): boolean {
-    return (
-      pointer.x >= row.viewLeft &&
-      pointer.x <= row.viewLeft + VIEW_W &&
-      pointer.y >= row.viewTop &&
-      pointer.y <= row.viewTop + VIEW_H
-    );
-  }
-
-  // Каждая камера рисует только свою полку. Всё остальное на сцене для неё невидимо.
-  private syncListCamera(): void {
-    const statsId = this.statsRow.cam.id;
-    const gearId = this.gearRow.cam.id;
-    const mainId = this.statsRow.content.scene.cameras.main.id;
-    const both = statsId | gearId;
-    const children = this.statsRow.content.scene.children.list;
-    for (const child of children) {
-      if (child === this.statsRow.content) {
-        child.cameraFilter = (child.cameraFilter & ~statsId) | mainId | gearId;
-      } else if (child === this.gearRow.content) {
-        child.cameraFilter = (child.cameraFilter & ~gearId) | mainId | statsId;
-      } else {
-        child.cameraFilter |= both;
-      }
-    }
+    return this.paused || !this.container.visible;
   }
 
   private paint(offer: Offer, card: ShopCardView): void {

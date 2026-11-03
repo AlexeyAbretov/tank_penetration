@@ -7,12 +7,17 @@ import { MachineGun } from '../entities/MachineGun';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
-import { ProgressShopPanel, type ProgressCardView, type ProgressShopView } from '../ui/shops/ProgressShopPanel';
+import {
+  ProgressShopPanel,
+  type ProgressCardView,
+  type ProgressShopView,
+  type ProgressTabView,
+} from '../ui/shops/ProgressShopPanel';
 import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;
 
-type Stat = 'coins' | 'damage' | 'blast' | 'speed' | 'bullets' | 'mgDamage' | 'laserShots';
+type Stat = 'coins' | 'points' | 'damage' | 'blast' | 'speed' | 'bullets' | 'mgDamage' | 'laserShots';
 
 export class ProgressShopController {
   // Панель живёт только пока жива сцена. restart() её уничтожает, bind() собирает заново.
@@ -52,6 +57,10 @@ export class ProgressShopController {
 
   coinBonus(): number {
     return this.progress.coins;
+  }
+
+  pointBonus(): number {
+    return this.progress.points;
   }
 
   bulletCount(): number {
@@ -118,6 +127,10 @@ export class ProgressShopController {
     this.buy('coins');
   }
 
+  private buyPoints(): void {
+    this.buy('points');
+  }
+
   private buyDamage(): void {
     this.buy('damage');
   }
@@ -173,16 +186,17 @@ export class ProgressShopController {
     const score = this.progress.score;
     return {
       score,
-      cards: [
-        this.coinsCard(score),
-        this.damageCard(score),
-        this.blastCard(score),
-        this.speedCard(score),
-        this.bulletsCard(score),
-        this.mgDamageCard(score),
-        this.laserCard(score),
+      tabs: [
+        this.tab('tank', 'Танк', [this.damageCard(score), this.blastCard(score), this.speedCard(score)]),
+        this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
+        this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
+        this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
       ],
     };
+  }
+
+  private tab(id: string, label: string, cards: ProgressCardView[]): ProgressTabView {
+    return { id, label, cards };
   }
 
   private coinsCard(score: number): ProgressCardView {
@@ -191,6 +205,19 @@ export class ProgressShopController {
     return {
       title: '+1 монета',
       buy: () => this.buyCoins(),
+      info: `ур. ${level} · +${level}→+${level + 1}`,
+      cost: this.coin(price),
+      open: true,
+      canBuy: score >= price,
+    };
+  }
+
+  private pointsCard(score: number): ProgressCardView {
+    const level = this.progress.points;
+    const price = this.price(level);
+    return {
+      title: '+1 очко',
+      buy: () => this.buyPoints(),
       info: `ур. ${level} · +${level}→+${level + 1}`,
       cost: this.coin(price),
       open: true,
@@ -236,7 +263,7 @@ export class ProgressShopController {
     const delay = this.formatSeconds(now);
     const ahead = this.formatSeconds(next);
     return {
-      title: '−0.01 с',
+      title: '−0.01 с перезарядки',
       buy: () => this.buySpeed(),
       info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${ahead}`,
       cost: maxed ? 'макс.' : this.coin(price),

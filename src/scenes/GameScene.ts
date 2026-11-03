@@ -274,6 +274,8 @@ export class GameScene extends Phaser.Scene {
         damage: this.progressShop.damageBonus(),
         blast: this.progressShop.blastBonus(),
         coins: this.progressShop.coinBonus(),
+        points: this.progressShop.pointBonus(),
+        mg: this.progressShop.mgDamageBonus(),
       },
       () => this.waves.beginNextWave(),
       // Любая покупка сразу пишет партию, не дожидаясь автозаписи раз в 400 мс.
@@ -530,7 +532,6 @@ export class GameScene extends Phaser.Scene {
       this.physics.world.pause();
       this.settingsPausedPhysics = true;
     }
-    // Камера списка магазина рисуется поверх основного холста и закрыла бы окно.
     this.shop.panel.coverForPause(true);
     this.music.applyVolume();
     this.settings.setOpen(true);
@@ -647,7 +648,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onEnemyKill(coinReward: number): void {
-    this.score += 10;
+    this.score += 10 + this.progressShop.pointBonus();
     // coinReward — монеты вида врага. coinBonus() — постоянная прибавка за каждое убийство.
     this.coins += coinReward + this.progressShop.coinBonus();
     this.hud.setScore(this.score);

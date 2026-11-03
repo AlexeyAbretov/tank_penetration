@@ -430,12 +430,14 @@ export class GameHud {
     fireDelayMs: number,
     autoFire = false,
     coinBonus = 0,
+    pointBonus = 0,
   ): void {
     const fireSec = (fireDelayMs / 1000).toFixed(2);
     const mode = autoFire ? 'авто' : 'ЛКМ';
     const coins = coinBonus > 0 ? `   МОНЕТЫ +${coinBonus}` : '';
+    const points = pointBonus > 0 ? `   ОЧКИ +${pointBonus}` : '';
     this.tankStatsText.setText(
-      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с${coins}   ${mode}`,
+      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с${coins}${points}   ${mode}`,
     );
   }
 

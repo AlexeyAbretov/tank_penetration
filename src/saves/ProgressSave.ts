@@ -16,6 +16,8 @@ export type SavedProgress = {
   score: number;
   awaitingShop: boolean;
   coins: number;
+  // Сколько лишних очков даёт каждое убийство. 0 — только базовые 10.
+  points: number;
   damage: number;
   blast: number;
   speed: number;
@@ -63,6 +65,7 @@ export class ProgressSave {
     progress.score = 0;
     progress.awaitingShop = false;
     progress.coins = 0;
+    progress.points = 0;
     progress.damage = 0;
     progress.blast = 0;
     progress.speed = 0;
@@ -93,6 +96,7 @@ export class ProgressSave {
       score: 0,
       awaitingShop: false,
       coins: 0,
+      points: 0,
       damage: 0,
       blast: 0,
       speed: 0,
@@ -138,6 +142,7 @@ function parseProgress(value: unknown): SavedProgress | null {
     score: requiredInt(value.score, 0, SCORE_MAX) ?? 0,
     awaitingShop: value.awaitingShop === true,
     coins: requiredInt(value.coins, 0, LEVEL_MAX) ?? 0,
+    points: requiredInt(value.points, 0, LEVEL_MAX) ?? 0,
     damage: requiredInt(value.damage, 0, LEVEL_MAX) ?? 0,
     blast: requiredInt(value.blast, 0, LEVEL_MAX) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,

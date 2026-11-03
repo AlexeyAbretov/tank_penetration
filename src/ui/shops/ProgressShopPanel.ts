@@ -1,5 +1,5 @@
 // Магазин после гибели базы. Оплата накопленным score.
-// Один список в своей камере: он скроллится вертикально и не залезает на кнопки.
+// Слева закладки, справа карточки выбранной. Скролла нет: в полке не больше трёх карточек.
 // Покупки и тексты карточек приходят из контроллера: окно их список не знает.
 
 import Phaser from 'phaser';
@@ -17,15 +17,21 @@ export type ProgressCardView = {
   title: string;
   info: string;
   cost: string;
-  // false — скорость уже на пределе, клик не покупает.
+  // false — скорость, пули или лучи уже на пределе, клик не покупает.
   open: boolean;
   canBuy: boolean;
   buy: () => void;
 };
 
+export type ProgressTabView = {
+  id: string;
+  label: string;
+  cards: ProgressCardView[];
+};
+
 export type ProgressShopView = {
   score: number;
-  cards: ProgressCardView[];
+  tabs: ProgressTabView[];
 };
 
 // «Новая игра» и «в бой». Сами покупки приходят в карточке.
@@ -34,26 +40,31 @@ export type ProgressShopDelegate = {
   wipeAndRestart(): void;
 };
 
-const PANEL_W = 660;
-const PANEL_H = 600;
+const PANEL_W = 980;
+const PANEL_H = 680;
 
-const CARD_W = 133;
-const CARD_H = 68;
+const SIDE = 22;
+const TAB_W = 250;
+const TAB_H = 46;
+const TAB_GAP = 6;
+const CONTENT_TOP = -220;
+const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
+
+const CARD_GAP_X = 16;
+const CARD_W = PANEL_W - SIDE * 2 - TAB_W - CARD_GAP_X;
+const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
+const CARD_H = 92;
 const CARD_GAP = 10;
-const PAD = 8;
-const TRACK = 8;
-// Две кнопки внизу. Список совпадает с их внешними краями.
+const CARD_SLOTS = 4;
+
+const TITLE_Y = -302;
+const SCORE_Y = -258;
+const RULE_Y = -238;
+const BUTTON_Y = 292;
 const BUTTON_W = 260;
 const BUTTON_X = 145;
-const BUTTON_SPAN = BUTTON_X * 2 + BUTTON_W;
-const VIEW_W = BUTTON_SPAN;
 
-const TITLE_Y = -258;
-const SCORE_Y = -214;
-const VIEW_BAND = -184;
-// Низ панели минус зазор и половина кнопки.
-const BUTTON_Y = PANEL_H / 2 - 28 - 26;
-const VIEW_H = BUTTON_Y - 26 - 16 - VIEW_BAND;
+const BRASS = 0xc4a15a;
 
 type Offer = {
   card: Phaser.GameObjects.Rectangle;
@@ -64,48 +75,46 @@ type Offer = {
   open: boolean;
 };
 
+type Tab = {
+  id: string;
+  face: Phaser.GameObjects.Graphics;
+  hit: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
+};
+
 export class ProgressShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly dim: Phaser.GameObjects.Rectangle;
-  private readonly screen: { width: number; height: number };
-  private readonly cam: Phaser.Cameras.Scene2D.Camera;
-  private readonly content: Phaser.GameObjects.Container;
-  private readonly track: Phaser.GameObjects.Rectangle;
-  private readonly thumb: Phaser.GameObjects.Rectangle;
-  private readonly offers: Offer[] = [];
+  private readonly offers: Offer[];
+  private readonly tabs: Tab[] = [];
 
-  private viewLeft = 0;
-  private viewTop = 0;
-  private scroll = 0;
-  private maxScroll = 0;
-  private thumbH = 36;
-  private listShown = false;
   private paused = false;
-  private drag: { y: number; scroll: number; moved: boolean } | null = null;
-  private pressedCard: Phaser.GameObjects.Rectangle | null = null;
+  private selected = '';
+  private tabKey = '';
+  private lastView: ProgressShopView | null = null;
+  private lastCards: ProgressCardView[] = [];
 
   constructor(
     scene: Phaser.Scene,
     shop: ProgressShopDelegate,
-    screen: { width: number; height: number },
+    private readonly screen: { width: number; height: number },
   ) {
-    this.screen = screen;
-    this.cam = scene.cameras.add(0, 0, VIEW_W, VIEW_H);
-    this.cam.roundPixels = true;
-    this.cam.setVisible(false);
-
-    this.content = scene.add.container(0, 0);
-    this.content.cameraFilter |= scene.cameras.main.id;
-    this.content.setVisible(false).setDepth(86);
-
     this.dim = scene.add.rectangle(0, 0, screen.width, screen.height, 0x000000, 0.62).setInteractive();
     const panel = scene.add.graphics();
     paintFieldPlate(panel, PANEL_W, PANEL_H);
-    const well = scene.add.rectangle(0, VIEW_BAND + VIEW_H / 2, VIEW_W, VIEW_H, 0x12170e);
+    const wellTop = CONTENT_TOP - 8;
+    const wellBottom = BUTTON_Y - 26 - 14;
+    const well = scene.add.rectangle(
+      CARD_X,
+      (wellTop + wellBottom) / 2,
+      CARD_W + 16,
+      wellBottom - wellTop,
+      0x12170e,
+    );
     const rule = scene.add.graphics();
-    paintFieldRule(rule, -236, 200);
+    paintFieldRule(rule, RULE_Y, PANEL_W / 2 - 36);
 
     const title = scene.add
       .text(0, TITLE_Y, 'БАЗА РАЗБИТА', {
@@ -123,20 +132,9 @@ export class ProgressShopPanel {
       })
       .setOrigin(0.5);
 
-    const trackX = VIEW_W / 2 - TRACK / 2;
-    this.track = scene.add.rectangle(trackX, VIEW_BAND + VIEW_H / 2, TRACK, VIEW_H, 0x161c12);
-    this.thumb = scene.add
-      .rectangle(trackX, VIEW_BAND + this.thumbH / 2, TRACK, this.thumbH, 0x8a7848)
-      .setInteractive({ useHandCursor: true, draggable: true });
-    scene.input.setDraggable(this.thumb);
-    this.track.setVisible(false);
-    this.thumb.setVisible(false);
-    this.thumb.on('drag', (pointer: Phaser.Input.Pointer) => {
-      if (!this.paused && this.listShown) {
-        this.dragThumb(pointer);
-      }
-    });
+    this.offers = Array.from({ length: CARD_SLOTS }, (_, index) => this.makeOffer(scene, index));
 
+    const offerNodes = this.offers.flatMap((offer) => [offer.card, offer.title, offer.info, offer.cost]);
     this.container = scene.add.container(screen.width / 2, screen.height / 2, [
       this.dim,
       panel,
@@ -144,8 +142,7 @@ export class ProgressShopPanel {
       rule,
       title,
       this.scoreText,
-      this.track,
-      this.thumb,
+      ...offerNodes,
     ]);
 
     const fresh = this.makeButton(scene, -BUTTON_X, BUTTON_Y, BUTTON_W, 'НОВАЯ ИГРА', () => shop.wipeAndRestart());
@@ -154,245 +151,168 @@ export class ProgressShopPanel {
 
     // Выше игрового UI и окна между волнами. Пауза (90) остаётся сверху.
     this.container.setDepth(85).setVisible(false);
-
-    const onMove = (pointer: Phaser.Input.Pointer) => {
-      if (!this.paused) {
-        this.dragList(pointer);
-      }
-    };
-    const onUp = () => {
-      this.drag = null;
-      this.pressedCard = null;
-    };
-    const onWheel = (
-      pointer: Phaser.Input.Pointer,
-      _over: Phaser.GameObjects.GameObject[],
-      _dx: number,
-      dy: number,
-    ) => {
-      if (this.paused || !this.listShown || !this.container.visible || !this.overList(pointer)) {
-        return;
-      }
-      this.setScroll(this.scroll + dy * 0.55);
-    };
-    scene.input.on('pointermove', onMove);
-    scene.input.on('pointerup', onUp);
-    scene.input.on('wheel', onWheel);
-
-    // Сцена при перезапуске та же, поэтому подписки снимаем на shutdown.
-    scene.events.on('update', this.syncListCamera, this);
-    scene.events.once('shutdown', () => {
-      scene.events.off('update', this.syncListCamera, this);
-      scene.input.off('pointermove', onMove);
-      scene.input.off('pointerup', onUp);
-      scene.input.off('wheel', onWheel);
-    });
     this.layout();
-    this.syncListCamera();
   }
 
+  // Поле шире 1280 — окно и затемнение остаются по центру.
   layout(): void {
-    this.viewLeft = this.screen.width / 2 - VIEW_W / 2;
-    this.viewTop = this.screen.height / 2 + VIEW_BAND;
-    this.cam.setPosition(this.viewLeft, this.viewTop);
-    this.cam.setScroll(this.viewLeft, this.viewTop);
-    this.content.setPosition(this.viewLeft + VIEW_W / 2, this.viewTop - this.scroll);
     this.container.setPosition(this.screen.width / 2, this.screen.height / 2);
     this.dim.setSize(this.screen.width, this.screen.height);
   }
 
   show(view: ProgressShopView): void {
+    this.selected = view.tabs[0]?.id ?? '';
     this.refresh(view);
-    this.setScroll(0);
     this.container.setVisible(true);
-    this.listShown = !this.paused;
-    this.applyList();
-    this.syncListCamera();
   }
 
   hide(): void {
-    this.drag = null;
-    this.pressedCard = null;
-    this.listShown = false;
     this.container.setVisible(false);
-    this.applyList();
   }
 
-  // Камера списка рисуется поверх основной и закрыла бы плашку «ПАУЗА».
+  // Покупки ждут продолжения. «В бой» и «Новая игра» паузу не спрашивают.
   setPaused(paused: boolean): void {
     this.paused = paused;
-    if (!this.container.visible) {
-      return;
-    }
-    this.listShown = !paused;
-    this.applyList();
   }
 
   refresh(view: ProgressShopView): void {
+    this.lastView = view;
     this.scoreText.setText(`SCORE  ${view.score}`);
-    this.syncOffers(view.cards);
-    for (let i = 0; i < view.cards.length; i += 1) {
-      this.paint(this.offers[i], view.cards[i]);
+    this.syncTabs(view.tabs);
+  }
+
+  private syncTabs(tabs: ProgressTabView[]): void {
+    const key = tabs.map((tab) => tab.id).join('\0');
+    if (key !== this.tabKey) {
+      this.destroyTabs();
+      this.tabKey = key;
+      tabs.forEach((tab, index) => {
+        this.tabs.push(this.makeTab(tab.id, tab.label, index));
+      });
+    } else {
+      tabs.forEach((tab, index) => {
+        this.tabs[index]?.label.setText(tab.label);
+      });
+    }
+    if (!tabs.some((tab) => tab.id === this.selected)) {
+      this.selected = tabs[0]?.id ?? '';
+    }
+    for (const tab of this.tabs) {
+      this.paintTab(tab, tab.id === this.selected);
+    }
+    const current = tabs.find((tab) => tab.id === this.selected);
+    this.lastCards = current?.cards ?? [];
+    this.applyOffers();
+  }
+
+  private makeTab(id: string, label: string, index: number): Tab {
+    const scene = this.container.scene;
+    const y = CONTENT_TOP + TAB_H / 2 + index * (TAB_H + TAB_GAP);
+    const face = scene.add.graphics().setPosition(TAB_X, y);
+    const hit = scene.add.rectangle(TAB_X, y, TAB_W, TAB_H, 0x000000, 0);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', () => {
+      if (this.blocked() || this.selected === id || !this.lastView) {
+        return;
+      }
+      this.selected = id;
+      this.refresh(this.lastView);
+    });
+    const text = scene.add
+      .text(TAB_X - TAB_W / 2 + 18, y, label, {
+        fontSize: '16px',
+        color: fieldPaper,
+      })
+      .setOrigin(0, 0.5);
+    this.container.add([face, hit, text]);
+    return { id, face, hit, label: text };
+  }
+
+  private paintTab(tab: Tab, selected: boolean): void {
+    const g = tab.face;
+    g.clear();
+    const left = -TAB_W / 2;
+    const top = -TAB_H / 2;
+    g.fillStyle(selected ? 0x6e6240 : 0x3e4634, 1);
+    g.fillRect(left, top, TAB_W, TAB_H);
+    g.fillStyle(selected ? 0x3a4630 : 0x1e2618, 1);
+    g.fillRect(left + 3, top + 3, TAB_W - 6, TAB_H - 6);
+    if (selected) {
+      g.fillStyle(BRASS, 1);
+      g.fillRect(left + 3, top + 3, 5, TAB_H - 6);
+    }
+    tab.label.setColor(selected ? fieldInk : fieldPaper);
+  }
+
+  private destroyTabs(): void {
+    for (const tab of this.tabs) {
+      tab.face.destroy();
+      tab.hit.destroy();
+      tab.label.destroy();
+    }
+    this.tabs.length = 0;
+  }
+
+  private applyOffers(): void {
+    for (let i = 0; i < this.offers.length; i += 1) {
+      const card = this.lastCards[i];
+      const shown = card !== undefined;
+      this.setOfferShown(this.offers[i], shown);
+      if (shown && card) {
+        this.paint(this.offers[i], card);
+      }
     }
   }
 
-  private applyList(): void {
-    this.cam.setVisible(this.listShown);
-    this.content.setVisible(this.listShown);
-    const scroll = this.listShown && this.maxScroll > 0;
-    this.track.setVisible(scroll);
-    this.thumb.setVisible(scroll);
-  }
-
-  private syncOffers(cards: ProgressCardView[]): void {
-    if (this.offers.length === cards.length) {
+  private setOfferShown(offer: Offer, shown: boolean): void {
+    offer.card.setVisible(shown);
+    offer.title.setVisible(shown);
+    offer.info.setVisible(shown);
+    offer.cost.setVisible(shown);
+    if (!shown) {
+      offer.card.disableInteractive();
       return;
     }
-    for (const offer of this.offers) {
-      offer.card.destroy();
-      offer.title.destroy();
-      offer.info.destroy();
-      offer.cost.destroy();
-    }
-    this.offers.length = 0;
-    const scene = this.content.scene;
-    cards.forEach((card, index) => {
-      this.offers.push(this.makeOffer(scene, index, card.buy));
-    });
-    this.layoutList();
+    offer.card.setInteractive({ useHandCursor: true });
   }
 
-  private layoutList(): void {
-    const rows = Math.ceil(this.offers.length / this.columns());
-    const gaps = Math.max(0, rows - 1);
-    const contentHeight = PAD * 2 + rows * CARD_H + gaps * CARD_GAP;
-    this.maxScroll = Math.max(0, contentHeight - VIEW_H);
-    const span = Math.max(contentHeight, 1);
-    this.thumbH = Math.min(VIEW_H, Math.max(36, Math.round((VIEW_H * VIEW_H) / span)));
-    this.thumb.setSize(TRACK, this.thumbH);
-    this.setScroll(this.scroll);
-    this.applyList();
-  }
-
-  private columns(): number {
-    const inner = VIEW_W - PAD * 2 + CARD_GAP;
-    return Math.max(1, Math.floor(inner / (CARD_W + CARD_GAP)));
-  }
-
-  private makeOffer(scene: Phaser.Scene, index: number, buy: () => void): Offer {
-    const cols = this.columns();
-    const col = index % cols;
-    const row = Math.floor(index / cols);
-    const x = -VIEW_W / 2 + PAD + col * (CARD_W + CARD_GAP) + CARD_W / 2;
-    const y = PAD + row * (CARD_H + CARD_GAP) + CARD_H / 2;
-    const card = scene.add.rectangle(x, y, CARD_W, CARD_H, 0x343e2a).setStrokeStyle(2, 0x6e6848);
-    // Выше затемнения окна: иначе полный экран перехватывает клик по карточке.
-    card.setDepth(10);
-    card.setInteractive({ useHandCursor: true });
+  private makeOffer(scene: Phaser.Scene, index: number): Offer {
+    const y = CONTENT_TOP + CARD_H / 2 + index * (CARD_H + CARD_GAP);
+    const card = scene.add.rectangle(CARD_X, y, CARD_W, CARD_H, 0x343e2a).setStrokeStyle(2, 0x6e6848);
     const title = scene.add
-      .text(x, y - CARD_H / 2 + 6, '', {
-        fontSize: '13px',
+      .text(CARD_X, y - CARD_H / 2 + 12, '', {
+        fontSize: '18px',
         color: fieldInk,
         align: 'center',
       })
       .setOrigin(0.5, 0);
     const info = scene.add
-      .text(x, y + 1, '', {
-        fontSize: '11px',
+      .text(CARD_X, y + 4, '', {
+        fontSize: '16px',
         color: fieldPaper,
         align: 'center',
       })
       .setOrigin(0.5);
     const cost = scene.add
-      .text(x, y + CARD_H / 2 - 5, '', {
-        fontSize: '13px',
+      .text(CARD_X, y + CARD_H / 2 - 10, '', {
+        fontSize: '18px',
         color: fieldInk,
         align: 'center',
       })
       .setOrigin(0.5, 1);
-
-    this.content.add([card, title, info, cost]);
-    const offer: Offer = { card, title, info, cost, buy, open: true };
-    card.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.paused || !this.listShown || !this.inView(pointer)) {
-        return;
-      }
-      this.pressedCard = card;
-      this.drag = { y: pointer.y, scroll: this.scroll, moved: false };
-    });
-    card.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (this.paused || !this.listShown || this.pressedCard !== card || this.drag?.moved || !offer.open) {
-        return;
-      }
-      if (!this.inView(pointer)) {
+    const offer: Offer = { card, title, info, cost, buy: () => undefined, open: false };
+    card.on('pointerup', () => {
+      if (this.blocked() || !offer.open) {
         return;
       }
       offer.buy();
     });
+    this.setOfferShown(offer, false);
     return offer;
   }
 
-  private dragList(pointer: Phaser.Input.Pointer): void {
-    if (!this.drag || !pointer.isDown) {
-      return;
-    }
-    const dy = pointer.y - this.drag.y;
-    if (Math.abs(dy) > 8) {
-      this.drag.moved = true;
-    }
-    if (this.drag.moved) {
-      this.setScroll(this.drag.scroll - dy);
-    }
-  }
-
-  private dragThumb(pointer: Phaser.Input.Pointer): void {
-    const screenTop = this.screen.height / 2 + VIEW_BAND;
-    const travel = VIEW_H - this.thumbH;
-    const half = this.thumbH / 2;
-    const center = Phaser.Math.Clamp(pointer.y, screenTop + half, screenTop + travel + half);
-    const t = travel > 0 ? (center - (screenTop + half)) / travel : 0;
-    this.setScroll(t * this.maxScroll);
-  }
-
-  private setScroll(value: number): void {
-    this.scroll = Phaser.Math.Clamp(value, 0, this.maxScroll);
-    this.content.y = this.viewTop - this.scroll;
-    const travel = VIEW_H - this.thumbH;
-    const t = this.maxScroll > 0 ? this.scroll / this.maxScroll : 0;
-    this.thumb.y = VIEW_BAND + this.thumbH / 2 + travel * t;
-  }
-
-  private overList(pointer: Phaser.Input.Pointer): boolean {
-    const right = this.viewLeft + VIEW_W;
-    return (
-      pointer.x >= this.viewLeft &&
-      pointer.x <= right &&
-      pointer.y >= this.viewTop &&
-      pointer.y <= this.viewTop + VIEW_H
-    );
-  }
-
-  private inView(pointer: Phaser.Input.Pointer): boolean {
-    return (
-      pointer.x >= this.viewLeft &&
-      pointer.x <= this.viewLeft + VIEW_W &&
-      pointer.y >= this.viewTop &&
-      pointer.y <= this.viewTop + VIEW_H
-    );
-  }
-
-  // Камера списка рисует только карточки. Остальная сцена для неё невидима.
-  private syncListCamera(): void {
-    const listId = this.cam.id;
-    const mainId = this.content.scene.cameras.main.id;
-    const children = this.content.scene.children.list;
-    for (const child of children) {
-      if (child === this.content) {
-        child.cameraFilter = (child.cameraFilter & ~listId) | mainId;
-      } else {
-        child.cameraFilter |= listId;
-      }
-    }
+  private blocked(): boolean {
+    return this.paused || !this.container.visible;
   }
 
   private paint(offer: Offer, card: ProgressCardView): void {

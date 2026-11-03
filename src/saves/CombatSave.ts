@@ -36,6 +36,12 @@ export type ShopSave = {
   nuclear: boolean;
   autoFire: boolean;
   autoFireOn: boolean;
+  mgDamage: number;
+  wireDamage: number;
+  flameDamage: number;
+  salvoDamage: number;
+  artilleryDamage: number;
+  minesDamage: number;
 };
 
 export type PlantedMineSave = {
@@ -206,6 +212,13 @@ function parseShop(value: unknown): ShopSave | null {
   const autoFire = flag(value.autoFire);
   // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
   const autoFireOn = flag(value.autoFireOn) ?? (autoFire === true);
+  // Старые сохранения не писали урон партии у пулемёта, проволоки, огнемёта, РСЗО, артиллерии и мин.
+  const mgDamage = requiredInt(value.mgDamage, 0, 500) ?? 0;
+  const wireDamage = requiredInt(value.wireDamage, 0, 500) ?? 0;
+  const flameDamage = requiredInt(value.flameDamage, 0, 500) ?? 0;
+  const salvoDamage = requiredInt(value.salvoDamage, 0, 500) ?? 0;
+  const artilleryDamage = requiredInt(value.artilleryDamage, 0, 500) ?? 0;
+  const minesDamage = requiredInt(value.minesDamage, 0, 500) ?? 0;
   if (
     blast === null ||
     damage === null ||
@@ -231,6 +244,12 @@ function parseShop(value: unknown): ShopSave | null {
     nuclear,
     autoFire,
     autoFireOn: autoFire && autoFireOn,
+    mgDamage,
+    wireDamage,
+    flameDamage,
+    salvoDamage,
+    artilleryDamage,
+    minesDamage,
   };
 }
 
