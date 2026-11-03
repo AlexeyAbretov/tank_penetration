@@ -1,16 +1,18 @@
 // Дебаг-бой. Те же выстрелы, но двойное нажатие кнопки способности сбрасывает перезарядку.
 // Второе нажатие за короткое окно удар не вызывает. После сброса окно пустое.
 // Двойной щелчок по РСЗО, огнемёту, лазеру или танку глушит и снова включает их стрельбу.
+// Флаг пишется в localStorage: перезагрузка оставляет технику в том же состоянии.
 // У танка вместе с пушкой замолкает пулемёт. Щелчок по машине сам выстрел не даёт.
 
 import Phaser from 'phaser';
 import { HitboxOverlay } from '../debug/HitboxOverlay';
+import { WeaponQuiet, type QuietWeapon } from '../debug/WeaponQuiet';
 import { CombatSystem } from './CombatSystem';
 
 const DOUBLE_MS = 400;
 
 type AbilityTap = 'artillery' | 'mines' | 'nuclear';
-type WeaponTap = 'tank' | 'laser' | 'flame' | 'salvo';
+type WeaponTap = QuietWeapon;
 
 export class DebugCombatSystem extends CombatSystem {
   private readonly tappedAt: Record<AbilityTap, number> = {
@@ -23,13 +25,6 @@ export class DebugCombatSystem extends CombatSystem {
     laser: -1,
     flame: -1,
     salvo: -1,
-  };
-  // true — эта стрельба молчит. Пушка и пулемёт делят один флаг танка.
-  private readonly silenced: Record<WeaponTap, boolean> = {
-    tank: false,
-    laser: false,
-    flame: false,
-    salvo: false,
   };
   // Зажатая кнопка началась на машине: пока её не отпустили, ЛКМ не стреляет.
   private blockShot = false;
@@ -54,15 +49,15 @@ export class DebugCombatSystem extends CombatSystem {
 
   override tick(delta: number, allowFire = true): void {
     super.tick(delta, allowFire);
-    this.tank.setQuiet(this.silenced.tank);
-    this.shop.machineGun?.setQuiet(this.silenced.tank);
-    this.shop.laser?.setQuiet(this.silenced.laser);
-    this.shop.flame?.setQuiet(this.silenced.flame);
-    this.shop.salvo?.setQuiet(this.silenced.salvo);
+    this.tank.setQuiet(WeaponQuiet.isQuiet('tank'));
+    this.shop.machineGun?.setQuiet(WeaponQuiet.isQuiet('tank'));
+    this.shop.laser?.setQuiet(WeaponQuiet.isQuiet('laser'));
+    this.shop.flame?.setQuiet(WeaponQuiet.isQuiet('flame'));
+    this.shop.salvo?.setQuiet(WeaponQuiet.isQuiet('salvo'));
   }
 
   protected override weaponLive(kind: WeaponTap): boolean {
-    return !this.silenced[kind];
+    return !WeaponQuiet.isQuiet(kind);
   }
 
   protected override handleFireInput(pointer: Phaser.Input.Pointer): void {
@@ -89,7 +84,7 @@ export class DebugCombatSystem extends CombatSystem {
     const doubled = last >= 0 && now - last <= DOUBLE_MS;
     this.weaponAt[weapon] = doubled ? -1 : now;
     if (doubled) {
-      this.silenced[weapon] = !this.silenced[weapon];
+      WeaponQuiet.toggle(weapon);
     }
   }
 
