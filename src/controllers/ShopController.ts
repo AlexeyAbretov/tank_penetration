@@ -452,7 +452,7 @@ export class ShopController {
   syncTankStats(): void {
     this.hud.setTankStats(
       Infantry.shellDamage + this.damageLevel + this.bonuses.damage,
-      (this.blastLevel + this.bonuses.blast) * Tank.blastRadiusPerLevel,
+      Tank.blastRadiusFor(this.blastLevel + this.bonuses.blast),
       Tank.fireDelayFor(this.fireRateLevel),
       this.autoFire.enabled,
       this.bonuses.coins,
@@ -701,8 +701,8 @@ export class ShopController {
 
   private blastCard(coins: number): ShopCardView {
     const price = ShopController.upgradeCost(this.blastLevel);
-    const radius = (this.blastLevel + this.bonuses.blast) * Tank.blastRadiusPerLevel;
-    const nextRadius = (this.blastLevel + 1 + this.bonuses.blast) * Tank.blastRadiusPerLevel;
+    const radius = Tank.blastRadiusFor(this.blastLevel + this.bonuses.blast);
+    const nextRadius = Tank.blastRadiusFor(this.blastLevel + 1 + this.bonuses.blast);
     return {
       title: '+1 область взрыва',
       buy: () => this.buyBlast(),

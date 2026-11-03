@@ -55,7 +55,13 @@ export class Tank extends GameObjects.Container {
     return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep - progressCut);
   }
   static readonly shellSpeed = 740;
+  // Радиус взрыва снаряда без покупок. Уровень магазина и прогресса прибавляет blastRadiusPerLevel.
+  static readonly baseBlastRadius = 10;
   static readonly blastRadiusPerLevel = 1;
+
+  static blastRadiusFor(level: number): number {
+    return Tank.baseBlastRadius + level * Tank.blastRadiusPerLevel;
+  }
 
   // Точка прицеливания врагов: чуть правее носа танка.
   static aimPoint(): { x: number; y: number } {

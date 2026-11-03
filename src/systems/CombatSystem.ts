@@ -56,7 +56,7 @@ type FlamePatch = {
 
 export class CombatSystem implements Combat {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
-  private readonly shells: Phaser.Physics.Arcade.Group;
+  protected readonly shells: Phaser.Physics.Arcade.Group;
   private readonly mgShots: Phaser.Physics.Arcade.Group;
   private mgCooldown = 0;
   // Сколько пуль ещё осталось в текущей очереди. 0 — очередь не начата.
@@ -1136,8 +1136,8 @@ export class CombatSystem implements Combat {
     return MachineGun.shop.damage + this.shop.mgDamageLevel + this.progressMgDamage;
   }
 
-  private blastRadius(): number {
-    return (this.shop.blastLevel + this.progressBlast) * Tank.blastRadiusPerLevel;
+  protected blastRadius(): number {
+    return Tank.blastRadiusFor(this.shop.blastLevel + this.progressBlast);
   }
 
   private playBlast(x: number, y: number): void {

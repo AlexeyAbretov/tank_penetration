@@ -242,8 +242,8 @@ export class ProgressShopController {
   private blastCard(score: number): ProgressCardView {
     const level = this.progress.blast;
     const price = this.price(level);
-    const now = level * Tank.blastRadiusPerLevel;
-    const next = (level + 1) * Tank.blastRadiusPerLevel;
+    const now = Tank.blastRadiusFor(level);
+    const next = Tank.blastRadiusFor(level + 1);
     return {
       title: '+1 взрыв',
       buy: () => this.buyBlast(),

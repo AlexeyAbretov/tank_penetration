@@ -30,7 +30,7 @@ export class DebugCombatSystem extends CombatSystem {
   private blockShot = false;
 
   protected override afterConstruct(): void {
-    new HitboxOverlay(this.scene, this.infantry);
+    new HitboxOverlay(this.scene, this.infantry, this.shells, () => this.blastRadius());
     const onDown = (pointer: Phaser.Input.Pointer): void => {
       this.onWeaponDown(pointer);
     };
