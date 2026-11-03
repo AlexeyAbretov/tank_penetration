@@ -1,6 +1,7 @@
 // Партия в localStorage. Обновление и закрытие вкладки поднимают ту же волну,
 // а не новую игру. Снаряды не пишем: после загрузки враги просто стреляют заново.
 // Лежащие мины пишем: иначе поставленный заряд пропадает вместе с вкладкой.
+// Стену огня пишем вместе с остатком срока: горение потом станет длиннее вкладки.
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
@@ -42,6 +43,12 @@ export type PlantedMineSave = {
   y: number;
 };
 
+export type FlameWallSave = {
+  points: PlantedMineSave[];
+  // Общий остаток: полное горение, сжатие костров и гашение земли.
+  left: number;
+};
+
 export type SavedRun = {
   version: 1;
   score: number;
@@ -51,6 +58,8 @@ export type SavedRun = {
   artilleryCooldownMs: number;
   minesCooldownMs: number;
   nuclearCooldownMs: number;
+  flameCooldownMs: number;
+  flameWall: FlameWallSave | null;
   wave: number;
   phase: WavePhase;
   spawned: number;
@@ -140,6 +149,10 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
   const minesCooldownMs = requiredInt(value.minesCooldownMs, 0, Mines.shop.cooldownMs) ?? 0;
   const nuclearCooldownMs =
     requiredInt(value.nuclearCooldownMs, 0, NuclearStrike.shop.cooldownMs) ?? 0;
+  // Старые сохранения не писали перезарядку огнемёта: струя просто ждёт новый заход.
+  const flameCooldownMs = requiredInt(value.flameCooldownMs, 0, 60 * 60 * 1000) ?? 0;
+  // Старые сохранения не писали стену огня: на поле её не было.
+  const flameWall = parseFlameWall(value.flameWall);
   // В магазине список врагов пустой по смыслу фазы, даже если в JSON они остались.
   const enemies = phase === 'shop' ? [] : parseEnemies(value.enemies);
   // Старые сохранения не писали лежащие мины: поля просто нет, зарядов на нём не было.
@@ -161,6 +174,8 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     artilleryCooldownMs,
     minesCooldownMs,
     nuclearCooldownMs,
+    flameCooldownMs,
+    flameWall,
     wave,
     phase,
     spawned,
@@ -217,6 +232,32 @@ function parseShop(value: unknown): ShopSave | null {
     autoFire,
     autoFireOn: autoFire && autoFireOn,
   };
+}
+
+function parseFlameWall(value: unknown): FlameWallSave | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const left = requiredInt(value.left, 1, 60 * 60 * 1000);
+  if (left === null || !Array.isArray(value.points)) {
+    return null;
+  }
+  const points: PlantedMineSave[] = [];
+  for (const entry of value.points) {
+    if (points.length >= 64 || !isRecord(entry)) {
+      continue;
+    }
+    const x = finite(entry.x, -400, 8000);
+    const y = finite(entry.y, -200, 2000);
+    if (x === null || y === null) {
+      continue;
+    }
+    points.push({ x: Math.round(x), y: Math.round(y) });
+  }
+  if (points.length === 0) {
+    return null;
+  }
+  return { points, left };
 }
 
 function parsePlantedMines(value: unknown): PlantedMineSave[] {

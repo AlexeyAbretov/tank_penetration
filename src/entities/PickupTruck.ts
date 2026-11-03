@@ -56,6 +56,8 @@ export class PickupTruck extends RangedEnemy {
   static readonly muzzleTip = { x: 54, y: 14 };
   // Пламя на капоте обломков. Отсюда поднимается дым.
   static readonly flame = { x: 26, y: 30 };
+  // Струя огнемёта сажает огонь на капот, а не на задний борт.
+  readonly flameSeat = 'hood' as const;
 
   static readonly coinReward = 3;
   readonly coinReward = PickupTruck.coinReward;

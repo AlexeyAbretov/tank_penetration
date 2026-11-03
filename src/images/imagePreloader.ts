@@ -14,7 +14,7 @@ import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 import { GameHud } from '../ui/huds/GameHud';
 import { preloadAirBurst } from '../gfx/airBurst';
-import { preloadCampfire, preloadFlameStream } from '../gfx/flame';
+import { preloadCampfire, preloadFlameStream, preloadScorchedEarth } from '../gfx/flame';
 import { preloadBoom } from '../gfx/boom';
 import { preloadCraters } from '../gfx/craters';
 import { preloadNuke } from '../gfx/nuke';
@@ -45,5 +45,6 @@ export const preloadImages = (scene: Phaser.Scene) => {
   preloadBoom(scene);
   preloadCampfire(scene);
   preloadFlameStream(scene);
+  preloadScorchedEarth(scene);
   preloadAirBurst(scene);
 };

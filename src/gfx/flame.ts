@@ -1,15 +1,17 @@
 // Струя — лист из восьми кадров: выбросы с просветами, кладётся от среза и повторяется по лучу.
-// Костёр на конце струи — свой лист. Языки на юните рисуются кодом и урона не наносят.
+// Костёр на конце струи — свой лист. Под дугой костров фотографическая выжженная полоса.
+// Огонь на юните — уменьшенные костры по контуру. Урона не наносят.
+// У пехоты они идут по задней части, у машины — по капоту. Над ними поднимается дым.
 
 import Phaser from 'phaser';
+import { bake } from './textures';
 
 type Point = { x: number; y: number };
 
-type Body = Phaser.GameObjects.GameObject & {
-  x: number;
-  y: number;
-  displayHeight: number;
+type Body = Phaser.GameObjects.Sprite & {
   active: boolean;
+  // Машина помечает капот. У пехоты поля нет: огонь садится на задний контур.
+  flameSeat?: 'hood';
 };
 
 // Полуширина струи у среза и у дальнего конца.
@@ -48,8 +50,9 @@ export const flameStreamSheetPath = 'assets/flame-stream.png';
 
 type Burn = {
   left: number;
-  pen: Phaser.GameObjects.Graphics;
   unit: Body;
+  tongues: Phaser.GameObjects.Sprite[];
+  smoke: Phaser.GameObjects.Particles.ParticleEmitter;
 };
 
 const burns: Burn[] = [];
@@ -67,7 +70,7 @@ function bindScene(scene: Phaser.Scene): void {
 
 export function clearBurns(): void {
   for (const burn of burns) {
-    burn.pen.destroy();
+    dropBurn(burn);
   }
   burns.length = 0;
 }
@@ -78,11 +81,11 @@ export function tickBurns(scene: Phaser.Scene, delta: number): void {
     const burn = burns[i];
     burn.left -= delta;
     if (burn.left <= 0 || !burn.unit.active) {
-      burn.pen.destroy();
+      dropBurn(burn);
       burns.splice(i, 1);
       continue;
     }
-    paintBurn(burn.pen, burn.unit, burn.left);
+    followBurn(burn);
   }
 }
 
@@ -94,10 +97,15 @@ export function ignite(scene: Phaser.Scene, unit: Body, lifeMs: number): void {
     existing.left = lifeMs;
     return;
   }
-  const pen = scene.add.graphics().setDepth(14);
-  pen.setBlendMode(Phaser.BlendModes.ADD);
-  burns.push({ left: lifeMs, pen, unit });
-  paintBurn(pen, unit, lifeMs);
+  const hood = unit.flameSeat === 'hood';
+  const burn: Burn = {
+    left: lifeMs,
+    unit,
+    tongues: tonguesAt(scene, hood ? 3 : 4),
+    smoke: burnSmokeAt(scene, unit.x, unit.y, hood),
+  };
+  burns.push(burn);
+  followBurn(burn);
 }
 
 export function preloadFlameStream(scene: Phaser.Scene): void {
@@ -222,6 +230,105 @@ export function placeCampfires(
   });
 }
 
+// Лист public/assets/flame-scorch.png: 4 кадра 460×230. Уголь в середине, край прозрачный.
+export const scorchedEarth = {
+  frame: { w: 460, h: 230 },
+  frames: 4,
+  // Высота кадра на поле. Видимый ожог уже: сверху и снизу кадра пусто.
+  thick: 108,
+  // Доля ширины между центрами кусков. Стык попадает в прозрачный край.
+  along: 0.48,
+  sheetKey: 'flame-scorch',
+};
+
+// Путь буквальный: singlefile-сборка подменяет его на data:.
+export const scorchedEarthPath = 'assets/flame-scorch.png';
+
+export function preloadScorchedEarth(scene: Phaser.Scene): void {
+  if (scene.textures.exists(scorchedEarth.sheetKey)) {
+    return;
+  }
+  scene.load.spritesheet(scorchedEarth.sheetKey, scorchedEarthPath, {
+    frameWidth: scorchedEarth.frame.w,
+    frameHeight: scorchedEarth.frame.h,
+  });
+}
+
+function ensureScorchedEarth(scene: Phaser.Scene): boolean {
+  if (!scene.textures.exists(scorchedEarth.sheetKey)) {
+    return false;
+  }
+  scene.textures.get(scorchedEarth.sheetKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
+  return true;
+}
+
+// Куски фотографии ложатся по дуге оснований и сходятся в одну полосу.
+export function syncScorchedEarth(
+  scene: Phaser.Scene,
+  earth: Phaser.GameObjects.Container,
+  points: Point[],
+): void {
+  const samples = scorchSamples(points);
+  if (!ensureScorchedEarth(scene)) {
+    earth.removeAll(true);
+    return;
+  }
+  const scale = scorchedEarth.thick / scorchedEarth.frame.h;
+  while (earth.length < samples.length) {
+    const sprite = scene.add
+      .sprite(0, 0, scorchedEarth.sheetKey, earth.length % scorchedEarth.frames)
+      .setOrigin(0.5);
+    earth.add(sprite);
+  }
+  while (earth.length > samples.length) {
+    earth.getAt(earth.length - 1)?.destroy();
+  }
+  samples.forEach((sample, index) => {
+    const sprite = earth.getAt(index) as Phaser.GameObjects.Sprite;
+    sprite.setFrame(index % scorchedEarth.frames);
+    sprite.setPosition(sample.x, sample.y);
+    sprite.setRotation(sample.angle);
+    sprite.setScale(scale);
+  });
+}
+
+function scorchSamples(points: Point[]): Array<Point & { angle: number }> {
+  if (points.length < 2) {
+    return [];
+  }
+  const span = scorchedEarth.frame.w * (scorchedEarth.thick / scorchedEarth.frame.h) * scorchedEarth.along;
+  const samples: Array<Point & { angle: number }> = [];
+  const firstAngle = Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x);
+  samples.push({ x: points[0].x, y: points[0].y, angle: firstAngle });
+  let cursor = 0;
+  let traveled = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = points[index - 1];
+    const next = points[index];
+    const dx = next.x - prev.x;
+    const dy = next.y - prev.y;
+    const seg = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    while (cursor + span <= traveled + seg) {
+      cursor += span;
+      const t = seg < 1 ? 1 : (cursor - traveled) / seg;
+      samples.push({ x: prev.x + dx * t, y: prev.y + dy * t, angle });
+    }
+    traveled += seg;
+  }
+  const last = points[points.length - 1];
+  const tail = samples[samples.length - 1];
+  if (Math.hypot(last.x - tail.x, last.y - tail.y) > span * 0.4) {
+    const prev = points[points.length - 2];
+    samples.push({
+      x: last.x,
+      y: last.y,
+      angle: Math.atan2(last.y - prev.y, last.x - prev.x),
+    });
+  }
+  return samples;
+}
+
 export function inStream(px: number, py: number, from: Point, to: Point): boolean {
   const abx = to.x - from.x;
   const aby = to.y - from.y;
@@ -247,26 +354,251 @@ export function inPatch(px: number, py: number, points: Point[]): boolean {
   return false;
 }
 
-function lick(
-  g: Phaser.GameObjects.Graphics,
-  x: number,
-  y: number,
-  height: number,
-  half: number,
-  color: number,
-): void {
-  g.fillStyle(color, 0.9);
-  g.fillTriangle(x - half, y + 4, x + half, y + 4, x, y - height);
+function dropBurn(burn: Burn): void {
+  for (const tongue of burn.tongues) {
+    tongue.destroy();
+  }
+  burn.smoke.destroy();
 }
 
-function paintBurn(g: Phaser.GameObjects.Graphics, unit: Body, left: number): void {
-  g.clear();
-  const x = unit.x;
-  const y = unit.y - unit.displayHeight * 0.62;
-  const flick = Math.sin(left * 0.04) * 3;
-  lick(g, x - 6, y + 6, 12 + flick, 4, 0xc42e08);
-  lick(g, x + 5, y + 4, 16 + flick, 5, 0xff8a18);
-  lick(g, x, y + 2, 9, 3, 0xfff0a0);
+// Костры по числу языков. Соседи начинают с разных кадров, чтобы пламя не мигало разом.
+function tonguesAt(scene: Phaser.Scene, count: number): Phaser.GameObjects.Sprite[] {
+  ensureCampfire(scene);
+  if (!scene.textures.exists(campfire.sheetKey)) {
+    return [];
+  }
+  const tongues: Phaser.GameObjects.Sprite[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const tongue = scene.add.sprite(0, 0, campfire.sheetKey, 0).setOrigin(0.5, 1).setDepth(14);
+    tongue.play({ key: campfire.animKey, startFrame: index % campfire.frames });
+    tongues.push(tongue);
+  }
+  return tongues;
+}
+
+function burnSmokeAt(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  hood: boolean,
+): Phaser.GameObjects.Particles.ParticleEmitter {
+  const smoke = scene.add.particles(x, y, puffKey(scene), {
+    lifespan: { min: 700, max: 1400 },
+    frequency: 80,
+    quantity: 1,
+    speed: { min: 12, max: 28 },
+    angle: hood ? { min: -100, max: -80 } : { min: -80, max: -45 },
+    scale: { start: 0.28, end: 1.15 },
+    alpha: { start: 0.62, end: 0 },
+    color: [0x6e6862, 0x4a453f, 0x2c2926],
+    gravityY: -36,
+  });
+  smoke.setDepth(15);
+  return smoke;
+}
+
+function puffKey(scene: Phaser.Scene): string {
+  const key = 'smoke-puff';
+  if (!scene.textures.exists(key)) {
+    bake(scene, key, 32, 32, (g) => {
+      g.fillStyle(0xffffff, 0.18);
+      g.fillCircle(16, 16, 15);
+      g.fillStyle(0xffffff, 0.4);
+      g.fillCircle(16, 16, 9);
+      g.fillStyle(0xffffff, 0.75);
+      g.fillCircle(16, 16, 4);
+    });
+  }
+  return key;
+}
+
+// Языки едут вместе с юнитом: основание на контуре, верх клонится наружу.
+function followBurn(burn: Burn): void {
+  const hood = burn.unit.flameSeat === 'hood';
+  const seats = pick(contour(burn.unit, hood ? 'hood' : 'back'), Math.max(1, burn.tongues.length));
+  burn.tongues.forEach((tongue, index) => {
+    const seat = seats[Math.min(index, seats.length - 1)];
+    const scale = (hood ? 0.58 : 0.46) + (index % 3) * 0.08 + Math.sin(burn.left * 0.02 + index * 1.7) * 0.04;
+    tongue.setPosition(seat.x, seat.y);
+    tongue.setRotation(hood ? -0.12 : 0.4);
+    tongue.setScale(scale);
+  });
+  const anchor = seats[Math.min(hood ? 1 : 0, seats.length - 1)];
+  burn.smoke.setPosition(anchor.x + (hood ? 0 : 8), anchor.y - (hood ? 16 : 6));
+}
+
+function pick(points: Point[], count: number): Point[] {
+  if (points.length === 0 || count < 1) {
+    return points;
+  }
+  if (points.length <= count) {
+    return points;
+  }
+  const chosen: Point[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const at = Math.round(((points.length - 1) * index) / (count - 1));
+    chosen.push(points[at]);
+  }
+  return chosen;
+}
+
+const contourCache = new Map<string, Point[]>();
+const imageCache = new Map<string, ImageData>();
+
+// Точки контура в мире. Спина — правый край фигуры, капот — верх переда.
+function contour(unit: Body, seat: 'back' | 'hood'): Point[] {
+  const key = `${unit.texture.key}:${unit.frame.name}:${seat}`;
+  let local = contourCache.get(key);
+  if (!local) {
+    local = seat === 'hood' ? hoodEdge(unit) : backEdge(unit);
+    contourCache.set(key, local);
+  }
+  if (local.length === 0) {
+    return [{ x: unit.x, y: unit.y - unit.displayHeight * 0.55 }];
+  }
+  const outward = seat === 'hood' ? 0 : 4;
+  const lift = seat === 'hood' ? 3 : 0;
+  return local.map((point) => ({
+    x: worldX(unit, point.x) + outward,
+    y: worldY(unit, point.y) - lift,
+  }));
+}
+
+function backEdge(unit: Body): Point[] {
+  const pixels = framePixels(unit);
+  if (!pixels) {
+    return [];
+  }
+  const { data, width, height } = pixels;
+  let minY = height;
+  let maxY = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (data[(y * width + x) * 4 + 3] > 32) {
+        if (y < minY) {
+          minY = y;
+        }
+        if (y > maxY) {
+          maxY = y;
+        }
+      }
+    }
+  }
+  if (maxY <= minY) {
+    return [];
+  }
+  const rows = 7;
+  const edge: Point[] = [];
+  for (let index = 0; index < rows; index += 1) {
+    const y = Math.round(minY + (maxY - minY) * (0.04 + (0.82 * index) / (rows - 1)));
+    let right = -1;
+    for (let x = width - 1; x >= 0; x -= 1) {
+      if (data[(y * width + x) * 4 + 3] > 32) {
+        right = x;
+        break;
+      }
+    }
+    if (right >= 0) {
+      edge.push({ x: right, y });
+    }
+  }
+  return edge;
+}
+
+function hoodEdge(unit: Body): Point[] {
+  const pixels = framePixels(unit);
+  if (!pixels) {
+    return [];
+  }
+  const { data, width, height } = pixels;
+  let minX = width;
+  let maxX = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (data[(y * width + x) * 4 + 3] > 32) {
+        if (x < minX) {
+          minX = x;
+        }
+        if (x > maxX) {
+          maxX = x;
+        }
+      }
+    }
+  }
+  if (maxX <= minX) {
+    return [];
+  }
+  const front = minX + (maxX - minX) * 0.3;
+  const tops: Point[] = [];
+  for (let x = minX; x <= front; x += 1) {
+    for (let y = 0; y < height; y += 1) {
+      if (data[(y * width + x) * 4 + 3] > 32) {
+        tops.push({ x, y });
+        break;
+      }
+    }
+  }
+  if (tops.length === 0) {
+    return [];
+  }
+  const crown = Math.min(...tops.map((point) => point.y));
+  const hood = tops.filter((point) => point.y <= crown + 8);
+  const picks = 4;
+  const edge: Point[] = [];
+  for (let index = 0; index < picks; index += 1) {
+    const at = Math.round(((hood.length - 1) * index) / (picks - 1));
+    edge.push(hood[at]);
+  }
+  return edge;
+}
+
+function framePixels(unit: Body): { data: Uint8ClampedArray; width: number; height: number } | null {
+  const image = sourceImage(unit.texture);
+  if (!image) {
+    return null;
+  }
+  const frame = unit.frame;
+  const width = frame.cutWidth;
+  const height = frame.cutHeight;
+  if (width < 1 || height < 1) {
+    return null;
+  }
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    const from = ((frame.cutY + y) * image.width + frame.cutX) * 4;
+    data.set(image.data.subarray(from, from + width * 4), y * width * 4);
+  }
+  return { data, width, height };
+}
+
+function sourceImage(texture: Phaser.Textures.Texture): ImageData | null {
+  const cached = imageCache.get(texture.key);
+  if (cached) {
+    return cached;
+  }
+  const source = texture.getSourceImage() as CanvasImageSource & { width?: number; height?: number };
+  if (!source || !source.width || !source.height) {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) {
+    return null;
+  }
+  ctx.drawImage(source, 0, 0);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  imageCache.set(texture.key, image);
+  return image;
+}
+
+function worldX(unit: Body, pixel: number): number {
+  return unit.x + (pixel - unit.originX * unit.frame.width) * unit.scaleX;
+}
+
+function worldY(unit: Body, pixel: number): number {
+  return unit.y + (pixel - unit.originY * unit.frame.height) * unit.scaleY;
 }
 
 function near(px: number, py: number, from: Point, to: Point, reach: number): boolean {

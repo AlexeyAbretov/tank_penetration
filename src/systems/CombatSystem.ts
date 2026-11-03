@@ -17,7 +17,7 @@ import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { airBurstAt } from '../gfx/airBurst';
 import { craterReach } from '../gfx/craters';
-import { clearBurns, ignite, inPatch, inStream, placeCampfires, syncFlameStream, tickBurns } from '../gfx/flame';
+import { clearBurns, ignite, inPatch, inStream, placeCampfires, syncFlameStream, syncScorchedEarth, tickBurns } from '../gfx/flame';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from '../sounds/BoomSounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
@@ -46,7 +46,10 @@ type FlameMark = {
 
 type FlamePatch = {
   marks: FlameMark[];
+  // Основания дуги. Остаются, когда костры уже сжались и гаснет только земля.
+  points: FlamePoint[];
   hit: Set<Infantry>;
+  earth: Phaser.GameObjects.Container;
   // Общий остаток всей дуги. Пока струя идёт, поле пустое и костры не стареют.
   left?: number;
 };
@@ -62,7 +65,7 @@ export class CombatSystem implements Combat {
   // Сколько лучей ещё осталось в текущей очереди. 0 — очередь не начата.
   private laserBurstLeft = 0;
   private salvoCooldown = 0;
-  private flameCooldown = 0;
+  private flameCooldownMs = 0;
   private flameAngle = 0;
   private flameSweep?: FlameSweep;
   private flamePatch?: FlamePatch;
@@ -147,6 +150,14 @@ export class CombatSystem implements Combat {
 
   get nuclearCooldown(): number {
     return this.nuclearCooldownMs;
+  }
+
+  get flameCooldown(): number {
+    return this.flameCooldownMs;
+  }
+
+  setFlameCooldown(ms: number): void {
+    this.flameCooldownMs = Math.max(0, ms);
   }
 
   setNuclearCooldown(ms: number): void {
@@ -707,13 +718,13 @@ export class CombatSystem implements Combat {
       this.stopFlame();
       return;
     }
-    this.flameCooldown = Math.max(0, this.flameCooldown - delta);
+    this.flameCooldownMs = Math.max(0, this.flameCooldownMs - delta);
     if (this.flameSweep) {
       this.advanceSweep(flame, delta);
     } else {
       this.easeAim(flame, delta);
-      if (this.flameCooldown <= 0 && this.weaponLive('flame')) {
-        this.flameCooldown = FlameTank.shop.fireIntervalMs;
+      if (this.flameCooldownMs <= 0 && this.weaponLive('flame')) {
+        this.flameCooldownMs = FlameTank.shop.fireIntervalMs;
         this.beginSweep(flame);
       }
     }
@@ -764,9 +775,16 @@ export class CombatSystem implements Combat {
       const [fire] = placeCampfires(this.scene, [tip], sweep.placed);
       if (fire) {
         if (!this.flamePatch) {
-          this.flamePatch = { marks: [], hit: new Set() };
+          this.flamePatch = {
+            marks: [],
+            points: [],
+            hit: new Set(),
+            earth: this.scene.add.container(0, 0).setDepth(1),
+          };
         }
         this.flamePatch.marks.push({ point: tip, fire });
+        this.flamePatch.points.push(tip);
+        syncScorchedEarth(this.scene, this.flamePatch.earth, this.flamePatch.points);
       }
       sweep.placed += 1;
     }
@@ -781,22 +799,87 @@ export class CombatSystem implements Combat {
       this.scorchPatch(patch);
       return;
     }
+    const fade = FlameTank.shop.patchFadeMs;
+    const earthFade = FlameTank.shop.earthFadeMs;
     if (patch.left === undefined) {
-      patch.left = FlameTank.shop.patchMs + FlameTank.shop.patchFadeMs;
+      patch.left = FlameTank.shop.patchMs + fade + earthFade;
     }
     patch.left -= delta;
     if (patch.left <= 0) {
       this.clearPatch();
       return;
     }
-    const fade = FlameTank.shop.patchFadeMs;
-    const scale = patch.left >= fade ? 1 : patch.left / fade;
-    for (const mark of patch.marks) {
-      mark.fire.setScale(scale);
-    }
-    if (patch.left >= fade) {
+    if (patch.left > fade + earthFade) {
       this.scorchPatch(patch);
+      return;
     }
+    this.applyPatchLook();
+  }
+
+  // Сжатие костров и гашение земли по общему остатку. Восстановление из сохранения зовёт то же.
+  private applyPatchLook(): void {
+    const patch = this.flamePatch;
+    if (!patch || patch.left === undefined) {
+      return;
+    }
+    const fade = FlameTank.shop.patchFadeMs;
+    const earthFade = FlameTank.shop.earthFadeMs;
+    if (patch.left > earthFade) {
+      const scale = Math.min(1, (patch.left - earthFade) / fade);
+      for (const mark of patch.marks) {
+        mark.fire.setScale(scale);
+      }
+      return;
+    }
+    for (const mark of patch.marks) {
+      mark.fire.destroy();
+    }
+    patch.marks = [];
+    patch.earth.setAlpha(Math.max(0, patch.left) / earthFade);
+  }
+
+  // Точки дуги и остаток срока. Пока струя ещё идёт, срок ещё не начат — пишем полный.
+  captureFlameWall(): { points: FlamePoint[]; left: number } | null {
+    const patch = this.flamePatch;
+    if (!patch || patch.points.length === 0) {
+      return null;
+    }
+    const full = FlameTank.shop.patchMs + FlameTank.shop.patchFadeMs + FlameTank.shop.earthFadeMs;
+    const left = patch.left ?? full;
+    if (left <= 0) {
+      return null;
+    }
+    return {
+      points: patch.points.map((point) => ({ x: Math.round(point.x), y: Math.round(point.y) })),
+      left: Math.round(left),
+    };
+  }
+
+  restoreFlameWall(saved: { points: FlamePoint[]; left: number } | null): void {
+    this.clearPatch();
+    if (!saved || saved.points.length === 0 || saved.left <= 0) {
+      return;
+    }
+    const earth = this.scene.add.container(0, 0).setDepth(1);
+    const marks: FlameMark[] = [];
+    if (saved.left > FlameTank.shop.earthFadeMs) {
+      const fires = placeCampfires(this.scene, saved.points);
+      saved.points.forEach((point, index) => {
+        const fire = fires[index];
+        if (fire) {
+          marks.push({ point, fire });
+        }
+      });
+    }
+    this.flamePatch = {
+      marks,
+      points: saved.points.map((point) => ({ x: point.x, y: point.y })),
+      hit: new Set(),
+      earth,
+      left: saved.left,
+    };
+    syncScorchedEarth(this.scene, earth, this.flamePatch.points);
+    this.applyPatchLook();
   }
 
   private easeAim(flame: FlameTank, delta: number): void {
@@ -836,7 +919,7 @@ export class CombatSystem implements Combat {
         continue;
       }
       const center = unit.hitCenter();
-      if (!inPatch(center.x, center.y, patch.marks.map((mark) => mark.point))) {
+      if (!inPatch(center.x, center.y, patch.points)) {
         continue;
       }
       patch.hit.add(unit);
@@ -864,6 +947,7 @@ export class CombatSystem implements Combat {
 
   private clearPatch(): void {
     this.flamePatch?.marks.forEach((mark) => mark.fire.destroy());
+    this.flamePatch?.earth.destroy();
     this.flamePatch = undefined;
   }
 

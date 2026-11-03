@@ -5,9 +5,11 @@ export type CombatSystem = {
   readonly artilleryCooldown: number;
   readonly minesCooldown: number;
   readonly nuclearCooldown: number;
+  readonly flameCooldown: number;
   setArtilleryCooldown(ms: number): void;
   setMinesCooldown(ms: number): void;
   setNuclearCooldown(ms: number): void;
+  setFlameCooldown(ms: number): void;
   nuclearCloudLeft(): number;
   requestArtillery(): void;
   requestMines(): void;
@@ -15,6 +17,8 @@ export type CombatSystem = {
   clearProjectiles(): void;
   captureMines(): { x: number; y: number }[];
   restoreMines(spots: { x: number; y: number }[]): void;
+  captureFlameWall(): { points: { x: number; y: number }[]; left: number } | null;
+  restoreFlameWall(saved: { points: { x: number; y: number }[]; left: number } | null): void;
   setupOverlap(): void;
   tickArtillery(delta: number, canFire: boolean): void;
   tickMines(delta: number, canFire: boolean): void;
