@@ -102,6 +102,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   protected paceWave = 1;
   // Скорость шага без темпа игрока. march считает её один раз, темп только умножает.
   private baseSpeed = 0;
+  // Ключ шага. Стойка его гасит, возврат на рубеж включает снова.
+  private readonly walkKey: string;
   // true после первого шага. Пока юнит стоит (стрельба или проволока), темп скорость не возвращает.
   private paceLatched = false;
 
@@ -124,6 +126,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   ) {
     // Sprite запоминает сцену, позицию и первую картинку.
     super(scene, x, y, texture);
+    this.walkKey = walkKey;
     // Пока спрайт не добавлен в сцену, его не видно и update его не касается.
     scene.add.existing(this);
     // Включаем Arcade-физику: появится body со скоростью и размером.
@@ -260,8 +263,22 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.anims.timeScale = haste;
   }
 
+  // Стойка погасила шаг. Снова идём влево с той же скоростью, картинка шага возвращается.
+  protected resumeMarch(): void {
+    if (this.reachedWall || this.baseSpeed <= 0) {
+      return;
+    }
+    this.paceLatched = false;
+    if (!this.anims.isPlaying) {
+      this.play(this.walkKey);
+    }
+    this.syncPace();
+  }
+
   // Сдвиг вправо от разрыва снаряда танка. Тело двигаем сами: postUpdate перенесёт спрайт.
   // Дошедшего до базы не трогаем — он уже выбыл.
+  // Проволока гасит шаг, и syncPace стоящего не отпускает. Если сдвиг унёс штурмовика
+  // с линии, ход возвращаем. Тот же кадр снова поймает его, если он всё ещё на проволоке.
   knockBack(pixels: number): void {
     if (this.reachedWall || pixels <= 0 || !this.active) {
       return;
@@ -271,6 +288,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
       return;
     }
     body.x += pixels;
+    if (this.reachesBase) {
+      this.resumeMarch();
+    }
   }
 
   // Упирает юнита в правый край проволоки и гасит шаг.

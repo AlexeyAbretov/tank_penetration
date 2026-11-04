@@ -68,7 +68,12 @@ export abstract class RangedEnemy extends Infantry {
 
   // Каждый кадр, пока идёт бой. delta — время с прошлого кадра в миллисекундах.
   protected override act(delta: number): void {
-    // Дошли до рубежа впервые: гасим скорость и переключаемся на неподвижную картинку.
+    // Снаряд сдвинул уже вставшего правее рубежа: снова идём к той же точке и не стреляем.
+    if (this.shooting && this.x > this.holdX) {
+      this.shooting = false;
+      this.resumeMarch();
+    }
+    // Дошли до рубежа: гасим скорость и переключаемся на неподвижную картинку.
     if (!this.shooting && this.x <= this.holdX) {
       this.shooting = true;
       this.body?.stop();

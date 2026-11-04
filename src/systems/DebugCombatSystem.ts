@@ -5,6 +5,7 @@
 // У танка вместе с пушкой замолкает пулемёт. Щелчок по машине сам выстрел не даёт.
 
 import Phaser from 'phaser';
+import { FieldRulerOverlay } from '../debug/FieldRulerOverlay';
 import { HitboxOverlay } from '../debug/HitboxOverlay';
 import { WeaponQuiet, type QuietWeapon } from '../debug/WeaponQuiet';
 import { CombatSystem } from './CombatSystem';
@@ -31,6 +32,7 @@ export class DebugCombatSystem extends CombatSystem {
 
   protected override afterConstruct(): void {
     new HitboxOverlay(this.scene, this.infantry, this.shells, () => this.blastRadius());
+    new FieldRulerOverlay(this.scene);
     const onDown = (pointer: Phaser.Input.Pointer): void => {
       this.onWeaponDown(pointer);
     };

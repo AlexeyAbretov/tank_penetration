@@ -7,9 +7,23 @@ import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, 
 
 const PANEL_W = 520;
 const PANEL_H = 400;
-const TRACK_W = 340;
+const PANEL_HALF = PANEL_W / 2;
 const MUSIC_Y = -56;
 const EFFECTS_Y = 64;
+// Отступ карточки до контента. Дорожка, «0%» и строки дебага стоят в этих краях.
+const INSET = 24;
+const PERCENT_HALF = 18;
+const TRACK_GAP = 12;
+const THUMB_R = 11;
+// Обводка круга наполовину снаружи радиуса. Край круга, не центр, встаёт на край текста.
+const THUMB_EDGE = THUMB_R + 1;
+export const SETTINGS_CONTENT_LEFT = -PANEL_HALF + INSET;
+export const SETTINGS_CONTENT_RIGHT = PANEL_HALF - INSET;
+export const SETTINGS_PERCENT_X = SETTINGS_CONTENT_RIGHT - PERCENT_HALF;
+const TRACK_LEFT = SETTINGS_CONTENT_LEFT + THUMB_EDGE;
+const TRACK_RIGHT = SETTINGS_PERCENT_X - PERCENT_HALF - TRACK_GAP;
+const TRACK_W = TRACK_RIGHT - TRACK_LEFT;
+const TRACK_CENTER = TRACK_LEFT + TRACK_W / 2;
 
 type Slider = {
   nodes: Phaser.GameObjects.GameObject[];
@@ -19,7 +33,8 @@ type Slider = {
 
 export class SettingsPanel {
   protected container!: Phaser.GameObjects.Container;
-  private readonly dim: Phaser.GameObjects.Rectangle;
+  // Затемнение открыто наследнику: после сдвига контейнера его возвращают в центр экрана.
+  protected readonly dim: Phaser.GameObjects.Rectangle;
   // Карточка и «Готово» открыты наследнику: дебаг дописывает поле снизу и растит окно вниз.
   protected card!: Phaser.GameObjects.Rectangle;
   protected cardFace!: Phaser.GameObjects.Graphics;
@@ -140,11 +155,11 @@ export class SettingsPanel {
     y: number,
     onChange: (level: number) => void,
   ): Slider {
-    const track = scene.add.rectangle(0, y, TRACK_W, 8, 0x161c12);
-    const fill = scene.add.rectangle(-TRACK_W / 2, y, 0, 8, 0x8a7848).setOrigin(0, 0.5);
-    const thumb = scene.add.circle(-TRACK_W / 2, y, 11, 0xc4a15a).setStrokeStyle(2, 0x1a2214);
+    const track = scene.add.rectangle(TRACK_CENTER, y, TRACK_W, 8, 0x161c12);
+    const fill = scene.add.rectangle(TRACK_LEFT, y, 0, 8, 0x8a7848).setOrigin(0, 0.5);
+    const thumb = scene.add.circle(TRACK_LEFT, y, THUMB_R, 0xc4a15a).setStrokeStyle(2, 0x1a2214);
     const valueText = scene.add
-      .text(TRACK_W / 2 + 48, y, '0%', {
+      .text(SETTINGS_PERCENT_X, y, '0%', {
         fontSize: '22px',
         color: fieldInk,
       })
@@ -155,11 +170,11 @@ export class SettingsPanel {
       paint: (level) => {
         const width = TRACK_W * level;
         fill.width = Math.max(0, width);
-        thumb.x = -TRACK_W / 2 + width;
+        thumb.x = TRACK_LEFT + width;
         valueText.setText(`${Math.round(level * 100)}%`);
       },
       apply: (pointer) => {
-        const left = this.frame.width / 2 - TRACK_W / 2;
+        const left = this.container.x + TRACK_LEFT;
         const ratio = clamp01((pointer.worldX - left) / TRACK_W);
         const level = Math.round(ratio * 100) / 100;
         slider.paint(level);
@@ -168,7 +183,9 @@ export class SettingsPanel {
     };
 
     // Полоска толще дорожки, чтобы в неё попадали без прицеливания.
-    const hit = scene.add.rectangle(0, y, TRACK_W, 36, 0x000000, 0.001).setInteractive({ useHandCursor: true });
+    const hit = scene.add
+      .rectangle(TRACK_CENTER, y, TRACK_W, 36, 0x000000, 0.001)
+      .setInteractive({ useHandCursor: true });
     hit.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (this.dragging) {
         return;

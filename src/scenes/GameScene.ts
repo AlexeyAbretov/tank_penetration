@@ -568,8 +568,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.writeSave();
+    // Настройки уже держат бой. Плашку паузы не ставим: иначе по возврату вместо громкости «ПАУЗА».
     if (this.settingsOpen) {
-      this.closeSettings();
+      return;
     }
     this.pauses.onHidden();
   }

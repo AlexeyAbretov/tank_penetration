@@ -4,28 +4,35 @@
 // Смешанная тоже не читает: там по одному штурмовику, стрелку, пикапу и ракетчику.
 // Клавиша A добавляет юнита в идущую волну и этим числом не ограничена.
 // Здоровье танка пишется в localStorage в том же закрытии, что и кнопка «Готово».
-// Хитбокс переключается сразу: рамка на поле гаснет, не дожидаясь «Готово».
+// Хитбокс и линейка в одной строке. Переключаются сразу, не дожидаясь «Готово».
 
 import Phaser from 'phaser';
+import { FieldRuler } from '../../debug/FieldRuler';
 import { Hitboxes } from '../../debug/Hitboxes';
 import { TankDebugBaseHp } from '../../entities/Tank/TankDebugBaseHp';
 import { DebugEnemyFactory } from '../../entities/DebugEnemyFactory';
-import { SettingsPanel } from './SettingsPanel';
+import { SETTINGS_CONTENT_LEFT, SETTINGS_CONTENT_RIGHT, SettingsPanel } from './SettingsPanel';
 
-const FIELD_X = 156;
 const WAVE_Y = 120;
 const HP_Y = 172;
-const HITBOX_Y = 224;
-const FIELD_W = 88;
-const HP_W = 112;
-const FIELD_H = 40;
+const TOGGLE_Y = 224;
+const INPUT_W = 100;
+const INPUT_H = 40;
+const GAP = 16;
+const TOGGLE_W = 72;
 const CARD_EXTRA = 128;
 const DONE_Y = 280;
+// Те же края, что у дорожки и «0%».
+const CONTENT_RIGHT = SETTINGS_CONTENT_RIGHT;
+const CONTENT_LEFT = SETTINGS_CONTENT_LEFT;
+const INPUT_CENTER_X = CONTENT_RIGHT - INPUT_W / 2;
+const RULER_BTN_X = CONTENT_RIGHT - TOGGLE_W / 2;
 
 export class DebugSettingsPanel extends SettingsPanel {
   private readonly field: HTMLInputElement;
   private readonly hpField: HTMLInputElement;
   private readonly hitboxLabel: Phaser.GameObjects.Text;
+  private readonly rulerLabel: Phaser.GameObjects.Text;
   private readonly scene: Phaser.Scene;
   private readonly view: { width: number; height: number };
 
@@ -47,9 +54,10 @@ export class DebugSettingsPanel extends SettingsPanel {
     this.done.y = DONE_Y;
     this.doneFace.y = DONE_Y;
     this.doneLabel.y = DONE_Y;
+    this.centerExtended();
 
-    this.container.add(this.caption(scene, WAVE_Y, FIELD_W, 'Обычных в волне'));
-    this.container.add(this.caption(scene, HP_Y, HP_W, 'Здоровье танка'));
+    this.container.add(this.caption(scene, WAVE_Y, 'Обычных в волне'));
+    this.container.add(this.caption(scene, HP_Y, 'Здоровье танка'));
 
     this.field = this.mountField(
       'debug-wave-count',
@@ -71,24 +79,19 @@ export class DebugSettingsPanel extends SettingsPanel {
 
     this.placeFields();
 
-    this.container.add(this.caption(scene, HITBOX_Y, HP_W, 'Хитбокс'));
-    const hitX = FIELD_X + FIELD_W / 2 - HP_W / 2;
-    const hitbox = scene.add
-      .rectangle(hitX, HITBOX_Y, HP_W, FIELD_H, 0x1a2214)
-      .setStrokeStyle(2, 0x6e6240)
-      .setInteractive({ useHandCursor: true });
-    this.hitboxLabel = scene.add
-      .text(hitX, HITBOX_Y, '', {
-        fontSize: '22px',
-        color: '#e6d7a8',
-      })
-      .setOrigin(0.5);
-    this.paintHitbox();
-    hitbox.on('pointerup', () => {
+    const hitbox = this.makeLeftToggle(scene, 'Хитбокс', () => {
       Hitboxes.toggle();
       this.paintHitbox();
     });
-    this.container.add([hitbox, this.hitboxLabel]);
+    this.hitboxLabel = hitbox.label;
+    this.paintHitbox();
+
+    const ruler = this.makeToggle(scene, RULER_BTN_X, 'Линейка', () => {
+      FieldRuler.toggle();
+      this.paintRuler();
+    });
+    this.rulerLabel = ruler.label;
+    this.paintRuler();
 
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.placeFields, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -96,6 +99,12 @@ export class DebugSettingsPanel extends SettingsPanel {
       this.field.remove();
       this.hpField.remove();
     });
+  }
+
+  override layout(): void {
+    super.layout();
+    this.centerExtended();
+    this.placeFields();
   }
 
   override setOpen(open: boolean): void {
@@ -110,6 +119,8 @@ export class DebugSettingsPanel extends SettingsPanel {
       this.field.value = String(DebugEnemyFactory.regularCountOf());
       this.hpField.value = String(TankDebugBaseHp.currentOf());
       this.paintHitbox();
+      this.paintRuler();
+      this.centerExtended();
       this.placeFields();
     } else {
       this.field.blur();
@@ -124,13 +135,75 @@ export class DebugSettingsPanel extends SettingsPanel {
     this.card.y = top + this.card.height / 2;
   }
 
-  private caption(scene: Phaser.Scene, y: number, fieldW: number, text: string): Phaser.GameObjects.Text {
-    return scene.add
-      .text(FIELD_X + FIELD_W / 2 - fieldW - 16, y, text, {
+  // Карточка после роста смещена вниз. Поднимаем контейнер, затемнение оставляем в центре экрана.
+  private centerExtended(): void {
+    this.container.setPosition(this.view.width / 2, this.view.height / 2 - this.card.y);
+    this.dim.setPosition(0, this.card.y);
+    this.dim.setSize(this.view.width, this.view.height);
+  }
+
+  // Подпись с того же левого края, что «Обычных в волне». Кнопка сразу справа от неё.
+  private makeLeftToggle(
+    scene: Phaser.Scene,
+    title: string,
+    onClick: () => void,
+  ): { label: Phaser.GameObjects.Text } {
+    const caption = scene.add
+      .text(CONTENT_LEFT, TOGGLE_Y, title, {
+        fontSize: '22px',
+        color: '#d4ccb8',
+      })
+      .setOrigin(0, 0.5);
+    const btnX = CONTENT_LEFT + caption.width + GAP + TOGGLE_W / 2;
+    const button = scene.add
+      .rectangle(btnX, TOGGLE_Y, TOGGLE_W, INPUT_H, 0x1a2214)
+      .setStrokeStyle(2, 0x6e6240)
+      .setInteractive({ useHandCursor: true });
+    const label = scene.add
+      .text(btnX, TOGGLE_Y, '', {
+        fontSize: '22px',
+        color: '#e6d7a8',
+      })
+      .setOrigin(0.5);
+    button.on('pointerup', onClick);
+    this.container.add([caption, button, label]);
+    return { label };
+  }
+
+  private makeToggle(
+    scene: Phaser.Scene,
+    btnX: number,
+    title: string,
+    onClick: () => void,
+  ): { label: Phaser.GameObjects.Text } {
+    const caption = scene.add
+      .text(btnX - TOGGLE_W / 2 - GAP, TOGGLE_Y, title, {
         fontSize: '22px',
         color: '#d4ccb8',
       })
       .setOrigin(1, 0.5);
+    const button = scene.add
+      .rectangle(btnX, TOGGLE_Y, TOGGLE_W, INPUT_H, 0x1a2214)
+      .setStrokeStyle(2, 0x6e6240)
+      .setInteractive({ useHandCursor: true });
+    const label = scene.add
+      .text(btnX, TOGGLE_Y, '', {
+        fontSize: '22px',
+        color: '#e6d7a8',
+      })
+      .setOrigin(0.5);
+    button.on('pointerup', onClick);
+    this.container.add([caption, button, label]);
+    return { label };
+  }
+
+  private caption(scene: Phaser.Scene, y: number, text: string): Phaser.GameObjects.Text {
+    return scene.add
+      .text(CONTENT_LEFT, y, text, {
+        fontSize: '22px',
+        color: '#d4ccb8',
+      })
+      .setOrigin(0, 0.5);
   }
 
   private mountField(
@@ -178,11 +251,11 @@ export class DebugSettingsPanel extends SettingsPanel {
   }
 
   private placeFields = (): void => {
-    this.placeInput(this.field, WAVE_Y, FIELD_W);
-    this.placeInput(this.hpField, HP_Y, HP_W);
+    this.placeInput(this.field, WAVE_Y);
+    this.placeInput(this.hpField, HP_Y);
   };
 
-  private placeInput(field: HTMLInputElement, fieldY: number, fieldW: number): void {
+  private placeInput(field: HTMLInputElement, fieldY: number): void {
     const canvas = this.scene.game.canvas;
     const rect = canvas.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) {
@@ -190,10 +263,10 @@ export class DebugSettingsPanel extends SettingsPanel {
     }
     const sx = rect.width / this.view.width;
     const sy = rect.height / this.view.height;
-    const x = this.view.width / 2 + FIELD_X + FIELD_W / 2 - fieldW / 2;
-    const y = this.view.height / 2 + fieldY;
-    const w = fieldW * sx;
-    const h = FIELD_H * sy;
+    const x = this.container.x + INPUT_CENTER_X;
+    const y = this.container.y + fieldY;
+    const w = INPUT_W * sx;
+    const h = INPUT_H * sy;
     const style = field.style;
     style.left = `${rect.left + x * sx - w / 2}px`;
     style.top = `${rect.top + y * sy - h / 2}px`;
@@ -224,6 +297,12 @@ export class DebugSettingsPanel extends SettingsPanel {
     const on = Hitboxes.isEnabled;
     this.hitboxLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
     this.hitboxLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
+  }
+
+  private paintRuler(): void {
+    const on = FieldRuler.isEnabled;
+    this.rulerLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    this.rulerLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
   }
 
   private commitHp(): void {
