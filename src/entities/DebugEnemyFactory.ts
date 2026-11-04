@@ -6,6 +6,7 @@
 // Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
 // Босс толстеет и бьёт больнее с каждым своим выходом: 6-я волна — первое появление, 12-я — второе.
 // Число на поле то же, что в партии: три выхода на одном составе, потолок пять. Появление здесь — волна / 6.
+// Монеты считает та же касса, что в партии: номер выхода умножается на 25, тела делят сумму.
 
 import { AssaultInfantry } from './AssaultInfantry';
 import { EnemyFactory } from './EnemyFactory';
@@ -84,23 +85,38 @@ export class DebugEnemyFactory extends EnemyFactory {
     return this.regularCount;
   }
 
-  // Монеты юнита на этом месте очереди. У обычной волны и у босса вид один, номер не важен.
+  // Монеты юнита на этом месте очереди. У обычной волны вид один, номер не важен.
+  // У босса доля зависит от места: касса делится на число тел, остаток — первым.
   // В смешанной у каждого места свой вид. Пропуск платит сумму и спрайт для них не создаёт.
   static coinReward(wave: number, index = 0): number {
     if (wave < 1) {
       return 0;
     }
-    return this.kindAt(wave, index).coinReward;
+    const kind = this.kindAt(wave, index);
+    if (kind === SuperSoldier) {
+      return SuperSoldier.coinsForBody(this.bossAppearance(wave), index, this.bossCount(wave));
+    }
+    if (kind === GunnerInfantry) {
+      return GunnerInfantry.coinReward;
+    }
+    if (kind === PickupTruck) {
+      return PickupTruck.coinReward;
+    }
+    if (kind === RocketInfantry) {
+      return RocketInfantry.coinReward;
+    }
+    return AssaultInfantry.coinReward;
   }
 
   static create(index: number, ctx: SpawnContext): Infantry {
-    return this.spawnUnit(this.kindAt(ctx.wave, index), ctx);
+    return this.spawnUnit(this.kindAt(ctx.wave, index), ctx, index);
   }
 
   // pace из сохранения не нужен: ранг уже посчитан по номеру волны.
   // Текущее hp ставим поверх этого запаса, чтобы полоска помнила урон.
-  static restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, _pace: number): Infantry {
-    const unit = this.spawnUnit(this.kindOfSave(kind), ctx);
+  // slot — место в очереди. У босса от него доля кассы. Старое сохранение без места даёт 0.
+  static restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, _pace: number, slot = 0): Infantry {
+    const unit = this.spawnUnit(this.kindOfSave(kind), ctx, slot);
     unit.setHealth(hp);
     return unit;
   }

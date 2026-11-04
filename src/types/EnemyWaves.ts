@@ -15,5 +15,5 @@ export type EnemyWaves = {
   isBossWave(wave: number): boolean;
   kindOf(unit: WaveUnit): EnemySaveKind | null;
   create(index: number, ctx: SpawnContext): WaveUnit;
-  restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, pace: number): WaveUnit;
+  restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, pace: number, slot?: number): WaveUnit;
 };

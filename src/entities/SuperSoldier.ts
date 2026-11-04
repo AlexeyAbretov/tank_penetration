@@ -41,6 +41,25 @@ export class SuperSoldier extends Infantry {
     return this.baseHp + extra * this.hpPerAppearance;
   }
 
+  // Касса одного выхода: 25 монет за номер появления. 10-я волна — 25, 20-я — 50, 40-я — 100.
+  static readonly coinsPerAppearance = 25;
+
+  // Доля одного тела. Сумма по местам 0 .. count−1 равна кассе.
+  // Остаток от деления по одной монете забирают первые места очереди.
+  // Место за последним в составе берёт базовую долю без остатка.
+  static coinsForBody(appearance: number, index: number, count: number): number {
+    const n = Math.max(1, Math.floor(appearance));
+    const bodies = Math.max(1, Math.floor(count));
+    const purse = this.coinsPerAppearance * n;
+    const base = Math.floor(purse / bodies);
+    const extra = purse % bodies;
+    const slot = Math.max(0, Math.floor(index));
+    if (slot >= bodies) {
+      return base;
+    }
+    return base + (slot < extra ? 1 : 0);
+  }
+
   // Первая пуля снимает shotDamage. Каждый следующий выход прибавляет damagePerAppearance.
   // Второй босс бьёт на 2, третий — на 3.
   static damageForAppearance(appearance: number): number {
@@ -127,8 +146,8 @@ export class SuperSoldier extends Infantry {
     return { x: point.x, y: point.y };
   }
 
-  static readonly coinReward = 10;
-  readonly coinReward = SuperSoldier.coinReward;
+  // Доля кассы этого тела. Считается в конструкторе от номера выхода и места в очереди.
+  readonly coinReward: number;
   // false: WaveManager и проволока не ждут, что он дойдёт до стены.
   readonly reachesBase = false;
   readonly contactDamage = 0;
@@ -245,8 +264,13 @@ export class SuperSoldier extends Infantry {
     shots: Phaser.Physics.Arcade.Group,
     fireTarget: WorldPoint,
     appearance = 1,
+    slot = 0,
+    count = 1,
   ) {
     super(scene, x, y, hp, 'super-0', 'super-walk', 0xff3348);
+    // Место пишется в сохранение: после загрузки доля кассы остаётся у того же тела.
+    this.slot = Math.max(0, Math.floor(slot));
+    this.coinReward = SuperSoldier.coinsForBody(appearance, this.slot, count);
     this.bulletDamage = SuperSoldier.damageForAppearance(appearance);
     this.setScale(SuperSoldier.scale);
     // Полоска HP у предка узкая. После super её можно расширить и сразу перерисовать.

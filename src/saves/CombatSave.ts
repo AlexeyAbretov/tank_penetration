@@ -335,7 +335,13 @@ function parseEnemies(value: unknown): EnemySave[] {
     if (!kind || x === null || y === null || hp === null || pace === null) {
       continue;
     }
-    enemies.push({ kind, x, y, hp, pace });
+    // Место в очереди. Старые записи его не писали: тогда волна подставит порядок в списке.
+    const slot = entry.slot === undefined ? undefined : requiredInt(entry.slot, 0, 10_000);
+    if (slot === undefined || slot === null) {
+      enemies.push({ kind, x, y, hp, pace });
+      continue;
+    }
+    enemies.push({ kind, x, y, hp, pace, slot });
   }
   return enemies;
 }

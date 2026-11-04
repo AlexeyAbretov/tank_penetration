@@ -58,6 +58,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Сколько монет даёт убийство. Каждая разновидность врага задаёт своё число.
   // abstract: наследник обязан написать это поле, иначе TypeScript не соберёт файл.
   abstract readonly coinReward: number;
+  // Место в очереди волны, с нуля. Суперсолдат по нему берёт долю кассы.
+  // Остальным видам монеты от места не зависят, поле остаётся 0.
+  slot = 0;
   // true — юнит идёт до стены и бьёт базу. false — останавливается и стреляет издалека.
   abstract readonly reachesBase: boolean;
   // Урон базе при контакте с танком или с линией baseReachX. У стрелков 0: они бьют пулями.

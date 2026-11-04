@@ -12,6 +12,8 @@ export type EnemySave = {
   y: number;
   hp: number;
   pace: number;
+  // Место в очереди волны. Доля кассы босса от него. Старые записи поля не имеют.
+  slot?: number;
 };
 
 export type WavePhase = 'combat' | 'shop';

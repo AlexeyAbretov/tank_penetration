@@ -107,6 +107,7 @@ export class WaveManager {
         y: unit.y,
         hp: unit.hp,
         pace: unit.paceRank,
+        slot: unit.slot,
       });
     }
     return {
@@ -130,8 +131,8 @@ export class WaveManager {
   resumeCombat(wave: number, spawned: number, enemies: EnemySave[]): void {
     this.wave = wave;
     this.awaitingClear = false;
-    for (const enemy of enemies) {
-      this.restoreEnemy(enemy);
+    for (let i = 0; i < enemies.length; i += 1) {
+      this.restoreEnemy(enemies[i], i);
     }
     const total = this.enemies.count(wave);
     // Берём большее из двух чисел: запись «сколько вышло» и сколько реально положили на поле.
@@ -226,7 +227,7 @@ export class WaveManager {
     }
   }
 
-  private restoreEnemy(enemy: EnemySave): void {
+  private restoreEnemy(enemy: EnemySave, index: number): void {
     const unit = this.enemies.restore(
       enemy.kind,
       {
@@ -239,6 +240,8 @@ export class WaveManager {
       },
       enemy.hp,
       enemy.pace,
+      // Старая запись без места берёт порядок в списке. Новая хранит место очереди.
+      enemy.slot ?? index,
     );
     this.infantry.add(unit);
     // march включает скорость. Без него спрайт стоит в точке появления.
