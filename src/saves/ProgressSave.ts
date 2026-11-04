@@ -22,6 +22,8 @@ export type SavedProgress = {
   blast: number;
   // Пиксели отталкивания снарядом танка. 0 — снаряд не толкает.
   knockback: number;
+  // Проценты шанса прошивания снарядом. 0 — снаряд всегда рвётся о первого.
+  pierce: number;
   speed: number;
   // Сколько раз докуплена пуля пулемёта. 0 — одна пуля, 9 — десять.
   bullets: number;
@@ -59,6 +61,12 @@ export class ProgressSave {
     return 300 + Math.max(0, level) * 300;
   }
 
+  // Первый процент пробивания стоит 300. Каждая следующая — на 300 × уже купленный уровень дороже:
+  // 300, 600, 900, …
+  static pierceCost(level: number): number {
+    return 300 + Math.max(0, level) * 300;
+  }
+
   load(): SavedProgress {
     if (this.current) {
       return this.current;
@@ -77,6 +85,7 @@ export class ProgressSave {
     progress.damage = 0;
     progress.blast = 0;
     progress.knockback = 0;
+    progress.pierce = 0;
     progress.speed = 0;
     progress.bullets = 0;
     progress.mgDamage = 0;
@@ -85,6 +94,7 @@ export class ProgressSave {
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressBlastLevel(0);
     Tank.setProgressKnockbackLevel(0);
+    Tank.setProgressPierceLevel(0);
   }
 
   save(data: SavedProgress): void {
@@ -111,6 +121,7 @@ export class ProgressSave {
       damage: 0,
       blast: 0,
       knockback: 0,
+      pierce: 0,
       speed: 0,
       bullets: 0,
       mgDamage: 0,
@@ -159,6 +170,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     blast: requiredInt(value.blast, 0, Tank.maxProgressBlastLevel) ?? 0,
     // Старые сохранения не писали отталкивание: снаряд врагов не толкал.
     knockback: requiredInt(value.knockback, 0, Tank.maxProgressKnockbackLevel) ?? 0,
+    // Старые сохранения не писали пробивание: снаряд всегда рвался о первого.
+    pierce: requiredInt(value.pierce, 0, Tank.maxProgressPierceLevel) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,

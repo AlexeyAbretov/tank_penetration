@@ -7,6 +7,7 @@
 import Phaser from 'phaser';
 import { FieldRulerOverlay } from '../debug/FieldRulerOverlay';
 import { HitboxOverlay } from '../debug/HitboxOverlay';
+import { PierceMarkOverlay } from '../debug/PierceMarkOverlay';
 import { WeaponQuiet, type QuietWeapon } from '../debug/WeaponQuiet';
 import { CombatSystem } from './CombatSystem';
 
@@ -33,6 +34,7 @@ export class DebugCombatSystem extends CombatSystem {
   protected override afterConstruct(): void {
     new HitboxOverlay(this.scene, this.infantry, this.shells, () => this.blastRadius());
     new FieldRulerOverlay(this.scene);
+    new PierceMarkOverlay(this.scene, this.shells, (shell) => this.shellPierces(shell));
     const onDown = (pointer: Phaser.Input.Pointer): void => {
       this.onWeaponDown(pointer);
     };

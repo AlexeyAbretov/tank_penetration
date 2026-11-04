@@ -51,6 +51,7 @@ export class DebugCombatSave extends CombatSave {
         damage: 0,
         fireRate: 0,
         knockback: 0,
+        pierce: 0,
         wire: true,
         machineGun: true,
         laser: true,

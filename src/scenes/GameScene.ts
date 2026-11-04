@@ -109,6 +109,7 @@ export class GameScene extends Phaser.Scene {
       progressDamage: number,
       progressBlast: number,
       progressKnockback: number,
+      progressPierce: number,
       mgBullets: number,
       progressMgDamage: number,
       laserShots: number,
@@ -167,6 +168,7 @@ export class GameScene extends Phaser.Scene {
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
+    Tank.setProgressPierceLevel(this.progressShop.pierceBonus());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
     this.field = this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
@@ -281,6 +283,7 @@ export class GameScene extends Phaser.Scene {
         damage: this.progressShop.damageBonus(),
         blast: this.progressShop.blastBonus(),
         knockback: this.progressShop.knockbackBonus(),
+        pierce: this.progressShop.pierceBonus(),
         coins: this.progressShop.coinBonus(),
         points: this.progressShop.pointBonus(),
         mg: this.progressShop.mgDamageBonus(),
@@ -303,6 +306,7 @@ export class GameScene extends Phaser.Scene {
       this.progressShop.damageBonus(),
       this.progressShop.blastBonus(),
       this.progressShop.knockbackBonus(),
+      this.progressShop.pierceBonus(),
       this.progressShop.bulletCount(),
       this.progressShop.mgDamageBonus(),
       this.progressShop.laserShotCount(),

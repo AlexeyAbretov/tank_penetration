@@ -28,6 +28,13 @@ import type { WorldPoint } from '../types/WorldPoint';
 
 type ArtillerySpot = { x: number; y: number; mark: ArtilleryMark };
 
+// pierce — ближайший враг получит урон без взрыва, снаряд полетит дальше.
+// passed — кого этот снаряд уже прошил. Повторно его не бьём и осколками того же разрыва не задеваем.
+type ShellFlight = {
+  pierce: boolean;
+  passed: Infantry | null;
+};
+
 type FlamePoint = { x: number; y: number };
 
 type FlameSweep = {
@@ -58,6 +65,7 @@ type FlamePatch = {
 export class CombatSystem implements Combat {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
   protected readonly shells: Phaser.Physics.Arcade.Group;
+  private readonly shellFlights = new Map<Phaser.Physics.Arcade.Image, ShellFlight>();
   private readonly mgShots: Phaser.Physics.Arcade.Group;
   private mgCooldown = 0;
   // Сколько пуль ещё осталось в текущей очереди. 0 — очередь не начата.
@@ -105,6 +113,7 @@ export class CombatSystem implements Combat {
     private readonly progressDamage: number,
     private readonly progressBlast: number,
     private readonly progressKnockback: number,
+    private readonly progressPierce: number,
     private readonly mgBullets: number,
     private readonly progressMgDamage: number,
     private readonly laserShots: number,
@@ -191,6 +200,7 @@ export class CombatSystem implements Combat {
     this.mineFromIcon = false;
     this.nuclearFromIcon = false;
     this.shells.clear(true, true);
+    this.shellFlights.clear();
     this.mgShots.clear(true, true);
     this.mgBurstLeft = 0;
     this.cancelArtillery();
@@ -210,7 +220,7 @@ export class CombatSystem implements Combat {
         if (!shell || !unit) {
           return;
         }
-        this.detonateShell(shell, unit);
+        this.deliverShell(shell, unit);
       },
       undefined,
       this,
@@ -599,6 +609,8 @@ export class CombatSystem implements Combat {
       return;
     }
 
+    const passed = this.shellFlights.get(shell)?.passed ?? null;
+    this.shellFlights.delete(shell);
     const x = shell.x;
     const y = shell.y;
     shell.destroy();
@@ -616,7 +628,7 @@ export class CombatSystem implements Combat {
     }
 
     (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
-      if (unit === direct || !unit.active || unit.reachedWall) {
+      if (unit === direct || unit === passed || !unit.active || unit.reachedWall) {
         return;
       }
       const torso = this.torsoPoint(unit);
@@ -646,22 +658,57 @@ export class CombatSystem implements Combat {
       if (!shell.active) {
         continue;
       }
+      const flight = this.shellFlights.get(shell);
+      const hit: Infantry[] = [];
       for (const unit of units) {
         if (!unit.active || unit.reachedWall) {
           continue;
         }
-        if (this.shellHitsUnit(shell, unit)) {
-          this.detonateShell(shell, unit);
+        if (flight?.passed === unit) {
+          continue;
+        }
+        if (!this.shellHitsUnit(shell, unit)) {
+          continue;
+        }
+        hit.push(unit);
+      }
+      // Ближний забирает прошивку, следующий по дистанции — разрыв.
+      hit.sort((a, b) => this.hitDistance(shell, a) - this.hitDistance(shell, b));
+      for (const unit of hit) {
+        if (!shell.active) {
           break;
         }
+        this.deliverShell(shell, unit);
       }
     }
+  }
+
+  // Прошивка тратит заряд и не рвёт снаряд. Обычное касание взрывается как раньше.
+  private deliverShell(shell: Phaser.Physics.Arcade.Image, unit: Infantry): void {
+    if (!shell.active || !unit.active || unit.reachedWall) {
+      return;
+    }
+    if (!this.shellHitsUnit(shell, unit)) {
+      return;
+    }
+    const flight = this.shellFlights.get(shell);
+    if (flight?.passed === unit) {
+      return;
+    }
+    if (flight?.pierce) {
+      flight.pierce = false;
+      flight.passed = unit;
+      this.hurtInfantry(unit);
+      return;
+    }
+    this.detonateShell(shell, unit);
   }
 
   private cleanupShells(): void {
     this.shells.getChildren().forEach((obj) => {
       const shell = obj as Phaser.Physics.Arcade.Image;
       if (shell.x > GAME.width + 40 || shell.x < 0 || shell.y < 0 || shell.y > GAME.bannerY) {
+        this.shellFlights.delete(shell);
         shell.destroy();
       }
     });
@@ -1161,6 +1208,25 @@ export class CombatSystem implements Combat {
     return Tank.knockbackPxFor(this.shop.knockbackLevel, this.progressKnockback);
   }
 
+  // Шанс берётся один раз, в момент выстрела. Прошитый враг заряд тратит.
+  private rollPierce(): boolean {
+    const chance = Tank.pierceChanceFor(this.shop.pierceLevel, this.progressPierce);
+    if (chance <= 0) {
+      return false;
+    }
+    return Math.random() * 100 < chance;
+  }
+
+  // Дебаг читает это, чтобы подписать снаряд. На попадание подпись не влияет.
+  protected shellPierces(shell: Phaser.Physics.Arcade.Image): boolean {
+    return this.shellFlights.get(shell)?.pierce === true;
+  }
+
+  private hitDistance(shell: Phaser.Physics.Arcade.Image, unit: Infantry): number {
+    const center = unit.hitCenter();
+    return Phaser.Math.Distance.Between(shell.x, shell.y, center.x, center.y);
+  }
+
   private playBlast(x: number, y: number): void {
     const radius = this.blastRadius();
     this.blast.emitParticleAt(x, y, radius > 0 ? 16 : 8);
@@ -1178,6 +1244,7 @@ export class CombatSystem implements Combat {
   private fireShell(x: number, y: number, angle: number): void {
     const shell = this.scene.physics.add.image(x, y, 'shell');
     this.shells.add(shell);
+    this.shellFlights.set(shell, { pierce: this.rollPierce(), passed: null });
     shell.setDepth(15);
     shell.setBlendMode(Phaser.BlendModes.ADD);
     shell.setRotation(angle);

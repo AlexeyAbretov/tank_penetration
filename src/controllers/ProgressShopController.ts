@@ -23,6 +23,7 @@ type Stat =
   | 'damage'
   | 'blast'
   | 'knockback'
+  | 'pierce'
   | 'speed'
   | 'bullets'
   | 'mgDamage'
@@ -66,6 +67,10 @@ export class ProgressShopController {
 
   knockbackBonus(): number {
     return this.progress.knockback;
+  }
+
+  pierceBonus(): number {
+    return this.progress.pierce;
   }
 
   coinBonus(): number {
@@ -156,6 +161,10 @@ export class ProgressShopController {
     this.buy('knockback');
   }
 
+  private buyPierce(): void {
+    this.buy('pierce');
+  }
+
   private buySpeed(): void {
     this.buy('speed');
   }
@@ -183,6 +192,9 @@ export class ProgressShopController {
     if (stat === 'knockback' && level >= Tank.maxProgressKnockbackLevel) {
       return;
     }
+    if (stat === 'pierce' && level >= Tank.maxProgressPierceLevel) {
+      return;
+    }
     if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
@@ -207,6 +219,9 @@ export class ProgressShopController {
     if (stat === 'knockback') {
       Tank.setProgressKnockbackLevel(this.progress.knockback);
     }
+    if (stat === 'pierce') {
+      Tank.setProgressPierceLevel(this.progress.pierce);
+    }
     this.progressSave.save(this.progress);
     this.panel.refresh(this.view());
   }
@@ -221,6 +236,7 @@ export class ProgressShopController {
           this.blastCard(score),
           this.speedCard(score),
           this.knockbackCard(score),
+          this.pierceCard(score),
         ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
@@ -323,6 +339,22 @@ export class ProgressShopController {
     };
   }
 
+  private pierceCard(score: number): ProgressCardView {
+    const level = this.progress.pierce;
+    const price = this.piercePrice(level);
+    const now = Tank.pierceChanceFor(0, level);
+    const next = Tank.pierceChanceFor(0, level + 1);
+    const maxed = level >= Tank.maxProgressPierceLevel;
+    return {
+      title: '+1% пробивание',
+      buy: () => this.buyPierce(),
+      info: maxed ? `ур. ${level} · ${now}%` : `ур. ${level} · ${now}%→${next}%`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private bulletsCard(score: number): ProgressCardView {
     const level = this.progress.bullets;
     const price = this.bulletPrice(level);
@@ -386,6 +418,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.knockbackCost(level));
   }
 
+  private piercePrice(level: number): number {
+    return shopPrice(ProgressSave.pierceCost(level));
+  }
+
   private costFor(stat: Stat, level: number): number {
     if (stat === 'bullets') {
       return this.bulletPrice(level);
@@ -395,6 +431,9 @@ export class ProgressShopController {
     }
     if (stat === 'knockback') {
       return this.knockbackPrice(level);
+    }
+    if (stat === 'pierce') {
+      return this.piercePrice(level);
     }
     return this.price(level);
   }

@@ -28,6 +28,8 @@ export type ShopSave = {
   fireRate: number;
   // Уровни отталкивания снарядом. Старые сохранения читают 0.
   knockback: number;
+  // Уровни шанса прошивания. Старые сохранения читают 0.
+  pierce: number;
   wire: boolean;
   machineGun: boolean;
   laser: boolean;
@@ -202,6 +204,8 @@ function parseShop(value: unknown): ShopSave | null {
   const fireRate = requiredInt(value.fireRate, 0, Tank.maxFireRateLevel);
   // Старые сохранения не писали отталкивание: снаряд врагов не толкал.
   const knockback = requiredInt(value.knockback, 0, Tank.maxShopKnockbackLevel) ?? 0;
+  // Старые сохранения не писали пробивание: снаряд всегда рвался о первого.
+  const pierce = requiredInt(value.pierce, 0, Tank.maxPierceChance) ?? 0;
   const wire = flag(value.wire);
   const machineGun = flag(value.machineGun);
   const artillery = flag(value.artillery);
@@ -239,6 +243,7 @@ function parseShop(value: unknown): ShopSave | null {
     damage,
     fireRate,
     knockback,
+    pierce,
     wire,
     machineGun,
     laser,

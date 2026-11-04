@@ -427,6 +427,7 @@ export class GameHud {
   setTankStats(
     damage: number,
     blastRadius: number,
+    pierceChance: number,
     fireDelayMs: number,
     autoFire = false,
     coinBonus = 0,
@@ -437,7 +438,7 @@ export class GameHud {
     const coins = coinBonus > 0 ? `   МОНЕТЫ +${coinBonus}` : '';
     const points = pointBonus > 0 ? `   ОЧКИ +${pointBonus}` : '';
     this.tankStatsText.setText(
-      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ОГОНЬ  ${fireSec} с${coins}${points}   ${mode}`,
+      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ПРОБИВ  ${pierceChance}%   ОГОНЬ  ${fireSec} с${coins}${points}   ${mode}`,
     );
   }
 

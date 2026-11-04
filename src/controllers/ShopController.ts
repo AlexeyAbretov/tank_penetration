@@ -1,6 +1,6 @@
 // Покупки между волнами. Окно ShopPanel только рисует кнопки и зовёт методы ниже.
 // Уровни живут здесь, пока жива партия. В localStorage их кладёт CombatSave через capture().
-// Постоянные прибавки к урону, взрыву и монетам приходят снаружи и за партию не меняются.
+// Постоянные прибавки к урону, взрыву, пробиванию и монетам приходят снаружи и за партию не меняются.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
@@ -27,6 +27,8 @@ type PermanentBonuses = {
   blast: number;
   // Постоянное отталкивание снаряда из магазина после гибели. К пикселям партии прибавляется на карточке.
   knockback: number;
+  // Постоянный шанс прошивания из магазина после гибели. К процентам партии прибавляется на карточке.
+  pierce: number;
   coins: number;
   points: number;
   // Постоянный урон пули из магазина после гибели. К урону партии прибавляется на карточке.
@@ -45,6 +47,7 @@ export class ShopController {
   damageLevel = 0;
   fireRateLevel = 0;
   knockbackLevel = 0;
+  pierceLevel = 0;
   wireOwned = false;
   wire?: BarbedWire;
   machineGunOwned = false;
@@ -88,6 +91,7 @@ export class ShopController {
       damage: this.damageLevel,
       fireRate: this.fireRateLevel,
       knockback: this.knockbackLevel,
+      pierce: this.pierceLevel,
       wire: this.wireOwned,
       machineGun: this.machineGunOwned,
       laser: this.laserOwned,
@@ -113,6 +117,7 @@ export class ShopController {
     this.damageLevel = saved.damage;
     this.fireRateLevel = Math.min(saved.fireRate, Tank.maxFireRateLevel);
     this.knockbackLevel = Math.min(saved.knockback, Tank.maxShopKnockbackLevel);
+    this.pierceLevel = Math.min(saved.pierce, Tank.maxShopPierceLevel);
     this.tank.setFireRateLevel(this.fireRateLevel);
     this.autoFire.restore(saved.autoFire, saved.autoFireOn);
     this.wireOwned = saved.wire;
@@ -152,6 +157,7 @@ export class ShopController {
     this.damageLevel = 0;
     this.fireRateLevel = 0;
     this.knockbackLevel = 0;
+    this.pierceLevel = 0;
     this.wireOwned = false;
     this.machineGunOwned = false;
     this.laserOwned = false;
@@ -254,6 +260,20 @@ export class ShopController {
       return;
     }
     this.knockbackLevel += 1;
+    this.refresh();
+  }
+
+  // +1% шанса прошивания. Вместе с прогрессом не выше Tank.maxPierceChance.
+  // Цена от уже купленного уровня этой кнопки: 100 × 1,15.
+  buyPierce(): void {
+    if (this.isPaused() || this.pierceLevel >= Tank.maxShopPierceLevel) {
+      return;
+    }
+    const cost = ShopController.pierceCost(this.pierceLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.pierceLevel += 1;
     this.refresh();
   }
 
@@ -476,6 +496,7 @@ export class ShopController {
     this.hud.setTankStats(
       Infantry.shellDamage + this.damageLevel + this.bonuses.damage,
       Tank.blastRadiusFor(this.blastLevel + this.bonuses.blast),
+      Tank.pierceChanceFor(this.pierceLevel, this.bonuses.pierce),
       Tank.fireDelayFor(this.fireRateLevel),
       this.autoFire.enabled,
       this.bonuses.coins,
@@ -515,6 +536,12 @@ export class ShopController {
     return shopPrice(Math.round(100 * 1.15 ** Math.max(0, level)));
   }
 
+  // Первая покупка пробивания стоит 100. Дальше та же ступень 15%:
+  // 100, 115, 132, 152, …
+  private static pierceCost(level: number): number {
+    return shopPrice(Math.round(100 * 1.15 ** Math.max(0, level)));
+  }
+
   // На карточке уровень партии и прогресса — одно число. От него же цена.
   private blastOfferLevel(): number {
     return this.blastLevel + this.bonuses.blast;
@@ -542,6 +569,7 @@ export class ShopController {
           this.blastCard(coins),
           this.fireRateCard(coins),
           this.knockbackCard(coins),
+          this.pierceCard(coins),
           this.gearCard('autoFire', coins),
         ]),
         this.tab('gun', 'Пулемёт', [
@@ -811,6 +839,23 @@ export class ShopController {
       title: '+3 отталкивание',
       buy: () => this.buyKnockback(),
       info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
+  private pierceCard(coins: number): ShopCardView {
+    const level = this.pierceLevel;
+    const price = ShopController.pierceCost(level);
+    const now = Tank.pierceChanceFor(level, this.bonuses.pierce);
+    const next = Tank.pierceChanceFor(level + 1, this.bonuses.pierce);
+    const maxed = level >= Tank.maxShopPierceLevel;
+    return {
+      title: '+1% пробивание',
+      buy: () => this.buyPierce(),
+      info: maxed ? `ур. ${level} · ${now}%` : `ур. ${level} · ${now}%→${next}%`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,

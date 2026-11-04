@@ -116,6 +116,33 @@ export class Tank extends GameObjects.Container {
     return Math.min(Tank.maxKnockbackPx, shop + progress);
   }
 
+  // Шанс прошивания в процентах. Без покупок снаряд всегда рвётся о первого врага.
+  // Уровень партии и прогресса дают по 1%. Вместе не выше 70. Прогресс сам не выше 50.
+  static readonly maxPierceChance = 70;
+  static readonly maxProgressPierceLevel = 50;
+  static progressPierceLevel = 0;
+
+  static setProgressPierceLevel(level: number): void {
+    Tank.progressPierceLevel = Math.min(
+      Tank.maxProgressPierceLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Магазин между волнами добивает остаток до общего потолка.
+  static get maxShopPierceLevel(): number {
+    return Math.max(0, Tank.maxPierceChance - Tank.progressPierceLevel);
+  }
+
+  static pierceChanceFor(
+    shopLevel: number,
+    progressLevel = Tank.progressPierceLevel,
+  ): number {
+    const shop = Math.max(0, Math.round(shopLevel));
+    const progress = Math.max(0, Math.round(progressLevel));
+    return Math.min(Tank.maxPierceChance, shop + progress);
+  }
+
   // Точка прицеливания врагов: чуть правее носа танка.
   static aimPoint(): { x: number; y: number } {
     return { x: Tank.spawn.x + 24, y: Tank.spawn.y };

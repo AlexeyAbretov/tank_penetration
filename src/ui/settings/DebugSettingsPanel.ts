@@ -4,11 +4,14 @@
 // Смешанная тоже не читает: там по одному штурмовику, стрелку, пикапу и ракетчику.
 // Клавиша A добавляет юнита в идущую волну и этим числом не ограничена.
 // Здоровье танка пишется в localStorage в том же закрытии, что и кнопка «Готово».
-// Хитбокс и линейка в одной строке. Переключаются сразу, не дожидаясь «Готово».
+// Хитбокс и линейка в одной строке. Пробитие — строкой ниже.
+// Переключаются сразу, не дожидаясь «Готово».
+// Пробитие только пишет на снаряде, пробьёт он или нет. Сам выстрел не меняет.
 
 import Phaser from 'phaser';
 import { FieldRuler } from '../../debug/FieldRuler';
 import { Hitboxes } from '../../debug/Hitboxes';
+import { PierceMarks } from '../../debug/PierceMarks';
 import { TankDebugBaseHp } from '../../entities/Tank/TankDebugBaseHp';
 import { DebugEnemyFactory } from '../../entities/DebugEnemyFactory';
 import { SETTINGS_CONTENT_LEFT, SETTINGS_CONTENT_RIGHT, SettingsPanel } from './SettingsPanel';
@@ -16,12 +19,13 @@ import { SETTINGS_CONTENT_LEFT, SETTINGS_CONTENT_RIGHT, SettingsPanel } from './
 const WAVE_Y = 120;
 const HP_Y = 172;
 const TOGGLE_Y = 224;
+const PIERCE_Y = 276;
 const INPUT_W = 100;
 const INPUT_H = 40;
 const GAP = 16;
 const TOGGLE_W = 72;
-const CARD_EXTRA = 128;
-const DONE_Y = 280;
+const CARD_EXTRA = 184;
+const DONE_Y = 340;
 // Те же края, что у дорожки и «0%».
 const CONTENT_RIGHT = SETTINGS_CONTENT_RIGHT;
 const CONTENT_LEFT = SETTINGS_CONTENT_LEFT;
@@ -33,6 +37,7 @@ export class DebugSettingsPanel extends SettingsPanel {
   private readonly hpField: HTMLInputElement;
   private readonly hitboxLabel: Phaser.GameObjects.Text;
   private readonly rulerLabel: Phaser.GameObjects.Text;
+  private readonly pierceLabel: Phaser.GameObjects.Text;
   private readonly scene: Phaser.Scene;
   private readonly view: { width: number; height: number };
 
@@ -93,6 +98,13 @@ export class DebugSettingsPanel extends SettingsPanel {
     this.rulerLabel = ruler.label;
     this.paintRuler();
 
+    const pierce = this.makeLeftToggle(scene, 'Пробитие', () => {
+      PierceMarks.toggle();
+      this.paintPierce();
+    }, PIERCE_Y);
+    this.pierceLabel = pierce.label;
+    this.paintPierce();
+
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.placeFields, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.scale.off(Phaser.Scale.Events.RESIZE, this.placeFields, this);
@@ -120,6 +132,7 @@ export class DebugSettingsPanel extends SettingsPanel {
       this.hpField.value = String(TankDebugBaseHp.currentOf());
       this.paintHitbox();
       this.paintRuler();
+      this.paintPierce();
       this.centerExtended();
       this.placeFields();
     } else {
@@ -147,20 +160,21 @@ export class DebugSettingsPanel extends SettingsPanel {
     scene: Phaser.Scene,
     title: string,
     onClick: () => void,
+    y = TOGGLE_Y,
   ): { label: Phaser.GameObjects.Text } {
     const caption = scene.add
-      .text(CONTENT_LEFT, TOGGLE_Y, title, {
+      .text(CONTENT_LEFT, y, title, {
         fontSize: '22px',
         color: '#d4ccb8',
       })
       .setOrigin(0, 0.5);
     const btnX = CONTENT_LEFT + caption.width + GAP + TOGGLE_W / 2;
     const button = scene.add
-      .rectangle(btnX, TOGGLE_Y, TOGGLE_W, INPUT_H, 0x1a2214)
+      .rectangle(btnX, y, TOGGLE_W, INPUT_H, 0x1a2214)
       .setStrokeStyle(2, 0x6e6240)
       .setInteractive({ useHandCursor: true });
     const label = scene.add
-      .text(btnX, TOGGLE_Y, '', {
+      .text(btnX, y, '', {
         fontSize: '22px',
         color: '#e6d7a8',
       })
@@ -303,6 +317,12 @@ export class DebugSettingsPanel extends SettingsPanel {
     const on = FieldRuler.isEnabled;
     this.rulerLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
     this.rulerLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
+  }
+
+  private paintPierce(): void {
+    const on = PierceMarks.isEnabled;
+    this.pierceLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    this.pierceLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
   }
 
   private commitHp(): void {

@@ -1,5 +1,5 @@
 // Магазин между волнами: слева закладки, справа карточки выбранной.
-// В полке четыре карточки и меньше, поэтому отдельной камеры и скролла нет.
+// Высота карточки не сжимается. Больше четырёх встают в два узких столбца, скролла нет.
 // Покупки делегируются ShopController через ShopDelegate.
 
 import Phaser from 'phaser';
@@ -56,7 +56,8 @@ const CARD_W = PANEL_W - SIDE * 2 - TAB_W - CARD_GAP_X;
 const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
 const CARD_H = 92;
 const CARD_GAP = 10;
-const CARD_SLOTS = 4;
+// Шесть мест: урон, взрыв, перезарядка, отталкивание, пробивание и автострельба.
+const CARD_SLOTS = 6;
 
 const TITLE_Y = -302;
 const COINS_Y = -258;
@@ -280,6 +281,7 @@ export class ShopPanel {
   }
 
   private applyOffers(): void {
+    this.placeOffers(this.lastCards.length);
     for (let i = 0; i < this.offers.length; i += 1) {
       const card = this.lastCards[i];
       const shown = !this.cardsCovered && card !== undefined;
@@ -287,6 +289,28 @@ export class ShopPanel {
       if (shown && card) {
         this.paint(this.offers[i], card);
       }
+    }
+  }
+
+  // Больше четырёх карточек не лезут столбиком. Высота та же, ширина делится на два столбца.
+  private placeOffers(count: number): void {
+    const columns = count > 4 ? 2 : 1;
+    const cardW = columns === 2 ? (CARD_W - CARD_GAP) / 2 : CARD_W;
+    const span = cardW + CARD_GAP;
+    for (let i = 0; i < this.offers.length; i += 1) {
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const x = CARD_X - ((columns - 1) * span) / 2 + col * span;
+      const y = CONTENT_TOP + CARD_H / 2 + row * (CARD_H + CARD_GAP);
+      const offer = this.offers[i];
+      offer.card.setPosition(x, y);
+      offer.card.setSize(cardW, CARD_H);
+      offer.title.setPosition(x, y - CARD_H / 2 + 12);
+      offer.title.setWordWrapWidth(cardW - 16);
+      offer.info.setPosition(x, y + 4);
+      offer.info.setWordWrapWidth(cardW - 16);
+      offer.cost.setPosition(x, y + CARD_H / 2 - 10);
+      offer.mark.setPosition(x - cardW / 2 + 28, y + CARD_H / 2 - 26);
     }
   }
 
