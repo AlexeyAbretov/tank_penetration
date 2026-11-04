@@ -246,12 +246,13 @@ export class ShopController {
   }
 
   // Короче пауза между выстрелами. Выше Tank.maxFireRateLevel уровень не поднимается.
-  // Цена считается от уже купленного уровня, включая прогресс.
+  // Цена от уровня этой кнопки. Прогресс секунды снимает, но лестницу цены не двигает:
+  // его шаг 0,01 с, а у партии 0,02 с.
   buyFireRate(): void {
     if (this.isPaused() || this.fireRateLevel >= Tank.maxFireRateLevel) {
       return;
     }
-    const cost = ShopController.upgradeCost(this.fireRateOfferLevel());
+    const cost = ShopController.upgradeCost(this.fireRateLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -610,10 +611,6 @@ export class ShopController {
     return this.damageLevel + this.bonuses.damage;
   }
 
-  private fireRateOfferLevel(): number {
-    return this.fireRateLevel + Tank.progressSpeedLevel;
-  }
-
   private mgDamageOfferLevel(): number {
     return this.mgDamageLevel + this.bonuses.mg;
   }
@@ -876,7 +873,7 @@ export class ShopController {
   }
 
   private fireRateCard(coins: number): ShopCardView {
-    const level = this.fireRateOfferLevel();
+    const level = this.fireRateLevel;
     const price = ShopController.upgradeCost(level);
     const delay = this.formatSeconds(Tank.fireDelayFor(this.fireRateLevel));
     const next = this.formatSeconds(Tank.fireDelayFor(this.fireRateLevel + 1));
