@@ -3,6 +3,7 @@
 
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
+import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 
 const CAMPAIGN_KEY = 'tank-penetration-progress:v1';
@@ -33,6 +34,8 @@ export type SavedProgress = {
   mgDamage: number;
   // Сколько раз докуплен луч лазера. 0 — один луч, 2 — три. Цена — общая, 500 + 500 × уровень.
   laserShots: number;
+  // Сколько раз укорочен откат атомного взрыва. 0 — базовые 3 минуты. Прогресс сам останавливается на 2:30.
+  nuclearCooldown: number;
 };
 
 export class ProgressSave {
@@ -93,12 +96,14 @@ export class ProgressSave {
     progress.bullets = 0;
     progress.mgDamage = 0;
     progress.laserShots = 0;
+    progress.nuclearCooldown = 0;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressFlightLevel(0);
     Tank.setProgressBlastLevel(0);
     Tank.setProgressKnockbackLevel(0);
     Tank.setProgressPierceLevel(0);
+    NuclearStrike.setProgressCooldownLevel(0);
   }
 
   save(data: SavedProgress): void {
@@ -131,6 +136,7 @@ export class ProgressSave {
       bullets: 0,
       mgDamage: 0,
       laserShots: 0,
+      nuclearCooldown: 0,
     };
   }
 
@@ -183,6 +189,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     laserShots: requiredInt(value.laserShots, 0, LaserDefense.maxShotLevel) ?? 0,
+    // Старые сохранения не писали откат атомного взрыва: бомба ждала базовые 3 минуты.
+    nuclearCooldown: requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxProgressCooldownLevel) ?? 0,
   };
 }
 

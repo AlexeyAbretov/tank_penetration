@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
+import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
@@ -28,7 +29,8 @@ type Stat =
   | 'flight'
   | 'bullets'
   | 'mgDamage'
-  | 'laserShots';
+  | 'laserShots'
+  | 'nuclearCooldown';
 
 export class ProgressShopController {
   // Панель живёт только пока жива сцена. restart() её уничтожает, bind() собирает заново.
@@ -96,6 +98,10 @@ export class ProgressShopController {
 
   laserShotCount(): number {
     return LaserDefense.shotCount(this.progress.laserShots);
+  }
+
+  nuclearCooldownLevel(): number {
+    return this.progress.nuclearCooldown;
   }
 
   isAwaitingShop(): boolean {
@@ -190,6 +196,10 @@ export class ProgressShopController {
     this.buy('laserShots');
   }
 
+  private buyNuclearCooldown(): void {
+    this.buy('nuclearCooldown');
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -216,6 +226,9 @@ export class ProgressShopController {
     if (stat === 'laserShots' && level >= LaserDefense.maxShotLevel) {
       return;
     }
+    if (stat === 'nuclearCooldown' && !NuclearStrike.progressCooldownShortens(level)) {
+      return;
+    }
     const cost = this.costFor(stat, level);
     if (this.progress.score < cost) {
       return;
@@ -237,6 +250,9 @@ export class ProgressShopController {
     if (stat === 'pierce') {
       Tank.setProgressPierceLevel(this.progress.pierce);
     }
+    if (stat === 'nuclearCooldown') {
+      NuclearStrike.setProgressCooldownLevel(this.progress.nuclearCooldown);
+    }
     this.progressSave.save(this.progress);
     this.panel.refresh(this.view());
   }
@@ -256,6 +272,7 @@ export class ProgressShopController {
         ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
+        this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
         this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
       ],
     };
@@ -421,6 +438,24 @@ export class ProgressShopController {
     };
   }
 
+  private nuclearCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.nuclearCooldown;
+    const price = this.nuclearCooldownPrice(level);
+    const now = NuclearStrike.cooldownFor(NuclearStrike.shopCooldownLevel, level);
+    const next = NuclearStrike.cooldownFor(NuclearStrike.shopCooldownLevel, level + 1);
+    const maxed = !NuclearStrike.progressCooldownShortens(level);
+    return {
+      title: '−1 с перезарядки',
+      buy: () => this.buyNuclearCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}`
+        : `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}→${NuclearStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private mgDamageCard(score: number): ProgressCardView {
     const level = this.progress.mgDamage;
     const price = this.mgDamagePrice(level);
@@ -456,6 +491,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.pierceCost(level));
   }
 
+  private nuclearCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.cost(level));
+  }
+
   private costFor(stat: Stat, level: number): number {
     if (stat === 'bullets') {
       return this.bulletPrice(level);
@@ -468,6 +507,9 @@ export class ProgressShopController {
     }
     if (stat === 'pierce') {
       return this.piercePrice(level);
+    }
+    if (stat === 'nuclearCooldown') {
+      return this.nuclearCooldownPrice(level);
     }
     return this.price(level);
   }

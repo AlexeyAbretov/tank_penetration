@@ -32,6 +32,87 @@ export class NuclearStrike {
     fallMs: 780,
   };
 
+  // Вместе с магазином партии откат не короче 2 минут. Шаг обоих магазинов — 1 с.
+  static readonly minCooldownMs = 2 * 60_000;
+  static readonly cooldownStepMs = 1_000;
+  // Прогресс снимает не больше полминуты и останавливается на 2:30.
+  static readonly progressCutMsMax = 30_000;
+  static progressCooldownLevel = 0;
+  // Сколько секунд партия уже докупила в этом заходе. Прогресс читает это, чтобы не продавать шаг до 2:30 поверх пола.
+  static shopCooldownLevel = 0;
+
+  static setShopCooldownLevel(level: number): void {
+    NuclearStrike.shopCooldownLevel = Math.max(0, Math.round(level));
+  }
+
+  // Сколько секунд партия ещё может докупить до пола 2 минут при уже купленном прогрессе.
+  static get maxShopCooldownLevel(): number {
+    return NuclearStrike.shopLevelsFor(NuclearStrike.progressCooldownLevel);
+  }
+
+  static get minProgressCooldownMs(): number {
+    return NuclearStrike.shop.cooldownMs - NuclearStrike.progressCutMsMax;
+  }
+
+  static get maxProgressCooldownLevel(): number {
+    return (
+      (NuclearStrike.shop.cooldownMs - NuclearStrike.minProgressCooldownMs) / NuclearStrike.cooldownStepMs
+    );
+  }
+
+  static setProgressCooldownLevel(level: number): void {
+    NuclearStrike.progressCooldownLevel = Math.min(
+      NuclearStrike.maxProgressCooldownLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Прогресс не уводит откат ниже 2:30, даже если в сохранении уровень выше нового потолка.
+  private static progressCutMs(level: number): number {
+    const cut = Math.max(0, Math.round(level)) * NuclearStrike.cooldownStepMs;
+    return Math.min(cut, NuclearStrike.shop.cooldownMs - NuclearStrike.minProgressCooldownMs);
+  }
+
+  // Партия забирает всё, что прогресс ещё не снял, вплоть до 2 минут.
+  private static shopLevelsFor(progressLevel: number): number {
+    const room =
+      NuclearStrike.shop.cooldownMs -
+      NuclearStrike.progressCutMs(progressLevel) -
+      NuclearStrike.minCooldownMs;
+    return Math.max(0, Math.floor(room / NuclearStrike.cooldownStepMs));
+  }
+
+  // Партия уже у 2 минут — следующий уровень прогресса откат не укорачивает.
+  static progressCooldownShortens(progressLevel: number): boolean {
+    const shop = NuclearStrike.shopCooldownLevel;
+    return (
+      NuclearStrike.cooldownFor(shop, progressLevel + 1) < NuclearStrike.cooldownFor(shop, progressLevel)
+    );
+  }
+
+  static cooldownFor(shopLevel: number, progressLevel = NuclearStrike.progressCooldownLevel): number {
+    const progressCut = NuclearStrike.progressCutMs(progressLevel);
+    const maxShop = NuclearStrike.shopLevelsFor(progressLevel);
+    const capped = Math.min(Math.max(0, Math.round(shopLevel)), maxShop);
+    return Math.max(
+      NuclearStrike.minCooldownMs,
+      NuclearStrike.shop.cooldownMs - progressCut - capped * NuclearStrike.cooldownStepMs,
+    );
+  }
+
+  // Дольше минуты — как на иконке: 3:00, следующий шаг 2:59. Пол — 2:00.
+  static cooldownLabel(ms: number): string {
+    const totalSec = ms / 1000;
+    if (totalSec < 60) {
+      const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
+      return `${text} с`;
+    }
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec - min * 60;
+    const secText = Number.isInteger(sec) ? String(sec).padStart(2, '0') : sec.toFixed(1).padStart(4, '0');
+    return `${min}:${secText}`;
+  }
+
   // Кадр листа 400×256. 1.28 — шапка последней фазы почти у верхнего края и накрывает середину поля.
   static readonly mushroomScale = 1.28;
 

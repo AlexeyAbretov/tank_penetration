@@ -594,11 +594,16 @@ export class GameHud {
     );
   }
 
-  setAbility(id: string, owned: boolean, cooldownMs: number): void {
+  setAbility(id: string, owned: boolean, cooldownMs: number, spanMs?: number): void {
     const icon = this.ability(id);
-    if (icon) {
-      this.paintAbility(icon, owned, cooldownMs);
+    if (!icon) {
+      return;
     }
+    // Полный круг затемнения — текущий откат покупки, а не всегда базовые 3 минуты.
+    if (spanMs !== undefined && spanMs > 0) {
+      icon.cooldownMs = spanMs;
+    }
+    this.paintAbility(icon, owned, cooldownMs);
   }
 
   setMaxHp(maxHp: number): void {

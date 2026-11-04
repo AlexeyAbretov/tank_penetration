@@ -40,6 +40,8 @@ export type ShopSave = {
   artillery: boolean;
   mines: boolean;
   nuclear: boolean;
+  // Уровни отката атомного взрыва за эту партию. Старые сохранения читают 0.
+  nuclearCooldown: number;
   autoFire: boolean;
   autoFireOn: boolean;
   mgDamage: number;
@@ -221,6 +223,7 @@ function parseShop(value: unknown): ShopSave | null {
   // Старые сохранения не писали РСЗО: этой покупки ещё не было.
   const salvo = flag(value.salvo) ?? false;
   const nuclear = flag(value.nuclear) ?? false;
+  const nuclearCooldown = requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxShopCooldownLevel) ?? 0;
   const autoFire = flag(value.autoFire);
   // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
   const autoFireOn = flag(value.autoFireOn) ?? (autoFire === true);
@@ -257,6 +260,7 @@ function parseShop(value: unknown): ShopSave | null {
     artillery,
     mines,
     nuclear,
+    nuclearCooldown,
     autoFire,
     autoFireOn: autoFire && autoFireOn,
     mgDamage,

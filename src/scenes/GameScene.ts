@@ -170,6 +170,7 @@ export class GameScene extends Phaser.Scene {
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
     Tank.setProgressPierceLevel(this.progressShop.pierceBonus());
+    NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
     this.field = this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);
@@ -448,7 +449,12 @@ export class GameScene extends Phaser.Scene {
     this.combat.tickNuclear(delta, fighting);
     this.hud.setAbility('artillery', this.shop.artilleryOwned, this.combat.artilleryCooldown);
     this.hud.setAbility('mines', this.shop.minesOwned, this.combat.minesCooldown);
-    this.hud.setAbility('nuclear', this.shop.nuclearOwned, this.combat.nuclearCooldown);
+    this.hud.setAbility(
+      'nuclear',
+      this.shop.nuclearOwned,
+      this.combat.nuclearCooldown,
+      NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel),
+    );
     if (!fighting) {
       return;
     }
@@ -647,11 +653,11 @@ export class GameScene extends Phaser.Scene {
   // 100 очков и 100 монет. Магазин между волнами тратит монеты, магазин после гибели — накопленные очки.
   private grantDebugFunds(): void {
     if (this.defeatShop) {
-      this.progressShop.addScore(100);
+      this.progressShop.addScore(10000);
       return;
     }
-    this.score += 100;
-    this.coins += 100;
+    this.score += 10000;
+    this.coins += 10000;
     this.hud.setScore(this.score);
     this.hud.setCoins(this.coins);
     this.shop.refreshCoins();

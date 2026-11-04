@@ -62,6 +62,7 @@ export class ShopController {
   artilleryOwned = false;
   minesOwned = false;
   nuclearOwned = false;
+  nuclearCooldownLevel = 0;
   mgDamageLevel = 0;
   wireDamageLevel = 0;
   flameDamageLevel = 0;
@@ -83,6 +84,7 @@ export class ShopController {
     private readonly onChanged: () => void,
   ) {
     this.panel = new ShopPanel(scene, this, GAME);
+    NuclearStrike.setShopCooldownLevel(0);
   }
 
   // Снимок покупок для сохранения партии. Монеты и номер волны пишет сцена, не этот метод.
@@ -102,6 +104,7 @@ export class ShopController {
       artillery: this.artilleryOwned,
       mines: this.minesOwned,
       nuclear: this.nuclearOwned,
+      nuclearCooldown: this.nuclearCooldownLevel,
       autoFire: this.autoFire.isOwned,
       autoFireOn: this.autoFire.enabled,
       mgDamage: this.mgDamageLevel,
@@ -146,6 +149,8 @@ export class ShopController {
     this.artilleryOwned = saved.artillery;
     this.minesOwned = saved.mines;
     this.nuclearOwned = saved.nuclear;
+    this.nuclearCooldownLevel = Math.min(saved.nuclearCooldown, NuclearStrike.maxShopCooldownLevel);
+    NuclearStrike.setShopCooldownLevel(this.nuclearCooldownLevel);
     this.mgDamageLevel = saved.mgDamage;
     this.wireDamageLevel = saved.wireDamage;
     this.flameDamageLevel = saved.flameDamage;
@@ -170,6 +175,8 @@ export class ShopController {
     this.artilleryOwned = false;
     this.minesOwned = false;
     this.nuclearOwned = false;
+    this.nuclearCooldownLevel = 0;
+    NuclearStrike.setShopCooldownLevel(0);
     this.mgDamageLevel = 0;
     this.wireDamageLevel = 0;
     this.flameDamageLevel = 0;
@@ -457,6 +464,27 @@ export class ShopController {
     this.refresh();
   }
 
+  // −1 с к откату атомного взрыва. Партия добивает остаток до 2 минут.
+  buyNuclearCooldown(): void {
+    if (this.isPaused() || !this.nuclearOwned) {
+      return;
+    }
+    if (this.nuclearCooldownLevel >= NuclearStrike.maxShopCooldownLevel) {
+      return;
+    }
+    const now = NuclearStrike.cooldownFor(this.nuclearCooldownLevel);
+    if (NuclearStrike.cooldownFor(this.nuclearCooldownLevel + 1) >= now) {
+      return;
+    }
+    const cost = ShopController.nuclearCooldownCost(this.nuclearCooldownLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.nuclearCooldownLevel += 1;
+    NuclearStrike.setShopCooldownLevel(this.nuclearCooldownLevel);
+    this.refresh();
+  }
+
   // Открывает клавишу 2. Постановку и подрыв считает CombatSystem.
   buyMines(): void {
     const cost = shopPrice(Mines.shop.cost);
@@ -567,6 +595,12 @@ export class ShopController {
     return shopPrice(Math.round(300 * 1.15 ** Math.max(0, level)));
   }
 
+  // Первая секунда отката атомного взрыва стоит 1000. Дальше та же ступень 15%:
+  // 1000, 1150, 1323, 1521, …
+  private static nuclearCooldownCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
   // На карточке уровень партии и прогресса — одно число. От него же цена.
   private blastOfferLevel(): number {
     return this.blastLevel + this.bonuses.blast;
@@ -656,7 +690,10 @@ export class ShopController {
             'после покупки',
           ),
         ]),
-        this.tab('nuclear', 'Атомный взрыв', [this.gearCard('nuclear', coins)]),
+        this.tab('nuclear', 'Атомный взрыв', [
+          this.gearCard('nuclear', coins),
+          this.nuclearCooldownCard(coins),
+        ]),
       ],
     };
   }
@@ -961,12 +998,12 @@ export class ShopController {
   private nuclearCard(coins: number): ShopCardView {
     const offer = NuclearStrike.shop;
     const price = shopPrice(offer.cost);
-    const reload = offer.cooldownMs / 60_000;
+    const reload = NuclearStrike.cooldownLabel(NuclearStrike.cooldownFor(this.nuclearCooldownLevel));
     if (this.nuclearOwned) {
       return {
         title: 'Покупка',
         buy: () => this.buyNuclear(),
-        info: `откат ${reload} мин`,
+        info: `откат ${reload}`,
         cost: '',
         open: false,
         canBuy: false,
@@ -976,10 +1013,41 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyNuclear(),
-      info: `весь экран · ${reload} мин`,
+      info: `весь экран · ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private nuclearCooldownCard(coins: number): ShopCardView {
+    const buy = () => this.buyNuclearCooldown();
+    const level = this.nuclearCooldownLevel;
+    const price = ShopController.nuclearCooldownCost(level);
+    if (!this.nuclearOwned) {
+      return {
+        title: '−1 с перезарядки',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = NuclearStrike.cooldownFor(level);
+    const next = NuclearStrike.cooldownFor(level + 1);
+    const maxed = level >= NuclearStrike.maxShopCooldownLevel || next >= now;
+    return {
+      title: '−1 с перезарядки',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}`
+        : `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}→${NuclearStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
       owned: false,
     };
   }

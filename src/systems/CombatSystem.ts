@@ -172,7 +172,12 @@ export class CombatSystem implements Combat {
   }
 
   setNuclearCooldown(ms: number): void {
-    this.nuclearCooldownMs = Math.max(0, ms);
+    this.nuclearCooldownMs = Math.min(this.nuclearSpan(), Math.max(0, ms));
+  }
+
+  // Купленный откат. Круг на иконке и следующий вызов берут одно число.
+  private nuclearSpan(): number {
+    return NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel);
   }
 
   // Сколько миллисекунд гриб ещё будет на поле. Магазин волны ждёт это, чтобы не закрыть взрыв.
@@ -305,7 +310,9 @@ export class CombatSystem implements Combat {
       this.nuclearFromIcon = false;
       return;
     }
-    this.nuclearCooldownMs = Math.max(0, this.nuclearCooldownMs - delta);
+    // Покупка короче текущего ожидания: дольше нового отката ждать не нужно.
+    const span = this.nuclearSpan();
+    this.nuclearCooldownMs = Math.min(span, Math.max(0, this.nuclearCooldownMs - delta));
     if (!this.nuclearPressed()) {
       return;
     }
@@ -316,7 +323,7 @@ export class CombatSystem implements Combat {
     if (!canFire || this.nuclearCooldownMs > 0) {
       return;
     }
-    this.nuclearCooldownMs = NuclearStrike.shop.cooldownMs;
+    this.nuclearCooldownMs = this.nuclearSpan();
     this.launchNuclear();
   }
 
