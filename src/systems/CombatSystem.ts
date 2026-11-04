@@ -104,6 +104,7 @@ export class CombatSystem implements Combat {
     private readonly callbacks: CombatCallbacks,
     private readonly progressDamage: number,
     private readonly progressBlast: number,
+    private readonly progressKnockback: number,
     private readonly mgBullets: number,
     private readonly progressMgDamage: number,
     private readonly laserShots: number,
@@ -131,7 +132,7 @@ export class CombatSystem implements Combat {
     this.afterConstruct();
   }
 
-  protected afterConstruct(): void {}
+  protected afterConstruct(): void { }
 
   get artilleryCooldown(): number {
     return this.artilleryCooldownMs;
@@ -606,7 +607,7 @@ export class CombatSystem implements Combat {
     this.effects.impacts.play();
 
     if (direct) {
-      this.hurtInfantry(direct);
+      this.shellHit(direct);
     }
 
     const blastRadius = this.blastRadius();
@@ -620,9 +621,21 @@ export class CombatSystem implements Combat {
       }
       const torso = this.torsoPoint(unit);
       if (Phaser.Math.Distance.Between(x, y, torso.x, torso.y) <= blastRadius) {
-        this.hurtInfantry(unit);
+        this.shellHit(unit);
       }
     });
+  }
+
+  // Урон снаряда и отталкивание из магазинов. Мёртвого уже не двигаем.
+  private shellHit(unit: Infantry): void {
+    this.hurtInfantry(unit);
+    if (!unit.active || unit.reachedWall) {
+      return;
+    }
+    const push = this.shellKnockback();
+    if (push > 0) {
+      unit.knockBack(push);
+    }
   }
 
   private resolveShellHits(): void {
@@ -1142,6 +1155,10 @@ export class CombatSystem implements Combat {
 
   protected blastRadius(): number {
     return Tank.blastRadiusFor(this.shop.blastLevel + this.progressBlast);
+  }
+
+  private shellKnockback(): number {
+    return Tank.knockbackPxFor(this.shop.knockbackLevel, this.progressKnockback);
   }
 
   private playBlast(x: number, y: number): void {

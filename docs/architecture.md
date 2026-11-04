@@ -154,11 +154,11 @@
 | --- | --- | --- |
 | Урон, скорость, здоровье вида | Класс врага в `src/entities` | `README.md`, раздел врагов |
 | Кто выходит на волне | `EnemyFactory` и `debutWave` вида | `README.md`, сбор волны |
-| Выстрел танка, радиус, перезарядка | `Tank` | Карточка в `ShopController`, если меняется подпись |
+| Выстрел танка, радиус, перезарядка, отталкивание | `Tank` | Карточка в `ShopController`, если меняется подпись |
 | Попадание по врагу, проволока, свои постройки | `CombatSystem` | Сущность, если меняется её число |
 | Пуля и ракета врага по танку | Выпуск — сущность. Попадание — `ProjectileSystem` | Звук в `src/sounds`, если клип новый |
-| Цена монет | `shop` сущности или `ShopController.upgradeCost` | `README.md` |
-| Цена очков | `ProgressSave` | `README.md` |
+| Цена монет | `shop` сущности или `ShopController.upgradeCost` / `knockbackCost` | `README.md` |
+| Цена очков | `ProgressSave` (`cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`) | `README.md` |
 | Новая кнопка витрины | Контроллер собирает карточку | Окно только если изменилась вёрстка карточки |
 | Новая клавиша способности | `CombatSystem` и иконка в `create()` сцены | Подсказка в `GameHud`, `README.md` |
 | Новый вид паузы | Класс `Pause` | Строка в `GameSceneFactory` |

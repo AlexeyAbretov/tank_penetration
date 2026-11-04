@@ -260,6 +260,19 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.anims.timeScale = haste;
   }
 
+  // Сдвиг вправо от разрыва снаряда танка. Тело двигаем сами: postUpdate перенесёт спрайт.
+  // Дошедшего до базы не трогаем — он уже выбыл.
+  knockBack(pixels: number): void {
+    if (this.reachedWall || pixels <= 0 || !this.active) {
+      return;
+    }
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    if (!body?.enable) {
+      return;
+    }
+    body.x += pixels;
+  }
+
   // Упирает юнита в правый край проволоки и гасит шаг.
   // true, когда пора снять HP: в первое касание и потом каждые hurtIntervalMs.
   snare(faceX: number, delta: number, hurtIntervalMs: number): boolean {

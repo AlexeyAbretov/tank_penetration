@@ -26,6 +26,8 @@ export type ShopSave = {
   blast: number;
   damage: number;
   fireRate: number;
+  // Уровни отталкивания снарядом. Старые сохранения читают 0.
+  knockback: number;
   wire: boolean;
   machineGun: boolean;
   laser: boolean;
@@ -198,6 +200,8 @@ function parseShop(value: unknown): ShopSave | null {
   const blast = requiredInt(value.blast, 0, Tank.maxShopBlastLevel);
   const damage = requiredInt(value.damage, 0, 500);
   const fireRate = requiredInt(value.fireRate, 0, Tank.maxFireRateLevel);
+  // Старые сохранения не писали отталкивание: снаряд врагов не толкал.
+  const knockback = requiredInt(value.knockback, 0, Tank.maxShopKnockbackLevel) ?? 0;
   const wire = flag(value.wire);
   const machineGun = flag(value.machineGun);
   const artillery = flag(value.artillery);
@@ -234,6 +238,7 @@ function parseShop(value: unknown): ShopSave | null {
     blast,
     damage,
     fireRate,
+    knockback,
     wire,
     machineGun,
     laser,

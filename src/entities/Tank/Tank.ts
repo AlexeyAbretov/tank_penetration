@@ -85,6 +85,37 @@ export class Tank extends GameObjects.Container {
     return Tank.baseBlastRadius + capped * Tank.blastRadiusPerLevel;
   }
 
+  // Снаряд без покупок врагов не толкает. Магазин волны даёт +3 px за уровень, прогресс — +1.
+  // Сумма не выше 100. Прогресс сам не выше 50.
+  static readonly shopKnockbackPerLevel = 3;
+  static readonly progressKnockbackPerLevel = 1;
+  static readonly maxKnockbackPx = 100;
+  static readonly maxProgressKnockbackLevel = 50;
+  static progressKnockbackLevel = 0;
+
+  static setProgressKnockbackLevel(level: number): void {
+    Tank.progressKnockbackLevel = Math.min(
+      Tank.maxProgressKnockbackLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Магазин между волнами добивает остаток до общего потолка шагами по 3 px.
+  static get maxShopKnockbackLevel(): number {
+    const room =
+      Tank.maxKnockbackPx - Tank.progressKnockbackLevel * Tank.progressKnockbackPerLevel;
+    return Math.max(0, Math.floor(room / Tank.shopKnockbackPerLevel));
+  }
+
+  static knockbackPxFor(
+    shopLevel: number,
+    progressLevel = Tank.progressKnockbackLevel,
+  ): number {
+    const shop = Math.max(0, Math.round(shopLevel)) * Tank.shopKnockbackPerLevel;
+    const progress = Math.max(0, Math.round(progressLevel)) * Tank.progressKnockbackPerLevel;
+    return Math.min(Tank.maxKnockbackPx, shop + progress);
+  }
+
   // Точка прицеливания врагов: чуть правее носа танка.
   static aimPoint(): { x: number; y: number } {
     return { x: Tank.spawn.x + 24, y: Tank.spawn.y };

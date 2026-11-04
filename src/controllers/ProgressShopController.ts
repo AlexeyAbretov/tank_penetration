@@ -17,7 +17,16 @@ import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;
 
-type Stat = 'coins' | 'points' | 'damage' | 'blast' | 'speed' | 'bullets' | 'mgDamage' | 'laserShots';
+type Stat =
+  | 'coins'
+  | 'points'
+  | 'damage'
+  | 'blast'
+  | 'knockback'
+  | 'speed'
+  | 'bullets'
+  | 'mgDamage'
+  | 'laserShots';
 
 export class ProgressShopController {
   // Панель живёт только пока жива сцена. restart() её уничтожает, bind() собирает заново.
@@ -53,6 +62,10 @@ export class ProgressShopController {
 
   blastBonus(): number {
     return this.progress.blast;
+  }
+
+  knockbackBonus(): number {
+    return this.progress.knockback;
   }
 
   coinBonus(): number {
@@ -139,6 +152,10 @@ export class ProgressShopController {
     this.buy('blast');
   }
 
+  private buyKnockback(): void {
+    this.buy('knockback');
+  }
+
   private buySpeed(): void {
     this.buy('speed');
   }
@@ -163,6 +180,9 @@ export class ProgressShopController {
     if (stat === 'blast' && level >= Tank.maxProgressBlastLevel) {
       return;
     }
+    if (stat === 'knockback' && level >= Tank.maxProgressKnockbackLevel) {
+      return;
+    }
     if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
@@ -184,6 +204,9 @@ export class ProgressShopController {
     if (stat === 'blast') {
       Tank.setProgressBlastLevel(this.progress.blast);
     }
+    if (stat === 'knockback') {
+      Tank.setProgressKnockbackLevel(this.progress.knockback);
+    }
     this.progressSave.save(this.progress);
     this.panel.refresh(this.view());
   }
@@ -193,7 +216,12 @@ export class ProgressShopController {
     return {
       score,
       tabs: [
-        this.tab('tank', 'Танк', [this.damageCard(score), this.blastCard(score), this.speedCard(score)]),
+        this.tab('tank', 'Танк', [
+          this.damageCard(score),
+          this.blastCard(score),
+          this.speedCard(score),
+          this.knockbackCard(score),
+        ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
         this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
@@ -279,6 +307,22 @@ export class ProgressShopController {
     };
   }
 
+  private knockbackCard(score: number): ProgressCardView {
+    const level = this.progress.knockback;
+    const price = this.knockbackPrice(level);
+    const now = Tank.knockbackPxFor(0, level);
+    const next = Tank.knockbackPxFor(0, level + 1);
+    const maxed = level >= Tank.maxProgressKnockbackLevel;
+    return {
+      title: '+1 отталкивание',
+      buy: () => this.buyKnockback(),
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private bulletsCard(score: number): ProgressCardView {
     const level = this.progress.bullets;
     const price = this.bulletPrice(level);
@@ -338,12 +382,19 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.mgDamageCost(level));
   }
 
+  private knockbackPrice(level: number): number {
+    return shopPrice(ProgressSave.knockbackCost(level));
+  }
+
   private costFor(stat: Stat, level: number): number {
     if (stat === 'bullets') {
       return this.bulletPrice(level);
     }
     if (stat === 'mgDamage') {
       return this.mgDamagePrice(level);
+    }
+    if (stat === 'knockback') {
+      return this.knockbackPrice(level);
     }
     return this.price(level);
   }

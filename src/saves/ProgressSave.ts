@@ -20,6 +20,8 @@ export type SavedProgress = {
   points: number;
   damage: number;
   blast: number;
+  // Пиксели отталкивания снарядом танка. 0 — снаряд не толкает.
+  knockback: number;
   speed: number;
   // Сколько раз докуплена пуля пулемёта. 0 — одна пуля, 9 — десять.
   bullets: number;
@@ -51,6 +53,12 @@ export class ProgressSave {
     return 300 + Math.max(0, level) * 300;
   }
 
+  // Первый пиксель отталкивания стоит 300. Каждая следующая — на 300 × уже купленный уровень дороже:
+  // 300, 600, 900, …
+  static knockbackCost(level: number): number {
+    return 300 + Math.max(0, level) * 300;
+  }
+
   load(): SavedProgress {
     if (this.current) {
       return this.current;
@@ -68,6 +76,7 @@ export class ProgressSave {
     progress.points = 0;
     progress.damage = 0;
     progress.blast = 0;
+    progress.knockback = 0;
     progress.speed = 0;
     progress.bullets = 0;
     progress.mgDamage = 0;
@@ -75,6 +84,7 @@ export class ProgressSave {
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressBlastLevel(0);
+    Tank.setProgressKnockbackLevel(0);
   }
 
   save(data: SavedProgress): void {
@@ -100,6 +110,7 @@ export class ProgressSave {
       points: 0,
       damage: 0,
       blast: 0,
+      knockback: 0,
       speed: 0,
       bullets: 0,
       mgDamage: 0,
@@ -146,6 +157,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     points: requiredInt(value.points, 0, LEVEL_MAX) ?? 0,
     damage: requiredInt(value.damage, 0, LEVEL_MAX) ?? 0,
     blast: requiredInt(value.blast, 0, Tank.maxProgressBlastLevel) ?? 0,
+    // Старые сохранения не писали отталкивание: снаряд врагов не толкал.
+    knockback: requiredInt(value.knockback, 0, Tank.maxProgressKnockbackLevel) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
