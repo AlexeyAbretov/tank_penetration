@@ -25,6 +25,7 @@ type Stat =
   | 'knockback'
   | 'pierce'
   | 'speed'
+  | 'flight'
   | 'bullets'
   | 'mgDamage'
   | 'laserShots';
@@ -55,6 +56,10 @@ export class ProgressShopController {
 
   speedLevel(): number {
     return this.progress.speed;
+  }
+
+  flightLevel(): number {
+    return this.progress.flight;
   }
 
   damageBonus(): number {
@@ -169,6 +174,10 @@ export class ProgressShopController {
     this.buy('speed');
   }
 
+  private buyFlight(): void {
+    this.buy('flight');
+  }
+
   private buyBullets(): void {
     this.buy('bullets');
   }
@@ -198,6 +207,9 @@ export class ProgressShopController {
     if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
+    if (stat === 'flight' && level >= Tank.maxProgressFlightLevel) {
+      return;
+    }
     if (stat === 'bullets' && level >= MachineGun.maxBulletLevel) {
       return;
     }
@@ -212,6 +224,9 @@ export class ProgressShopController {
     this.progress[stat] += 1;
     if (stat === 'speed') {
       Tank.setProgressSpeedLevel(this.progress.speed);
+    }
+    if (stat === 'flight') {
+      Tank.setProgressFlightLevel(this.progress.flight);
     }
     if (stat === 'blast') {
       Tank.setProgressBlastLevel(this.progress.blast);
@@ -235,6 +250,7 @@ export class ProgressShopController {
           this.damageCard(score),
           this.blastCard(score),
           this.speedCard(score),
+          this.flightCard(score),
           this.knockbackCard(score),
           this.pierceCard(score),
         ]),
@@ -317,6 +333,24 @@ export class ProgressShopController {
       title: '−0.01 с перезарядки',
       buy: () => this.buySpeed(),
       info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${ahead}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private flightCard(score: number): ProgressCardView {
+    const level = this.progress.flight;
+    const price = this.price(level);
+    const now = Tank.flightMsFor(0, level);
+    const next = Tank.flightMsFor(0, level + 1);
+    const maxed = level >= Tank.maxProgressFlightLevel || next >= now;
+    const flight = this.formatSeconds(now);
+    const ahead = this.formatSeconds(next);
+    return {
+      title: '−0.10 с полёта',
+      buy: () => this.buyFlight(),
+      info: maxed ? `ур. ${level} · ${flight}` : `ур. ${level} · ${flight}→${ahead}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,

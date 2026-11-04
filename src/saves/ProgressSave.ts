@@ -25,6 +25,8 @@ export type SavedProgress = {
   // Проценты шанса прошивания снарядом. 0 — снаряд всегда рвётся о первого.
   pierce: number;
   speed: number;
+  // Сколько раз укорочен полёт снаряда. 0 — базовые 2 с через поле.
+  flight: number;
   // Сколько раз докуплена пуля пулемёта. 0 — одна пуля, 9 — десять.
   bullets: number;
   // Сколько раз докуплен урон пули пулемёта. 0 — базовый урон пули.
@@ -87,11 +89,13 @@ export class ProgressSave {
     progress.knockback = 0;
     progress.pierce = 0;
     progress.speed = 0;
+    progress.flight = 0;
     progress.bullets = 0;
     progress.mgDamage = 0;
     progress.laserShots = 0;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
+    Tank.setProgressFlightLevel(0);
     Tank.setProgressBlastLevel(0);
     Tank.setProgressKnockbackLevel(0);
     Tank.setProgressPierceLevel(0);
@@ -123,6 +127,7 @@ export class ProgressSave {
       knockback: 0,
       pierce: 0,
       speed: 0,
+      flight: 0,
       bullets: 0,
       mgDamage: 0,
       laserShots: 0,
@@ -173,6 +178,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали пробивание: снаряд всегда рвался о первого.
     pierce: requiredInt(value.pierce, 0, Tank.maxProgressPierceLevel) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
+    // Старые сохранения не писали полёт: снаряд шёл базовые 2 с.
+    flight: requiredInt(value.flight, 0, Tank.maxProgressFlightLevel) ?? 0,
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     laserShots: requiredInt(value.laserShots, 0, LaserDefense.maxShotLevel) ?? 0,

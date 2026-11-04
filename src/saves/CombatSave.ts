@@ -26,6 +26,8 @@ export type ShopSave = {
   blast: number;
   damage: number;
   fireRate: number;
+  // Уровни скорости снаряда. Старые сохранения читают 0.
+  flight: number;
   // Уровни отталкивания снарядом. Старые сохранения читают 0.
   knockback: number;
   // Уровни шанса прошивания. Старые сохранения читают 0.
@@ -202,6 +204,8 @@ function parseShop(value: unknown): ShopSave | null {
   const blast = requiredInt(value.blast, 0, Tank.maxShopBlastLevel);
   const damage = requiredInt(value.damage, 0, 500);
   const fireRate = requiredInt(value.fireRate, 0, Tank.maxFireRateLevel);
+  // Старые сохранения не писали полёт: снаряд шёл базовые 2 с.
+  const flight = requiredInt(value.flight, 0, Tank.maxShopFlightLevel) ?? 0;
   // Старые сохранения не писали отталкивание: снаряд врагов не толкал.
   const knockback = requiredInt(value.knockback, 0, Tank.maxShopKnockbackLevel) ?? 0;
   // Старые сохранения не писали пробивание: снаряд всегда рвался о первого.
@@ -242,6 +246,7 @@ function parseShop(value: unknown): ShopSave | null {
     blast,
     damage,
     fireRate,
+    flight,
     knockback,
     pierce,
     wire,

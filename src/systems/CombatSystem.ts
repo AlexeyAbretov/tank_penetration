@@ -1248,10 +1248,8 @@ export class CombatSystem implements Combat {
     shell.setDepth(15);
     shell.setBlendMode(Phaser.BlendModes.ADD);
     shell.setRotation(angle);
-    shell.setVelocity(
-      Math.cos(angle) * Tank.shellSpeed,
-      Math.sin(angle) * Tank.shellSpeed,
-    );
+    const speed = Tank.shellSpeedFor(this.shop.flightLevel);
+    shell.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
     const body = shell.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
     body.setCircle(18);

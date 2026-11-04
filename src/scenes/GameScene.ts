@@ -166,6 +166,7 @@ export class GameScene extends Phaser.Scene {
       this.scene.restart();
     });
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
+    Tank.setProgressFlightLevel(this.progressShop.flightLevel());
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
     Tank.setProgressPierceLevel(this.progressShop.pierceBonus());

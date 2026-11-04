@@ -56,8 +56,8 @@ const CARD_W = PANEL_W - SIDE * 2 - TAB_W - CARD_GAP_X;
 const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
 const CARD_H = 92;
 const CARD_GAP = 10;
-// Шесть мест: урон, взрыв, перезарядка, отталкивание, пробивание и автострельба.
-const CARD_SLOTS = 6;
+// Семь мест на вкладке «Танк»: урон, взрыв, перезарядка, полёт, отталкивание, пробивание и автострельба.
+const CARD_SLOTS = 7;
 
 const TITLE_Y = -302;
 const COINS_Y = -258;

@@ -56,7 +56,7 @@ const CARD_W = PANEL_W - SIDE * 2 - TAB_W - CARD_GAP_X;
 const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
 const CARD_H = 92;
 const CARD_GAP = 10;
-// Пять карточек танка: урон, взрыв, перезарядка, отталкивание и пробивание.
+// Шесть карточек танка: урон, взрыв, перезарядка, полёт, отталкивание и пробивание.
 const CARD_SLOTS = 6;
 
 const TITLE_Y = -302;

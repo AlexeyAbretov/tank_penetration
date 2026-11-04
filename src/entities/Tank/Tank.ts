@@ -60,9 +60,58 @@ export class Tank extends GameObjects.Container {
     const room = Tank.baseFireDelay - progressCut - Tank.minFireDelay;
     const maxShop = Math.max(0, Math.floor(room / Tank.fireRateStep));
     const capped = Math.min(Math.max(0, Math.round(level)), maxShop);
+    // Шаг партии 0,02 с, шаг прогресса 0,01 с. На потолке остаток короче шага
+    // всё равно добирается до 0,20 с, иначе кнопка пишет «максимум» на 0,21 с.
+    if (maxShop > 0 && capped >= maxShop) {
+      return Tank.minFireDelay;
+    }
     return Math.max(Tank.minFireDelay, Tank.baseFireDelay - capped * Tank.fireRateStep - progressCut);
   }
-  static readonly shellSpeed = 740;
+  // Полёт до правого края поля 1280 при ровном стволе. Без покупок это 2 с.
+  static readonly baseFlightMs = 2000;
+  // Магазин партии добивает полёт до 0,40 с. Прогресс сам останавливается на 0,60 с.
+  static readonly minFlightMs = 400;
+  static readonly minProgressFlightMs = 600;
+  // Оба магазина снимают по 0,10 с за уровень.
+  static readonly flightStepMs = 100;
+  static progressFlightLevel = 0;
+
+  static get maxProgressFlightLevel(): number {
+    return (Tank.baseFlightMs - Tank.minProgressFlightMs) / Tank.flightStepMs;
+  }
+
+  static setProgressFlightLevel(level: number): void {
+    Tank.progressFlightLevel = Math.min(
+      Tank.maxProgressFlightLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Прогресс не уводит полёт ниже 0,60 с, даже если в сохранении уровень выше нового потолка.
+  private static progressFlightCutMs(progressLevel: number): number {
+    const cut = Math.max(0, Math.round(progressLevel)) * Tank.flightStepMs;
+    return Math.min(cut, Tank.baseFlightMs - Tank.minProgressFlightMs);
+  }
+
+  // Магазин между волнами добивает остаток до 0,40 с. Прогресс сам останавливается на 0,60 с.
+  static get maxShopFlightLevel(): number {
+    const room =
+      Tank.baseFlightMs - Tank.progressFlightCutMs(Tank.progressFlightLevel) - Tank.minFlightMs;
+    return Math.max(0, Math.floor(room / Tank.flightStepMs));
+  }
+
+  static flightMsFor(level: number, progressLevel = Tank.progressFlightLevel): number {
+    const progressCut = Tank.progressFlightCutMs(progressLevel);
+    const room = Tank.baseFlightMs - progressCut - Tank.minFlightMs;
+    const maxShop = Math.max(0, Math.floor(room / Tank.flightStepMs));
+    const capped = Math.min(Math.max(0, Math.round(level)), maxShop);
+    return Math.max(Tank.minFlightMs, Tank.baseFlightMs - capped * Tank.flightStepMs - progressCut);
+  }
+
+  // Пиксели в секунду за тот же отрезок, что shellCrossPx, за время flightMsFor.
+  static shellSpeedFor(level: number, progressLevel = Tank.progressFlightLevel): number {
+    return (Tank.shellCrossPx() * 1000) / Tank.flightMsFor(level, progressLevel);
+  }
   // Радиус взрыва снаряда без покупок. Уровень магазина и прогресса прибавляет blastRadiusPerLevel.
   static readonly baseBlastRadius = 10;
   static readonly blastRadiusPerLevel = 1;
@@ -248,6 +297,12 @@ export class Tank extends GameObjects.Container {
       layout.gunX - layout.seatX + layout.muzzleLength,
       layout.gunY - layout.seatY,
     );
+  }
+
+  // Дуло при ровном стволе до правого края нарисованного поля.
+  // Широкое окно холст растягивает, а скорость снаряда от этого не растёт.
+  static shellCrossPx(): number {
+    return 1280 - (Tank.spawn.x + Tank.muzzleAt(0).x);
   }
   // Круглая вспышка у дула раздувается и гаснет.
   static readonly muzzleFlash = { scale: 1.6, ms: 90 };
