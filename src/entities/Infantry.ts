@@ -371,7 +371,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Куски кадра, если добила мина, артиллерия или залп. null — ложится целиком.
-  // Пикап возвращает null: у него свои обломки, не части солдата.
+  // Пикап возвращает null: лужа крови ему не нужна, кузов он ломает в своём kill.
   protected blastBits(): GibBit[] | null {
     return null;
   }

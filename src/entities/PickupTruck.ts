@@ -14,6 +14,24 @@ import { bake } from '../gfx/textures';
 import type { WorldPoint } from '../types/WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
+type ApartPixel = { x: number; y: number };
+
+type ApartCut = {
+  frontKey: string;
+  rearKey: string;
+  layKey: string;
+  wheelKeys: string[];
+  keys: string[];
+  frontHull: ApartPixel[];
+  rearHull: ApartPixel[];
+};
+
+type PixelPad = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  image: ImageData;
+};
+
 export class PickupTruck extends RangedEnemy {
   static readonly debutWave = 10;
   // Крест через центр повторяется каждые 180°. Шесть кадров делят эту половину оборота.
@@ -56,12 +74,36 @@ export class PickupTruck extends RangedEnemy {
   static readonly muzzleTip = { x: 54, y: 14 };
   // Пламя на капоте обломков. Отсюда поднимается дым.
   static readonly flame = { x: 26, y: 30 };
+  // Шов за кабиной. Куски — кадр сгоревшей машины, не живой ход.
+  // Шины спущены и сидят ниже арки. Пулемёт — отдельная полоска под днищем.
+  private static readonly apart = {
+    splitX: 77,
+    hingeY: 48,
+    wheels: [
+      { x0: 14, y0: 59, x1: 36, y1: 67 },
+      { x0: 88, y0: 59, x1: 118, y1: 68 },
+    ],
+    gun: { x0: 38, x1: 87, y0: 60, y1: 68, topX: 57 },
+    frontTilt: -0.48,
+    rearTilt: 0.48,
+    frontShift: -14,
+    rearShift: 16,
+    tiltMs: 560,
+    wheelRoll: 86,
+    wheelHop: 18,
+    wheelMs: 720,
+    wheelDelay: 40,
+  };
+  private static apartSeq = 0;
   // Струя огнемёта сажает огонь на капот, а не на задний борт.
   readonly flameSeat = 'hood' as const;
 
   static readonly coinReward = 3;
   readonly coinReward = PickupTruck.coinReward;
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Половинки и колёса после разрыва. Живут, пока спрайт машины не снимут с поля.
+  private readonly debris: Phaser.GameObjects.GameObject[] = [];
+  private readonly debrisKeys: string[] = [];
   // Зона попадания шире солдатской (46): снаряд задевает машину с большего расстояния.
   // override: у родителя Infantry это поле уже есть, здесь мы задаём своё значение.
   override readonly hitRadius: number = 86;
@@ -139,6 +181,7 @@ export class PickupTruck extends RangedEnemy {
       this.scene.tweens.killTweensOf(this.recoil);
       this.gun.destroy();
       this.smoke?.destroy();
+      this.clearDebris();
     });
     this.syncGun();
   }
@@ -165,6 +208,22 @@ export class PickupTruck extends RangedEnemy {
     this.playDeathBlast();
     const anchor = PickupTruck.smokeAnchor(this.scaleX);
     this.smoke = PickupTruck.smokeAt(this.scene, this.x + anchor.x, this.y + anchor.y, this.scaleX);
+  }
+
+  // Мина, артиллерия и залп передают центр разрыва. От них кузов расходится по шву,
+  // колёса выкатываются. Пуля и огонь этот центр не передают: остаётся целый остов.
+  override kill(blastAt?: WorldPoint): void {
+    if (this.reachedWall || this.hp > 0 || !blastAt) {
+      super.kill(blastAt);
+      return;
+    }
+    const cut = PickupTruck.cutApart(this.scene);
+    super.kill();
+    if (!cut) {
+      return;
+    }
+    this.setVisible(false);
+    this.spawnApart(cut);
   }
 
   override hit(damage?: number): boolean {
@@ -743,5 +802,421 @@ export class PickupTruck extends RangedEnemy {
     g.fillStyle(0xffffff, 1);
     g.fillCircle(5, y, 3.5);
     g.fillCircle(11, y - 2, 2);
+  }
+
+  // Половинки крутятся вокруг шва. Как только угол упирается в землю, кузов поднимается,
+  // чтобы не уйти под линию колёс. Дым остаётся на капоте и едет вместе с носом.
+  // Пулемёт уже лежит на земле в кадре остова: его не крутим.
+  private spawnApart(cut: ApartCut): void {
+    const scene = this.scene;
+    const scale = this.scaleX;
+    const groundY = this.y;
+    const spec = PickupTruck.apart;
+    const hinge = this.texPoint(spec.splitX, spec.hingeY);
+    const depth = this.depth;
+
+    const front = scene.add.container(hinge.x, hinge.y).setDepth(depth + 0.04);
+    const frontImg = scene.add.image(0, 0, cut.frontKey);
+    frontImg.setOrigin(1, spec.hingeY / PickupTruck.frame.h);
+    frontImg.setScale(scale);
+    front.add(frontImg);
+
+    const rear = scene.add.container(hinge.x, hinge.y).setDepth(depth + 0.05);
+    const rearImg = scene.add.image(0, 0, cut.rearKey);
+    rearImg.setOrigin(spec.splitX / PickupTruck.frame.w, spec.hingeY / PickupTruck.frame.h);
+    rearImg.setScale(scale);
+    rear.add(rearImg);
+
+    const lay = scene.add.image(this.x, this.y, cut.layKey);
+    lay.setOrigin(PickupTruck.placed.originX, PickupTruck.placed.originY);
+    lay.setScale(scale);
+    lay.setDepth(depth + 0.02);
+
+    const toLocal = (points: readonly ApartPixel[]) => points.map((point) => ({
+      x: (point.x - spec.splitX) * scale,
+      y: (point.y - spec.hingeY) * scale,
+    }));
+    const frontHull = toLocal(cut.frontHull);
+    const rearHull = toLocal(cut.rearHull);
+
+    const wheels: Phaser.GameObjects.Image[] = [];
+    spec.wheels.forEach((wheel, index) => {
+      const wheelKey = cut.wheelKeys[index];
+      if (!wheelKey) {
+        return;
+      }
+      const at = this.texPoint((wheel.x0 + wheel.x1) / 2, (wheel.y0 + wheel.y1) / 2);
+      const img = scene.add.image(at.x, at.y, wheelKey);
+      img.setOrigin(0.5, 0.5);
+      img.setScale(scale);
+      img.setDepth(depth + 0.08);
+      wheels.push(img);
+    });
+
+    this.debris.push(frontImg, rearImg, lay, ...wheels, front, rear);
+    this.debrisKeys.push(...cut.keys);
+
+    const frontBaseY = front.y;
+    scene.tweens.add({
+      targets: front,
+      x: front.x + spec.frontShift,
+      rotation: spec.frontTilt,
+      duration: spec.tiltMs,
+      ease: 'Cubic.Out',
+      onUpdate: () => {
+        this.seat(front, frontHull, frontBaseY, groundY);
+        this.followSmoke(front);
+      },
+    });
+    const rearBaseY = rear.y;
+    scene.tweens.add({
+      targets: rear,
+      x: rear.x + spec.rearShift,
+      rotation: spec.rearTilt,
+      duration: spec.tiltMs,
+      ease: 'Cubic.Out',
+      onUpdate: () => {
+        this.seat(rear, rearHull, rearBaseY, groundY);
+      },
+    });
+
+    wheels.forEach((wheel, index) => {
+      const sign = index === 0 ? -1 : 1;
+      const homeY = wheel.y;
+      const tire = spec.wheels[index];
+      if (!tire) {
+        return;
+      }
+      const radius = ((tire.x1 - tire.x0) / 2) * scale;
+      wheel.y = homeY - spec.wheelHop;
+      scene.tweens.add({
+        targets: wheel,
+        x: wheel.x + sign * spec.wheelRoll,
+        rotation: sign * (spec.wheelRoll / radius),
+        duration: spec.wheelMs,
+        delay: spec.wheelDelay,
+        ease: 'Quad.Out',
+      });
+      scene.tweens.add({
+        targets: wheel,
+        y: homeY,
+        duration: spec.wheelMs,
+        delay: spec.wheelDelay,
+        ease: 'Bounce.Out',
+      });
+    });
+  }
+
+  private texPoint(tx: number, ty: number): { x: number; y: number } {
+    const scale = this.scaleX;
+    return {
+      x: this.x + (tx - PickupTruck.placed.originX * PickupTruck.frame.w) * scale,
+      y: this.y + (ty - PickupTruck.placed.originY * PickupTruck.frame.h) * scale,
+    };
+  }
+
+  // baseY — высота до наклона. Ниже земли не опускаем: упёршийся край поднимает всю половину.
+  private seat(
+    piece: Phaser.GameObjects.Container,
+    hull: readonly { x: number; y: number }[],
+    baseY: number,
+    groundY: number,
+  ): void {
+    piece.y = baseY;
+    if (hull.length === 0) {
+      return;
+    }
+    const cos = Math.cos(piece.rotation);
+    const sin = Math.sin(piece.rotation);
+    let low = -Infinity;
+    for (const point of hull) {
+      const y = piece.y + point.x * sin + point.y * cos;
+      if (y > low) {
+        low = y;
+      }
+    }
+    if (low > groundY) {
+      piece.y -= low - groundY;
+    }
+  }
+
+  private followSmoke(front: Phaser.GameObjects.Container): void {
+    const smoke = this.smoke;
+    if (!smoke?.active) {
+      return;
+    }
+    const scale = this.scaleX;
+    const spec = PickupTruck.apart;
+    const localX = (PickupTruck.flame.x - spec.splitX) * scale;
+    const localY = (PickupTruck.flame.y - spec.hingeY) * scale;
+    const cos = Math.cos(front.rotation);
+    const sin = Math.sin(front.rotation);
+    smoke.setPosition(
+      front.x + localX * cos - localY * sin,
+      front.y + localX * sin + localY * cos,
+    );
+  }
+
+  private clearDebris(): void {
+    const pending = [...this.debris];
+    this.debris.length = 0;
+    const boxes: Phaser.GameObjects.Container[] = [];
+    for (const piece of pending) {
+      this.scene.tweens.killTweensOf(piece);
+      if (piece instanceof Phaser.GameObjects.Container) {
+        boxes.push(piece);
+        continue;
+      }
+      if (piece.active) {
+        piece.destroy();
+      }
+    }
+    for (const box of boxes) {
+      if (box.active) {
+        box.destroy();
+      }
+    }
+    for (const key of this.debrisKeys) {
+      if (this.scene.textures.exists(key)) {
+        this.scene.textures.remove(key);
+      }
+    }
+    this.debrisKeys.length = 0;
+  }
+
+  // Режет сгоревший кадр: нос, корма, две спущенные шины и пулемёт под днищем.
+  // Чужой размер кадра — запасной рисунок. Тогда null, и на поле остаётся целый остов.
+  private static cutApart(scene: Phaser.Scene): ApartCut | null {
+    const key = PickupTruck.corpseKey;
+    if (!scene.textures.exists(key)) {
+      return null;
+    }
+    const source = scene.textures.get(key).getSourceImage();
+    if (!(source instanceof HTMLImageElement) && !(source instanceof HTMLCanvasElement)) {
+      return null;
+    }
+    const w = PickupTruck.frame.w;
+    const h = PickupTruck.frame.h;
+    if (source.width !== w || source.height !== h) {
+      return null;
+    }
+    const full = document.createElement('canvas');
+    full.width = w;
+    full.height = h;
+    const fullCtx = full.getContext('2d', { willReadFrequently: true });
+    if (!fullCtx) {
+      return null;
+    }
+    fullCtx.imageSmoothingEnabled = false;
+    fullCtx.drawImage(source, 0, 0);
+    const src = fullCtx.getImageData(0, 0, w, h).data;
+    const spec = PickupTruck.apart;
+    const front = PickupTruck.blank(spec.splitX, h);
+    const rear = PickupTruck.blank(w, h);
+    const lay = PickupTruck.blank(w, h);
+    if (!front || !rear || !lay) {
+      return null;
+    }
+    const pads: PixelPad[] = [];
+    for (const wheel of spec.wheels) {
+      const pad = PickupTruck.blank(wheel.x1 - wheel.x0 + 1, wheel.y1 - wheel.y0 + 1);
+      if (!pad) {
+        return null;
+      }
+      pads.push(pad);
+    }
+
+    const mask = new Uint8Array(w * h);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const from = (y * w + x) * 4;
+        if (src[from + 3] === 0) {
+          continue;
+        }
+        const wheel = PickupTruck.wheelSlot(x, y);
+        if (wheel >= 0) {
+          const pad = pads[wheel];
+          const wheelSpec = spec.wheels[wheel];
+          if (!pad || !wheelSpec) {
+            continue;
+          }
+          const wx = x - wheelSpec.x0;
+          const wy = y - wheelSpec.y0;
+          PickupTruck.stamp(src, from, pad.image.data, (wy * pad.canvas.width + wx) * 4);
+          continue;
+        }
+        if (PickupTruck.isLaidGun(x, y)) {
+          PickupTruck.stamp(src, from, lay.image.data, from);
+          continue;
+        }
+        if (x >= spec.splitX) {
+          PickupTruck.stamp(src, from, rear.image.data, from);
+          mask[y * w + x] = 2;
+        } else {
+          PickupTruck.stamp(src, from, front.image.data, (y * spec.splitX + x) * 4);
+          mask[y * w + x] = 1;
+        }
+      }
+    }
+
+    const frontEdge: ApartPixel[] = [];
+    const rearEdge: ApartPixel[] = [];
+    const kindAt = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) {
+        return 0;
+      }
+      return mask[y * w + x] ?? 0;
+    };
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const kind = mask[y * w + x] ?? 0;
+        if (kind !== 1 && kind !== 2) {
+          continue;
+        }
+        const edge = kindAt(x - 1, y) !== kind
+          || kindAt(x + 1, y) !== kind
+          || kindAt(x, y - 1) !== kind
+          || kindAt(x, y + 1) !== kind;
+        if (!edge) {
+          continue;
+        }
+        (kind === 1 ? frontEdge : rearEdge).push({ x, y });
+      }
+    }
+
+    front.ctx.putImageData(front.image, 0, 0);
+    rear.ctx.putImageData(rear.image, 0, 0);
+    lay.ctx.putImageData(lay.image, 0, 0);
+    for (const pad of pads) {
+      pad.ctx.putImageData(pad.image, 0, 0);
+    }
+
+    PickupTruck.apartSeq += 1;
+    const seq = PickupTruck.apartSeq;
+    const frontKey = `pickup-apart-${seq}-front`;
+    const rearKey = `pickup-apart-${seq}-rear`;
+    const layKey = `pickup-apart-${seq}-gun`;
+    const wheelKeys = pads.map((_, index) => `pickup-apart-${seq}-wheel-${index}`);
+    const keys = [frontKey, rearKey, layKey, ...wheelKeys];
+    const canvases = [front.canvas, rear.canvas, lay.canvas, ...pads.map((pad) => pad.canvas)];
+    for (let i = 0; i < keys.length; i += 1) {
+      const name = keys[i];
+      const canvas = canvases[i];
+      if (!name || !canvas || !PickupTruck.publish(scene, name, canvas)) {
+        for (const made of keys) {
+          if (scene.textures.exists(made)) {
+            scene.textures.remove(made);
+          }
+        }
+        return null;
+      }
+    }
+
+    return {
+      frontKey,
+      rearKey,
+      layKey,
+      wheelKeys,
+      keys,
+      frontHull: PickupTruck.hull(frontEdge),
+      rearHull: PickupTruck.hull(rearEdge),
+    };
+  }
+
+  private static wheelSlot(x: number, y: number): number {
+    const wheels = PickupTruck.apart.wheels;
+    for (let i = 0; i < wheels.length; i += 1) {
+      const wheel = wheels[i];
+      if (!wheel) {
+        continue;
+      }
+      if (x >= wheel.x0 && x <= wheel.x1 && y >= wheel.y0 && y <= wheel.y1) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  // Верхняя кромка y0 слева ещё днище. Ствол начинается правее topX.
+  private static isLaidGun(x: number, y: number): boolean {
+    const gun = PickupTruck.apart.gun;
+    if (x < gun.x0 || x > gun.x1 || y < gun.y0 || y > gun.y1) {
+      return false;
+    }
+    return y > gun.y0 || x >= gun.topX;
+  }
+
+  private static blank(width: number, height: number): PixelPad | null {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      return null;
+    }
+    ctx.imageSmoothingEnabled = false;
+    return { canvas, ctx, image: ctx.getImageData(0, 0, width, height) };
+  }
+
+  private static stamp(
+    src: Uint8ClampedArray,
+    from: number,
+    dst: Uint8ClampedArray,
+    to: number,
+  ): void {
+    dst[to] = src[from] ?? 0;
+    dst[to + 1] = src[from + 1] ?? 0;
+    dst[to + 2] = src[from + 2] ?? 0;
+    dst[to + 3] = src[from + 3] ?? 0;
+  }
+
+  private static publish(scene: Phaser.Scene, key: string, canvas: HTMLCanvasElement): boolean {
+    const added = scene.textures.addCanvas(key, canvas);
+    if (!added) {
+      return false;
+    }
+    added.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    return true;
+  }
+
+  // Оболочка куска. По ней половина понимает, какой край уже на земле.
+  private static hull(points: readonly ApartPixel[]): ApartPixel[] {
+    if (points.length < 3) {
+      return points.map((point) => ({ x: point.x, y: point.y }));
+    }
+    const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+    const unique: ApartPixel[] = [];
+    for (const point of sorted) {
+      const prev = unique[unique.length - 1];
+      if (prev && prev.x === point.x && prev.y === point.y) {
+        continue;
+      }
+      unique.push(point);
+    }
+    if (unique.length < 3) {
+      return unique;
+    }
+    const cross = (o: ApartPixel, a: ApartPixel, b: ApartPixel) =>
+      (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const chain = (from: readonly ApartPixel[]) => {
+      const edge: ApartPixel[] = [];
+      for (const point of from) {
+        while (edge.length >= 2) {
+          const a = edge[edge.length - 2];
+          const b = edge[edge.length - 1];
+          if (!a || !b || cross(a, b, point) > 0) {
+            break;
+          }
+          edge.pop();
+        }
+        edge.push(point);
+      }
+      return edge;
+    };
+    const lower = chain(unique);
+    const upper = chain([...unique].reverse());
+    lower.pop();
+    upper.pop();
+    return lower.concat(upper);
   }
 }
