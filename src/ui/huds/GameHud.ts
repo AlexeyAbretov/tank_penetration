@@ -114,6 +114,10 @@ export class GameHud {
   private resumeRequest?: () => void;
   private settingsRequest?: () => void;
   private autoFireRequest?: () => void;
+  private autoAimRoot?: Phaser.GameObjects.Container;
+  private autoAimGlow?: Phaser.GameObjects.Image;
+  private autoAimOwned = false;
+  private autoAimRequest?: () => void;
   private newGameRequest?: () => void;
 
   protected readonly statusY = 28;
@@ -387,6 +391,8 @@ export class GameHud {
     this.autoFirePlate.setPosition(this.autoFireX, y);
     this.autoFireFace.setPosition(this.autoFireX, y);
     this.autoFireIcon.setPosition(this.autoFireX, y);
+    // Тот же ряд, что у способностей, но у правого края. Широкое окно сдвигает его вместе с полем.
+    this.autoAimRoot?.setPosition(width - 56, this.frame.bannerY - 48);
 
     this.hpFrame.setPosition(hpCenter, 28);
     this.hpTrack.setPosition(barLeft, 28);
@@ -462,6 +468,61 @@ export class GameHud {
 
   onAutoFire(request: () => void): void {
     this.autoFireRequest = request;
+  }
+
+  // Картинка уже прогрета. Ряд способностей слева, эта кнопка — на той же высоте справа.
+  // Глубина как у автострельбы: магазин волны накрывает иконки ударов, выключатель остаётся.
+  installAutoAim(texture: string): void {
+    if (this.autoAimRoot) {
+      return;
+    }
+    const scene = this.scoreText.scene;
+    const glyph = scene.add.image(0, 0, texture);
+    const glow = scene.add
+      .image(0, 0, texture)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0.5)
+      .setVisible(false);
+    const root = scene.add
+      .container(this.frame.width - 56, this.frame.bannerY - 48, [glyph, glow])
+      .setDepth(80)
+      .setVisible(false);
+    root.on('pointerup', () => this.autoAimRequest?.());
+    this.autoAimRoot = root;
+    this.autoAimGlow = glow;
+  }
+
+  onAutoAim(request: () => void): void {
+    this.autoAimRequest = request;
+  }
+
+  // Скрытая кнопка не занимает место: до покупки курсор над ней всё ещё стреляет.
+  setAutoAimToggle(owned: boolean, enabled: boolean): void {
+    const root = this.autoAimRoot;
+    const glow = this.autoAimGlow;
+    if (!root || !glow) {
+      return;
+    }
+    if (this.autoAimOwned !== owned) {
+      this.autoAimOwned = owned;
+      this.syncControls();
+    }
+    root.setVisible(owned);
+    if (!owned) {
+      if (root.input?.enabled) {
+        root.disableInteractive();
+      }
+      return;
+    }
+    if (!root.input?.enabled) {
+      root.setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(-32, -32, 64, 64),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+        useHandCursor: true,
+      });
+    }
+    root.setAlpha(enabled ? 1 : 0.45);
+    glow.setVisible(enabled);
   }
 
   onAbility(id: string, request: () => void): void {
@@ -577,6 +638,12 @@ export class GameHud {
     );
   }
 
+  // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
+  coversAutoAim(pointer: Phaser.Input.Pointer): boolean {
+    const root = this.autoAimRoot;
+    return !!root && root.visible && root.getBounds().contains(pointer.worldX, pointer.worldY);
+  }
+
   // В обычной партии плашки нет. Дебаг перекрывает клик своей кнопкой урона.
   coversEnemyDamage(_pointer: Phaser.Input.Pointer): boolean {
     return false;
@@ -642,6 +709,9 @@ export class GameHud {
   // Строки окна. Купленная способность дописывает свою, пока её нет — в списке её нет.
   protected controlHints(): readonly string[] {
     const hints = ['мышь — прицел', 'ЛКМ — огонь', '+ — темп', 'Esc — пауза', 'шестерёнка — звук'];
+    if (this.autoAimOwned) {
+      hints.push('иконка справа — автонаведение');
+    }
     for (const icon of this.abilities) {
       if (icon.owned) {
         hints.push(icon.hint);

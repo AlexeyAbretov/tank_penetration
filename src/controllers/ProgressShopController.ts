@@ -168,6 +168,23 @@ export class ProgressShopController {
     return this.progress.nuclearCooldown;
   }
 
+  autoAimOwned(): boolean {
+    return this.progress.autoAim;
+  }
+
+  // Куплено и не выключено кнопкой над лентой.
+  autoAimEnabled(): boolean {
+    return this.progress.autoAim && this.progress.autoAimOn;
+  }
+
+  toggleAutoAim(): void {
+    if (this.paused || !this.progress.autoAim) {
+      return;
+    }
+    this.progress.autoAimOn = !this.progress.autoAimOn;
+    this.progressSave.save(this.progress);
+  }
+
   isAwaitingShop(): boolean {
     return this.progress.awaitingShop;
   }
@@ -312,6 +329,21 @@ export class ProgressShopController {
     this.buy('nuclearCooldown');
   }
 
+  private buyAutoAim(): void {
+    if (this.isPaused() || this.progress.autoAim) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoAimCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoAim = true;
+    this.progress.autoAimOn = true;
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -429,6 +461,7 @@ export class ProgressShopController {
           this.flightCard(score),
           this.knockbackCard(score),
           this.pierceCard(score),
+          this.autoAimCard(score),
         ]),
         this.tab('gun', 'Пулемёт', [
           this.bulletsCard(score),
@@ -457,6 +490,19 @@ export class ProgressShopController {
 
   private tab(id: string, label: string, cards: ProgressCardView[]): ProgressTabView {
     return { id, label, cards };
+  }
+
+  private autoAimCard(score: number): ProgressCardView {
+    const owned = this.progress.autoAim;
+    const price = shopPrice(ProgressSave.autoAimCost());
+    return {
+      title: 'автонаведение',
+      buy: () => this.buyAutoAim(),
+      info: owned ? 'держит одну цель' : 'башня сама держит врага',
+      cost: owned ? 'куплено' : this.coin(price),
+      open: !owned,
+      canBuy: !owned && score >= price,
+    };
   }
 
   private coinsCard(score: number): ProgressCardView {

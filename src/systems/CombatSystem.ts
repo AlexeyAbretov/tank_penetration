@@ -102,6 +102,8 @@ export class CombatSystem implements Combat {
   private nuclearToken = 0;
   // Момент, когда гриб атомного удара уже погас. 0 — облака на поле нет.
   private nuclearCloudUntil = 0;
+  // Кого башня держит при автонаведении. Ближний новичок не перебивает, пока этот жив.
+  private aimLock: Infantry | null = null;
 
   constructor(
     protected readonly scene: Phaser.Scene,
@@ -177,6 +179,35 @@ export class CombatSystem implements Combat {
 
   setNuclearCooldown(ms: number): void {
     this.nuclearCooldownMs = Math.min(this.nuclearSpan(), Math.max(0, ms));
+  }
+
+  // Живая цель остаётся, даже если к танку подошёл кто-то ближе. Труп и дошедший до базы уже не цель.
+  aimPoint(): { x: number; y: number } | null {
+    const locked = this.aimLock;
+    if (locked && locked.active && !locked.reachedWall) {
+      return locked.hitCenter();
+    }
+    this.aimLock = this.nearestEnemy();
+    return this.aimLock ? this.aimLock.hitCenter() : null;
+  }
+
+  private nearestEnemy(): Infantry | null {
+    let best: Infantry | null = null;
+    let bestDistance = Infinity;
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (!unit.active || unit.reachedWall) {
+        continue;
+      }
+      const center = unit.hitCenter();
+      const dx = center.x - this.tank.x;
+      const dy = center.y - this.tank.y;
+      const distance = dx * dx + dy * dy;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = unit;
+      }
+    }
+    return best;
   }
 
   // Купленный откат. Круг на иконке и следующий вызов берут одно число.

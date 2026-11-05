@@ -63,6 +63,10 @@ export type SavedProgress = {
   minesCooldown: number;
   // Сколько раз укорочен откат атомного взрыва. 0 — базовые 3 минуты. Прогресс сам останавливается на 2:30.
   nuclearCooldown: number;
+  // Куплено ли автонаведение. Башня сама держит одну цель, пока та жива.
+  autoAim: boolean;
+  // Выключатель уже купленного автонаведения. Пока false, башню ведёт курсор.
+  autoAimOn: boolean;
 };
 
 export class ProgressSave {
@@ -97,6 +101,11 @@ export class ProgressSave {
   // 300, 600, 900, …
   static pierceCost(level: number): number {
     return 300 + Math.max(0, level) * 300;
+  }
+
+  // Одна покупка. Башня сама держит ближайшего врага и не бросает его, пока он жив.
+  static autoAimCost(): number {
+    return 50_000;
   }
 
   // Первая секунда перезарядки лазера стоит 5000, вторая — 50000.
@@ -148,6 +157,8 @@ export class ProgressSave {
     progress.artilleryCooldown = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
+    progress.autoAim = false;
+    progress.autoAimOn = false;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressFlightLevel(0);
@@ -208,6 +219,8 @@ export class ProgressSave {
       artilleryCooldown: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
+      autoAim: false,
+      autoAimOn: false,
     };
   }
 
@@ -280,6 +293,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали откат атомного взрыва: бомба ждала базовые 3 минуты.
     nuclearCooldown: requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxProgressCooldownLevel) ?? 0,
+    // Старые сохранения не писали автонаведение: башню вёл курсор.
+    autoAim: value.autoAim === true,
+    autoAimOn: value.autoAim === true && value.autoAimOn !== false,
   };
 }
 

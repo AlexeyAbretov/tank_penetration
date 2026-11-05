@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { AutoAim } from '../entities/AutoAim';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -234,6 +235,15 @@ export class GameScene extends Phaser.Scene {
       }
       this.shop.toggleAutoFire();
     });
+    this.hud.installAutoAim(AutoAim.iconKey);
+    this.hud.onAutoAim(() => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.progressShop.toggleAutoAim();
+      this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
+    });
+    this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
     this.hud.onAbility('artillery', () => {
       if (this.blocksPlay()) {
         return;
@@ -488,21 +498,25 @@ export class GameScene extends Phaser.Scene {
       this.combat.nuclearCooldown,
       NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel),
     );
+    this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
     if (!fighting) {
       return;
     }
 
     // worldX/worldY — курсор в координатах поля, а не окна браузера.
+    // Включённое автонаведение подставляет живую цель и не бросает её, пока она не погибла.
     const pointer = this.input.activePointer;
-    this.player.tick(delta, pointer.worldX, pointer.worldY);
+    const locked = this.progressShop.autoAimEnabled() ? this.combat.aimPoint() : null;
+    this.player.tick(delta, locked?.x ?? pointer.worldX, locked?.y ?? pointer.worldY);
 
-    // Клик по кнопкам темпа, паузы, автострельбы, урона врагов, клавиш, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
+    // Клик по кнопкам темпа, паузы, автострельбы, автонаведения, урона врагов, клавиш, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
     this.combat.tick(
       delta,
       !this.hud.coversHaste(pointer) &&
         !this.hud.coversPause(pointer) &&
         !this.hud.coversSettings(pointer) &&
         !this.hud.coversAutoFire(pointer) &&
+        !this.hud.coversAutoAim(pointer) &&
         !this.hud.coversEnemyDamage(pointer) &&
         !this.hud.coversAbility(pointer) &&
         !this.hud.coversKeys(pointer),

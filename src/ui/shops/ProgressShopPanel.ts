@@ -56,8 +56,6 @@ const CARD_W = PANEL_W - SIDE * 2 - TAB_W - CARD_GAP_X;
 const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
 const CARD_H = 92;
 const CARD_GAP = 10;
-// Шесть карточек танка: урон, взрыв, перезарядка, полёт, отталкивание и пробивание.
-const CARD_SLOTS = 6;
 
 const TITLE_Y = -302;
 const SCORE_Y = -258;
@@ -89,7 +87,7 @@ export class ProgressShopPanel {
 
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly dim: Phaser.GameObjects.Rectangle;
-  private readonly offers: Offer[];
+  private readonly offers: Offer[] = [];
   private readonly tabs: Tab[] = [];
 
   private paused = false;
@@ -134,9 +132,6 @@ export class ProgressShopPanel {
       })
       .setOrigin(0.5);
 
-    this.offers = Array.from({ length: CARD_SLOTS }, (_, index) => this.makeOffer(scene, index));
-
-    const offerNodes = this.offers.flatMap((offer) => [offer.card, offer.title, offer.info, offer.cost]);
     this.container = scene.add.container(screen.width / 2, screen.height / 2, [
       this.dim,
       panel,
@@ -144,7 +139,6 @@ export class ProgressShopPanel {
       rule,
       title,
       this.scoreText,
-      ...offerNodes,
     ]);
 
     const fresh = this.makeButton(scene, -BUTTON_X, BUTTON_Y, BUTTON_W, 'НОВАЯ ИГРА', () => shop.wipeAndRestart());
@@ -256,6 +250,7 @@ export class ProgressShopPanel {
   }
 
   private applyOffers(): void {
+    this.ensureOffers(this.lastCards.length);
     this.placeOffers(this.lastCards.length);
     for (let i = 0; i < this.offers.length; i += 1) {
       const card = this.lastCards[i];
@@ -264,6 +259,19 @@ export class ProgressShopPanel {
       if (shown && card) {
         this.paint(this.offers[i], card);
       }
+    }
+  }
+
+  // Плашек ровно столько, сколько карточек в самой длинной вкладке. Короткая вкладка лишние прячет.
+  private ensureOffers(count: number): void {
+    const scene = this.container.scene;
+    while (this.offers.length < count) {
+      const offer = this.makeOffer(scene, this.offers.length);
+      this.offers.push(offer);
+      // Кнопки «Новая игра» и «В бой» остаются поверх карточек.
+      const at = Math.max(0, this.container.length - 2);
+      const nodes = [offer.card, offer.title, offer.info, offer.cost];
+      nodes.forEach((node, index) => this.container.addAt(node, at + index));
     }
   }
 

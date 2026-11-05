@@ -1,0 +1,43 @@
+// Иконка автонаведения. Покупка и выключатель живут в прогрессе, точку башне отдаёт бой.
+// Пока файла нет, кнопка рисуется кругом. Готовая картинка — public/assets/auto-aim-icon.png.
+
+import Phaser from 'phaser';
+import { bake } from '../gfx/textures';
+
+export class AutoAim {
+  static readonly iconKey = 'auto-aim-icon';
+  // Радиус круга. Такой же, как у иконок способностей над лентой.
+  static readonly iconRadius = 30;
+
+  static ensureTextures(scene: Phaser.Scene): void {
+    if (scene.textures.exists(AutoAim.iconKey)) {
+      scene.textures.get(AutoAim.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      return;
+    }
+    bake(scene, AutoAim.iconKey, 64, 64, (g) => AutoAim.renderIcon(g));
+  }
+
+  // Запасной круг: золотой обод и перекрестие. Файл, если загрузился, этот рисунок не вызывает.
+  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
+    g.fillStyle(0x2a0c0c);
+    g.fillCircle(32, 32, AutoAim.iconRadius);
+    g.fillStyle(0x5a1210);
+    g.fillCircle(32, 32, 26);
+    g.lineStyle(3, 0xf0d56a, 1);
+    g.strokeCircle(32, 32, 28);
+    g.lineStyle(2, 0xf0d56a, 1);
+    g.strokeCircle(32, 32, 10);
+    g.beginPath();
+    g.moveTo(32, 14);
+    g.lineTo(32, 22);
+    g.moveTo(32, 42);
+    g.lineTo(32, 50);
+    g.moveTo(14, 32);
+    g.lineTo(22, 32);
+    g.moveTo(42, 32);
+    g.lineTo(50, 32);
+    g.strokePath();
+    g.fillStyle(0xf0d56a);
+    g.fillRect(18, 30, 12, 4);
+  }
+}
