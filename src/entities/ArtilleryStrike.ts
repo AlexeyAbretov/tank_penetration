@@ -38,6 +38,68 @@ export class ArtilleryStrike {
     afterShotMs: 0,
   };
 
+  // Вместе с магазином очков откат не короче 20 с. У каждого магазина свой запас в 20 с, шаг — 1 с.
+  static readonly minCooldownMs = 20_000;
+  static readonly cooldownStepMs = 1_000;
+  static readonly shopCutMsMax = 20_000;
+  static readonly progressCutMsMax = 20_000;
+  static progressCooldownLevel = 0;
+  // Сколько секунд партия уже докупила в этом заходе. Прогресс читает это, чтобы карточка показывала текущий откат.
+  static shopCooldownLevel = 0;
+
+  static setShopCooldownLevel(level: number): void {
+    ArtilleryStrike.shopCooldownLevel = Math.min(
+      ArtilleryStrike.maxShopCooldownLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  static get maxShopCooldownLevel(): number {
+    return ArtilleryStrike.shopCutMsMax / ArtilleryStrike.cooldownStepMs;
+  }
+
+  static get maxProgressCooldownLevel(): number {
+    return ArtilleryStrike.progressCutMsMax / ArtilleryStrike.cooldownStepMs;
+  }
+
+  static setProgressCooldownLevel(level: number): void {
+    ArtilleryStrike.progressCooldownLevel = Math.min(
+      ArtilleryStrike.maxProgressCooldownLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Свой запас прогресса уже выбран — следующий уровень откат не укорачивает.
+  static progressCooldownShortens(progressLevel: number): boolean {
+    const shop = ArtilleryStrike.shopCooldownLevel;
+    return ArtilleryStrike.cooldownFor(shop, progressLevel + 1) < ArtilleryStrike.cooldownFor(shop, progressLevel);
+  }
+
+  static cooldownFor(shopLevel: number, progressLevel = ArtilleryStrike.progressCooldownLevel): number {
+    const progressCut = Math.min(
+      ArtilleryStrike.progressCutMsMax,
+      Math.max(0, Math.round(progressLevel)) * ArtilleryStrike.cooldownStepMs,
+    );
+    const shopCut = Math.min(
+      ArtilleryStrike.shopCutMsMax,
+      Math.max(0, Math.round(shopLevel)) * ArtilleryStrike.cooldownStepMs,
+    );
+    return Math.max(ArtilleryStrike.minCooldownMs, ArtilleryStrike.shop.cooldownMs - progressCut - shopCut);
+  }
+
+  // Дольше минуты — как на иконке: 1:00, следующий шаг 59 с. Пол — 20 с.
+  static cooldownLabel(ms: number): string {
+    const totalSec = ms / 1000;
+    if (totalSec < 60) {
+      const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
+      return `${text} с`;
+    }
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec - min * 60;
+    const secText = Number.isInteger(sec) ? String(sec).padStart(2, '0') : sec.toFixed(1).padStart(4, '0');
+    return `${min}:${secText}`;
+  }
+
   // Прямоугольник удара без левого края: его даёт бой, чтобы чаша не ушла за проволоку.
   static readonly field = {
     maxX: 1160,

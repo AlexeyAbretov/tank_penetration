@@ -170,6 +170,8 @@ export class GameScene extends Phaser.Scene {
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
     Tank.setProgressPierceLevel(this.progressShop.pierceBonus());
+    ArtilleryStrike.setProgressCooldownLevel(this.progressShop.artilleryCooldownLevel());
+    Mines.setProgressCooldownLevel(this.progressShop.minesCooldownLevel());
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
@@ -447,8 +449,18 @@ export class GameScene extends Phaser.Scene {
     this.combat.tickArtillery(delta, fighting);
     this.combat.tickMines(delta, fighting);
     this.combat.tickNuclear(delta, fighting);
-    this.hud.setAbility('artillery', this.shop.artilleryOwned, this.combat.artilleryCooldown);
-    this.hud.setAbility('mines', this.shop.minesOwned, this.combat.minesCooldown);
+    this.hud.setAbility(
+      'artillery',
+      this.shop.artilleryOwned,
+      this.combat.artilleryCooldown,
+      ArtilleryStrike.cooldownFor(this.shop.artilleryCooldownLevel),
+    );
+    this.hud.setAbility(
+      'mines',
+      this.shop.minesOwned,
+      this.combat.minesCooldown,
+      Mines.cooldownFor(this.shop.minesCooldownLevel),
+    );
     this.hud.setAbility(
       'nuclear',
       this.shop.nuclearOwned,

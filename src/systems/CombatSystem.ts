@@ -148,7 +148,7 @@ export class CombatSystem implements Combat {
   }
 
   setArtilleryCooldown(ms: number): void {
-    this.artilleryCooldownMs = Math.max(0, ms);
+    this.artilleryCooldownMs = Math.min(this.artillerySpan(), Math.max(0, ms));
   }
 
   get minesCooldown(): number {
@@ -156,7 +156,7 @@ export class CombatSystem implements Combat {
   }
 
   setMinesCooldown(ms: number): void {
-    this.minesCooldownMs = Math.max(0, ms);
+    this.minesCooldownMs = Math.min(this.minesSpan(), Math.max(0, ms));
   }
 
   get nuclearCooldown(): number {
@@ -176,6 +176,14 @@ export class CombatSystem implements Combat {
   }
 
   // Купленный откат. Круг на иконке и следующий вызов берут одно число.
+  private artillerySpan(): number {
+    return ArtilleryStrike.cooldownFor(this.shop.artilleryCooldownLevel);
+  }
+
+  private minesSpan(): number {
+    return Mines.cooldownFor(this.shop.minesCooldownLevel);
+  }
+
   private nuclearSpan(): number {
     return NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel);
   }
@@ -262,7 +270,9 @@ export class CombatSystem implements Combat {
       this.strikeFromIcon = false;
       return;
     }
-    this.artilleryCooldownMs = Math.max(0, this.artilleryCooldownMs - delta);
+    // Покупка короче текущего ожидания: дольше нового отката ждать не нужно.
+    const artillerySpan = this.artillerySpan();
+    this.artilleryCooldownMs = Math.min(artillerySpan, Math.max(0, this.artilleryCooldownMs - delta));
     if (!this.strikePressed()) {
       return;
     }
@@ -273,7 +283,7 @@ export class CombatSystem implements Combat {
     if (!canFire || this.artilleryCooldownMs > 0) {
       return;
     }
-    this.artilleryCooldownMs = ArtilleryStrike.shop.cooldownMs;
+    this.artilleryCooldownMs = this.artillerySpan();
     this.launchArtillery();
   }
 
@@ -284,7 +294,9 @@ export class CombatSystem implements Combat {
       this.mineFromIcon = false;
       return;
     }
-    this.minesCooldownMs = Math.max(0, this.minesCooldownMs - delta);
+    // Покупка короче текущего ожидания: дольше нового отката ждать не нужно.
+    const minesSpan = this.minesSpan();
+    this.minesCooldownMs = Math.min(minesSpan, Math.max(0, this.minesCooldownMs - delta));
     const pressed = this.minePressed();
     if (canFire) {
       this.touchMines();
@@ -300,7 +312,7 @@ export class CombatSystem implements Combat {
       return;
     }
     if (this.layMines()) {
-      this.minesCooldownMs = Mines.shop.cooldownMs;
+      this.minesCooldownMs = this.minesSpan();
     }
   }
 

@@ -38,7 +38,11 @@ export type ShopSave = {
   flame: boolean;
   salvo: boolean;
   artillery: boolean;
+  // Уровни отката артиллерии за эту партию. Старые сохранения читают 0.
+  artilleryCooldown: number;
   mines: boolean;
+  // Уровни отката мин за эту партию. Старые сохранения читают 0.
+  minesCooldown: number;
   nuclear: boolean;
   // Уровни отката атомного взрыва за эту партию. Старые сохранения читают 0.
   nuclearCooldown: number;
@@ -223,6 +227,9 @@ function parseShop(value: unknown): ShopSave | null {
   // Старые сохранения не писали РСЗО: этой покупки ещё не было.
   const salvo = flag(value.salvo) ?? false;
   const nuclear = flag(value.nuclear) ?? false;
+  // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
+  const artilleryCooldown = requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxShopCooldownLevel) ?? 0;
+  const minesCooldown = requiredInt(value.minesCooldown, 0, Mines.maxShopCooldownLevel) ?? 0;
   const nuclearCooldown = requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxShopCooldownLevel) ?? 0;
   const autoFire = flag(value.autoFire);
   // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
@@ -258,7 +265,9 @@ function parseShop(value: unknown): ShopSave | null {
     flame,
     salvo,
     artillery,
+    artilleryCooldown,
     mines,
+    minesCooldown,
     nuclear,
     nuclearCooldown,
     autoFire,

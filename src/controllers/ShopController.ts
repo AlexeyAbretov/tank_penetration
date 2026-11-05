@@ -60,7 +60,9 @@ export class ShopController {
   salvoOwned = false;
   salvo?: RocketSalvo;
   artilleryOwned = false;
+  artilleryCooldownLevel = 0;
   minesOwned = false;
+  minesCooldownLevel = 0;
   nuclearOwned = false;
   nuclearCooldownLevel = 0;
   mgDamageLevel = 0;
@@ -84,6 +86,8 @@ export class ShopController {
     private readonly onChanged: () => void,
   ) {
     this.panel = new ShopPanel(scene, this, GAME);
+    ArtilleryStrike.setShopCooldownLevel(0);
+    Mines.setShopCooldownLevel(0);
     NuclearStrike.setShopCooldownLevel(0);
   }
 
@@ -102,7 +106,9 @@ export class ShopController {
       flame: this.flameOwned,
       salvo: this.salvoOwned,
       artillery: this.artilleryOwned,
+      artilleryCooldown: this.artilleryCooldownLevel,
       mines: this.minesOwned,
+      minesCooldown: this.minesCooldownLevel,
       nuclear: this.nuclearOwned,
       nuclearCooldown: this.nuclearCooldownLevel,
       autoFire: this.autoFire.isOwned,
@@ -147,7 +153,11 @@ export class ShopController {
       this.salvo = this.installSalvo();
     }
     this.artilleryOwned = saved.artillery;
+    this.artilleryCooldownLevel = Math.min(saved.artilleryCooldown, ArtilleryStrike.maxShopCooldownLevel);
+    ArtilleryStrike.setShopCooldownLevel(this.artilleryCooldownLevel);
     this.minesOwned = saved.mines;
+    this.minesCooldownLevel = Math.min(saved.minesCooldown, Mines.maxShopCooldownLevel);
+    Mines.setShopCooldownLevel(this.minesCooldownLevel);
     this.nuclearOwned = saved.nuclear;
     this.nuclearCooldownLevel = Math.min(saved.nuclearCooldown, NuclearStrike.maxShopCooldownLevel);
     NuclearStrike.setShopCooldownLevel(this.nuclearCooldownLevel);
@@ -173,7 +183,11 @@ export class ShopController {
     this.flameOwned = false;
     this.salvoOwned = false;
     this.artilleryOwned = false;
+    this.artilleryCooldownLevel = 0;
+    ArtilleryStrike.setShopCooldownLevel(0);
     this.minesOwned = false;
+    this.minesCooldownLevel = 0;
+    Mines.setShopCooldownLevel(0);
     this.nuclearOwned = false;
     this.nuclearCooldownLevel = 0;
     NuclearStrike.setShopCooldownLevel(0);
@@ -452,6 +466,27 @@ export class ShopController {
     this.refresh();
   }
 
+  // −1 с к откату артиллерии. Партия снимает свои 20 с и останавливается на 40 с без очков.
+  buyArtilleryCooldown(): void {
+    if (this.isPaused() || !this.artilleryOwned) {
+      return;
+    }
+    if (this.artilleryCooldownLevel >= ArtilleryStrike.maxShopCooldownLevel) {
+      return;
+    }
+    const now = ArtilleryStrike.cooldownFor(this.artilleryCooldownLevel);
+    if (ArtilleryStrike.cooldownFor(this.artilleryCooldownLevel + 1) >= now) {
+      return;
+    }
+    const cost = ShopController.artilleryCooldownCost(this.artilleryCooldownLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.artilleryCooldownLevel += 1;
+    ArtilleryStrike.setShopCooldownLevel(this.artilleryCooldownLevel);
+    this.refresh();
+  }
+
   // Открывает клавишу 3. Падение и взрыв считает CombatSystem.
   buyNuclear(): void {
     const cost = shopPrice(NuclearStrike.shop.cost);
@@ -496,6 +531,27 @@ export class ShopController {
       return;
     }
     this.minesOwned = true;
+    this.refresh();
+  }
+
+  // −1 с к откату мин. Партия снимает свои 20 с и останавливается на 40 с без очков.
+  buyMinesCooldown(): void {
+    if (this.isPaused() || !this.minesOwned) {
+      return;
+    }
+    if (this.minesCooldownLevel >= Mines.maxShopCooldownLevel) {
+      return;
+    }
+    const now = Mines.cooldownFor(this.minesCooldownLevel);
+    if (Mines.cooldownFor(this.minesCooldownLevel + 1) >= now) {
+      return;
+    }
+    const cost = ShopController.minesCooldownCost(this.minesCooldownLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.minesCooldownLevel += 1;
+    Mines.setShopCooldownLevel(this.minesCooldownLevel);
     this.refresh();
   }
 
@@ -596,6 +652,18 @@ export class ShopController {
     return shopPrice(Math.round(300 * 1.15 ** Math.max(0, level)));
   }
 
+  // Первая секунда отката артиллерии стоит 1000. Дальше та же ступень 15%:
+  // 1000, 1150, 1323, 1521, …
+  private static artilleryCooldownCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
+  // Первая секунда отката мин стоит 1000. Дальше та же ступень 15%:
+  // 1000, 1150, 1323, 1521, …
+  private static minesCooldownCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
   // Первая секунда отката атомного взрыва стоит 1000. Дальше та же ступень 15%:
   // 1000, 1150, 1323, 1521, …
   private static nuclearCooldownCost(level: number): number {
@@ -675,6 +743,7 @@ export class ShopController {
             this.artilleryOwned,
             'после покупки',
           ),
+          this.artilleryCooldownCard(coins),
         ]),
         this.tab('mines', 'Мина', [
           this.gearCard('mines', coins),
@@ -686,6 +755,7 @@ export class ShopController {
             this.minesOwned,
             'после покупки',
           ),
+          this.minesCooldownCard(coins),
         ]),
         this.tab('nuclear', 'Атомный взрыв', [
           this.gearCard('nuclear', coins),
@@ -943,12 +1013,12 @@ export class ShopController {
   private artilleryCard(coins: number): ShopCardView {
     const offer = ArtilleryStrike.shop;
     const price = shopPrice(offer.cost);
-    const reload = offer.cooldownMs / 1000;
+    const reload = ArtilleryStrike.cooldownLabel(ArtilleryStrike.cooldownFor(this.artilleryCooldownLevel));
     if (this.artilleryOwned) {
       return {
         title: 'Покупка',
         buy: () => this.buyArtillery(),
-        info: `откат ${reload} с`,
+        info: `откат ${reload}`,
         cost: '',
         open: false,
         canBuy: false,
@@ -958,7 +1028,7 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyArtillery(),
-      info: `${offer.shells}×${offer.damage} · откат ${reload} с`,
+      info: `${offer.shells}×${offer.damage} · откат ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
@@ -966,15 +1036,46 @@ export class ShopController {
     };
   }
 
+  private artilleryCooldownCard(coins: number): ShopCardView {
+    const buy = () => this.buyArtilleryCooldown();
+    const level = this.artilleryCooldownLevel;
+    const price = ShopController.artilleryCooldownCost(level);
+    if (!this.artilleryOwned) {
+      return {
+        title: '−1 с перезарядки',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = ArtilleryStrike.cooldownFor(level);
+    const next = ArtilleryStrike.cooldownFor(level + 1);
+    const maxed = level >= ArtilleryStrike.maxShopCooldownLevel || next >= now;
+    return {
+      title: '−1 с перезарядки',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}`
+        : `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}→${ArtilleryStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
   private minesCard(coins: number): ShopCardView {
     const offer = Mines.shop;
     const price = shopPrice(offer.cost);
-    const reload = offer.cooldownMs / 1000;
+    const reload = Mines.cooldownLabel(Mines.cooldownFor(this.minesCooldownLevel));
     if (this.minesOwned) {
       return {
         title: 'Покупка',
         buy: () => this.buyMines(),
-        info: `откат ${reload} с`,
+        info: `откат ${reload}`,
         cost: '',
         open: false,
         canBuy: false,
@@ -984,10 +1085,41 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyMines(),
-      info: `${offer.count}×${offer.damage} · откат ${reload} с`,
+      info: `${offer.count}×${offer.damage} · откат ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private minesCooldownCard(coins: number): ShopCardView {
+    const buy = () => this.buyMinesCooldown();
+    const level = this.minesCooldownLevel;
+    const price = ShopController.minesCooldownCost(level);
+    if (!this.minesOwned) {
+      return {
+        title: '−1 с перезарядки',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = Mines.cooldownFor(level);
+    const next = Mines.cooldownFor(level + 1);
+    const maxed = level >= Mines.maxShopCooldownLevel || next >= now;
+    return {
+      title: '−1 с перезарядки',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${Mines.cooldownLabel(now)}`
+        : `ур. ${level} · ${Mines.cooldownLabel(now)}→${Mines.cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
       owned: false,
     };
   }

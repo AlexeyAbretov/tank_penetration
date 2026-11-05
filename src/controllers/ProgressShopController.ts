@@ -1,9 +1,11 @@
 // Покупки после проигрыша. Score копится между партиями, уровни не сбрасываются.
 
 import Phaser from 'phaser';
+import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
+import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
@@ -30,6 +32,8 @@ type Stat =
   | 'bullets'
   | 'mgDamage'
   | 'laserShots'
+  | 'artilleryCooldown'
+  | 'minesCooldown'
   | 'nuclearCooldown';
 
 export class ProgressShopController {
@@ -98,6 +102,14 @@ export class ProgressShopController {
 
   laserShotCount(): number {
     return LaserDefense.shotCount(this.progress.laserShots);
+  }
+
+  artilleryCooldownLevel(): number {
+    return this.progress.artilleryCooldown;
+  }
+
+  minesCooldownLevel(): number {
+    return this.progress.minesCooldown;
   }
 
   nuclearCooldownLevel(): number {
@@ -196,6 +208,14 @@ export class ProgressShopController {
     this.buy('laserShots');
   }
 
+  private buyArtilleryCooldown(): void {
+    this.buy('artilleryCooldown');
+  }
+
+  private buyMinesCooldown(): void {
+    this.buy('minesCooldown');
+  }
+
   private buyNuclearCooldown(): void {
     this.buy('nuclearCooldown');
   }
@@ -226,6 +246,12 @@ export class ProgressShopController {
     if (stat === 'laserShots' && level >= LaserDefense.maxShotLevel) {
       return;
     }
+    if (stat === 'artilleryCooldown' && !ArtilleryStrike.progressCooldownShortens(level)) {
+      return;
+    }
+    if (stat === 'minesCooldown' && !Mines.progressCooldownShortens(level)) {
+      return;
+    }
     if (stat === 'nuclearCooldown' && !NuclearStrike.progressCooldownShortens(level)) {
       return;
     }
@@ -250,6 +276,12 @@ export class ProgressShopController {
     if (stat === 'pierce') {
       Tank.setProgressPierceLevel(this.progress.pierce);
     }
+    if (stat === 'artilleryCooldown') {
+      ArtilleryStrike.setProgressCooldownLevel(this.progress.artilleryCooldown);
+    }
+    if (stat === 'minesCooldown') {
+      Mines.setProgressCooldownLevel(this.progress.minesCooldown);
+    }
     if (stat === 'nuclearCooldown') {
       NuclearStrike.setProgressCooldownLevel(this.progress.nuclearCooldown);
     }
@@ -272,6 +304,8 @@ export class ProgressShopController {
         ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
+        this.tab('artillery', 'Артиллерия', [this.artilleryCooldownCard(score)]),
+        this.tab('mines', 'Мина', [this.minesCooldownCard(score)]),
         this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
         this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
       ],
@@ -438,6 +472,42 @@ export class ProgressShopController {
     };
   }
 
+  private artilleryCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.artilleryCooldown;
+    const price = this.artilleryCooldownPrice(level);
+    const now = ArtilleryStrike.cooldownFor(ArtilleryStrike.shopCooldownLevel, level);
+    const next = ArtilleryStrike.cooldownFor(ArtilleryStrike.shopCooldownLevel, level + 1);
+    const maxed = !ArtilleryStrike.progressCooldownShortens(level);
+    return {
+      title: '−1 с перезарядки',
+      buy: () => this.buyArtilleryCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}`
+        : `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}→${ArtilleryStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private minesCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.minesCooldown;
+    const price = this.minesCooldownPrice(level);
+    const now = Mines.cooldownFor(Mines.shopCooldownLevel, level);
+    const next = Mines.cooldownFor(Mines.shopCooldownLevel, level + 1);
+    const maxed = !Mines.progressCooldownShortens(level);
+    return {
+      title: '−1 с перезарядки',
+      buy: () => this.buyMinesCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${Mines.cooldownLabel(now)}`
+        : `ур. ${level} · ${Mines.cooldownLabel(now)}→${Mines.cooldownLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private nuclearCooldownCard(score: number): ProgressCardView {
     const level = this.progress.nuclearCooldown;
     const price = this.nuclearCooldownPrice(level);
@@ -491,6 +561,14 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.pierceCost(level));
   }
 
+  private artilleryCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.cost(level));
+  }
+
+  private minesCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.cost(level));
+  }
+
   private nuclearCooldownPrice(level: number): number {
     return shopPrice(ProgressSave.cost(level));
   }
@@ -507,6 +585,12 @@ export class ProgressShopController {
     }
     if (stat === 'pierce') {
       return this.piercePrice(level);
+    }
+    if (stat === 'artilleryCooldown') {
+      return this.artilleryCooldownPrice(level);
+    }
+    if (stat === 'minesCooldown') {
+      return this.minesCooldownPrice(level);
     }
     if (stat === 'nuclearCooldown') {
       return this.nuclearCooldownPrice(level);
