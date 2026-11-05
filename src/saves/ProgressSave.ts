@@ -37,6 +37,8 @@ export type SavedProgress = {
   mgDamage: number;
   // Сколько раз докуплен луч лазера. 0 — один луч, 2 — три. Цена — общая, 500 + 500 × уровень.
   laserShots: number;
+  // Сколько раз укорочен откат лазера. 0 — базовые 3 с. Прогресс сам останавливается на 1 с.
+  laserCooldown: number;
   // Сколько раз докуплена ракета РСЗО. 0 — три ракеты, 5 — восемь. Цена — 1000 + 1000 × уровень.
   salvoRockets: number;
   // Сколько раз докуплен снаряд артиллерии. 0 — три снаряда, 3 — шесть. Цена — 1000 + 1000 × уровень.
@@ -93,6 +95,11 @@ export class ProgressSave {
     return 300 + Math.max(0, level) * 300;
   }
 
+  // Первая секунда перезарядки лазера стоит 5000, вторая — 50000.
+  static laserCooldownCost(level: number): number {
+    return Math.max(0, level) < 1 ? 5_000 : 50_000;
+  }
+
   // Первая лишняя ракета, снаряд или мина стоит 1000.
   // Каждая следующая того же улучшения — на 1000 × уже купленный уровень дороже:
   // 1000, 2000, 3000, …
@@ -124,6 +131,7 @@ export class ProgressSave {
     progress.bullets = 0;
     progress.mgDamage = 0;
     progress.laserShots = 0;
+    progress.laserCooldown = 0;
     progress.salvoRockets = 0;
     progress.artilleryShells = 0;
     progress.minesCount = 0;
@@ -146,6 +154,7 @@ export class ProgressSave {
     ArtilleryStrike.setProgressCooldownLevel(0);
     Mines.setProgressCooldownLevel(0);
     NuclearStrike.setProgressCooldownLevel(0);
+    LaserDefense.setProgressCooldownLevel(0);
   }
 
   save(data: SavedProgress): void {
@@ -178,6 +187,7 @@ export class ProgressSave {
       bullets: 0,
       mgDamage: 0,
       laserShots: 0,
+      laserCooldown: 0,
       salvoRockets: 0,
       artilleryShells: 0,
       minesCount: 0,
@@ -240,6 +250,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     laserShots: requiredInt(value.laserShots, 0, LaserDefense.maxShotLevel) ?? 0,
+    // Старые сохранения не писали откат лазера: луч ждал базовые 3 с.
+    laserCooldown: requiredInt(value.laserCooldown, 0, LaserDefense.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали число ракет, снарядов и мин: залп оставался базовым.
     salvoRockets: requiredInt(value.salvoRockets, 0, RocketSalvo.maxRocketLevel) ?? 0,
     artilleryShells: requiredInt(value.artilleryShells, 0, ArtilleryStrike.maxShellLevel) ?? 0,

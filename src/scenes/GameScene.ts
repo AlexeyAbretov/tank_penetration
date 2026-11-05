@@ -6,6 +6,7 @@ import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
+import { LaserDefense } from '../entities/LaserDefense';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
@@ -181,6 +182,7 @@ export class GameScene extends Phaser.Scene {
     ArtilleryStrike.setProgressCooldownLevel(this.progressShop.artilleryCooldownLevel());
     Mines.setProgressCooldownLevel(this.progressShop.minesCooldownLevel());
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
+    LaserDefense.setProgressCooldownLevel(this.progressShop.laserCooldownLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
     this.field = this.add.image(GAME.width / 2, GAME.height / 2, 'battlefield').setDepth(0);

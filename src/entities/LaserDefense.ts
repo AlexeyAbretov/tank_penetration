@@ -36,6 +36,38 @@ export class LaserDefense extends GameObjects.Container {
     return Math.min(LaserDefense.shotMax, LaserDefense.shotMin + extra);
   }
 
+  // Магазин очков снимает по секунде. Короче 1 с луч не стреляет.
+  static readonly minCooldownMs = 1_000;
+  static readonly cooldownStepMs = 1_000;
+  static progressCooldownLevel = 0;
+
+  static get maxProgressCooldownLevel(): number {
+    return (LaserDefense.shop.fireIntervalMs - LaserDefense.minCooldownMs) / LaserDefense.cooldownStepMs;
+  }
+
+  static setProgressCooldownLevel(level: number): void {
+    LaserDefense.progressCooldownLevel = Math.min(
+      LaserDefense.maxProgressCooldownLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Свой запас уже выбран — следующий уровень откат не укорачивает.
+  static progressCooldownShortens(progressLevel: number): boolean {
+    return LaserDefense.fireIntervalFor(progressLevel + 1) < LaserDefense.fireIntervalFor(progressLevel);
+  }
+
+  static fireIntervalFor(level = LaserDefense.progressCooldownLevel): number {
+    const cut = Math.max(0, Math.round(level)) * LaserDefense.cooldownStepMs;
+    return Math.max(LaserDefense.minCooldownMs, LaserDefense.shop.fireIntervalMs - cut);
+  }
+
+  static cooldownLabel(ms: number): string {
+    const totalSec = ms / 1000;
+    const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
+    return `${text} с`;
+  }
+
   // Ось — ноль контейнера, это пятка линзы на крыше. belowBelly опускает пятку ниже днища танка.
   static readonly mount = { belowBelly: 100 };
 

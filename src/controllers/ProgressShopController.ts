@@ -34,6 +34,7 @@ type Stat =
   | 'bullets'
   | 'mgDamage'
   | 'laserShots'
+  | 'laserCooldown'
   | 'salvoRockets'
   | 'artilleryShells'
   | 'minesCount'
@@ -111,6 +112,10 @@ export class ProgressShopController {
 
   laserShotCount(): number {
     return LaserDefense.shotCount(this.progress.laserShots);
+  }
+
+  laserCooldownLevel(): number {
+    return this.progress.laserCooldown;
   }
 
   salvoRocketLevel(): number {
@@ -245,6 +250,10 @@ export class ProgressShopController {
     this.buy('laserShots');
   }
 
+  private buyLaserCooldown(): void {
+    this.buy('laserCooldown');
+  }
+
   private buySalvoRockets(): void {
     this.buy('salvoRockets');
   }
@@ -311,6 +320,9 @@ export class ProgressShopController {
     if (stat === 'laserShots' && level >= LaserDefense.maxShotLevel) {
       return;
     }
+    if (stat === 'laserCooldown' && !LaserDefense.progressCooldownShortens(level)) {
+      return;
+    }
     if (stat === 'salvoRockets' && level >= RocketSalvo.maxRocketLevel) {
       return;
     }
@@ -368,6 +380,9 @@ export class ProgressShopController {
     if (stat === 'nuclearCooldown') {
       NuclearStrike.setProgressCooldownLevel(this.progress.nuclearCooldown);
     }
+    if (stat === 'laserCooldown') {
+      LaserDefense.setProgressCooldownLevel(this.progress.laserCooldown);
+    }
     this.progressSave.save(this.progress);
     this.panel.refresh(this.view());
   }
@@ -387,7 +402,7 @@ export class ProgressShopController {
         ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
         this.tab('wire', 'Колючая проволока', [this.wireDamageCard(score)]),
-        this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
+        this.tab('laser', 'Лазерная установка', [this.laserCard(score), this.laserCooldownCard(score)]),
         this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score), this.salvoDamageCard(score)]),
         this.tab('artillery', 'Артиллерия', [
           this.artilleryShellsCard(score),
@@ -559,6 +574,24 @@ export class ProgressShopController {
       title: '+1 луч',
       buy: () => this.buyLaserShots(),
       info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private laserCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.laserCooldown;
+    const price = this.laserCooldownPrice(level);
+    const now = LaserDefense.fireIntervalFor(level);
+    const next = LaserDefense.fireIntervalFor(level + 1);
+    const maxed = !LaserDefense.progressCooldownShortens(level);
+    return {
+      title: '−1 с перезарядки',
+      buy: () => this.buyLaserCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${LaserDefense.cooldownLabel(now)}`
+        : `ур. ${level} · ${LaserDefense.cooldownLabel(now)}→${LaserDefense.cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -758,6 +791,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.cost(level));
   }
 
+  private laserCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.laserCooldownCost(level));
+  }
+
   private costFor(stat: Stat, level: number): number {
     if (stat === 'bullets') {
       return this.bulletPrice(level);
@@ -788,6 +825,9 @@ export class ProgressShopController {
     }
     if (stat === 'nuclearCooldown') {
       return this.nuclearCooldownPrice(level);
+    }
+    if (stat === 'laserCooldown') {
+      return this.laserCooldownPrice(level);
     }
     return this.price(level);
   }

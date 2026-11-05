@@ -908,7 +908,7 @@ export class ShopController {
           coins,
           this.laserOwned,
           shopPrice(LaserDefense.shop.cost),
-          'ракета / 3 с',
+          `ракета / ${LaserDefense.cooldownLabel(LaserDefense.fireIntervalFor())}`,
           'сбивает РПГ',
         );
       case 'flame':

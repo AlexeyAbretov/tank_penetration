@@ -757,7 +757,8 @@ export class CombatSystem implements Combat {
     this.mgCooldown = this.mgBurstLeft > 0 ? MachineGun.burstGap : MachineGun.shop.fireIntervalMs;
   }
 
-  // Очередь лучей. Между лучами короткая пауза, после последнего — 3 секунды.
+  // Очередь лучей. Между лучами короткая пауза, после последнего — перезарядка установки.
+  // Магазин очков укорачивает её до 1 с.
   // Каждый луч берёт другую ракету, которая уже летит minFlightMs: предыдущая уже сбита.
   // Пока очередь не начата, пустое небо перезарядку не тратит. Пустой слот уже начатой очереди проходит молча.
   private tickLaser(delta: number): void {
@@ -780,7 +781,7 @@ export class CombatSystem implements Combat {
       this.shootLaser(laser, rocket);
     }
     this.laserBurstLeft -= 1;
-    this.laserCooldown = this.laserBurstLeft > 0 ? LaserDefense.burstGap : LaserDefense.shop.fireIntervalMs;
+    this.laserCooldown = this.laserBurstLeft > 0 ? LaserDefense.burstGap : LaserDefense.fireIntervalFor();
   }
 
   private shootLaser(laser: LaserDefense, rocket: Rocket): void {
