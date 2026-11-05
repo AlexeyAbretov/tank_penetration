@@ -36,6 +36,9 @@ type Stat =
   | 'salvoRockets'
   | 'artilleryShells'
   | 'minesCount'
+  | 'salvoDamage'
+  | 'artilleryDamage'
+  | 'minesDamage'
   | 'artilleryCooldown'
   | 'minesCooldown'
   | 'nuclearCooldown';
@@ -118,6 +121,18 @@ export class ProgressShopController {
 
   minesCountLevel(): number {
     return this.progress.minesCount;
+  }
+
+  salvoDamageBonus(): number {
+    return this.progress.salvoDamage;
+  }
+
+  artilleryDamageBonus(): number {
+    return this.progress.artilleryDamage;
+  }
+
+  minesDamageBonus(): number {
+    return this.progress.minesDamage;
   }
 
   artilleryCooldownLevel(): number {
@@ -236,6 +251,18 @@ export class ProgressShopController {
     this.buy('minesCount');
   }
 
+  private buySalvoDamage(): void {
+    this.buy('salvoDamage');
+  }
+
+  private buyArtilleryDamage(): void {
+    this.buy('artilleryDamage');
+  }
+
+  private buyMinesDamage(): void {
+    this.buy('minesDamage');
+  }
+
   private buyArtilleryCooldown(): void {
     this.buy('artilleryCooldown');
   }
@@ -350,9 +377,17 @@ export class ProgressShopController {
         ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
-        this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score)]),
-        this.tab('artillery', 'Артиллерия', [this.artilleryShellsCard(score), this.artilleryCooldownCard(score)]),
-        this.tab('mines', 'Мина', [this.minesCountCard(score), this.minesCooldownCard(score)]),
+        this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score), this.salvoDamageCard(score)]),
+        this.tab('artillery', 'Артиллерия', [
+          this.artilleryShellsCard(score),
+          this.artilleryDamageCard(score),
+          this.artilleryCooldownCard(score),
+        ]),
+        this.tab('mines', 'Мина', [
+          this.minesCountCard(score),
+          this.minesDamageCard(score),
+          this.minesCooldownCard(score),
+        ]),
         this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
         this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
       ],
@@ -535,6 +570,42 @@ export class ProgressShopController {
     };
   }
 
+  private salvoDamageCard(score: number): ProgressCardView {
+    return this.damageCardFor(
+      this.progress.salvoDamage,
+      RocketSalvo.shop.damage,
+      score,
+      () => this.buySalvoDamage(),
+    );
+  }
+
+  private artilleryDamageCard(score: number): ProgressCardView {
+    return this.damageCardFor(
+      this.progress.artilleryDamage,
+      ArtilleryStrike.shop.damage,
+      score,
+      () => this.buyArtilleryDamage(),
+    );
+  }
+
+  private minesDamageCard(score: number): ProgressCardView {
+    return this.damageCardFor(this.progress.minesDamage, Mines.shop.damage, score, () => this.buyMinesDamage());
+  }
+
+  // Потолка нет. Лестница та же, что у урона пули: 300, 600, 900…
+  private damageCardFor(level: number, base: number, score: number, buy: () => void): ProgressCardView {
+    const price = this.mgDamagePrice(level);
+    const now = base + level;
+    return {
+      title: '+1 урон',
+      buy,
+      info: `ур. ${level} · ${now}→${now + 1}`,
+      cost: this.coin(price),
+      open: true,
+      canBuy: score >= price,
+    };
+  }
+
   private artilleryShellsCard(score: number): ProgressCardView {
     const level = this.progress.artilleryShells;
     const price = this.countPrice(level);
@@ -676,7 +747,7 @@ export class ProgressShopController {
     if (stat === 'bullets') {
       return this.bulletPrice(level);
     }
-    if (stat === 'mgDamage') {
+    if (stat === 'mgDamage' || stat === 'salvoDamage' || stat === 'artilleryDamage' || stat === 'minesDamage') {
       return this.mgDamagePrice(level);
     }
     if (stat === 'knockback') {

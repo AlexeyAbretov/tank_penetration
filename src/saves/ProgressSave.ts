@@ -43,6 +43,12 @@ export type SavedProgress = {
   artilleryShells: number;
   // Сколько раз докуплена мина. 0 — три мины, 3 — шесть. Цена — 1000 + 1000 × уровень.
   minesCount: number;
+  // Сколько раз докуплен урон ракеты РСЗО. 0 — базовый урон. Потолка нет. Цена как у урона пули.
+  salvoDamage: number;
+  // Сколько раз докуплен урон снаряда артиллерии. 0 — базовый урон. Потолка нет. Цена как у урона пули.
+  artilleryDamage: number;
+  // Сколько раз докуплен урон мины. 0 — базовый урон. Потолка нет. Цена как у урона пули.
+  minesDamage: number;
   // Сколько раз укорочен откат артиллерии. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   artilleryCooldown: number;
   // Сколько раз укорочен откат мин. 0 — базовая минута. Прогресс сам останавливается на 40 с.
@@ -119,6 +125,9 @@ export class ProgressSave {
     progress.salvoRockets = 0;
     progress.artilleryShells = 0;
     progress.minesCount = 0;
+    progress.salvoDamage = 0;
+    progress.artilleryDamage = 0;
+    progress.minesDamage = 0;
     progress.artilleryCooldown = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
@@ -169,6 +178,9 @@ export class ProgressSave {
       salvoRockets: 0,
       artilleryShells: 0,
       minesCount: 0,
+      salvoDamage: 0,
+      artilleryDamage: 0,
+      minesDamage: 0,
       artilleryCooldown: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
@@ -228,6 +240,10 @@ function parseProgress(value: unknown): SavedProgress | null {
     salvoRockets: requiredInt(value.salvoRockets, 0, RocketSalvo.maxRocketLevel) ?? 0,
     artilleryShells: requiredInt(value.artilleryShells, 0, ArtilleryStrike.maxShellLevel) ?? 0,
     minesCount: requiredInt(value.minesCount, 0, Mines.maxMineLevel) ?? 0,
+    // Старые сохранения не писали урон ракет, снарядов и мин: бил базовый урон.
+    salvoDamage: requiredInt(value.salvoDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    artilleryDamage: requiredInt(value.artilleryDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    minesDamage: requiredInt(value.minesDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
     artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxProgressCooldownLevel) ?? 0,
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,

@@ -116,6 +116,9 @@ export class CombatSystem implements Combat {
     private readonly progressPierce: number,
     private readonly mgBullets: number,
     private readonly progressMgDamage: number,
+    private readonly progressSalvoDamage: number,
+    private readonly progressArtilleryDamage: number,
+    private readonly progressMinesDamage: number,
     private readonly laserShots: number,
     private readonly effects: BattleEffects,
   ) {
@@ -432,7 +435,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, Mines.shop.damage + this.shop.minesDamageLevel, false, { x, y });
+        this.hurtInfantry(unit, this.minesDamage(), false, { x, y });
       }
     });
   }
@@ -542,7 +545,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, ArtilleryStrike.shop.damage + this.shop.artilleryDamageLevel, false, { x, y });
+        this.hurtInfantry(unit, this.artilleryDamage(), false, { x, y });
       }
     });
   }
@@ -1062,7 +1065,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (this.inBlast(unit, x, y, radius)) {
-        this.hurtInfantry(unit, RocketSalvo.shop.damage + this.shop.salvoDamageLevel, false, { x, y });
+        this.hurtInfantry(unit, this.salvoDamage(), false, { x, y });
       }
     });
   }
@@ -1217,6 +1220,19 @@ export class CombatSystem implements Combat {
 
   private mgDamage(): number {
     return MachineGun.shop.damage + this.shop.mgDamageLevel + this.progressMgDamage;
+  }
+
+  // База ракеты плюс покупки партии и постоянный урон из магазина очков.
+  private salvoDamage(): number {
+    return RocketSalvo.shop.damage + this.shop.salvoDamageLevel + this.progressSalvoDamage;
+  }
+
+  private artilleryDamage(): number {
+    return ArtilleryStrike.shop.damage + this.shop.artilleryDamageLevel + this.progressArtilleryDamage;
+  }
+
+  private minesDamage(): number {
+    return Mines.shop.damage + this.shop.minesDamageLevel + this.progressMinesDamage;
   }
 
   protected blastRadius(): number {

@@ -33,6 +33,10 @@ type PermanentBonuses = {
   points: number;
   // Постоянный урон пули из магазина после гибели. К урону партии прибавляется на карточке.
   mg: number;
+  // Постоянный урон ракеты, снаряда и мины. К урону партии прибавляется на карточке и в цене.
+  salvo: number;
+  artillery: number;
+  mines: number;
 };
 
 type Economy = {
@@ -576,22 +580,23 @@ export class ShopController {
     });
   }
 
+  // Цена — от суммы с прогрессом, в сохранение пишется только покупка партии.
   buySalvoDamage(): void {
     this.buyDamageLevel(this.salvoOwned, this.salvoDamageLevel, (level) => {
       this.salvoDamageLevel = level;
-    });
+    }, this.salvoDamageOfferLevel());
   }
 
   buyArtilleryDamage(): void {
     this.buyDamageLevel(this.artilleryOwned, this.artilleryDamageLevel, (level) => {
       this.artilleryDamageLevel = level;
-    });
+    }, this.artilleryDamageOfferLevel());
   }
 
   buyMinesDamage(): void {
     this.buyDamageLevel(this.minesOwned, this.minesDamageLevel, (level) => {
       this.minesDamageLevel = level;
-    });
+    }, this.minesDamageOfferLevel());
   }
 
   // Строка характеристик над полем: урон и взрыв партии плюс постоянные уровни.
@@ -683,6 +688,18 @@ export class ShopController {
     return this.mgDamageLevel + this.bonuses.mg;
   }
 
+  private salvoDamageOfferLevel(): number {
+    return this.salvoDamageLevel + this.bonuses.salvo;
+  }
+
+  private artilleryDamageOfferLevel(): number {
+    return this.artilleryDamageLevel + this.bonuses.artillery;
+  }
+
+  private minesDamageOfferLevel(): number {
+    return this.minesDamageLevel + this.bonuses.mines;
+  }
+
   private view(): ShopView {
     const coins = this.economy.getCoins();
     return {
@@ -725,8 +742,8 @@ export class ShopController {
         this.tab('salvo', 'РСЗО', [
           this.gearCard('salvo', coins),
           this.weaponDamageCard(
-            this.salvoDamageLevel,
-            RocketSalvo.shop.damage + this.salvoDamageLevel,
+            this.salvoDamageOfferLevel(),
+            RocketSalvo.shop.damage + this.salvoDamageOfferLevel(),
             () => this.buySalvoDamage(),
             coins,
             this.salvoOwned,
@@ -736,8 +753,8 @@ export class ShopController {
         this.tab('artillery', 'Артиллерия', [
           this.gearCard('artillery', coins),
           this.weaponDamageCard(
-            this.artilleryDamageLevel,
-            ArtilleryStrike.shop.damage + this.artilleryDamageLevel,
+            this.artilleryDamageOfferLevel(),
+            ArtilleryStrike.shop.damage + this.artilleryDamageOfferLevel(),
             () => this.buyArtilleryDamage(),
             coins,
             this.artilleryOwned,
@@ -748,8 +765,8 @@ export class ShopController {
         this.tab('mines', 'Мина', [
           this.gearCard('mines', coins),
           this.weaponDamageCard(
-            this.minesDamageLevel,
-            Mines.shop.damage + this.minesDamageLevel,
+            this.minesDamageOfferLevel(),
+            Mines.shop.damage + this.minesDamageOfferLevel(),
             () => this.buyMinesDamage(),
             coins,
             this.minesOwned,
@@ -1034,7 +1051,7 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyArtillery(),
-      info: `${ArtilleryStrike.shellCount()}×${offer.damage} · откат ${reload}`,
+      info: `${ArtilleryStrike.shellCount()}×${offer.damage + this.bonuses.artillery} · откат ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
@@ -1091,7 +1108,7 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyMines(),
-      info: `${Mines.mineCount()}×${offer.damage} · откат ${reload}`,
+      info: `${Mines.mineCount()}×${offer.damage + this.bonuses.mines} · откат ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
