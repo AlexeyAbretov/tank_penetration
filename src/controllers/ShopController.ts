@@ -33,6 +33,8 @@ type PermanentBonuses = {
   points: number;
   // Постоянный урон пули из магазина после гибели. К урону партии прибавляется на карточке.
   mg: number;
+  // Постоянный урон проволоки из магазина после гибели. К урону партии прибавляется на карточке и в цене.
+  wire: number;
   // Постоянный урон ракеты, снаряда и мины. К урону партии прибавляется на карточке и в цене.
   salvo: number;
   artillery: number;
@@ -567,10 +569,11 @@ export class ShopController {
     }, this.mgDamageOfferLevel());
   }
 
+  // Цена — от суммы с прогрессом, в сохранение пишется только покупка партии.
   buyWireDamage(): void {
     this.buyDamageLevel(this.wireOwned, this.wireDamageLevel, (level) => {
       this.wireDamageLevel = level;
-    });
+    }, this.wireDamageOfferLevel());
   }
 
   // Струя и пятно на земле получают одну и ту же прибавку.
@@ -688,6 +691,10 @@ export class ShopController {
     return this.mgDamageLevel + this.bonuses.mg;
   }
 
+  private wireDamageOfferLevel(): number {
+    return this.wireDamageLevel + this.bonuses.wire;
+  }
+
   private salvoDamageOfferLevel(): number {
     return this.salvoDamageLevel + this.bonuses.salvo;
   }
@@ -728,8 +735,8 @@ export class ShopController {
         this.tab('wire', 'Колючая проволока', [
           this.gearCard('wire', coins),
           this.weaponDamageCard(
-            this.wireDamageLevel,
-            BarbedWire.shop.damage + this.wireDamageLevel,
+            this.wireDamageOfferLevel(),
+            BarbedWire.shop.damage + this.wireDamageOfferLevel(),
             () => this.buyWireDamage(),
             coins,
             this.wireOwned,

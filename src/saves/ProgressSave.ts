@@ -49,6 +49,8 @@ export type SavedProgress = {
   artilleryDamage: number;
   // Сколько раз докуплен урон мины. 0 — базовый урон. Потолка нет. Цена как у урона пули.
   minesDamage: number;
+  // Сколько раз докуплен урон колючей проволоки. 0 — базовый урон. Потолка нет. Цена как у урона пули.
+  wireDamage: number;
   // Сколько раз укорочен откат артиллерии. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   artilleryCooldown: number;
   // Сколько раз укорочен откат мин. 0 — базовая минута. Прогресс сам останавливается на 40 с.
@@ -128,6 +130,7 @@ export class ProgressSave {
     progress.salvoDamage = 0;
     progress.artilleryDamage = 0;
     progress.minesDamage = 0;
+    progress.wireDamage = 0;
     progress.artilleryCooldown = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
@@ -181,6 +184,7 @@ export class ProgressSave {
       salvoDamage: 0,
       artilleryDamage: 0,
       minesDamage: 0,
+      wireDamage: 0,
       artilleryCooldown: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
@@ -244,6 +248,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     salvoDamage: requiredInt(value.salvoDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     artilleryDamage: requiredInt(value.artilleryDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     minesDamage: requiredInt(value.minesDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    // Старые сохранения не писали урон проволоки: рана оставалась базовой.
+    wireDamage: requiredInt(value.wireDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
     artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxProgressCooldownLevel) ?? 0,
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,

@@ -119,6 +119,7 @@ export class CombatSystem implements Combat {
     private readonly progressSalvoDamage: number,
     private readonly progressArtilleryDamage: number,
     private readonly progressMinesDamage: number,
+    private readonly progressWireDamage: number,
     private readonly laserShots: number,
     private readonly effects: BattleEffects,
   ) {
@@ -1140,7 +1141,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (unit.snare(BarbedWire.bounds.face, delta, BarbedWire.shop.hurtIntervalMs)) {
-        this.hurtInfantry(unit, BarbedWire.shop.damage + this.shop.wireDamageLevel, true);
+        this.hurtInfantry(unit, this.wireDamage(), true);
       }
     });
   }
@@ -1233,6 +1234,11 @@ export class CombatSystem implements Combat {
 
   private minesDamage(): number {
     return Mines.shop.damage + this.shop.minesDamageLevel + this.progressMinesDamage;
+  }
+
+  // База проволоки плюс покупки партии и постоянный урон из магазина очков.
+  private wireDamage(): number {
+    return BarbedWire.shop.damage + this.shop.wireDamageLevel + this.progressWireDamage;
   }
 
   protected blastRadius(): number {

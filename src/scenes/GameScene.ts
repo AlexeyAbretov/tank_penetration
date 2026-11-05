@@ -116,6 +116,7 @@ export class GameScene extends Phaser.Scene {
       progressSalvoDamage: number,
       progressArtilleryDamage: number,
       progressMinesDamage: number,
+      progressWireDamage: number,
       laserShots: number,
       effects: BattleEffects,
     ) => CombatSystem,
@@ -301,6 +302,7 @@ export class GameScene extends Phaser.Scene {
         salvo: this.progressShop.salvoDamageBonus(),
         artillery: this.progressShop.artilleryDamageBonus(),
         mines: this.progressShop.minesDamageBonus(),
+        wire: this.progressShop.wireDamageBonus(),
       },
       () => this.waves.beginNextWave(),
       // Любая покупка сразу пишет партию, не дожидаясь автозаписи раз в 400 мс.
@@ -326,6 +328,7 @@ export class GameScene extends Phaser.Scene {
       this.progressShop.salvoDamageBonus(),
       this.progressShop.artilleryDamageBonus(),
       this.progressShop.minesDamageBonus(),
+      this.progressShop.wireDamageBonus(),
       this.progressShop.laserShotCount(),
       fx,
     );

@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
@@ -39,6 +40,7 @@ type Stat =
   | 'salvoDamage'
   | 'artilleryDamage'
   | 'minesDamage'
+  | 'wireDamage'
   | 'artilleryCooldown'
   | 'minesCooldown'
   | 'nuclearCooldown';
@@ -133,6 +135,10 @@ export class ProgressShopController {
 
   minesDamageBonus(): number {
     return this.progress.minesDamage;
+  }
+
+  wireDamageBonus(): number {
+    return this.progress.wireDamage;
   }
 
   artilleryCooldownLevel(): number {
@@ -263,6 +269,10 @@ export class ProgressShopController {
     this.buy('minesDamage');
   }
 
+  private buyWireDamage(): void {
+    this.buy('wireDamage');
+  }
+
   private buyArtilleryCooldown(): void {
     this.buy('artilleryCooldown');
   }
@@ -376,6 +386,7 @@ export class ProgressShopController {
           this.pierceCard(score),
         ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
+        this.tab('wire', 'Колючая проволока', [this.wireDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
         this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score), this.salvoDamageCard(score)]),
         this.tab('artillery', 'Артиллерия', [
@@ -592,6 +603,10 @@ export class ProgressShopController {
     return this.damageCardFor(this.progress.minesDamage, Mines.shop.damage, score, () => this.buyMinesDamage());
   }
 
+  private wireDamageCard(score: number): ProgressCardView {
+    return this.damageCardFor(this.progress.wireDamage, BarbedWire.shop.damage, score, () => this.buyWireDamage());
+  }
+
   // Потолка нет. Лестница та же, что у урона пули: 300, 600, 900…
   private damageCardFor(level: number, base: number, score: number, buy: () => void): ProgressCardView {
     const price = this.mgDamagePrice(level);
@@ -747,7 +762,13 @@ export class ProgressShopController {
     if (stat === 'bullets') {
       return this.bulletPrice(level);
     }
-    if (stat === 'mgDamage' || stat === 'salvoDamage' || stat === 'artilleryDamage' || stat === 'minesDamage') {
+    if (
+      stat === 'mgDamage' ||
+      stat === 'salvoDamage' ||
+      stat === 'artilleryDamage' ||
+      stat === 'minesDamage' ||
+      stat === 'wireDamage'
+    ) {
       return this.mgDamagePrice(level);
     }
     if (stat === 'knockback') {
