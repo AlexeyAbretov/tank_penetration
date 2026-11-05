@@ -737,7 +737,8 @@ export class CombatSystem implements Combat {
     });
   }
 
-  // Очередь вдоль ствола. Между пулями короткая пауза, после последней — 3 секунды.
+  // Очередь вдоль ствола. Между пулями короткая пауза, после последней — перезарядка.
+  // Без покупок это 3 с. Магазины укорачивают её до 0,20 с.
   private tickMachineGun(delta: number): void {
     const mg = this.shop.machineGun;
     if (!mg) {
@@ -754,7 +755,8 @@ export class CombatSystem implements Combat {
     const shot = mg.muzzle();
     this.fireMgBullet(shot.x, shot.y, shot.angle);
     this.effects.tankMgShot.play();
-    this.mgCooldown = this.mgBurstLeft > 0 ? MachineGun.burstGap : MachineGun.shop.fireIntervalMs;
+    this.mgCooldown =
+      this.mgBurstLeft > 0 ? MachineGun.burstGap : MachineGun.fireDelayFor(this.shop.mgFireRateLevel);
   }
 
   // Очередь лучей. Между лучами короткая пауза, после последнего — перезарядка установки.
@@ -1091,10 +1093,8 @@ export class CombatSystem implements Combat {
     bullet.setDepth(14);
     bullet.setBlendMode(Phaser.BlendModes.ADD);
     bullet.setRotation(angle);
-    bullet.setVelocity(
-      Math.cos(angle) * MachineGun.shop.bulletSpeed,
-      Math.sin(angle) * MachineGun.shop.bulletSpeed,
-    );
+    const speed = MachineGun.bulletSpeedFor(this.shop.mgFlightLevel);
+    bullet.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
     const body = bullet.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
     body.setCircle(6);

@@ -33,6 +33,8 @@ type Stat =
   | 'flight'
   | 'bullets'
   | 'mgDamage'
+  | 'mgSpeed'
+  | 'mgFlight'
   | 'laserShots'
   | 'laserCooldown'
   | 'salvoRockets'
@@ -108,6 +110,14 @@ export class ProgressShopController {
 
   mgDamageBonus(): number {
     return this.progress.mgDamage;
+  }
+
+  mgSpeedLevel(): number {
+    return this.progress.mgSpeed;
+  }
+
+  mgFlightLevel(): number {
+    return this.progress.mgFlight;
   }
 
   laserShotCount(): number {
@@ -246,6 +256,14 @@ export class ProgressShopController {
     this.buy('mgDamage');
   }
 
+  private buyMgSpeed(): void {
+    this.buy('mgSpeed');
+  }
+
+  private buyMgFlight(): void {
+    this.buy('mgFlight');
+  }
+
   private buyLaserShots(): void {
     this.buy('laserShots');
   }
@@ -317,6 +335,12 @@ export class ProgressShopController {
     if (stat === 'bullets' && level >= MachineGun.maxBulletLevel) {
       return;
     }
+    if (stat === 'mgSpeed' && level >= MachineGun.maxProgressSpeedLevel) {
+      return;
+    }
+    if (stat === 'mgFlight' && level >= MachineGun.maxProgressFlightLevel) {
+      return;
+    }
     if (stat === 'laserShots' && level >= LaserDefense.maxShotLevel) {
       return;
     }
@@ -352,6 +376,12 @@ export class ProgressShopController {
     }
     if (stat === 'flight') {
       Tank.setProgressFlightLevel(this.progress.flight);
+    }
+    if (stat === 'mgSpeed') {
+      MachineGun.setProgressSpeedLevel(this.progress.mgSpeed);
+    }
+    if (stat === 'mgFlight') {
+      MachineGun.setProgressFlightLevel(this.progress.mgFlight);
     }
     if (stat === 'blast') {
       Tank.setProgressBlastLevel(this.progress.blast);
@@ -400,7 +430,12 @@ export class ProgressShopController {
           this.knockbackCard(score),
           this.pierceCard(score),
         ]),
-        this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
+        this.tab('gun', 'Пулемёт', [
+          this.bulletsCard(score),
+          this.mgDamageCard(score),
+          this.mgSpeedCard(score),
+          this.mgFlightCard(score),
+        ]),
         this.tab('wire', 'Колючая проволока', [this.wireDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score), this.laserCooldownCard(score)]),
         this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score), this.salvoDamageCard(score)]),
@@ -558,6 +593,42 @@ export class ProgressShopController {
       title: '+1 пуля',
       buy: () => this.buyBullets(),
       info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private mgSpeedCard(score: number): ProgressCardView {
+    const level = this.progress.mgSpeed;
+    const price = this.price(level);
+    const now = MachineGun.fireDelayFor(0, level);
+    const next = MachineGun.fireDelayFor(0, level + 1);
+    const maxed = level >= MachineGun.maxProgressSpeedLevel || next >= now;
+    const delay = this.formatSeconds(now);
+    const ahead = this.formatSeconds(next);
+    return {
+      title: '−0.01 с перезарядки',
+      buy: () => this.buyMgSpeed(),
+      info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${ahead}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private mgFlightCard(score: number): ProgressCardView {
+    const level = this.progress.mgFlight;
+    const price = this.price(level);
+    const now = MachineGun.flightMsFor(0, level);
+    const next = MachineGun.flightMsFor(0, level + 1);
+    const maxed = level >= MachineGun.maxProgressFlightLevel || next >= now;
+    const flight = this.formatSeconds(now);
+    const ahead = this.formatSeconds(next);
+    return {
+      title: '−0.10 с полёта',
+      buy: () => this.buyMgFlight(),
+      info: maxed ? `ур. ${level} · ${flight}` : `ур. ${level} · ${flight}→${ahead}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,

@@ -7,6 +7,7 @@ import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
+import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
@@ -173,6 +174,8 @@ export class GameScene extends Phaser.Scene {
     });
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
     Tank.setProgressFlightLevel(this.progressShop.flightLevel());
+    MachineGun.setProgressSpeedLevel(this.progressShop.mgSpeedLevel());
+    MachineGun.setProgressFlightLevel(this.progressShop.mgFlightLevel());
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
     Tank.setProgressPierceLevel(this.progressShop.pierceBonus());

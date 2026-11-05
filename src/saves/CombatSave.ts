@@ -5,6 +5,7 @@
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { EnemyFactory } from '../entities/EnemyFactory';
@@ -49,6 +50,10 @@ export type ShopSave = {
   autoFire: boolean;
   autoFireOn: boolean;
   mgDamage: number;
+  // Уровни перезарядки пулемёта за эту партию. Старые сохранения читают 0: пауза 3 с.
+  mgFireRate: number;
+  // Уровни полёта пули за эту партию. Старые сохранения читают 0: полёт 2 с.
+  mgFlight: number;
   wireDamage: number;
   flameDamage: number;
   salvoDamage: number;
@@ -236,6 +241,9 @@ function parseShop(value: unknown): ShopSave | null {
   const autoFireOn = flag(value.autoFireOn) ?? (autoFire === true);
   // Старые сохранения не писали урон партии у пулемёта, проволоки, огнемёта, РСЗО, артиллерии и мин.
   const mgDamage = requiredInt(value.mgDamage, 0, 500) ?? 0;
+  // Старые сохранения не писали перезарядку и полёт пулемёта: пауза 3 с, полёт 2 с.
+  const mgFireRate = requiredInt(value.mgFireRate, 0, MachineGun.maxFireRateLevel) ?? 0;
+  const mgFlight = requiredInt(value.mgFlight, 0, MachineGun.maxShopFlightLevel) ?? 0;
   const wireDamage = requiredInt(value.wireDamage, 0, 500) ?? 0;
   const flameDamage = requiredInt(value.flameDamage, 0, 500) ?? 0;
   const salvoDamage = requiredInt(value.salvoDamage, 0, 500) ?? 0;
@@ -273,6 +281,8 @@ function parseShop(value: unknown): ShopSave | null {
     autoFire,
     autoFireOn: autoFire && autoFireOn,
     mgDamage,
+    mgFireRate,
+    mgFlight,
     wireDamage,
     flameDamage,
     salvoDamage,

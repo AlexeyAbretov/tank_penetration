@@ -72,6 +72,8 @@ export class ShopController {
   nuclearOwned = false;
   nuclearCooldownLevel = 0;
   mgDamageLevel = 0;
+  mgFireRateLevel = 0;
+  mgFlightLevel = 0;
   wireDamageLevel = 0;
   flameDamageLevel = 0;
   salvoDamageLevel = 0;
@@ -120,6 +122,8 @@ export class ShopController {
       autoFire: this.autoFire.isOwned,
       autoFireOn: this.autoFire.enabled,
       mgDamage: this.mgDamageLevel,
+      mgFireRate: this.mgFireRateLevel,
+      mgFlight: this.mgFlightLevel,
       wireDamage: this.wireDamageLevel,
       flameDamage: this.flameDamageLevel,
       salvoDamage: this.salvoDamageLevel,
@@ -168,6 +172,8 @@ export class ShopController {
     this.nuclearCooldownLevel = Math.min(saved.nuclearCooldown, NuclearStrike.maxShopCooldownLevel);
     NuclearStrike.setShopCooldownLevel(this.nuclearCooldownLevel);
     this.mgDamageLevel = saved.mgDamage;
+    this.mgFireRateLevel = Math.min(saved.mgFireRate, MachineGun.maxFireRateLevel);
+    this.mgFlightLevel = Math.min(saved.mgFlight, MachineGun.maxShopFlightLevel);
     this.wireDamageLevel = saved.wireDamage;
     this.flameDamageLevel = saved.flameDamage;
     this.salvoDamageLevel = saved.salvoDamage;
@@ -198,6 +204,8 @@ export class ShopController {
     this.nuclearCooldownLevel = 0;
     NuclearStrike.setShopCooldownLevel(0);
     this.mgDamageLevel = 0;
+    this.mgFireRateLevel = 0;
+    this.mgFlightLevel = 0;
     this.wireDamageLevel = 0;
     this.flameDamageLevel = 0;
     this.salvoDamageLevel = 0;
@@ -569,6 +577,35 @@ export class ShopController {
     }, this.mgDamageOfferLevel());
   }
 
+  // Короче пауза между очередями. Выше MachineGun.maxFireRateLevel уровень не поднимается.
+  // Цена от уровня этой кнопки. Прогресс секунды снимает, но лестницу цены не двигает:
+  // его шаг 0,01 с, а у партии 0,02 с.
+  buyMgFireRate(): void {
+    if (this.isPaused() || !this.machineGunOwned || this.mgFireRateLevel >= MachineGun.maxFireRateLevel) {
+      return;
+    }
+    const cost = ShopController.upgradeCost(this.mgFireRateLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.mgFireRateLevel += 1;
+    this.refresh();
+  }
+
+  // Короче полёт пули через поле. Выше MachineGun.maxShopFlightLevel уровень не поднимается.
+  // Цена от уже купленного уровня этой кнопки: 300 × 1,15.
+  buyMgFlight(): void {
+    if (this.isPaused() || !this.machineGunOwned || this.mgFlightLevel >= MachineGun.maxShopFlightLevel) {
+      return;
+    }
+    const cost = ShopController.flightCost(this.mgFlightLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.mgFlightLevel += 1;
+    this.refresh();
+  }
+
   // Цена — от суммы с прогрессом, в сохранение пишется только покупка партии.
   buyWireDamage(): void {
     this.buyDamageLevel(this.wireOwned, this.wireDamageLevel, (level) => {
@@ -731,6 +768,8 @@ export class ShopController {
             this.machineGunOwned,
             'после установки',
           ),
+          this.mgFireRateCard(coins),
+          this.mgFlightCard(coins),
         ]),
         this.tab('wire', 'Колючая проволока', [
           this.gearCard('wire', coins),
@@ -898,7 +937,7 @@ export class ShopController {
           coins,
           this.machineGunOwned,
           shopPrice(MachineGun.shop.cost),
-          'очередь / 3 с',
+          `очередь / ${this.formatSeconds(MachineGun.fireDelayFor(this.mgFireRateLevel))} с`,
           'вдоль прицела',
         );
       case 'laser':
@@ -968,6 +1007,64 @@ export class ShopController {
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private mgFireRateCard(coins: number): ShopCardView {
+    const buy = () => this.buyMgFireRate();
+    const level = this.mgFireRateLevel;
+    const price = ShopController.upgradeCost(level);
+    if (!this.machineGunOwned) {
+      return {
+        title: '−0.02 с перезарядки',
+        buy,
+        info: 'после установки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const delay = this.formatSeconds(MachineGun.fireDelayFor(level));
+    const next = this.formatSeconds(MachineGun.fireDelayFor(level + 1));
+    const maxed = level >= MachineGun.maxFireRateLevel;
+    return {
+      title: '−0.02 с перезарядки',
+      buy,
+      info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${next}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
+  private mgFlightCard(coins: number): ShopCardView {
+    const buy = () => this.buyMgFlight();
+    const level = this.mgFlightLevel;
+    const price = ShopController.flightCost(level);
+    if (!this.machineGunOwned) {
+      return {
+        title: '−0.10 с полёта',
+        buy,
+        info: 'после установки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = this.formatSeconds(MachineGun.flightMsFor(level));
+    const next = this.formatSeconds(MachineGun.flightMsFor(level + 1));
+    const maxed = level >= MachineGun.maxShopFlightLevel;
+    return {
+      title: '−0.10 с полёта',
+      buy,
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
       owned: false,
     };
   }

@@ -18,11 +18,106 @@ export class MachineGun extends GameObjects.Container {
 
   static readonly shop = {
     cost: 100,
-    fireIntervalMs: 3000,
     damage: 1,
-    // Нарисованное поле 1280 по горизонтали за 2 с. Широкое окно холст растягивает, скорость от этого не растёт.
-    bulletSpeed: 640,
   };
+
+  // Пауза между очередями. Без покупок 3 с.
+  static readonly baseFireDelay = 3000;
+  // Магазин партии добивает паузу до 0,20 с. Прогресс сам останавливается на 0,50 с.
+  static readonly minFireDelay = 200;
+  static readonly minProgressFireDelay = 500;
+  // Шаг партии 0,02 с, шаг прогресса 0,01 с.
+  static readonly fireRateStep = 20;
+  static readonly progressSpeedStepMs = 10;
+  static progressSpeedLevel = 0;
+
+  static get maxProgressSpeedLevel(): number {
+    return (MachineGun.baseFireDelay - MachineGun.minProgressFireDelay) / MachineGun.progressSpeedStepMs;
+  }
+
+  static setProgressSpeedLevel(level: number): void {
+    MachineGun.progressSpeedLevel = Math.min(
+      MachineGun.maxProgressSpeedLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Прогресс не уводит паузу ниже 0,50 с, даже если в сохранении уровень выше нового потолка.
+  private static progressCutMs(progressSpeed: number): number {
+    const cut = Math.max(0, Math.round(progressSpeed)) * MachineGun.progressSpeedStepMs;
+    return Math.min(cut, MachineGun.baseFireDelay - MachineGun.minProgressFireDelay);
+  }
+
+  // Магазин между волнами добивает остаток до 0,20 с. Прогресс сам останавливается на 0,50 с.
+  static get maxFireRateLevel(): number {
+    const room =
+      MachineGun.baseFireDelay - MachineGun.progressCutMs(MachineGun.progressSpeedLevel) - MachineGun.minFireDelay;
+    return Math.max(0, Math.floor(room / MachineGun.fireRateStep));
+  }
+
+  static fireDelayFor(level: number, progressSpeed = MachineGun.progressSpeedLevel): number {
+    const progressCut = MachineGun.progressCutMs(progressSpeed);
+    const room = MachineGun.baseFireDelay - progressCut - MachineGun.minFireDelay;
+    const maxShop = Math.max(0, Math.floor(room / MachineGun.fireRateStep));
+    const capped = Math.min(Math.max(0, Math.round(level)), maxShop);
+    // Шаг партии 0,02 с, шаг прогресса 0,01 с. На потолке остаток короче шага
+    // всё равно добирается до 0,20 с, иначе кнопка пишет «максимум» на 0,21 с.
+    if (maxShop > 0 && capped >= maxShop) {
+      return MachineGun.minFireDelay;
+    }
+    return Math.max(
+      MachineGun.minFireDelay,
+      MachineGun.baseFireDelay - capped * MachineGun.fireRateStep - progressCut,
+    );
+  }
+
+  // Нарисованное поле по горизонтали. Широкое окно холст растягивает, скорость от этого не растёт.
+  static readonly crossPx = 1280;
+  // Полёт через это поле при ровном стволе. Без покупок 2 с, это 640 пикселей в секунду.
+  static readonly baseFlightMs = 2000;
+  // Магазин партии добивает полёт до 0,40 с. Прогресс сам останавливается на 0,60 с.
+  static readonly minFlightMs = 400;
+  static readonly minProgressFlightMs = 600;
+  // Оба магазина снимают по 0,10 с за уровень.
+  static readonly flightStepMs = 100;
+  static progressFlightLevel = 0;
+
+  static get maxProgressFlightLevel(): number {
+    return (MachineGun.baseFlightMs - MachineGun.minProgressFlightMs) / MachineGun.flightStepMs;
+  }
+
+  static setProgressFlightLevel(level: number): void {
+    MachineGun.progressFlightLevel = Math.min(
+      MachineGun.maxProgressFlightLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Прогресс не уводит полёт ниже 0,60 с, даже если в сохранении уровень выше нового потолка.
+  private static progressFlightCutMs(progressLevel: number): number {
+    const cut = Math.max(0, Math.round(progressLevel)) * MachineGun.flightStepMs;
+    return Math.min(cut, MachineGun.baseFlightMs - MachineGun.minProgressFlightMs);
+  }
+
+  // Магазин между волнами добивает остаток до 0,40 с. Прогресс сам останавливается на 0,60 с.
+  static get maxShopFlightLevel(): number {
+    const room =
+      MachineGun.baseFlightMs - MachineGun.progressFlightCutMs(MachineGun.progressFlightLevel) - MachineGun.minFlightMs;
+    return Math.max(0, Math.floor(room / MachineGun.flightStepMs));
+  }
+
+  static flightMsFor(level: number, progressLevel = MachineGun.progressFlightLevel): number {
+    const progressCut = MachineGun.progressFlightCutMs(progressLevel);
+    const room = MachineGun.baseFlightMs - progressCut - MachineGun.minFlightMs;
+    const maxShop = Math.max(0, Math.floor(room / MachineGun.flightStepMs));
+    const capped = Math.min(Math.max(0, Math.round(level)), maxShop);
+    return Math.max(MachineGun.minFlightMs, MachineGun.baseFlightMs - capped * MachineGun.flightStepMs - progressCut);
+  }
+
+  // Пиксели в секунду за поле crossPx за время flightMsFor.
+  static bulletSpeedFor(level: number, progressLevel = MachineGun.progressFlightLevel): number {
+    return (MachineGun.crossPx * 1000) / MachineGun.flightMsFor(level, progressLevel);
+  }
 
   // Очередь из магазина после проигрыша. Без покупок одна пуля, каждая покупка добавляет ещё одну.
   static readonly bulletMin = 1;

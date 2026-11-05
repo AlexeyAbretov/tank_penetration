@@ -67,6 +67,8 @@ export class DebugCombatSave extends CombatSave {
         autoFire: true,
         autoFireOn: true,
         mgDamage: 0,
+        mgFireRate: 0,
+        mgFlight: 0,
         wireDamage: 0,
         flameDamage: 0,
         salvoDamage: 0,

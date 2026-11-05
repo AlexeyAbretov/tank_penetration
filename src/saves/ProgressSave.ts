@@ -35,6 +35,10 @@ export type SavedProgress = {
   bullets: number;
   // Сколько раз докуплен урон пули пулемёта. 0 — базовый урон пули.
   mgDamage: number;
+  // Сколько раз укорочена пауза пулемёта. 0 — базовые 3 с. Прогресс сам останавливается на 0,50 с.
+  mgSpeed: number;
+  // Сколько раз укорочен полёт пули. 0 — базовые 2 с. Прогресс сам останавливается на 0,60 с.
+  mgFlight: number;
   // Сколько раз докуплен луч лазера. 0 — один луч, 2 — три. Цена — общая, 500 + 500 × уровень.
   laserShots: number;
   // Сколько раз укорочен откат лазера. 0 — базовые 3 с. Прогресс сам останавливается на 1 с.
@@ -130,6 +134,8 @@ export class ProgressSave {
     progress.flight = 0;
     progress.bullets = 0;
     progress.mgDamage = 0;
+    progress.mgSpeed = 0;
+    progress.mgFlight = 0;
     progress.laserShots = 0;
     progress.laserCooldown = 0;
     progress.salvoRockets = 0;
@@ -145,6 +151,8 @@ export class ProgressSave {
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressFlightLevel(0);
+    MachineGun.setProgressSpeedLevel(0);
+    MachineGun.setProgressFlightLevel(0);
     Tank.setProgressBlastLevel(0);
     Tank.setProgressKnockbackLevel(0);
     Tank.setProgressPierceLevel(0);
@@ -186,6 +194,8 @@ export class ProgressSave {
       flight: 0,
       bullets: 0,
       mgDamage: 0,
+      mgSpeed: 0,
+      mgFlight: 0,
       laserShots: 0,
       laserCooldown: 0,
       salvoRockets: 0,
@@ -249,6 +259,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     flight: requiredInt(value.flight, 0, Tank.maxProgressFlightLevel) ?? 0,
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    // Старые сохранения не писали перезарядку и полёт пулемёта: пауза 3 с, полёт 2 с.
+    mgSpeed: requiredInt(value.mgSpeed, 0, MachineGun.maxProgressSpeedLevel) ?? 0,
+    mgFlight: requiredInt(value.mgFlight, 0, MachineGun.maxProgressFlightLevel) ?? 0,
     laserShots: requiredInt(value.laserShots, 0, LaserDefense.maxShotLevel) ?? 0,
     // Старые сохранения не писали откат лазера: луч ждал базовые 3 с.
     laserCooldown: requiredInt(value.laserCooldown, 0, LaserDefense.maxProgressCooldownLevel) ?? 0,
