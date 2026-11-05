@@ -29,7 +29,7 @@ export class ArtilleryStrike {
     cost: 100,
     shells: 3,
     damage: 20,
-    cooldownMs: 20_000,
+    cooldownMs: 60_000,
     craterMs: 5_000,
     blastRadius: 74,
     gapMs: 180,

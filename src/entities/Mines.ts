@@ -121,7 +121,7 @@ export class Mines {
     cost: 100,
     count: 3,
     damage: 10,
-    cooldownMs: 20_000,
+    cooldownMs: 60_000,
     craterMs: 3_000,
     // Пехота в этом радиусе от центра получает урон. Соседняя дорожка (72 px) уже вне круга.
     blastRadius: 56,
