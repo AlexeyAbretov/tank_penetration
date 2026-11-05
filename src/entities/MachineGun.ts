@@ -1,6 +1,7 @@
 // Пулемёт перед люком башни: одна вертикальная опора, стреляет вдоль прицела.
 
 import Phaser, { GameObjects } from 'phaser';
+import { ejectCasing } from '../gfx/casing';
 import {
   BULLET_FRAME,
   MG_BULLET_PAINT,
@@ -142,6 +143,8 @@ export class MachineGun extends GameObjects.Container {
     originX: 27.5 / MG_MOUNT_FRAME.w,
     originY: 5.5 / MG_MOUNT_FRAME.h,
   };
+  // Окно наверху коробки, левее цапфы. Дуло у правого края картинки.
+  static readonly casingPort = { x: 20, y: 0 };
 
   private readonly barrel: Phaser.GameObjects.Image;
   private readonly worldPoint = new Phaser.Math.Vector2();
@@ -192,6 +195,18 @@ export class MachineGun extends GameObjects.Container {
     g.fillRect(12, 2, 5, 4);
   }
 
+  // Гильза из окна на коробке. Бой зовёт на каждую пулю очереди.
+  dropCasing(): void {
+    this.barrel.setRotation(0);
+    const matrix = this.barrel.getWorldTransformMatrix();
+    const localX = MachineGun.casingPort.x - MachineGun.layout.originX * MG_MOUNT_FRAME.w;
+    const localY = MachineGun.casingPort.y - MachineGun.layout.originY * MG_MOUNT_FRAME.h;
+    const port = this.worldPoint;
+    matrix.transformPoint(localX, localY, port);
+    const scale = Math.hypot(matrix.a, matrix.b);
+    ejectCasing(this.scene, port.x, port.y, Math.atan2(matrix.b, matrix.a), this.pictureDepth(), scale);
+  }
+
   // Ствол смотрит вместе с башней; отдаёт мировые координаты дула и угол выстрела.
   muzzle(): { x: number; y: number; angle: number } {
     this.barrel.setRotation(0);
@@ -205,5 +220,14 @@ export class MachineGun extends GameObjects.Container {
       y: tip.y,
       angle: Math.atan2(matrix.b, matrix.a),
     };
+  }
+
+  // Пулемёт вложен в башню. Глубина контейнера танка, не локальный ноль внутри неё.
+  private pictureDepth(): number {
+    let node: Phaser.GameObjects.Container = this;
+    while (node.parentContainer) {
+      node = node.parentContainer;
+    }
+    return node.depth;
   }
 }

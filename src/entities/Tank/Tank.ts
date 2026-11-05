@@ -17,6 +17,7 @@ import {
   type ShellPaint,
   type TankPaint,
 } from '../../gfx/looks';
+import { ejectCasing } from '../../gfx/casing';
 import { exhaustAt, idleShift } from '../../gfx/engine';
 import { tankBoomAt } from '../../gfx/tankBoom';
 import { bake } from '../../gfx/textures';
@@ -216,6 +217,12 @@ export class Tank extends GameObjects.Container {
     seatY: 14,
     muzzleLength: 54,
   };
+  // Крыша кормы башни, в пикселях кадра. Дуло справа, корма слева от оси.
+  static readonly shellPort = { x: 16, y: 9 };
+  // Гильза снаряда. Картинка 8×4, множитель читаемости 1.5: scale 3 даёт 36×18.
+  // Снаряд 54×22, башня 99×32. Короче снаряда и чуть тоньше, калибр всё ещё его.
+  // heft 2: та же дуга, что у пули, но вдвое ленивее. Пульная гильза здесь была бы точкой.
+  static readonly shellCasing = { scale: 2, heft: 2 };
 
   // Картинка с origin занимает прямоугольник (x, y, w, h) в системе своего родителя.
   private static boxAround(
@@ -519,6 +526,7 @@ export class Tank extends GameObjects.Container {
       duration: Tank.recoilSlide.ms,
       yoyo: true,
     });
+    this.dropShellCasing(shot.angle);
     return shot;
   }
 
@@ -546,6 +554,18 @@ export class Tank extends GameObjects.Container {
     // Сначала огонь, поверх него — дым от тех же очагов.
     this.fires = Tank.firesAt(this.scene, this.x, this.y);
     this.smokes = Tank.smokesAt(this.scene, this.x, this.y);
+  }
+
+  // Гильза с крыши кормы. Башня уже повёрнута, откат ствола её не увозит: корма стоит.
+  private dropShellCasing(angle: number): void {
+    const layout = Tank.layout;
+    const matrix = this.turret.getWorldTransformMatrix();
+    const localX = Tank.shellPort.x - layout.turretOriginX * TANK_TURRET_FRAME.w;
+    const localY = Tank.shellPort.y - layout.turretOriginY * TANK_TURRET_FRAME.h;
+    const port = new Phaser.Math.Vector2();
+    matrix.transformPoint(localX, localY, port);
+    const brass = Tank.shellCasing;
+    ejectCasing(this.scene, port.x, port.y, angle, this.depth, brass.scale, brass.heft);
   }
 
   // Мировые координаты конца ствола.

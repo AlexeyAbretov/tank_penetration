@@ -754,6 +754,7 @@ export class CombatSystem implements Combat {
     this.mgBurstLeft -= 1;
     const shot = mg.muzzle();
     this.fireMgBullet(shot.x, shot.y, shot.angle);
+    mg.dropCasing();
     this.effects.tankMgShot.play();
     this.mgCooldown =
       this.mgBurstLeft > 0 ? MachineGun.burstGap : MachineGun.fireDelayFor(this.shop.mgFireRateLevel);

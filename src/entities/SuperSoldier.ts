@@ -6,6 +6,7 @@
 
 import Phaser, { Scene } from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
+import { ejectCasing } from '../gfx/casing';
 import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
 import {
   CORPSE_FRAME,
@@ -130,6 +131,8 @@ export class SuperSoldier extends Infantry {
   // Ось внутри картинки руки: правый край наплечника.
   // Канал ниже плеча, но сам горизонтален, поэтому пуля идёт вдоль ствола, а не через плечо.
   static readonly armsPivot = { x: 81, y: 11 };
+  // Окно наверху коробки, левее наплечника. Канал ниже, дуло у левого края.
+  static readonly casingPort = { x: 50, y: 20 };
   // Дуло в пикселях стойки. Сдвиг дула картинки от оси, отложенный от казённика.
   static readonly muzzleTip = {
     x: SuperSoldier.breech.x + (SuperSoldier.muzzleInGun.x - SuperSoldier.armsPivot.x) * SuperSoldier.armsFit,
@@ -522,6 +525,8 @@ export class SuperSoldier extends Infantry {
     this.shots.add(bullet);
     bullet.launch(shot.angle, SuperSoldier.shotSpeed);
     this.flashAt(shot.x, shot.y, shot.angle);
+    const port = SuperSoldier.casingAt(this.x, this.y, this.scaleX, this.aim, this.recoil);
+    ejectCasing(this.scene, port.x, port.y, shot.angle, this.depth, this.scaleX * SuperSoldier.armsFit);
   }
 
   private kickGun(): void {
@@ -647,6 +652,38 @@ export class SuperSoldier extends Infantry {
     aim: number,
     recoil: { x: number; climb: number },
   ): void {
+    const place = SuperSoldier.gunPlace(anchorX, anchorY, scale, aim, recoil);
+    gun.setPosition(place.x, place.y);
+    gun.setScale(scale * SuperSoldier.armsFit);
+    gun.setRotation(place.rotation);
+  }
+
+  // Окно выброса в координатах поля. Та же поза, что у пулемёта, вместе с откатом.
+  static casingAt(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): { x: number; y: number } {
+    const place = SuperSoldier.gunPlace(anchorX, anchorY, scale, aim, recoil);
+    const mouth = SuperSoldier.turned(
+      place.rotation,
+      SuperSoldier.casingPort.x - SuperSoldier.armsPivot.x,
+      SuperSoldier.casingPort.y - SuperSoldier.armsPivot.y,
+      scale * SuperSoldier.armsFit,
+    );
+    return { x: place.x + mouth.x, y: place.y + mouth.y };
+  }
+
+  // Наплечник картинки. Отдача уже в повороте: гильза выходит из того окна, которое видно.
+  private static gunPlace(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): { x: number; y: number; rotation: number } {
     const rotation = aim + recoil.climb;
     const muzzle = SuperSoldier.muzzlePoint(anchorX, anchorY, scale, aim, recoil);
     const tip = SuperSoldier.turned(
@@ -655,9 +692,7 @@ export class SuperSoldier extends Infantry {
       SuperSoldier.muzzleTip.y - SuperSoldier.breech.y,
       scale,
     );
-    gun.setPosition(muzzle.x - tip.x, muzzle.y - tip.y);
-    gun.setScale(scale * SuperSoldier.armsFit);
-    gun.setRotation(rotation);
+    return { x: muzzle.x - tip.x, y: muzzle.y - tip.y, rotation };
   }
 
   // Кадр шага, стойка и труп разного размера. Подошва каждого стоит на точке ног.

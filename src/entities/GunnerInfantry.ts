@@ -3,6 +3,7 @@
 // а руки со стволом — одна картинка: она крутится вокруг плеча и отъезжает при выстреле.
 
 import Phaser, { Scene } from 'phaser';
+import { ejectCasing } from '../gfx/casing';
 import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
 import {
   CORPSE_FRAME,
@@ -67,6 +68,8 @@ export class GunnerInfantry extends RangedEnemy {
   static readonly muzzleTip = { x: 40 + (4 - 82) * GunnerInfantry.armsFit, y: 20 };
   // Плечо внутри картинки рук: правый край рукава, на высоте ствола.
   static readonly armsPivot = { x: 82, y: 41 };
+  // Окно выброса на текстуре рук: над коробкой, между прицелом и кистями. Дуло слева.
+  static readonly casingPort = { x: 64, y: 37 };
   // Откат короче, чем у станка пикапа: винтовка короткая, удар должен читаться и сразу гаснуть.
   static readonly recoilKick = { x: 5, climb: 0.12, ms: 90 };
   // Множитель к масштабу винтовки. 1 — пиксель вспышки совпадает с пикселем ствола, иначе огонь не читается.
@@ -306,6 +309,8 @@ export class GunnerInfantry extends RangedEnemy {
       ease: 'Quad.In',
       onComplete: () => flash.destroy(),
     });
+    const port = GunnerInfantry.casingAt(this.x, this.y, this.scaleX, this.aim, this.recoil);
+    ejectCasing(this.scene, port.x, port.y, angle, this.depth, this.scaleX * GunnerInfantry.armsFit);
   }
 
   private kickRifle(): void {
@@ -431,6 +436,38 @@ export class GunnerInfantry extends RangedEnemy {
     aim: number,
     recoil: { x: number; climb: number },
   ): void {
+    const place = GunnerInfantry.riflePlace(anchorX, anchorY, scale, aim, recoil);
+    rifle.setPosition(place.x, place.y);
+    rifle.setScale(scale * GunnerInfantry.armsFit);
+    rifle.setRotation(place.rotation);
+  }
+
+  // Окно выброса в координатах поля. Та же поза, что у картинки рук, вместе с откатом.
+  static casingAt(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): { x: number; y: number } {
+    const place = GunnerInfantry.riflePlace(anchorX, anchorY, scale, aim, recoil);
+    const mouth = GunnerInfantry.turned(
+      place.rotation,
+      GunnerInfantry.casingPort.x - GunnerInfantry.armsPivot.x,
+      GunnerInfantry.casingPort.y - GunnerInfantry.armsPivot.y,
+      scale * GunnerInfantry.armsFit,
+    );
+    return { x: place.x + mouth.x, y: place.y + mouth.y };
+  }
+
+  // Плечо картинки рук. Отдача уже в повороте: гильза выходит из того окна, которое видно.
+  private static riflePlace(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): { x: number; y: number; rotation: number } {
     const rotation = aim + recoil.climb;
     const muzzle = GunnerInfantry.muzzlePoint(anchorX, anchorY, scale, aim, recoil);
     const tip = GunnerInfantry.turned(
@@ -439,9 +476,7 @@ export class GunnerInfantry extends RangedEnemy {
       GunnerInfantry.muzzleTip.y - GunnerInfantry.breech.y,
       scale,
     );
-    rifle.setPosition(muzzle.x - tip.x, muzzle.y - tip.y);
-    rifle.setScale(scale * GunnerInfantry.armsFit);
-    rifle.setRotation(rotation);
+    return { x: muzzle.x - tip.x, y: muzzle.y - tip.y, rotation };
   }
 
   static renderRifle(g: Phaser.GameObjects.Graphics, look: SoldierLook = GUNNER_LOOK): void {

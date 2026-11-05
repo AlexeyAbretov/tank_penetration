@@ -10,6 +10,7 @@ import {
   PICKUP_PAINT,
   type PickupPaint,
 } from '../gfx/looks';
+import { ejectCasing } from '../gfx/casing';
 import { bake } from '../gfx/textures';
 import type { WorldPoint } from '../types/WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
@@ -72,6 +73,8 @@ export class PickupTruck extends RangedEnemy {
   static readonly breech = { x: 115, y: 15 };
   // Левый край ствола. От казённика эта точка уходит влево и крутится вместе со стволом.
   static readonly muzzleTip = { x: 54, y: 14 };
+  // Окно наверху коробки, у рукояти. На пиксель выше металла, дуло при этом слева.
+  static readonly casingPort = { x: 100, y: 10 };
   // Пламя на капоте обломков. Отсюда поднимается дым.
   static readonly flame = { x: 26, y: 30 };
   // Шов за кабиной. Куски — кадр сгоревшей машины, не живой ход.
@@ -252,6 +255,8 @@ export class PickupTruck extends RangedEnemy {
   // Вспышка остаётся в точке дула, ствол в этот момент отскакивает назад.
   protected override onFire(x: number, y: number, angle: number): void {
     this.kickGun();
+    const port = PickupTruck.casingAt(this.x, this.y, this.scaleX, this.aim, this.recoil);
+    ejectCasing(this.scene, port.x, port.y, angle, this.depth, this.scaleX);
     const flash = this.scene.add.image(x, y, PickupTruck.flashKey).setOrigin(0, 0.5).setDepth(16);
     flash.setRotation(angle);
     flash.setBlendMode(Phaser.BlendModes.ADD);
@@ -377,12 +382,42 @@ export class PickupTruck extends RangedEnemy {
     aim: number,
     recoil: { x: number; climb: number },
   ): void {
+    const place = PickupTruck.gunPlace(anchorX, anchorY, scale, aim, recoil);
+    gun.setPosition(place.x, place.y);
+    gun.setScale(scale);
+    gun.setRotation(place.rotation);
+  }
+
+  // Окно выброса в координатах поля. Та же поза, что у ствола, вместе с откатом.
+  static casingAt(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): { x: number; y: number } {
+    const place = PickupTruck.gunPlace(anchorX, anchorY, scale, aim, recoil);
+    const mouth = PickupTruck.turned(
+      place.rotation,
+      PickupTruck.casingPort.x - PickupTruck.breech.x,
+      PickupTruck.casingPort.y - PickupTruck.breech.y,
+      scale,
+    );
+    return { x: place.x + mouth.x, y: place.y + mouth.y };
+  }
+
+  // Казённик на кузове. Отдача уже в сдвиге: гильза выходит из того окна, которое видно.
+  private static gunPlace(
+    anchorX: number,
+    anchorY: number,
+    scale: number,
+    aim: number,
+    recoil: { x: number; climb: number },
+  ): { x: number; y: number; rotation: number } {
     const rotation = aim + recoil.climb;
     const mount = PickupTruck.mountPoint(anchorX, anchorY, scale);
     const kick = PickupTruck.turned(rotation, recoil.x, 0, scale);
-    gun.setPosition(mount.x + kick.x, mount.y + kick.y);
-    gun.setScale(scale);
-    gun.setRotation(rotation);
+    return { x: mount.x + kick.x, y: mount.y + kick.y, rotation };
   }
 
   // Своя скорость: родительский march для пехоты слишком медленный.
