@@ -33,9 +33,9 @@ type PermanentBonuses = {
   points: number;
   // Постоянный урон пули из магазина после гибели. К урону партии прибавляется на карточке.
   mg: number;
-  // Постоянный урон проволоки из магазина после гибели. К урону партии прибавляется на карточке и в цене.
+  // Постоянный урон проволоки из магазина после гибели. К урону на карточке прибавляется, лестницу цены не двигает.
   wire: number;
-  // Постоянный урон ракеты, снаряда и мины. К урону партии прибавляется на карточке и в цене.
+  // Постоянный урон ракеты, снаряда и мины. К урону на карточке прибавляется, лестницу цены не двигает.
   salvo: number;
   artillery: number;
   mines: number;
@@ -247,12 +247,12 @@ export class ShopController {
   }
 
   // +1 к радиусу взрыва. Вместе с прогрессом не выше Tank.maxBlastLevel.
-  // Цена считается от уже купленного уровня, включая прогресс.
+  // Цена — от уровня этой кнопки. Прогресс радиус поднимает, лестницу цены не двигает.
   buyBlast(): void {
     if (this.isPaused() || this.blastOfferLevel() >= Tank.maxBlastLevel) {
       return;
     }
-    const cost = ShopController.upgradeCost(this.blastOfferLevel());
+    const cost = ShopController.upgradeCost(this.blastLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -260,12 +260,13 @@ export class ShopController {
     this.refresh();
   }
 
-  // +1 к урону снаряда танка. Цена считается от уже купленного уровня, включая прогресс.
+  // +1 к урону снаряда танка. Цена — от уровня этой кнопки.
+  // Прогресс урон поднимает, лестницу цены не двигает.
   buyDamage(): void {
     if (this.isPaused()) {
       return;
     }
-    const cost = ShopController.upgradeCost(this.damageOfferLevel());
+    const cost = ShopController.upgradeCost(this.damageLevel);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -570,11 +571,11 @@ export class ShopController {
   }
 
   // +1 к пуле. Пока ствола нет, уровень не растёт: прибавка не к чему.
-  // Цена — от суммы с прогрессом, в сохранение пишется только покупка партии.
+  // Цена — от уровня этой кнопки. Прогресс урон поднимает, лестницу не двигает.
   buyMgDamage(): void {
     this.buyDamageLevel(this.machineGunOwned, this.mgDamageLevel, (level) => {
       this.mgDamageLevel = level;
-    }, this.mgDamageOfferLevel());
+    });
   }
 
   // Короче пауза между очередями. Выше MachineGun.maxFireRateLevel уровень не поднимается.
@@ -606,11 +607,11 @@ export class ShopController {
     this.refresh();
   }
 
-  // Цена — от суммы с прогрессом, в сохранение пишется только покупка партии.
+  // Цена — от уровня этой кнопки. Прогресс урон поднимает, лестницу не двигает.
   buyWireDamage(): void {
     this.buyDamageLevel(this.wireOwned, this.wireDamageLevel, (level) => {
       this.wireDamageLevel = level;
-    }, this.wireDamageOfferLevel());
+    });
   }
 
   // Струя и пятно на земле получают одну и ту же прибавку.
@@ -620,23 +621,23 @@ export class ShopController {
     });
   }
 
-  // Цена — от суммы с прогрессом, в сохранение пишется только покупка партии.
+  // Цена — от уровня этой кнопки. Прогресс урон поднимает, лестницу не двигает.
   buySalvoDamage(): void {
     this.buyDamageLevel(this.salvoOwned, this.salvoDamageLevel, (level) => {
       this.salvoDamageLevel = level;
-    }, this.salvoDamageOfferLevel());
+    });
   }
 
   buyArtilleryDamage(): void {
     this.buyDamageLevel(this.artilleryOwned, this.artilleryDamageLevel, (level) => {
       this.artilleryDamageLevel = level;
-    }, this.artilleryDamageOfferLevel());
+    });
   }
 
   buyMinesDamage(): void {
     this.buyDamageLevel(this.minesOwned, this.minesDamageLevel, (level) => {
       this.minesDamageLevel = level;
-    }, this.minesDamageOfferLevel());
+    });
   }
 
   // Строка характеристик над полем: урон и взрыв партии плюс постоянные уровни.
@@ -715,7 +716,8 @@ export class ShopController {
     return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
   }
 
-  // На карточке уровень партии и прогресса — одно число. От него же цена.
+  // Сумма партии и прогресса: число на карточке и потолок взрыва.
+  // Номер кнопки и цена считают только покупки партии.
   private blastOfferLevel(): number {
     return this.blastLevel + this.bonuses.blast;
   }
@@ -761,7 +763,7 @@ export class ShopController {
         this.tab('gun', 'Пулемёт', [
           this.gearCard('machineGun', coins),
           this.weaponDamageCard(
-            this.mgDamageOfferLevel(),
+            this.mgDamageLevel,
             this.mgDamageNow(),
             () => this.buyMgDamage(),
             coins,
@@ -774,7 +776,7 @@ export class ShopController {
         this.tab('wire', 'Колючая проволока', [
           this.gearCard('wire', coins),
           this.weaponDamageCard(
-            this.wireDamageOfferLevel(),
+            this.wireDamageLevel,
             BarbedWire.shop.damage + this.wireDamageOfferLevel(),
             () => this.buyWireDamage(),
             coins,
@@ -788,7 +790,7 @@ export class ShopController {
         this.tab('salvo', 'РСЗО', [
           this.gearCard('salvo', coins),
           this.weaponDamageCard(
-            this.salvoDamageOfferLevel(),
+            this.salvoDamageLevel,
             RocketSalvo.shop.damage + this.salvoDamageOfferLevel(),
             () => this.buySalvoDamage(),
             coins,
@@ -799,7 +801,7 @@ export class ShopController {
         this.tab('artillery', 'Артиллерия', [
           this.gearCard('artillery', coins),
           this.weaponDamageCard(
-            this.artilleryDamageOfferLevel(),
+            this.artilleryDamageLevel,
             ArtilleryStrike.shop.damage + this.artilleryDamageOfferLevel(),
             () => this.buyArtilleryDamage(),
             coins,
@@ -811,7 +813,7 @@ export class ShopController {
         this.tab('mines', 'Мина', [
           this.gearCard('mines', coins),
           this.weaponDamageCard(
-            this.minesDamageOfferLevel(),
+            this.minesDamageLevel,
             Mines.shop.damage + this.minesDamageOfferLevel(),
             () => this.buyMinesDamage(),
             coins,
@@ -833,7 +835,7 @@ export class ShopController {
   }
 
   private mgDamageNow(): number {
-    return MachineGun.shop.damage + this.mgDamageLevel + this.bonuses.mg;
+    return MachineGun.shop.damage + this.mgDamageOfferLevel();
   }
 
   // Струя и пятно на земле стартуют с одного числа и растут вместе.
@@ -889,12 +891,11 @@ export class ShopController {
     unlocked: boolean,
     level: number,
     put: (level: number) => void,
-    priceLevel = level,
   ): void {
     if (this.isPaused() || !unlocked) {
       return;
     }
-    const cost = ShopController.upgradeCost(priceLevel);
+    const cost = ShopController.upgradeCost(level);
     if (!this.economy.spendCoins(cost)) {
       return;
     }
@@ -980,11 +981,12 @@ export class ShopController {
   }
 
   private blastCard(coins: number): ShopCardView {
-    const level = this.blastOfferLevel();
+    const level = this.blastLevel;
+    const total = this.blastOfferLevel();
     const price = ShopController.upgradeCost(level);
-    const radius = Tank.blastRadiusFor(level);
-    const nextRadius = Tank.blastRadiusFor(level + 1);
-    const maxed = level >= Tank.maxBlastLevel;
+    const radius = Tank.blastRadiusFor(total);
+    const nextRadius = Tank.blastRadiusFor(total + 1);
+    const maxed = total >= Tank.maxBlastLevel;
     return {
       title: '+1 область взрыва',
       buy: () => this.buyBlast(),
@@ -997,9 +999,9 @@ export class ShopController {
   }
 
   private damageCard(coins: number): ShopCardView {
-    const level = this.damageOfferLevel();
+    const level = this.damageLevel;
     const price = ShopController.upgradeCost(level);
-    const now = Infantry.shellDamage + level;
+    const now = Infantry.shellDamage + this.damageOfferLevel();
     return {
       title: '+1 урон',
       buy: () => this.buyDamage(),
