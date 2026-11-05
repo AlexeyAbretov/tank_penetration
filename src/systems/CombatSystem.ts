@@ -501,7 +501,7 @@ export class CombatSystem implements Combat {
     this.salvoTimers.push(timer);
   }
 
-  // Три огня этого залпа. Уже горящие от прошлого вызова не трогаем.
+  // Огни этого залпа. Уже горящие от прошлого вызова не трогаем.
   private armSpots(): ArtillerySpot[] {
     const minX = Math.ceil(BarbedWire.bounds.face + craterReach());
     const spots = ArtilleryStrike.impacts(minX).map((point) => ({

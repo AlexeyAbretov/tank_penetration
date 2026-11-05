@@ -7,6 +7,7 @@ import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
+import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
@@ -32,6 +33,9 @@ type Stat =
   | 'bullets'
   | 'mgDamage'
   | 'laserShots'
+  | 'salvoRockets'
+  | 'artilleryShells'
+  | 'minesCount'
   | 'artilleryCooldown'
   | 'minesCooldown'
   | 'nuclearCooldown';
@@ -102,6 +106,18 @@ export class ProgressShopController {
 
   laserShotCount(): number {
     return LaserDefense.shotCount(this.progress.laserShots);
+  }
+
+  salvoRocketLevel(): number {
+    return this.progress.salvoRockets;
+  }
+
+  artilleryShellLevel(): number {
+    return this.progress.artilleryShells;
+  }
+
+  minesCountLevel(): number {
+    return this.progress.minesCount;
   }
 
   artilleryCooldownLevel(): number {
@@ -208,6 +224,18 @@ export class ProgressShopController {
     this.buy('laserShots');
   }
 
+  private buySalvoRockets(): void {
+    this.buy('salvoRockets');
+  }
+
+  private buyArtilleryShells(): void {
+    this.buy('artilleryShells');
+  }
+
+  private buyMinesCount(): void {
+    this.buy('minesCount');
+  }
+
   private buyArtilleryCooldown(): void {
     this.buy('artilleryCooldown');
   }
@@ -246,6 +274,15 @@ export class ProgressShopController {
     if (stat === 'laserShots' && level >= LaserDefense.maxShotLevel) {
       return;
     }
+    if (stat === 'salvoRockets' && level >= RocketSalvo.maxRocketLevel) {
+      return;
+    }
+    if (stat === 'artilleryShells' && level >= ArtilleryStrike.maxShellLevel) {
+      return;
+    }
+    if (stat === 'minesCount' && level >= Mines.maxMineLevel) {
+      return;
+    }
     if (stat === 'artilleryCooldown' && !ArtilleryStrike.progressCooldownShortens(level)) {
       return;
     }
@@ -276,6 +313,15 @@ export class ProgressShopController {
     if (stat === 'pierce') {
       Tank.setProgressPierceLevel(this.progress.pierce);
     }
+    if (stat === 'salvoRockets') {
+      RocketSalvo.setProgressRocketLevel(this.progress.salvoRockets);
+    }
+    if (stat === 'artilleryShells') {
+      ArtilleryStrike.setProgressShellLevel(this.progress.artilleryShells);
+    }
+    if (stat === 'minesCount') {
+      Mines.setProgressMineLevel(this.progress.minesCount);
+    }
     if (stat === 'artilleryCooldown') {
       ArtilleryStrike.setProgressCooldownLevel(this.progress.artilleryCooldown);
     }
@@ -304,8 +350,9 @@ export class ProgressShopController {
         ]),
         this.tab('gun', 'Пулемёт', [this.bulletsCard(score), this.mgDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score)]),
-        this.tab('artillery', 'Артиллерия', [this.artilleryCooldownCard(score)]),
-        this.tab('mines', 'Мина', [this.minesCooldownCard(score)]),
+        this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score)]),
+        this.tab('artillery', 'Артиллерия', [this.artilleryShellsCard(score), this.artilleryCooldownCard(score)]),
+        this.tab('mines', 'Мина', [this.minesCountCard(score), this.minesCooldownCard(score)]),
         this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
         this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
       ],
@@ -472,6 +519,54 @@ export class ProgressShopController {
     };
   }
 
+  private salvoRocketsCard(score: number): ProgressCardView {
+    const level = this.progress.salvoRockets;
+    const price = this.countPrice(level);
+    const now = RocketSalvo.rocketCount(level);
+    const next = RocketSalvo.rocketCount(level + 1);
+    const maxed = level >= RocketSalvo.maxRocketLevel;
+    return {
+      title: '+1 ракета',
+      buy: () => this.buySalvoRockets(),
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private artilleryShellsCard(score: number): ProgressCardView {
+    const level = this.progress.artilleryShells;
+    const price = this.countPrice(level);
+    const now = ArtilleryStrike.shellCount(level);
+    const next = ArtilleryStrike.shellCount(level + 1);
+    const maxed = level >= ArtilleryStrike.maxShellLevel;
+    return {
+      title: '+1 снаряд',
+      buy: () => this.buyArtilleryShells(),
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private minesCountCard(score: number): ProgressCardView {
+    const level = this.progress.minesCount;
+    const price = this.countPrice(level);
+    const now = Mines.mineCount(level);
+    const next = Mines.mineCount(level + 1);
+    const maxed = level >= Mines.maxMineLevel;
+    return {
+      title: '+1 мина',
+      buy: () => this.buyMinesCount(),
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private artilleryCooldownCard(score: number): ProgressCardView {
     const level = this.progress.artilleryCooldown;
     const price = this.artilleryCooldownPrice(level);
@@ -561,6 +656,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.pierceCost(level));
   }
 
+  private countPrice(level: number): number {
+    return shopPrice(ProgressSave.countCost(level));
+  }
+
   private artilleryCooldownPrice(level: number): number {
     return shopPrice(ProgressSave.cost(level));
   }
@@ -585,6 +684,9 @@ export class ProgressShopController {
     }
     if (stat === 'pierce') {
       return this.piercePrice(level);
+    }
+    if (stat === 'salvoRockets' || stat === 'artilleryShells' || stat === 'minesCount') {
+      return this.countPrice(level);
     }
     if (stat === 'artilleryCooldown') {
       return this.artilleryCooldownPrice(level);

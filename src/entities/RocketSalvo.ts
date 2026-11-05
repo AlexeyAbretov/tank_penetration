@@ -32,6 +32,26 @@ export class RocketSalvo extends GameObjects.Container {
     gapMs: 90,
   };
 
+  // Залп из магазина после проигрыша. Без покупок три ракеты, каждая покупка добавляет ещё одну.
+  static readonly rocketMax = 8;
+  static progressRocketLevel = 0;
+
+  static get maxRocketLevel(): number {
+    return RocketSalvo.rocketMax - RocketSalvo.shop.rockets;
+  }
+
+  static setProgressRocketLevel(level: number): void {
+    RocketSalvo.progressRocketLevel = Math.min(
+      RocketSalvo.maxRocketLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  static rocketCount(level = RocketSalvo.progressRocketLevel): number {
+    const extra = Math.max(0, Math.round(level));
+    return Math.min(RocketSalvo.rocketMax, RocketSalvo.shop.rockets + extra);
+  }
+
   // Скорость прямого участка, пикселей в миллисекунду. Длина — до края экрана.
   static readonly aimSpeed = 180 / 320;
 
@@ -113,11 +133,11 @@ export class RocketSalvo extends GameObjects.Container {
     }
   }
 
-  // Три точки с зазором, чтобы воронки не легли друг на друга.
+  // Точки с зазором, чтобы воронки не легли друг на друга.
   static impacts(): Point[] {
     const minGap = RocketSalvo.shop.blastRadius * 2;
     const points: Point[] = [];
-    for (let i = 0; i < RocketSalvo.shop.rockets; i += 1) {
+    for (let i = 0; i < RocketSalvo.rocketCount(); i += 1) {
       let point = RocketSalvo.randomPoint();
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const clear = points.every(
@@ -133,20 +153,21 @@ export class RocketSalvo extends GameObjects.Container {
     return points;
   }
 
-  // Три ракеты с короткой задержкой. Огонь вспыхивает в шахте, ракета выходит из носика.
+  // Ракеты с короткой задержкой. Шахт три: лишние выходят из тех же труб по кругу.
   // onImpact зовёт бой в точке падения: установка сама урон не считает.
   fire(targets: Point[], onImpact: (x: number, y: number) => void): void {
-    const count = Math.min(targets.length, RocketSalvo.layout.noses.length);
-    for (let i = 0; i < count; i += 1) {
+    const tubes = RocketSalvo.layout.noses.length;
+    for (let i = 0; i < targets.length; i += 1) {
       const target = targets[i];
+      const tube = i % tubes;
       const timer = this.scene.time.delayedCall(i * RocketSalvo.shop.gapMs, () => {
         const at = this.timers.indexOf(timer);
         if (at >= 0) {
           this.timers.splice(at, 1);
         }
-        this.flash(RocketSalvo.layout.holes[i], RocketSalvo.layout.noses[i]);
-        const from = this.worldOf(RocketSalvo.layout.noses[i]);
-        const back = this.worldOf(RocketSalvo.layout.holes[i]);
+        this.flash(RocketSalvo.layout.holes[tube], RocketSalvo.layout.noses[tube]);
+        const from = this.worldOf(RocketSalvo.layout.noses[tube]);
+        const back = this.worldOf(RocketSalvo.layout.holes[tube]);
         const flight = this.fly(from, target, RocketSalvo.aimOf(back, from), onImpact);
         this.flights.push(flight);
       });

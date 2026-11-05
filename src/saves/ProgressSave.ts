@@ -6,6 +6,7 @@ import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
+import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 
 const CAMPAIGN_KEY = 'tank-penetration-progress:v1';
@@ -36,6 +37,12 @@ export type SavedProgress = {
   mgDamage: number;
   // Сколько раз докуплен луч лазера. 0 — один луч, 2 — три. Цена — общая, 500 + 500 × уровень.
   laserShots: number;
+  // Сколько раз докуплена ракета РСЗО. 0 — три ракеты, 5 — восемь. Цена — 1000 + 1000 × уровень.
+  salvoRockets: number;
+  // Сколько раз докуплен снаряд артиллерии. 0 — три снаряда, 3 — шесть. Цена — 1000 + 1000 × уровень.
+  artilleryShells: number;
+  // Сколько раз докуплена мина. 0 — три мины, 3 — шесть. Цена — 1000 + 1000 × уровень.
+  minesCount: number;
   // Сколько раз укорочен откат артиллерии. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   artilleryCooldown: number;
   // Сколько раз укорочен откат мин. 0 — базовая минута. Прогресс сам останавливается на 40 с.
@@ -78,6 +85,13 @@ export class ProgressSave {
     return 300 + Math.max(0, level) * 300;
   }
 
+  // Первая лишняя ракета, снаряд или мина стоит 1000.
+  // Каждая следующая того же улучшения — на 1000 × уже купленный уровень дороже:
+  // 1000, 2000, 3000, …
+  static countCost(level: number): number {
+    return 1000 + Math.max(0, level) * 1000;
+  }
+
   load(): SavedProgress {
     if (this.current) {
       return this.current;
@@ -102,6 +116,9 @@ export class ProgressSave {
     progress.bullets = 0;
     progress.mgDamage = 0;
     progress.laserShots = 0;
+    progress.salvoRockets = 0;
+    progress.artilleryShells = 0;
+    progress.minesCount = 0;
     progress.artilleryCooldown = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
@@ -111,6 +128,9 @@ export class ProgressSave {
     Tank.setProgressBlastLevel(0);
     Tank.setProgressKnockbackLevel(0);
     Tank.setProgressPierceLevel(0);
+    RocketSalvo.setProgressRocketLevel(0);
+    ArtilleryStrike.setProgressShellLevel(0);
+    Mines.setProgressMineLevel(0);
     ArtilleryStrike.setProgressCooldownLevel(0);
     Mines.setProgressCooldownLevel(0);
     NuclearStrike.setProgressCooldownLevel(0);
@@ -146,6 +166,9 @@ export class ProgressSave {
       bullets: 0,
       mgDamage: 0,
       laserShots: 0,
+      salvoRockets: 0,
+      artilleryShells: 0,
+      minesCount: 0,
       artilleryCooldown: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
@@ -201,6 +224,10 @@ function parseProgress(value: unknown): SavedProgress | null {
     bullets: requiredInt(value.bullets, 0, MachineGun.maxBulletLevel) ?? 0,
     mgDamage: requiredInt(value.mgDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     laserShots: requiredInt(value.laserShots, 0, LaserDefense.maxShotLevel) ?? 0,
+    // Старые сохранения не писали число ракет, снарядов и мин: залп оставался базовым.
+    salvoRockets: requiredInt(value.salvoRockets, 0, RocketSalvo.maxRocketLevel) ?? 0,
+    artilleryShells: requiredInt(value.artilleryShells, 0, ArtilleryStrike.maxShellLevel) ?? 0,
+    minesCount: requiredInt(value.minesCount, 0, Mines.maxMineLevel) ?? 0,
     // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
     artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxProgressCooldownLevel) ?? 0,
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,

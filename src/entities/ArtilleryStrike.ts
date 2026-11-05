@@ -1,4 +1,4 @@
-// Артиллерийский удар: три снаряда в случайные точки поля.
+// Артиллерийский удар: снаряды в случайные точки поля.
 // Покупка в магазине открывает вызов по клавише 1 и по иконке на HUD. Сам залп считает CombatSystem.
 
 import Phaser from 'phaser';
@@ -37,6 +37,26 @@ export class ArtilleryStrike {
     // Пауза после конца хлопка, потом снаряды начинают падать.
     afterShotMs: 0,
   };
+
+  // Залп из магазина после проигрыша. Без покупок три снаряда, каждая покупка добавляет ещё один.
+  static readonly shellMax = 6;
+  static progressShellLevel = 0;
+
+  static get maxShellLevel(): number {
+    return ArtilleryStrike.shellMax - ArtilleryStrike.shop.shells;
+  }
+
+  static setProgressShellLevel(level: number): void {
+    ArtilleryStrike.progressShellLevel = Math.min(
+      ArtilleryStrike.maxShellLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  static shellCount(level = ArtilleryStrike.progressShellLevel): number {
+    const extra = Math.max(0, Math.round(level));
+    return Math.min(ArtilleryStrike.shellMax, ArtilleryStrike.shop.shells + extra);
+  }
 
   // Вместе с магазином очков откат не короче 20 с. У каждого магазина свой запас в 20 с, шаг — 1 с.
   static readonly minCooldownMs = 20_000;
@@ -125,12 +145,12 @@ export class ArtilleryStrike {
     }
   }
 
-  // Три точки с зазором, чтобы воронки не легли друг на друга.
+  // Точки с зазором, чтобы воронки не легли друг на друга.
   // minX приходит снаружи: артиллерия не знает, где стоит проволока.
   static impacts(minX: number): { x: number; y: number }[] {
     const minGap = ArtilleryStrike.shop.blastRadius * 2;
     const points: { x: number; y: number }[] = [];
-    for (let i = 0; i < ArtilleryStrike.shop.shells; i += 1) {
+    for (let i = 0; i < ArtilleryStrike.shellCount(); i += 1) {
       let point = ArtilleryStrike.randomPoint(minX);
       for (let attempt = 0; attempt < 10; attempt += 1) {
         const clear = points.every(

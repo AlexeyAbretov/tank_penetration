@@ -8,6 +8,7 @@ import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
+import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
 import { boom } from '../gfx/boom';
@@ -170,6 +171,9 @@ export class GameScene extends Phaser.Scene {
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
     Tank.setProgressPierceLevel(this.progressShop.pierceBonus());
+    RocketSalvo.setProgressRocketLevel(this.progressShop.salvoRocketLevel());
+    ArtilleryStrike.setProgressShellLevel(this.progressShop.artilleryShellLevel());
+    Mines.setProgressMineLevel(this.progressShop.minesCountLevel());
     ArtilleryStrike.setProgressCooldownLevel(this.progressShop.artilleryCooldownLevel());
     Mines.setProgressCooldownLevel(this.progressShop.minesCooldownLevel());
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());

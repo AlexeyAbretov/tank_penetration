@@ -839,6 +839,12 @@ export class ShopController {
     this.refresh();
   }
 
+  // 3 и 4 — «ракеты», с пяти — «ракет».
+  private rocketLabel(count: number): string {
+    const word = count % 10 >= 2 && count % 10 <= 4 ? 'ракеты' : 'ракет';
+    return `${count} ${word}`;
+  }
+
   private gearCard(id: GearId, coins: number): ShopCardView {
     switch (id) {
       case 'wire':
@@ -898,7 +904,7 @@ export class ShopController {
           coins,
           this.salvoOwned,
           shopPrice(RocketSalvo.shop.cost),
-          `3 ракеты / ${RocketSalvo.shop.fireIntervalMs / 1000} с`,
+          `${this.rocketLabel(RocketSalvo.rocketCount())} / ${RocketSalvo.shop.fireIntervalMs / 1000} с`,
           'залп по полю',
         );
       case 'artillery':
@@ -1028,7 +1034,7 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyArtillery(),
-      info: `${offer.shells}×${offer.damage} · откат ${reload}`,
+      info: `${ArtilleryStrike.shellCount()}×${offer.damage} · откат ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
@@ -1085,7 +1091,7 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyMines(),
-      info: `${offer.count}×${offer.damage} · откат ${reload}`,
+      info: `${Mines.mineCount()}×${offer.damage} · откат ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,

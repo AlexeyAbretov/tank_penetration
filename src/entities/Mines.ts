@@ -1,4 +1,4 @@
-// Мины: три заряда в случайные точки поля.
+// Мины: заряды в случайные точки поля.
 // Покупка в магазине открывает вызов по клавише 2 и по иконке на HUD.
 // Расстановку и подрыв считает CombatSystem. Заряд лежит, пока на него не наступит пехота.
 
@@ -128,6 +128,23 @@ export class Mines {
     gap: 84,
   };
 
+  // Постановка из магазина после проигрыша. Без покупок три мины, каждая покупка добавляет ещё одну.
+  static readonly mineMax = 6;
+  static progressMineLevel = 0;
+
+  static get maxMineLevel(): number {
+    return Mines.mineMax - Mines.shop.count;
+  }
+
+  static setProgressMineLevel(level: number): void {
+    Mines.progressMineLevel = Math.min(Mines.maxMineLevel, Math.max(0, Math.round(level)));
+  }
+
+  static mineCount(level = Mines.progressMineLevel): number {
+    const extra = Math.max(0, Math.round(level));
+    return Math.min(Mines.mineMax, Mines.shop.count + extra);
+  }
+
   // Вместе с магазином очков откат не короче 20 с. У каждого магазина свой запас в 20 с, шаг — 1 с.
   static readonly minCooldownMs = 20_000;
   static readonly cooldownStepMs = 1_000;
@@ -220,7 +237,7 @@ export class Mines {
     }
   }
 
-  // До трёх точек. Занятые места и переданные запреты пропускаются.
+  // До купленного числа точек. Занятые места и переданные запреты пропускаются.
   // Пустой список — на поле некуда поставить даже одну мину.
   static spots(
     keepOut: MineKeepOut[],
@@ -228,7 +245,7 @@ export class Mines {
   ): { x: number; y: number }[] {
     const taken = occupied.slice();
     const points: { x: number; y: number }[] = [];
-    for (let i = 0; i < Mines.shop.count; i += 1) {
+    for (let i = 0; i < Mines.mineCount(); i += 1) {
       const point = Mines.findSpot(keepOut, taken);
       if (!point) {
         break;
