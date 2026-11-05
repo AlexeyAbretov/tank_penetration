@@ -2,6 +2,7 @@
 // Пока файла нет, кнопка рисуется кругом. Готовая картинка — public/assets/auto-aim-icon.png.
 
 import Phaser from 'phaser';
+import { paintSkillDisc } from '../gfx/skillDisc';
 import { bake } from '../gfx/textures';
 
 export class AutoAim {
@@ -19,12 +20,7 @@ export class AutoAim {
 
   // Запасной круг: золотой обод и перекрестие. Файл, если загрузился, этот рисунок не вызывает.
   private static renderIcon(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x2a0c0c);
-    g.fillCircle(32, 32, AutoAim.iconRadius);
-    g.fillStyle(0x5a1210);
-    g.fillCircle(32, 32, 26);
-    g.lineStyle(3, 0xf0d56a, 1);
-    g.strokeCircle(32, 32, 28);
+    paintSkillDisc(g, 32, 32, AutoAim.iconRadius);
     g.lineStyle(2, 0xf0d56a, 1);
     g.strokeCircle(32, 32, 10);
     g.beginPath();

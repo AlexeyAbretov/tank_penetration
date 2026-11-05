@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { AutoAim } from '../entities/AutoAim';
+import { AutoFire } from '../entities/AutoFire';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -168,11 +169,6 @@ export class GameScene extends Phaser.Scene {
     this.persistEnabled = false;
     this.autosaveMs = 0;
     this.defeatShop = false;
-    this.progressShop.bind(this, () => {
-      // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
-      this.persistEnabled = false;
-      this.scene.restart();
-    });
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
     Tank.setProgressFlightLevel(this.progressShop.flightLevel());
     MachineGun.setProgressSpeedLevel(this.progressShop.mgSpeedLevel());
@@ -222,6 +218,11 @@ export class GameScene extends Phaser.Scene {
         iconRadius: NuclearStrike.iconRadius,
       },
     ]);
+    this.progressShop.bind(this, () => {
+      // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
+      this.persistEnabled = false;
+      this.scene.restart();
+    }, this.hud);
     this.hud.setHaste(1);
     this.hud.onHasteCycle(() => {
       if (!this.pauses.blocking && !this.defeatShop) {
@@ -233,8 +234,10 @@ export class GameScene extends Phaser.Scene {
       if (this.blocksPlay()) {
         return;
       }
-      this.shop.toggleAutoFire();
+      this.progressShop.toggleAutoFire();
+      this.paintAutoFire();
     });
+    this.hud.installAutoFire(AutoFire.iconKey);
     this.hud.installAutoAim(AutoAim.iconKey);
     this.hud.onAutoAim(() => {
       if (this.blocksPlay()) {
@@ -392,6 +395,8 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.applyCameraFx();
+    // Автострельба живёт в прогрессе. Надпись и бой читают её до разбора партии.
+    this.paintAutoFire();
     // load читает localStorage. Пустое сохранение начинает волну 1.
     // Если игрок закрыл вкладку на «БАЗА РАЗБИТА», continueRun откроет магазин очков.
     this.continueRun(this.combatSave.load());
@@ -499,6 +504,7 @@ export class GameScene extends Phaser.Scene {
       NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel),
     );
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
+    this.paintAutoFire();
     if (!fighting) {
       return;
     }
@@ -524,6 +530,14 @@ export class GameScene extends Phaser.Scene {
     this.projectiles.tick();
     this.waves.tick();
     this.touchAutosave(delta);
+  }
+
+  // Иконка справа и выстрел без ЛКМ читают одну и ту же покупку прогресса.
+  // Слово в строке над полем пишет сам магазин очков.
+  private paintAutoFire(): void {
+    const enabled = this.progressShop.autoFireEnabled();
+    this.hud.setAutoFireToggle(this.progressShop.autoFireOwned(), enabled);
+    this.combat.setAutoFire(enabled);
   }
 
   // Ранний выход из update не останавливает физику, таймеры, твины и анимации.

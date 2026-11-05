@@ -20,6 +20,8 @@ export type ProgressCardView = {
   cost: string;
   // false — скорость, пули или лучи уже на пределе, клик не покупает.
   open: boolean;
+  // Галочка вместо цены. Ставят только разовые покупки.
+  owned?: boolean;
   canBuy: boolean;
   buy: () => void;
 };
@@ -71,6 +73,7 @@ type Offer = {
   title: Phaser.GameObjects.Text;
   info: Phaser.GameObjects.Text;
   cost: Phaser.GameObjects.Text;
+  mark: Phaser.GameObjects.Graphics;
   buy: () => void;
   open: boolean;
 };
@@ -270,7 +273,7 @@ export class ProgressShopPanel {
       this.offers.push(offer);
       // Кнопки «Новая игра» и «В бой» остаются поверх карточек.
       const at = Math.max(0, this.container.length - 2);
-      const nodes = [offer.card, offer.title, offer.info, offer.cost];
+      const nodes = [offer.card, offer.title, offer.info, offer.cost, offer.mark];
       nodes.forEach((node, index) => this.container.addAt(node, at + index));
     }
   }
@@ -293,6 +296,7 @@ export class ProgressShopPanel {
       offer.info.setPosition(x, y + 4);
       offer.info.setWordWrapWidth(cardW - 16);
       offer.cost.setPosition(x, y + CARD_H / 2 - 10);
+      offer.mark.setPosition(x - cardW / 2 + 28, y + CARD_H / 2 - 26);
     }
   }
 
@@ -302,6 +306,7 @@ export class ProgressShopPanel {
     offer.info.setVisible(shown);
     offer.cost.setVisible(shown);
     if (!shown) {
+      offer.mark.setVisible(false);
       offer.card.disableInteractive();
       return;
     }
@@ -332,7 +337,9 @@ export class ProgressShopPanel {
         align: 'center',
       })
       .setOrigin(0.5, 1);
-    const offer: Offer = { card, title, info, cost, buy: () => undefined, open: false };
+    const mark = scene.add.graphics().setPosition(CARD_X - CARD_W / 2 + 28, y + CARD_H / 2 - 26);
+    paintOwnedMark(mark);
+    const offer: Offer = { card, title, info, cost, mark, buy: () => undefined, open: false };
     card.on('pointerup', () => {
       if (this.blocked() || !offer.open) {
         return;
@@ -353,6 +360,8 @@ export class ProgressShopPanel {
     offer.title.setText(card.title);
     offer.info.setText(card.info);
     offer.cost.setText(card.cost);
+    offer.cost.setVisible(!card.owned);
+    offer.mark.setVisible(card.owned === true);
     if (offer.card.input) {
       offer.card.input.cursor = card.open ? 'pointer' : 'default';
     }
@@ -403,4 +412,19 @@ export class ProgressShopPanel {
     });
     zone.on('pointerup', fire);
   }
+}
+
+// Тот же знак, что у купленной вещи в магазине волны.
+function paintOwnedMark(g: Phaser.GameObjects.Graphics): void {
+  g.clear();
+  g.fillStyle(0x1a2214, 1);
+  g.fillCircle(0, 0, 14);
+  g.lineStyle(2, BRASS, 1);
+  g.strokeCircle(0, 0, 14);
+  g.lineStyle(3, BRASS, 1);
+  g.beginPath();
+  g.moveTo(-7, 1);
+  g.lineTo(-2, 6);
+  g.lineTo(8, -6);
+  g.strokePath();
 }

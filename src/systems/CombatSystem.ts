@@ -104,6 +104,8 @@ export class CombatSystem implements Combat {
   private nuclearCloudUntil = 0;
   // Кого башня держит при автонаведении. Ближний новичок не перебивает, пока этот жив.
   private aimLock: Infantry | null = null;
+  // Сцена ставит из прогресса. Куплено и включено — танк стреляет без левой кнопки.
+  protected autoFire = false;
 
   constructor(
     protected readonly scene: Phaser.Scene,
@@ -292,9 +294,13 @@ export class CombatSystem implements Combat {
     }
   }
 
-  // ЛКМ и автострельба — здесь, чтобы сцена не знала про покупки магазина.
+  setAutoFire(on: boolean): void {
+    this.autoFire = on;
+  }
+
+  // ЛКМ и автострельба. Флаг прогресса сцена уже положила в setAutoFire.
   protected handleFireInput(pointer: Phaser.Input.Pointer): void {
-    if (this.shop.autoFire.enabled || pointer.leftButtonDown()) {
+    if (this.autoFire || pointer.leftButtonDown()) {
       this.shoot();
     }
   }

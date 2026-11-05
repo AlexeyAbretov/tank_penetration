@@ -4,9 +4,8 @@ import { GameHud, type HudAbility, type HudFrame } from './GameHud';
 
 export class DebugGameHud extends GameHud {
   private readonly debugLabel: Phaser.GameObjects.Text;
-  private readonly enemyDamagePlate: Phaser.GameObjects.Rectangle;
-  private readonly enemyDamageFace: Phaser.GameObjects.Graphics;
-  private readonly enemyDamageIcon: Phaser.GameObjects.Graphics;
+  private readonly enemyDamageRoot: Phaser.GameObjects.Container;
+  private readonly enemyDamageGlow: Phaser.GameObjects.Image;
 
   // Дебаг-клавиши только в окне списка. Верхняя плашка остаётся статусом партии.
   protected override controlHints(): readonly string[] {
@@ -17,7 +16,7 @@ export class DebugGameHud extends GameHud {
       'A — ещё юнит',
       'N — пропуск волны',
       'F — проигрыш',
-      'пуля — урон врагов',
+      'иконка слева — урон врагов',
     ];
   }
 
@@ -47,49 +46,27 @@ export class DebugGameHud extends GameHud {
       scene.events.off('quiet-pause', onQuietPause);
     });
 
-    // Сразу левее автострельбы. Та же глубина: между волнами плашка остаётся над магазином.
-    const x = this.plateLeftOf(this.autoFireX);
-    this.enemyDamagePlate = scene.add
-      .rectangle(x, this.plateY, this.plateSize, this.plateSize, 0x000000, 0)
-      .setDepth(80)
-      .setInteractive({ useHandCursor: true });
-    this.enemyDamageFace = scene.add.graphics().setPosition(x, this.plateY).setDepth(80);
-    this.drawMetalPlate(this.enemyDamageFace);
-    this.enemyDamageIcon = scene.add.graphics().setPosition(x, this.plateY).setDepth(81);
-    this.paintEnemyDamage(EnemyDamage.isEnabled);
-    this.enemyDamagePlate.on('pointerup', () => {
-      this.paintEnemyDamage(EnemyDamage.toggle());
+    // Сразу левее автострельбы. Та же глубина: магазин волны накрывает круг, как магазин очков.
+    EnemyDamage.ensureTextures(scene);
+    const icon = this.bindRoundIcon(EnemyDamage.iconKey, 2, 53);
+    this.enemyDamageRoot = icon.root;
+    this.enemyDamageGlow = icon.glow;
+    this.showRoundToggle(icon.root, icon.glow, true, EnemyDamage.isEnabled);
+    icon.root.on('pointerup', () => {
+      this.showRoundToggle(this.enemyDamageRoot, this.enemyDamageGlow, true, EnemyDamage.toggle());
     });
   }
 
   override layout(): void {
     super.layout();
-    const x = this.plateLeftOf(this.autoFireX);
-    this.enemyDamagePlate.setPosition(x, this.plateY);
-    this.enemyDamageFace.setPosition(x, this.plateY);
-    this.enemyDamageIcon.setPosition(x, this.plateY);
+    this.enemyDamageRoot.setPosition(this.edgeIconX(2), this.frame.bannerY - 48);
     this.debugLabel.setX(this.frame.width / 2);
   }
 
   override coversEnemyDamage(pointer: Phaser.Input.Pointer): boolean {
-    return this.enemyDamagePlate.getBounds().contains(pointer.worldX, pointer.worldY);
-  }
-
-  private paintEnemyDamage(on: boolean): void {
-    this.drawEnemyDamage(on);
-  }
-
-  // Толстый борт справа и короткая пуля слева. Тонкая стрелка читалась как «дальше».
-  // Тусклые, пока урон выключен.
-  private drawEnemyDamage(on: boolean): void {
-    const g = this.enemyDamageIcon;
-    g.clear();
-    const color = on ? 0xf0d56a : 0x6e5840;
-    g.fillStyle(color, 1);
-    g.fillRect(6, -11, 5, 22);
-    g.fillRect(-12, -1, 8, 2);
-    g.fillTriangle(-4, -3, -4, 3, 3, 0);
-    g.fillRect(3, -7, 2, 4);
-    g.fillRect(3, 3, 2, 4);
+    return (
+      this.enemyDamageRoot.visible &&
+      this.enemyDamageRoot.getBounds().contains(pointer.worldX, pointer.worldY)
+    );
   }
 }

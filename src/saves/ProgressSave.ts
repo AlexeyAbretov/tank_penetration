@@ -63,6 +63,10 @@ export type SavedProgress = {
   minesCooldown: number;
   // Сколько раз укорочен откат атомного взрыва. 0 — базовые 3 минуты. Прогресс сам останавливается на 2:30.
   nuclearCooldown: number;
+  // Куплена ли автострельба. Танк стреляет сам, пока включена иконка справа.
+  autoFire: boolean;
+  // Выключатель уже купленной автострельбы. Пока false, танк ждёт левую кнопку.
+  autoFireOn: boolean;
   // Куплено ли автонаведение. Башня сама держит одну цель, пока та жива.
   autoAim: boolean;
   // Выключатель уже купленного автонаведения. Пока false, башню ведёт курсор.
@@ -101,6 +105,11 @@ export class ProgressSave {
   // 300, 600, 900, …
   static pierceCost(level: number): number {
     return 300 + Math.max(0, level) * 300;
+  }
+
+  // Одна покупка. Танк стреляет сам, пока включена иконка справа.
+  static autoFireCost(): number {
+    return 5_000;
   }
 
   // Одна покупка. Башня сама держит ближайшего врага и не бросает его, пока он жив.
@@ -157,6 +166,8 @@ export class ProgressSave {
     progress.artilleryCooldown = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
+    progress.autoFire = false;
+    progress.autoFireOn = false;
     progress.autoAim = false;
     progress.autoAimOn = false;
     this.save(progress);
@@ -190,7 +201,7 @@ export class ProgressSave {
     return CAMPAIGN_KEY;
   }
 
-  private empty(): SavedProgress {
+  protected empty(): SavedProgress {
     return {
       version: 1,
       score: 0,
@@ -219,6 +230,8 @@ export class ProgressSave {
       artilleryCooldown: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
+      autoFire: false,
+      autoFireOn: false,
       autoAim: false,
       autoAimOn: false,
     };
@@ -293,6 +306,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали откат атомного взрыва: бомба ждала базовые 3 минуты.
     nuclearCooldown: requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxProgressCooldownLevel) ?? 0,
+    // Старые сохранения не писали автострельбу: она жила в партии и умирала с базой.
+    autoFire: value.autoFire === true,
+    autoFireOn: value.autoFire === true && value.autoFireOn !== false,
     // Старые сохранения не писали автонаведение: башню вёл курсор.
     autoAim: value.autoAim === true,
     autoAimOn: value.autoAim === true && value.autoAimOn !== false,

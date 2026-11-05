@@ -74,6 +74,18 @@ export class GameHud {
   private readonly waveText: Phaser.GameObjects.Text;
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly tankStatsText: Phaser.GameObjects.Text;
+  // Числа строки над полем. Слово «авто» или «ЛКМ» к ним дописывает магазин очков.
+  private tankStats = {
+    damage: 0,
+    blastRadius: 0,
+    pierceChance: 0,
+    fireDelayMs: 0,
+    flightMs: 0,
+    coinBonus: 0,
+    pointBonus: 0,
+  };
+  private tankStatsReady = false;
+  private autoFireMode = false;
   private readonly banner: Phaser.GameObjects.TileSprite;
   private readonly title: Phaser.GameObjects.Text;
   private readonly hpFrame: Phaser.GameObjects.Image;
@@ -102,9 +114,6 @@ export class GameHud {
   private readonly settingsPlate: Phaser.GameObjects.Rectangle;
   private readonly settingsFace: Phaser.GameObjects.Graphics;
   private readonly settingsGear: Phaser.GameObjects.Graphics;
-  private readonly autoFirePlate: Phaser.GameObjects.Rectangle;
-  private readonly autoFireFace: Phaser.GameObjects.Graphics;
-  private readonly autoFireIcon: Phaser.GameObjects.Graphics;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
   private readonly pauseDim: Phaser.GameObjects.Rectangle;
   protected readonly frame: HudFrame;
@@ -114,6 +123,9 @@ export class GameHud {
   private resumeRequest?: () => void;
   private settingsRequest?: () => void;
   private autoFireRequest?: () => void;
+  private autoFireRoot?: Phaser.GameObjects.Container;
+  private autoFireGlow?: Phaser.GameObjects.Image;
+  private autoFireOwned = false;
   private autoAimRoot?: Phaser.GameObjects.Container;
   private autoAimGlow?: Phaser.GameObjects.Image;
   private autoAimOwned = false;
@@ -121,11 +133,10 @@ export class GameHud {
   private newGameRequest?: () => void;
 
   protected readonly statusY = 28;
-  // Ряд плашек у полоски HP. Дебаг ставит свою левее автострельбы тем же шагом.
+  // Ряд плашек у полоски HP.
   protected readonly plateSize = 40;
   protected readonly plateGap = 6;
   protected readonly plateY = 28;
-  protected autoFireX = 0;
   protected readonly statusStyle = {
     fontSize: '18px',
     stroke: '#2a0a08',
@@ -196,7 +207,6 @@ export class GameHud {
     const hasteX = hpLeft - 8 - icon / 2;
     const pauseX = hasteX - this.plateGap - icon;
     const settingsX = pauseX - this.plateGap - icon;
-    this.autoFireX = settingsX - this.plateGap - icon;
     const iconY = this.plateY;
 
     this.hastePlate = scene.add
@@ -225,7 +235,7 @@ export class GameHud {
     });
 
     // Выше магазина (глубина 70), но ниже окна настроек (88), паузы (90) и экрана поражения (85).
-    // Иначе шестерёнка и кнопка автострельбы пропадают под затемнением между волнами.
+    // Иначе шестерёнка пропадает под затемнением между волнами.
     this.settingsPlate = scene.add
       .rectangle(settingsX, iconY, icon, icon, 0x000000, 0)
       .setDepth(80)
@@ -238,17 +248,6 @@ export class GameHud {
       this.setKeysOpen(false);
       this.settingsRequest?.();
     });
-
-    // Пока автострельба не куплена, плашка не ловит клики: иначе пустое место гасило бы выстрел.
-    this.autoFirePlate = scene.add
-      .rectangle(this.autoFireX, iconY, icon, icon, 0x000000, 0)
-      .setDepth(80)
-      .setVisible(false);
-    this.autoFireFace = scene.add.graphics().setPosition(this.autoFireX, iconY).setDepth(80).setVisible(false);
-    this.drawMetalPlate(this.autoFireFace);
-    this.autoFireIcon = scene.add.graphics().setPosition(this.autoFireX, iconY).setDepth(81).setVisible(false);
-    this.drawAutoFire(false);
-    this.autoFirePlate.on('pointerup', () => this.autoFireRequest?.());
 
     // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
     this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
@@ -370,7 +369,6 @@ export class GameHud {
     const hasteX = hpLeft - 8 - icon / 2;
     const pauseX = hasteX - this.plateGap - icon;
     const settingsX = pauseX - this.plateGap - icon;
-    this.autoFireX = settingsX - this.plateGap - icon;
     const y = this.plateY;
 
     // setSize удлиняет ленту. setDisplaySize растянул бы саму плитку.
@@ -388,11 +386,9 @@ export class GameHud {
     this.settingsPlate.setPosition(settingsX, y);
     this.settingsFace.setPosition(settingsX, y);
     this.settingsGear.setPosition(settingsX, y);
-    this.autoFirePlate.setPosition(this.autoFireX, y);
-    this.autoFireFace.setPosition(this.autoFireX, y);
-    this.autoFireIcon.setPosition(this.autoFireX, y);
-    // Тот же ряд, что у способностей, но у правого края. Широкое окно сдвигает его вместе с полем.
-    this.autoAimRoot?.setPosition(width - 56, this.frame.bannerY - 48);
+    // Тот же ряд, что у способностей, у правого края. Широкое окно сдвигает его вместе с полем.
+    this.autoFireRoot?.setPosition(this.edgeIconX(1), this.frame.bannerY - 48);
+    this.autoAimRoot?.setPosition(this.edgeIconX(0), this.frame.bannerY - 48);
 
     this.hpFrame.setPosition(hpCenter, 28);
     this.hpTrack.setPosition(barLeft, 28);
@@ -436,17 +432,31 @@ export class GameHud {
     pierceChance: number,
     fireDelayMs: number,
     flightMs: number,
-    autoFire = false,
     coinBonus = 0,
     pointBonus = 0,
   ): void {
-    const fireSec = (fireDelayMs / 1000).toFixed(2);
-    const flightSec = (flightMs / 1000).toFixed(2);
-    const mode = autoFire ? 'авто' : 'ЛКМ';
-    const coins = coinBonus > 0 ? `   МОНЕТЫ +${coinBonus}` : '';
-    const points = pointBonus > 0 ? `   ОЧКИ +${pointBonus}` : '';
+    this.tankStats = { damage, blastRadius, pierceChance, fireDelayMs, flightMs, coinBonus, pointBonus };
+    this.tankStatsReady = true;
+    this.paintTankStats();
+  }
+
+  // «авто» или «ЛКМ». Магазин очков знает выключатель, магазин волны — нет.
+  setAutoFireMode(on: boolean): void {
+    this.autoFireMode = on;
+    if (this.tankStatsReady) {
+      this.paintTankStats();
+    }
+  }
+
+  private paintTankStats(): void {
+    const stats = this.tankStats;
+    const fireSec = (stats.fireDelayMs / 1000).toFixed(2);
+    const flightSec = (stats.flightMs / 1000).toFixed(2);
+    const mode = this.autoFireMode ? 'авто' : 'ЛКМ';
+    const coins = stats.coinBonus > 0 ? `   МОНЕТЫ +${stats.coinBonus}` : '';
+    const points = stats.pointBonus > 0 ? `   ОЧКИ +${stats.pointBonus}` : '';
     this.tankStatsText.setText(
-      `УРОН  ${damage}   ВЗРЫВ  ${blastRadius}   ПРОБИВ  ${pierceChance}%   ОГОНЬ  ${fireSec} с   ПОЛЁТ  ${flightSec} с${coins}${points}   ${mode}`,
+      `УРОН  ${stats.damage}   ВЗРЫВ  ${stats.blastRadius}   ПРОБИВ  ${stats.pierceChance}%   ОГОНЬ  ${fireSec} с   ПОЛЁТ  ${flightSec} с${coins}${points}   ${mode}`,
     );
   }
 
@@ -470,12 +480,35 @@ export class GameHud {
     this.autoFireRequest = request;
   }
 
-  // Картинка уже прогрета. Ряд способностей слева, эта кнопка — на той же высоте справа.
-  // Глубина как у автострельбы: магазин волны накрывает иконки ударов, выключатель остаётся.
+  // Картинка уже прогрета. Слева от автонаведения, на той же высоте, что способности.
+  // Глубина как у ударов: магазин волны её накрывает. Автонаведение остаётся выше, оно у края экрана.
+  installAutoFire(texture: string): void {
+    if (this.autoFireRoot) {
+      return;
+    }
+    const icon = this.bindRoundIcon(texture, 1, 53);
+    icon.root.on('pointerup', () => this.autoFireRequest?.());
+    this.autoFireRoot = icon.root;
+    this.autoFireGlow = icon.glow;
+  }
+
+  // Картинка уже прогрета. Крайняя справа на ряду способностей.
   installAutoAim(texture: string): void {
     if (this.autoAimRoot) {
       return;
     }
+    const icon = this.bindRoundIcon(texture, 0, 53);
+    icon.root.on('pointerup', () => this.autoAimRequest?.());
+    this.autoAimRoot = icon.root;
+    this.autoAimGlow = icon.glow;
+  }
+
+  // Круг навыка: картинка и её светлая копия. fromRight 0 — у правого края.
+  // 53 прячется под магазин волны (70). 80 остаётся над ним.
+  protected bindRoundIcon(texture: string, fromRight: number, depth = 80): {
+    root: Phaser.GameObjects.Container;
+    glow: Phaser.GameObjects.Image;
+  } {
     const scene = this.scoreText.scene;
     const glyph = scene.add.image(0, 0, texture);
     const glow = scene.add
@@ -484,12 +517,15 @@ export class GameHud {
       .setAlpha(0.5)
       .setVisible(false);
     const root = scene.add
-      .container(this.frame.width - 56, this.frame.bannerY - 48, [glyph, glow])
-      .setDepth(80)
+      .container(this.edgeIconX(fromRight), this.frame.bannerY - 48, [glyph, glow])
+      .setDepth(depth)
       .setVisible(false);
-    root.on('pointerup', () => this.autoAimRequest?.());
-    this.autoAimRoot = root;
-    this.autoAimGlow = glow;
+    return { root, glow };
+  }
+
+  // Шаг 88 — как у иконок ударов слева. 0 стоит у правого края.
+  protected edgeIconX(fromRight: number): number {
+    return this.frame.width - 56 - fromRight * 88;
   }
 
   onAutoAim(request: () => void): void {
@@ -498,14 +534,38 @@ export class GameHud {
 
   // Скрытая кнопка не занимает место: до покупки курсор над ней всё ещё стреляет.
   setAutoAimToggle(owned: boolean, enabled: boolean): void {
-    const root = this.autoAimRoot;
-    const glow = this.autoAimGlow;
-    if (!root || !glow) {
-      return;
-    }
     if (this.autoAimOwned !== owned) {
       this.autoAimOwned = owned;
       this.syncControls();
+    }
+    this.showRoundToggle(this.autoAimRoot, this.autoAimGlow, owned, enabled);
+  }
+
+  onAbility(id: string, request: () => void): void {
+    const icon = this.ability(id);
+    if (icon) {
+      icon.request = request;
+    }
+  }
+
+  // Кнопка появляется после покупки. Тусклая, пока режим выключен, и светится, когда включён.
+  setAutoFireToggle(owned: boolean, enabled: boolean): void {
+    if (this.autoFireOwned !== owned) {
+      this.autoFireOwned = owned;
+      this.syncControls();
+    }
+    this.showRoundToggle(this.autoFireRoot, this.autoFireGlow, owned, enabled);
+  }
+
+  // До покупки круга нет. Выключенный режим остаётся на месте, но гаснет.
+  protected showRoundToggle(
+    root: Phaser.GameObjects.Container | undefined,
+    glow: Phaser.GameObjects.Image | undefined,
+    owned: boolean,
+    enabled: boolean,
+  ): void {
+    if (!root || !glow) {
+      return;
     }
     root.setVisible(owned);
     if (!owned) {
@@ -523,30 +583,6 @@ export class GameHud {
     }
     root.setAlpha(enabled ? 1 : 0.45);
     glow.setVisible(enabled);
-  }
-
-  onAbility(id: string, request: () => void): void {
-    const icon = this.ability(id);
-    if (icon) {
-      icon.request = request;
-    }
-  }
-
-  // Кнопка появляется после покупки. Очередь яркая, когда режим включён.
-  setAutoFireToggle(owned: boolean, enabled: boolean): void {
-    this.autoFirePlate.setVisible(owned);
-    this.autoFireFace.setVisible(owned);
-    this.autoFireIcon.setVisible(owned);
-    if (!owned) {
-      if (this.autoFirePlate.input?.enabled) {
-        this.autoFirePlate.disableInteractive();
-      }
-      return;
-    }
-    if (!this.autoFirePlate.input?.enabled) {
-      this.autoFirePlate.setInteractive({ useHandCursor: true });
-    }
-    this.drawAutoFire(enabled);
   }
 
   onNewGame(request: () => void): void {
@@ -631,11 +667,10 @@ export class GameHud {
     return this.settingsPlate.getBounds().contains(pointer.worldX, pointer.worldY);
   }
 
-  // Скрытая кнопка не занимает место: до покупки курсор над ней всё ещё стреляет.
+  // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
   coversAutoFire(pointer: Phaser.Input.Pointer): boolean {
-    return (
-      this.autoFirePlate.visible && this.autoFirePlate.getBounds().contains(pointer.worldX, pointer.worldY)
-    );
+    const root = this.autoFireRoot;
+    return !!root && root.visible && root.getBounds().contains(pointer.worldX, pointer.worldY);
   }
 
   // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
@@ -644,14 +679,9 @@ export class GameHud {
     return !!root && root.visible && root.getBounds().contains(pointer.worldX, pointer.worldY);
   }
 
-  // В обычной партии плашки нет. Дебаг перекрывает клик своей кнопкой урона.
+  // В обычной партии круга нет. Дебаг перекрывает клик своей иконкой урона.
   coversEnemyDamage(_pointer: Phaser.Input.Pointer): boolean {
     return false;
-  }
-
-  // Та же плашка, на один шаг левее. Дебаг ставит так выключатель урона.
-  protected plateLeftOf(x: number): number {
-    return x - this.plateGap - this.plateSize;
   }
 
   // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
@@ -709,8 +739,11 @@ export class GameHud {
   // Строки окна. Купленная способность дописывает свою, пока её нет — в списке её нет.
   protected controlHints(): readonly string[] {
     const hints = ['мышь — прицел', 'ЛКМ — огонь', '+ — темп', 'Esc — пауза', 'шестерёнка — звук'];
+    if (this.autoFireOwned) {
+      hints.push('иконка справа — автострельба');
+    }
     if (this.autoAimOwned) {
-      hints.push('иконка справа — автонаведение');
+      hints.push('иконка у края — автонаведение');
     }
     for (const icon of this.abilities) {
       if (icon.owned) {
@@ -884,23 +917,6 @@ export class GameHud {
     }
     icon.sweep.slice(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio, false);
     icon.sweep.fillPath();
-  }
-
-  // Ствол справа и три трассы влево — очередь в сторону врагов. Тусклые, пока режим выключен.
-  private drawAutoFire(on: boolean): void {
-    const g = this.autoFireIcon;
-    g.clear();
-    const color = on ? 0xf0d56a : 0x6e5840;
-    g.fillStyle(color, 1);
-    g.fillRect(6, -8, 3, 16);
-    const traces: ReadonlyArray<readonly [number, number]> = [
-      [-7, 6],
-      [0, 12],
-      [7, 6],
-    ];
-    for (const [y, length] of traces) {
-      g.fillRect(6 - length, y - 1, length, 2);
-    }
   }
 
   // Та же пластина, что у кнопки клавиш: тёмный металл, толстая латунь, пробоины по углам.

@@ -26,6 +26,8 @@ export type CombatSystem = {
   tickMines(delta: number, canFire: boolean): void;
   tickNuclear(delta: number, canFire: boolean): void;
   tick(delta: number, allowFire?: boolean): void;
+  // Сцена приносит флаг прогресса: бой магазин очков не читает.
+  setAutoFire(on: boolean): void;
   // Точка живой цели автонаведения. Та же, пока она не погибла. null — на поле никого.
   aimPoint(): WorldPoint | null;
 };

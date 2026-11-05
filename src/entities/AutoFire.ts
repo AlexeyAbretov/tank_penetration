@@ -1,43 +1,31 @@
-// Автострельба партии. Танк про неё не знает: бой сам решает, звать ли выстрел без ЛКМ.
-// Покупка одна на партию. Кнопка у шестерёнки включает и выключает уже купленный режим.
+// Иконка автострельбы. Покупка и выключатель живут в прогрессе, стреляет бой.
+// Пока файла нет, кнопка рисуется кругом. Готовая картинка — public/assets/auto-fire-icon.png.
+
+import Phaser from 'phaser';
+import { paintSkillDisc } from '../gfx/skillDisc';
+import { bake } from '../gfx/textures';
 
 export class AutoFire {
-  static readonly shop = {
-    cost: 100,
-  };
+  static readonly iconKey = 'auto-fire-icon';
+  // Радиус круга. Такой же, как у иконки автонаведения и способностей над лентой.
+  static readonly iconRadius = 30;
 
-  private owned = false;
-  private switchedOn = false;
-
-  get isOwned(): boolean {
-    return this.owned;
-  }
-
-  // Стреляет сам, только когда покупка есть и кнопка включена.
-  get enabled(): boolean {
-    return this.owned && this.switchedOn;
-  }
-
-  // Свежая покупка сразу включена.
-  grant(): void {
-    this.owned = true;
-    this.switchedOn = true;
-  }
-
-  restore(owned: boolean, enabled: boolean): void {
-    this.owned = owned;
-    this.switchedOn = owned && enabled;
-  }
-
-  clear(): void {
-    this.owned = false;
-    this.switchedOn = false;
-  }
-
-  toggle(): void {
-    if (!this.owned) {
+  static ensureTextures(scene: Phaser.Scene): void {
+    if (scene.textures.exists(AutoFire.iconKey)) {
+      scene.textures.get(AutoFire.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
       return;
     }
-    this.switchedOn = !this.switchedOn;
+    bake(scene, AutoFire.iconKey, 64, 64, (g) => AutoFire.renderIcon(g));
+  }
+
+  // Запасной круг: тот же обод, что у автонаведения, и ствол с трассами. Файл этот рисунок не вызывает.
+  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
+    paintSkillDisc(g, 32, 32, AutoFire.iconRadius);
+    g.fillStyle(0xf0d56a);
+    g.fillRect(14, 29, 16, 6);
+    g.fillRect(28, 25, 4, 14);
+    g.fillRect(34, 26, 12, 2);
+    g.fillRect(34, 31, 16, 2);
+    g.fillRect(34, 36, 10, 2);
   }
 }

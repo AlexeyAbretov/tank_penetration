@@ -65,7 +65,7 @@ export class DebugCombatSystem extends CombatSystem {
   }
 
   protected override handleFireInput(pointer: Phaser.Input.Pointer): void {
-    if (this.blockShot && !this.shop.autoFire.enabled) {
+    if (this.blockShot && !this.autoFire) {
       return;
     }
     super.handleFireInput(pointer);

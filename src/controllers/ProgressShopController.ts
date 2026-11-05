@@ -18,6 +18,7 @@ import {
   type ProgressShopView,
   type ProgressTabView,
 } from '../ui/shops/ProgressShopPanel';
+import { GameHud } from '../ui/huds/GameHud';
 import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;
@@ -49,8 +50,9 @@ type Stat =
   | 'nuclearCooldown';
 
 export class ProgressShopController {
-  // Панель живёт только пока жива сцена. restart() её уничтожает, bind() собирает заново.
+  // Панель и интерфейс живут только пока жива сцена. restart() их уничтожает, bind() собирает заново.
   private panel!: ProgressShopPanel;
+  private hud?: GameHud;
   private readonly progress: SavedProgress;
   // Пауза сцены. Покупки очков ждут продолжения. «В бой» паузу не спрашивает.
   private paused = false;
@@ -61,11 +63,13 @@ export class ProgressShopController {
     this.progress = this.progressSave.load();
   }
 
-  // До create() нет scene.add. Сюда сцена приходит уже запущенной.
-  bind(scene: Phaser.Scene, onNewGame: () => void): void {
+  // До create() нет scene.add. Сюда сцена приходит уже запущенной и отдаёт свежий интерфейс.
+  bind(scene: Phaser.Scene, onNewGame: () => void, hud: GameHud): void {
     this.onNewGame = onNewGame;
     this.paused = false;
     this.panel = new ProgressShopPanel(scene, this, GAME);
+    this.hud = hud;
+    this.paintAutoFireMode();
   }
 
   layout(): void {
@@ -166,6 +170,29 @@ export class ProgressShopController {
 
   nuclearCooldownLevel(): number {
     return this.progress.nuclearCooldown;
+  }
+
+  autoFireOwned(): boolean {
+    return this.progress.autoFire;
+  }
+
+  // Куплено и не выключено иконкой справа.
+  autoFireEnabled(): boolean {
+    return this.progress.autoFire && this.progress.autoFireOn;
+  }
+
+  // Строка над полем. Магазин волны эту надпись не собирает.
+  private paintAutoFireMode(): void {
+    this.hud?.setAutoFireMode(this.autoFireEnabled());
+  }
+
+  toggleAutoFire(): void {
+    if (this.paused || !this.progress.autoFire) {
+      return;
+    }
+    this.progress.autoFireOn = !this.progress.autoFireOn;
+    this.progressSave.save(this.progress);
+    this.paintAutoFireMode();
   }
 
   autoAimOwned(): boolean {
@@ -329,6 +356,22 @@ export class ProgressShopController {
     this.buy('nuclearCooldown');
   }
 
+  private buyAutoFire(): void {
+    if (this.isPaused() || this.progress.autoFire) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoFireCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoFire = true;
+    this.progress.autoFireOn = true;
+    this.progressSave.save(this.progress);
+    this.paintAutoFireMode();
+    this.panel.refresh(this.view());
+  }
+
   private buyAutoAim(): void {
     if (this.isPaused() || this.progress.autoAim) {
       return;
@@ -461,6 +504,7 @@ export class ProgressShopController {
           this.flightCard(score),
           this.knockbackCard(score),
           this.pierceCard(score),
+          this.autoFireCard(score),
           this.autoAimCard(score),
         ]),
         this.tab('gun', 'Пулемёт', [
@@ -492,6 +536,20 @@ export class ProgressShopController {
     return { id, label, cards };
   }
 
+  private autoFireCard(score: number): ProgressCardView {
+    const owned = this.progress.autoFire;
+    const price = shopPrice(ProgressSave.autoFireCost());
+    return {
+      title: 'автострельба',
+      buy: () => this.buyAutoFire(),
+      info: 'танк стреляет сам',
+      cost: this.coin(price),
+      open: !owned,
+      owned,
+      canBuy: !owned && score >= price,
+    };
+  }
+
   private autoAimCard(score: number): ProgressCardView {
     const owned = this.progress.autoAim;
     const price = shopPrice(ProgressSave.autoAimCost());
@@ -499,8 +557,9 @@ export class ProgressShopController {
       title: 'автонаведение',
       buy: () => this.buyAutoAim(),
       info: owned ? 'держит одну цель' : 'башня сама держит врага',
-      cost: owned ? 'куплено' : this.coin(price),
+      cost: this.coin(price),
       open: !owned,
+      owned,
       canBuy: !owned && score >= price,
     };
   }

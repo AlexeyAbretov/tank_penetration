@@ -56,8 +56,6 @@ const CARD_W = PANEL_W - SIDE * 2 - TAB_W - CARD_GAP_X;
 const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
 const CARD_H = 92;
 const CARD_GAP = 10;
-// Семь мест на вкладке «Танк»: урон, взрыв, перезарядка, полёт, отталкивание, пробивание и автострельба.
-const CARD_SLOTS = 7;
 
 const TITLE_Y = -302;
 const COINS_Y = -258;
@@ -88,7 +86,8 @@ export class ShopPanel {
 
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly dim: Phaser.GameObjects.Rectangle;
-  private readonly offers: Offer[];
+  private readonly offers: Offer[] = [];
+  private readonly waveButton: Phaser.GameObjects.Graphics;
   private readonly tabs: Tab[] = [];
 
   private paused = false;
@@ -134,9 +133,8 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
 
-    this.offers = Array.from({ length: CARD_SLOTS }, (_, index) => this.makeOffer(scene, index));
-
     const nextFace = scene.add.graphics().setPosition(0, BUTTON_Y);
+    this.waveButton = nextFace;
     paintOrderBar(nextFace, 280, 52);
     const next = scene.add.rectangle(0, BUTTON_Y, 280, 52, 0x000000, 0);
     next.setInteractive({ useHandCursor: true });
@@ -152,13 +150,6 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
 
-    const offerNodes = this.offers.flatMap((offer) => [
-      offer.card,
-      offer.title,
-      offer.info,
-      offer.cost,
-      offer.mark,
-    ]);
     this.container = scene.add.container(this.screen.width / 2, this.screen.height / 2, [
       this.dim,
       panel,
@@ -166,7 +157,6 @@ export class ShopPanel {
       rule,
       title,
       this.coinsText,
-      ...offerNodes,
       nextFace,
       next,
       nextLabel,
@@ -281,6 +271,7 @@ export class ShopPanel {
   }
 
   private applyOffers(): void {
+    this.ensureOffers(this.lastCards.length);
     this.placeOffers(this.lastCards.length);
     for (let i = 0; i < this.offers.length; i += 1) {
       const card = this.lastCards[i];
@@ -289,6 +280,19 @@ export class ShopPanel {
       if (shown && card) {
         this.paint(this.offers[i], card);
       }
+    }
+  }
+
+  // Плашек ровно столько, сколько карточек в самой длинной вкладке. Короткая вкладка лишние прячет.
+  private ensureOffers(count: number): void {
+    const scene = this.container.scene;
+    while (this.offers.length < count) {
+      const offer = this.makeOffer(scene, this.offers.length);
+      this.offers.push(offer);
+      // «Следующая волна» остаётся поверх карточек.
+      const at = this.container.getIndex(this.waveButton);
+      const nodes = [offer.card, offer.title, offer.info, offer.cost, offer.mark];
+      nodes.forEach((node, index) => this.container.addAt(node, at + index));
     }
   }
 

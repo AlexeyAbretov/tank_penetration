@@ -47,8 +47,6 @@ export type ShopSave = {
   nuclear: boolean;
   // Уровни отката атомного взрыва за эту партию. Старые сохранения читают 0.
   nuclearCooldown: number;
-  autoFire: boolean;
-  autoFireOn: boolean;
   mgDamage: number;
   // Уровни перезарядки пулемёта за эту партию. Старые сохранения читают 0: пауза 3 с.
   mgFireRate: number;
@@ -236,9 +234,6 @@ function parseShop(value: unknown): ShopSave | null {
   const artilleryCooldown = requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxShopCooldownLevel) ?? 0;
   const minesCooldown = requiredInt(value.minesCooldown, 0, Mines.maxShopCooldownLevel) ?? 0;
   const nuclearCooldown = requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxShopCooldownLevel) ?? 0;
-  const autoFire = flag(value.autoFire);
-  // Старые сохранения не писали выключатель: купленная автострельба была всегда включена.
-  const autoFireOn = flag(value.autoFireOn) ?? (autoFire === true);
   // Старые сохранения не писали урон партии у пулемёта, проволоки, огнемёта, РСЗО, артиллерии и мин.
   const mgDamage = requiredInt(value.mgDamage, 0, 500) ?? 0;
   // Старые сохранения не писали перезарядку и полёт пулемёта: пауза 3 с, полёт 2 с.
@@ -255,8 +250,7 @@ function parseShop(value: unknown): ShopSave | null {
     fireRate === null ||
     wire === null ||
     machineGun === null ||
-    artillery === null ||
-    autoFire === null
+    artillery === null
   ) {
     return null;
   }
@@ -278,8 +272,6 @@ function parseShop(value: unknown): ShopSave | null {
     minesCooldown,
     nuclear,
     nuclearCooldown,
-    autoFire,
-    autoFireOn: autoFire && autoFireOn,
     mgDamage,
     mgFireRate,
     mgFlight,

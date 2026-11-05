@@ -4,7 +4,6 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
-import { AutoFire } from '../entities/AutoFire';
 import { BarbedWire } from '../entities/BarbedWire';
 import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
@@ -20,7 +19,7 @@ import { ShopPanel, type ShopCardView, type ShopTabView, type ShopView } from '.
 import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
-type GearId = 'wire' | 'autoFire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'mines' | 'nuclear';
+type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'mines' | 'nuclear';
 
 type PermanentBonuses = {
   damage: number;
@@ -79,7 +78,6 @@ export class ShopController {
   salvoDamageLevel = 0;
   artilleryDamageLevel = 0;
   minesDamageLevel = 0;
-  readonly autoFire = new AutoFire();
   shopOpen = false;
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
   private paused = false;
@@ -119,8 +117,6 @@ export class ShopController {
       minesCooldown: this.minesCooldownLevel,
       nuclear: this.nuclearOwned,
       nuclearCooldown: this.nuclearCooldownLevel,
-      autoFire: this.autoFire.isOwned,
-      autoFireOn: this.autoFire.enabled,
       mgDamage: this.mgDamageLevel,
       mgFireRate: this.mgFireRateLevel,
       mgFlight: this.mgFlightLevel,
@@ -141,7 +137,6 @@ export class ShopController {
     this.knockbackLevel = Math.min(saved.knockback, Tank.maxShopKnockbackLevel);
     this.pierceLevel = Math.min(saved.pierce, Tank.maxShopPierceLevel);
     this.tank.setFireRateLevel(this.fireRateLevel);
-    this.autoFire.restore(saved.autoFire, saved.autoFireOn);
     this.wireOwned = saved.wire;
     if (saved.wire) {
       this.wire = new BarbedWire(this.scene);
@@ -211,7 +206,6 @@ export class ShopController {
     this.salvoDamageLevel = 0;
     this.artilleryDamageLevel = 0;
     this.minesDamageLevel = 0;
-    this.autoFire.clear();
     this.wire = undefined;
     this.machineGun = undefined;
     this.laser = undefined;
@@ -343,28 +337,6 @@ export class ShopController {
     }
     this.wireOwned = true;
     this.wire = new BarbedWire(this.scene);
-    this.refresh();
-  }
-
-  // Танк стреляет сам, пока курсор на поле. Покупка одна на партию.
-  buyAutoFire(): void {
-    const cost = shopPrice(AutoFire.shop.cost);
-    if (this.isPaused() || this.autoFire.isOwned || this.economy.getCoins() < cost) {
-      return;
-    }
-    if (!this.economy.spendCoins(cost)) {
-      return;
-    }
-    this.autoFire.grant();
-    this.refresh();
-  }
-
-  // Кнопка у шестерёнки. Покупку не отменяет: следующий клик снова включает огонь.
-  toggleAutoFire(): void {
-    if (this.isPaused() || !this.autoFire.isOwned) {
-      return;
-    }
-    this.autoFire.toggle();
     this.refresh();
   }
 
@@ -648,11 +620,9 @@ export class ShopController {
       Tank.pierceChanceFor(this.pierceLevel, this.bonuses.pierce),
       Tank.fireDelayFor(this.fireRateLevel),
       Tank.flightMsFor(this.flightLevel),
-      this.autoFire.enabled,
       this.bonuses.coins,
       this.bonuses.points,
     );
-    this.hud.setAutoFireToggle(this.autoFire.isOwned, this.autoFire.enabled);
   }
 
   private isPaused(): boolean {
@@ -758,7 +728,6 @@ export class ShopController {
           this.flightCard(coins),
           this.knockbackCard(coins),
           this.pierceCard(coins),
-          this.gearCard('autoFire', coins),
         ]),
         this.tab('gun', 'Пулемёт', [
           this.gearCard('machineGun', coins),
@@ -920,16 +889,6 @@ export class ShopController {
           shopPrice(BarbedWire.shop.cost),
           'перед танком',
           'держит пехоту',
-        );
-      case 'autoFire':
-        return this.onceCard(
-          'Автострельба',
-          () => this.buyAutoFire(),
-          coins,
-          this.autoFire.isOwned,
-          shopPrice(AutoFire.shop.cost),
-          'стреляет сам',
-          'стреляет сам',
         );
       case 'machineGun':
         return this.onceCard(
