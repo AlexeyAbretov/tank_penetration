@@ -269,6 +269,22 @@ export class GameScene extends Phaser.Scene {
       }
       this.combat.requestNuclear();
     });
+    this.hud.onAutoApply('artillery', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.progressShop.toggleAutoArtillery();
+      this.applyAutoStrikes();
+      this.paintAutoStrikes();
+    });
+    this.hud.onAutoApply('mines', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.progressShop.toggleAutoMines();
+      this.applyAutoStrikes();
+      this.paintAutoStrikes();
+    });
     // Стирает и партию, и постоянные улучшения. Кнопка живёт на плашке паузы.
     this.hud.onNewGame(() => this.restartRun());
     const keyboard = this.input.keyboard;
@@ -401,6 +417,7 @@ export class GameScene extends Phaser.Scene {
     this.applyCameraFx();
     // Автострельба живёт в прогрессе. Надпись и бой читают её до разбора партии.
     this.paintAutoFire();
+    this.applyAutoStrikes();
     // load читает localStorage. Пустое сохранение начинает волну 1.
     // Если игрок закрыл вкладку на «БАЗА РАЗБИТА», continueRun откроет магазин очков.
     this.continueRun(this.combatSave.load());
@@ -486,6 +503,8 @@ export class GameScene extends Phaser.Scene {
 
     const fighting = !this.shop.shopOpen;
     // Перезарядка артиллерии, мин и атомного взрыва идёт и в магазине. Вызов — только когда fighting.
+    // Секунда автоприменения тикает там же. Сам удар ждёт закрытого магазина.
+    this.applyAutoStrikes();
     this.combat.tickArtillery(delta, fighting);
     this.combat.tickMines(delta, fighting);
     this.combat.tickNuclear(delta, fighting);
@@ -507,6 +526,7 @@ export class GameScene extends Phaser.Scene {
       this.combat.nuclearCooldown,
       NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel),
     );
+    this.paintAutoStrikes();
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
     this.paintAutoFire();
     if (!fighting) {
@@ -534,6 +554,17 @@ export class GameScene extends Phaser.Scene {
     this.projectiles.tick();
     this.waves.tick();
     this.touchAutosave(delta);
+  }
+
+  // Знак питания на иконке и сам вызов читают одну покупку прогресса.
+  private applyAutoStrikes(): void {
+    this.combat.setAutoArtillery(this.progressShop.autoArtilleryEnabled());
+    this.combat.setAutoMines(this.progressShop.autoMinesEnabled());
+  }
+
+  private paintAutoStrikes(): void {
+    this.hud.setAutoApply('artillery', this.progressShop.autoArtilleryOwned(), this.progressShop.autoArtilleryEnabled());
+    this.hud.setAutoApply('mines', this.progressShop.autoMinesOwned(), this.progressShop.autoMinesEnabled());
   }
 
   // Иконка справа и выстрел без ЛКМ читают одну и ту же покупку прогресса.

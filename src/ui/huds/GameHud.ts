@@ -35,6 +35,18 @@ type AbilityIcon = {
   request?: () => void;
 };
 
+// Знак питания на ободе иконки удара или мин. Покупка в прогрессе, включение — здесь.
+type AutoApplyBadge = {
+  id: string;
+  root: Phaser.GameObjects.Container;
+  disc: Phaser.GameObjects.Graphics;
+  shown: boolean;
+  enabled: boolean;
+  request?: () => void;
+};
+
+const AUTO_POWER_HIT = 16;
+
 export class GameHud {
   // Ключ текстуры ленты. Путь к файлу — только в preload, строка буквальная для singlefile.
   static readonly bannerKey = 'banner';
@@ -130,6 +142,7 @@ export class GameHud {
   private autoAimGlow?: Phaser.GameObjects.Image;
   private autoAimOwned = false;
   private autoAimRequest?: () => void;
+  private autoApplies: AutoApplyBadge[] = [];
   private newGameRequest?: () => void;
 
   protected readonly statusY = 28;
@@ -251,6 +264,7 @@ export class GameHud {
 
     // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
     this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
+    this.autoApplies = ['artillery', 'mines'].map((id) => this.makeAutoApply(scene, id));
 
     // Справа на ленте. Прямоугольник только ловит клик: рисунок — отдельная пластина.
     const keysX = frame.width - 56;
@@ -389,6 +403,7 @@ export class GameHud {
     // Тот же ряд, что у способностей, у правого края. Широкое окно сдвигает его вместе с полем.
     this.autoFireRoot?.setPosition(this.edgeIconX(1), this.frame.bannerY - 48);
     this.autoAimRoot?.setPosition(this.edgeIconX(0), this.frame.bannerY - 48);
+    this.placeAutoApplies();
 
     this.hpFrame.setPosition(hpCenter, 28);
     this.hpTrack.setPosition(barLeft, 28);
@@ -548,6 +563,45 @@ export class GameHud {
     }
   }
 
+  onAutoApply(id: string, request: () => void): void {
+    const badge = this.autoApplyBadge(id);
+    if (badge) {
+      badge.request = request;
+    }
+  }
+
+  // Выключатель есть, когда автоприменение куплено и сама способность уже стоит на поле.
+  setAutoApply(id: string, purchased: boolean, enabled: boolean): void {
+    const badge = this.autoApplyBadge(id);
+    const ability = this.ability(id);
+    if (!badge || !ability) {
+      return;
+    }
+    const shown = purchased && ability.owned;
+    const appeared = badge.shown !== shown;
+    if (appeared) {
+      badge.shown = shown;
+      badge.root.setVisible(shown);
+      if (shown) {
+        if (!badge.root.input?.enabled) {
+          badge.root.setInteractive({
+            hitArea: new Phaser.Geom.Circle(0, 0, AUTO_POWER_HIT),
+            hitAreaCallback: Phaser.Geom.Circle.Contains,
+            useHandCursor: true,
+          });
+        }
+      } else if (badge.root.input?.enabled) {
+        badge.root.disableInteractive();
+      }
+      this.syncControls();
+    }
+    if (!shown || (!appeared && badge.enabled === enabled)) {
+      return;
+    }
+    badge.enabled = enabled;
+    this.paintAutoApply(badge);
+  }
+
   // Кнопка появляется после покупки. Тусклая, пока режим выключен, и светится, когда включён.
   setAutoFireToggle(owned: boolean, enabled: boolean): void {
     if (this.autoFireOwned !== owned) {
@@ -686,9 +740,24 @@ export class GameHud {
 
   // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
   coversAbility(pointer: Phaser.Input.Pointer): boolean {
+    if (this.coversAutoApply(pointer)) {
+      return true;
+    }
     return this.abilities.some(
       (icon) => icon.root.visible && icon.root.getBounds().contains(pointer.worldX, pointer.worldY),
     );
+  }
+
+  // Круг шире штриха: в край дуги тоже надо попадать.
+  private coversAutoApply(pointer: Phaser.Input.Pointer): boolean {
+    return this.autoApplies.some((badge) => {
+      if (!badge.root.visible) {
+        return false;
+      }
+      const dx = pointer.worldX - badge.root.x;
+      const dy = pointer.worldY - badge.root.y;
+      return dx * dx + dy * dy <= AUTO_POWER_HIT * AUTO_POWER_HIT;
+    });
   }
 
   setAbility(id: string, owned: boolean, cooldownMs: number, spanMs?: number): void {
@@ -749,6 +818,12 @@ export class GameHud {
       if (icon.owned) {
         hints.push(icon.hint);
       }
+    }
+    if (this.autoApplyShown('artillery')) {
+      hints.push('выключатель удара — автоприменение');
+    }
+    if (this.autoApplyShown('mines')) {
+      hints.push('выключатель мин — автоприменение');
     }
     return hints;
   }
@@ -853,12 +928,80 @@ export class GameHud {
       cooldownMs: spec.cooldownMs,
       iconRadius: spec.iconRadius,
     };
-    root.on('pointerup', () => icon.request?.());
+    root.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // Знак питания лежит на ободе. Его клик способность не вызывает.
+      if (this.coversAutoApply(pointer)) {
+        return;
+      }
+      icon.request?.();
+    });
     return icon;
   }
 
   private ability(id: string): AbilityIcon | undefined {
     return this.abilities.find((icon) => icon.id === id);
+  }
+
+  private autoApplyBadge(id: string): AutoApplyBadge | undefined {
+    return this.autoApplies.find((badge) => badge.id === id);
+  }
+
+  private autoApplyShown(id: string): boolean {
+    return this.autoApplyBadge(id)?.shown === true;
+  }
+
+  // На ободе иконки, сверху справа. Глубина 54: выше способности (53) и ниже магазина волны (70).
+  private placeAutoApplies(): void {
+    for (const badge of this.autoApplies) {
+      const ability = this.ability(badge.id);
+      if (!ability) {
+        continue;
+      }
+      badge.root.setPosition(ability.root.x + 15, ability.root.y - 22);
+    }
+  }
+
+  private makeAutoApply(scene: Phaser.Scene, id: string): AutoApplyBadge {
+    const disc = scene.add.graphics();
+    const root = scene.add.container(0, 0, [disc]).setDepth(54).setVisible(false);
+    const badge: AutoApplyBadge = { id, root, disc, shown: false, enabled: false };
+    root.on(
+      'pointerup',
+      (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+        event.stopPropagation();
+        badge.request?.();
+      },
+    );
+    return badge;
+  }
+
+  // Тот же знак питания. Золото — включено, песочный — выключено. Тёмная кромка держит его на траве и на ободе.
+  private paintAutoApply(badge: AutoApplyBadge): void {
+    const g = badge.disc;
+    g.clear();
+    this.paintPowerMark(g, 0x2a0a08, 5.4);
+    this.paintPowerMark(g, badge.enabled ? 0xf3d56a : 0xc4b49a, 3.2);
+  }
+
+  // Дуга с разрывом сверху и черта в этом разрыве. Концы штриха круглые.
+  private paintPowerMark(g: Phaser.GameObjects.Graphics, color: number, stroke: number): void {
+    const arcR = 7.5;
+    const cy = 1;
+    const gap = 0.62;
+    const start = -Math.PI / 2 + gap;
+    const end = -Math.PI / 2 - gap;
+    g.lineStyle(stroke, color, 1);
+    g.beginPath();
+    g.arc(0, cy, arcR, start, end, false);
+    g.strokePath();
+    g.fillStyle(color, 1);
+    g.fillCircle(Math.cos(start) * arcR, cy + Math.sin(start) * arcR, stroke / 2);
+    g.fillCircle(Math.cos(end) * arcR, cy + Math.sin(end) * arcR, stroke / 2);
+    const stemTop = cy - arcR - 2.2;
+    const stemBottom = cy;
+    g.fillCircle(0, stemTop, stroke / 2);
+    g.fillCircle(0, stemBottom, stroke / 2);
+    g.fillRect(-stroke / 2, stemTop, stroke, stemBottom - stemTop);
   }
 
   private cooldownLabel(ms: number): string {

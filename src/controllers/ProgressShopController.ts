@@ -212,6 +212,40 @@ export class ProgressShopController {
     this.progressSave.save(this.progress);
   }
 
+  autoArtilleryOwned(): boolean {
+    return this.progress.autoArtillery;
+  }
+
+  // Куплено и включено выключателем на иконке удара.
+  autoArtilleryEnabled(): boolean {
+    return this.progress.autoArtillery && this.progress.autoArtilleryOn;
+  }
+
+  toggleAutoArtillery(): void {
+    if (this.paused || !this.progress.autoArtillery) {
+      return;
+    }
+    this.progress.autoArtilleryOn = !this.progress.autoArtilleryOn;
+    this.progressSave.save(this.progress);
+  }
+
+  autoMinesOwned(): boolean {
+    return this.progress.autoMines;
+  }
+
+  // Куплено и включено выключателем на иконке мин.
+  autoMinesEnabled(): boolean {
+    return this.progress.autoMines && this.progress.autoMinesOn;
+  }
+
+  toggleAutoMines(): void {
+    if (this.paused || !this.progress.autoMines) {
+      return;
+    }
+    this.progress.autoMinesOn = !this.progress.autoMinesOn;
+    this.progressSave.save(this.progress);
+  }
+
   isAwaitingShop(): boolean {
     return this.progress.awaitingShop;
   }
@@ -387,6 +421,36 @@ export class ProgressShopController {
     this.panel.refresh(this.view());
   }
 
+  private buyAutoArtillery(): void {
+    if (this.isPaused() || this.progress.autoArtillery) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoArtilleryCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoArtillery = true;
+    this.progress.autoArtilleryOn = true;
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
+  }
+
+  private buyAutoMines(): void {
+    if (this.isPaused() || this.progress.autoMines) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoMinesCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoMines = true;
+    this.progress.autoMinesOn = true;
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -520,11 +584,13 @@ export class ProgressShopController {
           this.artilleryShellsCard(score),
           this.artilleryDamageCard(score),
           this.artilleryCooldownCard(score),
+          this.autoArtilleryCard(score),
         ]),
         this.tab('mines', 'Мина', [
           this.minesCountCard(score),
           this.minesDamageCard(score),
           this.minesCooldownCard(score),
+          this.autoMinesCard(score),
         ]),
         this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
         this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
@@ -557,6 +623,34 @@ export class ProgressShopController {
       title: 'автонаведение',
       buy: () => this.buyAutoAim(),
       info: owned ? 'держит одну цель' : 'башня сама держит врага',
+      cost: this.coin(price),
+      open: !owned,
+      owned,
+      canBuy: !owned && score >= price,
+    };
+  }
+
+  private autoArtilleryCard(score: number): ProgressCardView {
+    const owned = this.progress.autoArtillery;
+    const price = shopPrice(ProgressSave.autoArtilleryCost());
+    return {
+      title: 'автоприменение',
+      buy: () => this.buyAutoArtillery(),
+      info: 'удар сам через 1 с',
+      cost: this.coin(price),
+      open: !owned,
+      owned,
+      canBuy: !owned && score >= price,
+    };
+  }
+
+  private autoMinesCard(score: number): ProgressCardView {
+    const owned = this.progress.autoMines;
+    const price = shopPrice(ProgressSave.autoMinesCost());
+    return {
+      title: 'автоприменение',
+      buy: () => this.buyAutoMines(),
+      info: 'мины сами через 1 с',
       cost: this.coin(price),
       open: !owned,
       owned,

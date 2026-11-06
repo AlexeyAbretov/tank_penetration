@@ -71,6 +71,14 @@ export type SavedProgress = {
   autoAim: boolean;
   // Выключатель уже купленного автонаведения. Пока false, башню ведёт курсор.
   autoAimOn: boolean;
+  // Куплено ли автоприменение артиллерии. Удар сам через секунду после готовности.
+  autoArtillery: boolean;
+  // Выключатель уже купленного автоприменения. Пока false, удар ждёт клавишу или иконку.
+  autoArtilleryOn: boolean;
+  // Куплено ли автоприменение мин. Постановка сама через секунду после готовности.
+  autoMines: boolean;
+  // Выключатель уже купленного автоприменения. Пока false, мины ждут клавишу или иконку.
+  autoMinesOn: boolean;
 };
 
 export class ProgressSave {
@@ -115,6 +123,16 @@ export class ProgressSave {
   // Одна покупка. Башня сама держит ближайшего врага и не бросает его, пока он жив.
   static autoAimCost(): number {
     return 50_000;
+  }
+
+  // Одна покупка. Артиллерия сама бьёт через секунду после готовности, пока включён выключатель на иконке.
+  static autoArtilleryCost(): number {
+    return 20_000;
+  }
+
+  // Одна покупка. Мины сами встают через секунду после готовности, пока включён выключатель на иконке.
+  static autoMinesCost(): number {
+    return 20_000;
   }
 
   // Первая секунда перезарядки лазера стоит 5000, вторая — 50000.
@@ -170,6 +188,10 @@ export class ProgressSave {
     progress.autoFireOn = false;
     progress.autoAim = false;
     progress.autoAimOn = false;
+    progress.autoArtillery = false;
+    progress.autoArtilleryOn = false;
+    progress.autoMines = false;
+    progress.autoMinesOn = false;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressFlightLevel(0);
@@ -234,6 +256,10 @@ export class ProgressSave {
       autoFireOn: false,
       autoAim: false,
       autoAimOn: false,
+      autoArtillery: false,
+      autoArtilleryOn: false,
+      autoMines: false,
+      autoMinesOn: false,
     };
   }
 
@@ -312,6 +338,11 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали автонаведение: башню вёл курсор.
     autoAim: value.autoAim === true,
     autoAimOn: value.autoAim === true && value.autoAimOn !== false,
+    // Старые сохранения не писали автоприменение: удар и мины ждали клавишу.
+    autoArtillery: value.autoArtillery === true,
+    autoArtilleryOn: value.autoArtillery === true && value.autoArtilleryOn !== false,
+    autoMines: value.autoMines === true,
+    autoMinesOn: value.autoMines === true && value.autoMinesOn !== false,
   };
 }
 

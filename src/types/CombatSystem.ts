@@ -28,6 +28,10 @@ export type CombatSystem = {
   tick(delta: number, allowFire?: boolean): void;
   // Сцена приносит флаг прогресса: бой магазин очков не читает.
   setAutoFire(on: boolean): void;
+  // Куплено и включено: артиллерия сама через секунду после готовности.
+  setAutoArtillery(on: boolean): void;
+  // Куплено и включено: мины сами через секунду после готовности.
+  setAutoMines(on: boolean): void;
   // Точка живой цели автонаведения. Та же, пока она не погибла. null — на поле никого.
   aimPoint(): WorldPoint | null;
 };

@@ -62,6 +62,9 @@ type FlamePatch = {
   left?: number;
 };
 
+// Клавиша и иконка бьют сразу. Автоприменение ждёт эту паузу после конца перезарядки.
+const AUTO_APPLY_DELAY_MS = 1000;
+
 export class CombatSystem implements Combat {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
   protected readonly shells: Phaser.Physics.Arcade.Group;
@@ -106,6 +109,12 @@ export class CombatSystem implements Combat {
   private aimLock: Infantry | null = null;
   // Сцена ставит из прогресса. Куплено и включено — танк стреляет без левой кнопки.
   protected autoFire = false;
+  // Куплено и включено — удар и мины сами через секунду после конца перезарядки.
+  private autoArtillery = false;
+  private autoMines = false;
+  // Сколько миллисекунд способность уже готова. Секунда идёт и в магазине волны.
+  private artilleryReadyMs = 0;
+  private minesReadyMs = 0;
 
   constructor(
     protected readonly scene: Phaser.Scene,
@@ -249,6 +258,8 @@ export class CombatSystem implements Combat {
     this.strikeFromIcon = false;
     this.mineFromIcon = false;
     this.nuclearFromIcon = false;
+    this.artilleryReadyMs = 0;
+    this.minesReadyMs = 0;
     this.shells.clear(true, true);
     this.shellFlights.clear();
     this.mgShots.clear(true, true);
@@ -298,6 +309,21 @@ export class CombatSystem implements Combat {
     this.autoFire = on;
   }
 
+  // Выключенное положение сбрасывает уже накопленную секунду: следующее включение ждёт её заново.
+  setAutoArtillery(on: boolean): void {
+    if (!on) {
+      this.artilleryReadyMs = 0;
+    }
+    this.autoArtillery = on;
+  }
+
+  setAutoMines(on: boolean): void {
+    if (!on) {
+      this.minesReadyMs = 0;
+    }
+    this.autoMines = on;
+  }
+
   // ЛКМ и автострельба. Флаг прогресса сцена уже положила в setAutoFire.
   protected handleFireInput(pointer: Phaser.Input.Pointer): void {
     if (this.autoFire || pointer.leftButtonDown()) {
@@ -305,34 +331,60 @@ export class CombatSystem implements Combat {
     }
   }
 
-  // Перезарядка идёт и в магазине. Выстрел — только в бою, по клавише 1 или по иконке.
+  // Перезарядка идёт и в магазине. Выстрел — в бою, по клавише 1, по иконке или сам через секунду после готовности.
   tickArtillery(delta: number, canFire: boolean): void {
     if (!this.shop.artilleryOwned) {
       this.strikeFromIcon = false;
+      this.artilleryReadyMs = 0;
       return;
     }
     // Покупка короче текущего ожидания: дольше нового отката ждать не нужно.
     const artillerySpan = this.artillerySpan();
     this.artilleryCooldownMs = Math.min(artillerySpan, Math.max(0, this.artilleryCooldownMs - delta));
-    if (!this.strikePressed()) {
-      return;
+    if (this.strikePressed()) {
+      this.useArtillery(canFire);
+      if (this.artilleryCooldownMs > 0) {
+        this.artilleryReadyMs = 0;
+        return;
+      }
     }
-    this.useArtillery(canFire);
+    this.tickAutoArtillery(delta, canFire);
   }
 
   protected useArtillery(canFire: boolean): void {
     if (!canFire || this.artilleryCooldownMs > 0) {
       return;
     }
+    this.commitArtillery();
+  }
+
+  // Готовность — конец перезарядки. Секунда тикает и в магазине волны, удар выходит в бою.
+  private tickAutoArtillery(delta: number, canFire: boolean): void {
+    if (!this.autoArtillery || this.artilleryCooldownMs > 0) {
+      this.artilleryReadyMs = 0;
+      return;
+    }
+    if (this.artilleryReadyMs < AUTO_APPLY_DELAY_MS) {
+      this.artilleryReadyMs += delta;
+    }
+    if (!canFire || this.artilleryReadyMs < AUTO_APPLY_DELAY_MS) {
+      return;
+    }
+    this.commitArtillery();
+    this.artilleryReadyMs = 0;
+  }
+
+  private commitArtillery(): void {
     this.artilleryCooldownMs = this.artillerySpan();
     this.launchArtillery();
   }
 
-  // Перезарядка идёт и в магазине. Постановка — только в бою, по клавише 2 или по иконке.
+  // Перезарядка идёт и в магазине. Постановка — в бою, по клавише 2, по иконке или сама через секунду после готовности.
   // Уже лежащие мины в магазине молчат: физика на паузе, пехота не шагает.
   tickMines(delta: number, canFire: boolean): void {
     if (!this.shop.minesOwned) {
       this.mineFromIcon = false;
+      this.minesReadyMs = 0;
       return;
     }
     // Покупка короче текущего ожидания: дольше нового отката ждать не нужно.
@@ -342,19 +394,46 @@ export class CombatSystem implements Combat {
     if (canFire) {
       this.touchMines();
     }
-    if (!pressed) {
-      return;
+    if (pressed) {
+      this.useMines(canFire);
+      if (this.minesCooldownMs > 0) {
+        this.minesReadyMs = 0;
+        return;
+      }
     }
-    this.useMines(canFire);
+    this.tickAutoMines(delta, canFire);
   }
 
   protected useMines(canFire: boolean): void {
     if (!canFire || this.minesCooldownMs > 0) {
       return;
     }
-    if (this.layMines()) {
-      this.minesCooldownMs = this.minesSpan();
+    this.commitMines();
+  }
+
+  // Пока мине некуда встать, откат не начинается и попытка повторяется.
+  private tickAutoMines(delta: number, canFire: boolean): void {
+    if (!this.autoMines || this.minesCooldownMs > 0) {
+      this.minesReadyMs = 0;
+      return;
     }
+    if (this.minesReadyMs < AUTO_APPLY_DELAY_MS) {
+      this.minesReadyMs += delta;
+    }
+    if (!canFire || this.minesReadyMs < AUTO_APPLY_DELAY_MS) {
+      return;
+    }
+    if (this.commitMines()) {
+      this.minesReadyMs = 0;
+    }
+  }
+
+  private commitMines(): boolean {
+    if (!this.layMines()) {
+      return false;
+    }
+    this.minesCooldownMs = this.minesSpan();
+    return true;
   }
 
   // Перезарядка идёт и в магазине. Взрыв — только в бою, по клавише 3 или по иконке.
