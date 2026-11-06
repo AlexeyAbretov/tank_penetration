@@ -1,5 +1,5 @@
 // Иконка автострельбы. Покупка и выключатель живут в прогрессе, стреляет бой.
-// Пока файла нет, кнопка рисуется кругом. Готовая картинка — public/assets/auto-fire-icon.png.
+// Картинка — assets/auto-fire-icon.png. Если файл не загрузился, кнопка рисуется кругом.
 
 import Phaser from 'phaser';
 import { paintSkillDisc } from '../gfx/skillDisc';
@@ -7,8 +7,17 @@ import { bake } from '../gfx/textures';
 
 export class AutoFire {
   static readonly iconKey = 'auto-fire-icon';
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly iconPath = 'assets/auto-fire-icon.png';
   // Радиус круга. Такой же, как у иконки автонаведения и способностей над лентой.
   static readonly iconRadius = 30;
+
+  static preload(scene: Phaser.Scene): void {
+    if (scene.textures.exists(AutoFire.iconKey)) {
+      return;
+    }
+    scene.load.image(AutoFire.iconKey, AutoFire.iconPath);
+  }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(AutoFire.iconKey)) {

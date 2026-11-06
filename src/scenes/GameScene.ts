@@ -98,12 +98,14 @@ export class GameScene extends Phaser.Scene {
     private readonly progressShop: ProgressShopController,
     private readonly waves: WaveManager,
     private readonly music: BattleMusic,
-    private readonly Hud: new (
+    private readonly Hud: (new (
       scene: Phaser.Scene,
       frame: HudFrame,
       maxHp: number,
       abilities: readonly HudAbility[],
-    ) => GameHud,
+    ) => GameHud) & {
+      preload(scene: Phaser.Scene): void;
+    },
     private readonly Combat: new (
       scene: Phaser.Scene,
       tank: Tank,
@@ -146,6 +148,8 @@ export class GameScene extends Phaser.Scene {
   preload(): void {
     preloadImages(this);
     preloadSounds(this);
+    // Дебаг-интерфейс добавляет свою картинку. Общий список её не знает.
+    this.Hud.preload(this);
   }
 
   create(): void {

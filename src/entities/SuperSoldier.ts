@@ -167,11 +167,6 @@ export class SuperSoldier extends Infantry {
     return this.displayHeight * this.originY * 0.5 + SuperSoldier.crownPad;
   }
 
-  // Тот же круг, что у снаряда. Тесный торс до каски не достаёт, и пуля проходит сквозь шлем.
-  override mgReach(): number {
-    return this.shellRadius();
-  }
-
   // Урон одной пули этого выхода. Считается по номеру появления и дальше не меняется.
   private readonly bulletDamage: number;
   // Пулемёт — отдельная картинка. Так отдача двигает ствол, а тело остаётся на месте.

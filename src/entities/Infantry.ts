@@ -95,9 +95,10 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     return this.hitRadius;
   }
 
-  // Пуля пулемёта мельче снаряда и берёт только ближнюю к торсу часть круга.
+  // Пуля берёт тот же круг, что снаряд. Тесная середина торса оставляла винтовку,
+  // плечи и каску снаружи: очередь проходила фигуру насквозь и не снимала здоровье.
   mgReach(): number {
-    return this.shellRadius() * 0.55;
+    return this.shellRadius();
   }
 
   // Ранг роста скорости. У штурмовика это номер волны.

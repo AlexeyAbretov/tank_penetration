@@ -1,5 +1,5 @@
 // Иконка автонаведения. Покупка и выключатель живут в прогрессе, точку башне отдаёт бой.
-// Пока файла нет, кнопка рисуется кругом. Готовая картинка — public/assets/auto-aim-icon.png.
+// Картинка — assets/auto-aim-icon.png. Если файл не загрузился, кнопка рисуется кругом.
 
 import Phaser from 'phaser';
 import { paintSkillDisc } from '../gfx/skillDisc';
@@ -7,8 +7,17 @@ import { bake } from '../gfx/textures';
 
 export class AutoAim {
   static readonly iconKey = 'auto-aim-icon';
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly iconPath = 'assets/auto-aim-icon.png';
   // Радиус круга. Такой же, как у иконок способностей над лентой.
   static readonly iconRadius = 30;
+
+  static preload(scene: Phaser.Scene): void {
+    if (scene.textures.exists(AutoAim.iconKey)) {
+      return;
+    }
+    scene.load.image(AutoAim.iconKey, AutoAim.iconPath);
+  }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(AutoAim.iconKey)) {

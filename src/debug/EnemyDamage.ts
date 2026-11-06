@@ -1,7 +1,8 @@
 // Урон врагов по танку в дебаг-партии.
 // Иконка на ряду способностей пишет флаг. Игрок читает его в момент удара.
 // Свой ключ, не ключ партии: «новая игра» стирает бой, а выключатель остаётся.
-// Пока ключа нет, урон идёт.
+// Пока ключа нет, урон идёт. Картинка — assets/enemy-damage-icon.png.
+// Если файл не загрузился, кнопка рисуется кругом.
 
 import Phaser from 'phaser';
 import { paintSkillDisc } from '../gfx/skillDisc';
@@ -11,7 +12,16 @@ const STORAGE_KEY = 'tank-penetration-enemy-damage:debug';
 
 export class EnemyDamage {
   static readonly iconKey = 'enemy-damage-icon';
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly iconPath = 'assets/enemy-damage-icon.png';
   private static enabled = readEnabled();
+
+  static preload(scene: Phaser.Scene): void {
+    if (scene.textures.exists(EnemyDamage.iconKey)) {
+      return;
+    }
+    scene.load.image(EnemyDamage.iconKey, EnemyDamage.iconPath);
+  }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(EnemyDamage.iconKey)) {
@@ -21,7 +31,7 @@ export class EnemyDamage {
     bake(scene, EnemyDamage.iconKey, 64, 64, (g) => EnemyDamage.renderIcon(g));
   }
 
-  // Тот же круг, что у автострельбы. Внутри пуля в борт. Файла картинки нет.
+  // Запасной круг: пуля в борт. Файл, если загрузился, этот рисунок не вызывает.
   private static renderIcon(g: Phaser.GameObjects.Graphics): void {
     paintSkillDisc(g, 32, 32, 30);
     g.fillStyle(0xf0d56a);

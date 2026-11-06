@@ -581,7 +581,7 @@ export class GameHud {
         useHandCursor: true,
       });
     }
-    root.setAlpha(enabled ? 1 : 0.45);
+    root.setAlpha(enabled ? 1 : 0.72);
     glow.setVisible(enabled);
   }
 

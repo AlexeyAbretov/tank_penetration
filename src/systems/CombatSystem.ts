@@ -1145,20 +1145,61 @@ export class CombatSystem implements Combat {
       if (!bullet.active) {
         continue;
       }
+      // Картинка ещё в начале шага: тело физика уже сдвинула, и за длинный кадр шагов несколько.
+      // Точка на спрайте такой отрезок не видит, и пуля проходит солдата между проверками.
+      const step = this.mgStep(bullet);
+      let struck: Infantry | null = null;
+      let along = Infinity;
       for (const unit of units) {
         if (!unit.active || unit.reachedWall) {
           continue;
         }
         const center = unit.hitCenter();
-        if (Phaser.Math.Distance.Between(bullet.x, bullet.y, center.x, center.y) <= unit.mgReach()) {
-          bullet.destroy();
-          // Пуля долетела до круга попадания.
-          this.effects.impacts.play();
-          this.hurtInfantry(unit, this.mgDamage());
-          break;
+        const at = this.reachAlong(step, center.x, center.y, unit.mgReach());
+        if (at === null || at >= along) {
+          continue;
         }
+        // Ближний по полёту забирает пулю. Дальний на том же отрезке уже не считается.
+        along = at;
+        struck = unit;
       }
+      if (!struck) {
+        continue;
+      }
+      bullet.destroy();
+      // Пуля долетела до круга попадания.
+      this.effects.impacts.play();
+      this.hurtInfantry(struck, this.mgDamage());
     }
+  }
+
+  // Куда пуля доедет к отрисовке этого кадра. На кадре выстрела отрезок ещё точка у дула.
+  private mgStep(bullet: Phaser.Physics.Arcade.Image): { x0: number; y0: number; x1: number; y1: number } {
+    const body = bullet.body as Phaser.Physics.Arcade.Body;
+    const dx = body.position.x - body.prevFrame.x;
+    const dy = body.position.y - body.prevFrame.y;
+    return { x0: bullet.x, y0: bullet.y, x1: bullet.x + dx, y1: bullet.y + dy };
+  }
+
+  // Доля пути от 0 до 1, где отрезок ближе всего к центру круга. null — круг не задет.
+  private reachAlong(
+    step: { x0: number; y0: number; x1: number; y1: number },
+    cx: number,
+    cy: number,
+    radius: number,
+  ): number | null {
+    const abx = step.x1 - step.x0;
+    const aby = step.y1 - step.y0;
+    const acx = cx - step.x0;
+    const acy = cy - step.y0;
+    const lenSq = abx * abx + aby * aby;
+    const t = lenSq === 0 ? 0 : Phaser.Math.Clamp((acx * abx + acy * aby) / lenSq, 0, 1);
+    const dx = cx - (step.x0 + abx * t);
+    const dy = cy - (step.y0 + aby * t);
+    if (dx * dx + dy * dy > radius * radius) {
+      return null;
+    }
+    return t;
   }
 
   private cleanupMgShots(): void {

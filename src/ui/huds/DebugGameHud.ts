@@ -3,6 +3,12 @@ import { EnemyDamage } from '../../debug/EnemyDamage';
 import { GameHud, type HudAbility, type HudFrame } from './GameHud';
 
 export class DebugGameHud extends GameHud {
+  // Картинка урона врагов. Общий список её не грузит: обычная партия этот класс не импортирует.
+  static override preload(scene: Phaser.Scene): void {
+    super.preload(scene);
+    EnemyDamage.preload(scene);
+  }
+
   private readonly debugLabel: Phaser.GameObjects.Text;
   private readonly enemyDamageRoot: Phaser.GameObjects.Container;
   private readonly enemyDamageGlow: Phaser.GameObjects.Image;

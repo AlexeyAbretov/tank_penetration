@@ -1,4 +1,6 @@
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { AutoAim } from '../entities/AutoAim';
+import { AutoFire } from '../entities/AutoFire';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
@@ -12,7 +14,6 @@ import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
-import { GameHud } from '../ui/huds/GameHud';
 import { preloadAirBurst } from '../gfx/airBurst';
 import { preloadCampfire, preloadFlameStream, preloadScorchedEarth } from '../gfx/flame';
 import { preloadBoom } from '../gfx/boom';
@@ -24,7 +25,6 @@ import { preloadTankBoom } from '../gfx/tankBoom';
 export const preloadImages = (scene: Phaser.Scene) => {
   // Трава с той же фотографии, что и воронки. Строка буквальная: singlefile подменяет её на data:.
   scene.load.image('battlefield', 'assets/battlefield.jpg');
-  GameHud.preload(scene);
   Tank.preload(scene);
   BarbedWire.preload(scene);
   preloadCraters(scene);
@@ -35,6 +35,8 @@ export const preloadImages = (scene: Phaser.Scene) => {
   NuclearStrike.preload(scene);
   Mines.preload(scene);
   ArtilleryStrike.preload(scene);
+  AutoAim.preload(scene);
+  AutoFire.preload(scene);
   AssaultInfantry.preload(scene);
   GunnerInfantry.preload(scene);
   PickupTruck.preload(scene);
