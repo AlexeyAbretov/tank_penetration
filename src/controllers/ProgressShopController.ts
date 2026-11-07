@@ -32,6 +32,7 @@ type Stat =
   | 'blast'
   | 'knockback'
   | 'pierce'
+  | 'absorb'
   | 'hp'
   | 'speed'
   | 'flight'
@@ -103,6 +104,10 @@ export class ProgressShopController {
 
   pierceBonus(): number {
     return this.progress.pierce;
+  }
+
+  absorbBonus(): number {
+    return this.progress.absorb;
   }
 
   // Старт партии подставляет купленный запас до полоски и игрока.
@@ -353,6 +358,10 @@ export class ProgressShopController {
     this.buy('pierce');
   }
 
+  private buyAbsorb(): void {
+    this.buy('absorb');
+  }
+
   private buyHp(): void {
     this.buy('hp');
   }
@@ -527,6 +536,9 @@ export class ProgressShopController {
     if (stat === 'pierce' && level >= Tank.maxProgressPierceLevel) {
       return;
     }
+    if (stat === 'absorb' && level >= Tank.maxAbsorbChance) {
+      return;
+    }
     if (stat === 'hp' && level >= TankBaseHp.maxLevel) {
       return;
     }
@@ -599,6 +611,9 @@ export class ProgressShopController {
     if (stat === 'pierce') {
       Tank.setProgressPierceLevel(this.progress.pierce);
     }
+    if (stat === 'absorb') {
+      Tank.setAbsorbLevel(this.progress.absorb);
+    }
     if (stat === 'hp') {
       this.progressSave.applyHp(this.progress.hp);
     }
@@ -642,6 +657,7 @@ export class ProgressShopController {
           this.flightCard(score),
           this.knockbackCard(score),
           this.pierceCard(score),
+          this.absorbCard(score),
           this.hpCard(score),
           this.autoFireCard(score),
           this.autoAimCard(score),
@@ -869,6 +885,22 @@ export class ProgressShopController {
     return {
       title: '+1% пробивание',
       buy: () => this.buyPierce(),
+      info: maxed ? `ур. ${level} · ${now}%` : `ур. ${level} · ${now}%→${next}%`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private absorbCard(score: number): ProgressCardView {
+    const level = this.progress.absorb;
+    const price = this.absorbPrice(level);
+    const now = Tank.absorbChanceFor(level);
+    const next = Tank.absorbChanceFor(level + 1);
+    const maxed = level >= Tank.maxAbsorbChance;
+    return {
+      title: '+1% поглощение урона',
+      buy: () => this.buyAbsorb(),
       info: maxed ? `ур. ${level} · ${now}%` : `ур. ${level} · ${now}%→${next}%`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
@@ -1182,6 +1214,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.pierceCost(level));
   }
 
+  private absorbPrice(level: number): number {
+    return shopPrice(ProgressSave.absorbCost(level));
+  }
+
   private hpPrice(level: number): number {
     return shopPrice(ProgressSave.hpCost(level));
   }
@@ -1229,6 +1265,9 @@ export class ProgressShopController {
     }
     if (stat === 'pierce') {
       return this.piercePrice(level);
+    }
+    if (stat === 'absorb') {
+      return this.absorbPrice(level);
     }
     if (stat === 'hp') {
       return this.hpPrice(level);

@@ -185,6 +185,7 @@ export class GameScene extends Phaser.Scene {
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
     Tank.setProgressPierceLevel(this.progressShop.pierceBonus());
+    Tank.setAbsorbLevel(this.progressShop.absorbBonus());
     RocketSalvo.setProgressRocketLevel(this.progressShop.salvoRocketLevel());
     ArtilleryStrike.setProgressShellLevel(this.progressShop.artilleryShellLevel());
     Mines.setProgressMineLevel(this.progressShop.minesCountLevel());

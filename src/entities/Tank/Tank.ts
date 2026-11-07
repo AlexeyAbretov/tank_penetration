@@ -23,7 +23,7 @@ import { tankBoomAt } from '../../gfx/tankBoom';
 import { bake } from '../../gfx/textures';
 
 // Прямоугольник части в координатах её родителя, до поворота башни.
-type PartBox = { x: number; y: number; w: number; h: number };
+export type PartBox = { x: number; y: number; w: number; h: number };
 
 export class Tank extends GameObjects.Container {
   static readonly spawn = { x: 76, y: 360 };
@@ -193,6 +193,24 @@ export class Tank extends GameObjects.Container {
     return Math.min(Tank.maxPierceChance, shop + progress);
   }
 
+  // Шанс поглотить чужой патрон или снаряд, в процентах. 0 — каждый наносит урон.
+  // Один уровень — один процент, выше 30 прогресс не ставит.
+  // Очередь не делит один бросок: шанс кидают на каждый выстрел отдельно.
+  static readonly maxAbsorbChance = 30;
+  static absorbLevel = 0;
+
+  static setAbsorbLevel(level: number): void {
+    Tank.absorbLevel = Tank.absorbChanceFor(level);
+  }
+
+  static absorbChance(): number {
+    return Tank.absorbLevel;
+  }
+
+  static absorbChanceFor(level: number): number {
+    return Math.min(Tank.maxAbsorbChance, Math.max(0, Math.round(level)));
+  }
+
   // Точка прицеливания врагов: чуть правее носа танка.
   static aimPoint(): { x: number; y: number } {
     return { x: Tank.spawn.x + 24, y: Tank.spawn.y };
@@ -265,12 +283,12 @@ export class Tank extends GameObjects.Container {
     return Tank.boxAround(imageX, imageY, layout.gunOriginX, layout.gunOriginY, TANK_GUN_FRAME);
   }
 
-  private static inBox(x: number, y: number, box: PartBox): boolean {
+  static inBox(x: number, y: number, box: PartBox): boolean {
     return x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h;
   }
 
   // Точка танка → точка в контейнере прицеливания, обратный поворот башни.
-  private static intoAim(x: number, y: number, angle: number): { x: number; y: number } {
+  static intoAim(x: number, y: number, angle: number): { x: number; y: number } {
     const seat = Tank.layout;
     const dx = x - seat.seatX;
     const dy = y - seat.seatY;
@@ -447,6 +465,26 @@ export class Tank extends GameObjects.Container {
       return true;
     }
     return this.turretHits.some((box) => Tank.inBox(aim.x, aim.y, box));
+  }
+
+  // Сдвиг картинки от тряски. Попадание вычитает его, иначе точка не совпадает с корпусом.
+  get shake(): { x: number; y: number } {
+    return Tank.idleShift(this.engineMs);
+  }
+
+  // Поворот башни. Ствол и навеска крутятся вместе с ней.
+  get aimAngle(): number {
+    return this.aim.rotation;
+  }
+
+  // Где сейчас картинка ствола, вместе с откатом. Координаты контейнера прицеливания.
+  get gunPlace(): { x: number; y: number } {
+    return { x: this.gun.x, y: this.gun.y };
+  }
+
+  // Дополнительные прямоугольники башни. Пуля в такую деталь тоже попадает в танк.
+  get turretHitBoxes(): readonly PartBox[] {
+    return this.turretHits;
   }
 
   // Серый корпус, башня и ствол. Пулемёт на башне красится отдельно: это другой объект.

@@ -30,6 +30,8 @@ export type SavedProgress = {
   knockback: number;
   // Проценты шанса прошивания снарядом. 0 — снаряд всегда рвётся о первого.
   pierce: number;
+  // Проценты шанса поглотить чужой патрон или снаряд. 0 — каждый наносит урон.
+  absorb: number;
   // Сколько раз докуплено здоровье танка. 0 — базовый запас. Шаг и потолок считает TankBaseHp.
   hp: number;
   speed: number;
@@ -127,6 +129,12 @@ export class ProgressSave {
     return 300 + Math.max(0, level) * 300;
   }
 
+  // Первый процент поглощения стоит 1000. Каждая следующая — на 1000 × уже купленный уровень дороже:
+  // 1000, 2000, 3000, …
+  static absorbCost(level: number): number {
+    return 1000 + Math.max(0, level) * 1000;
+  }
+
   // Первая прибавка здоровья стоит 1000. Каждая следующая — на 1000 × уже купленный уровень дороже:
   // 1000, 2000, 3000, …
   static hpCost(level: number): number {
@@ -189,6 +197,7 @@ export class ProgressSave {
     progress.blast = 0;
     progress.knockback = 0;
     progress.pierce = 0;
+    progress.absorb = 0;
     progress.hp = 0;
     progress.speed = 0;
     progress.flight = 0;
@@ -228,6 +237,7 @@ export class ProgressSave {
     Tank.setProgressBlastLevel(0);
     Tank.setProgressKnockbackLevel(0);
     Tank.setProgressPierceLevel(0);
+    Tank.setAbsorbLevel(0);
     this.forgetHp();
     RocketSalvo.setProgressRocketLevel(0);
     ArtilleryStrike.setProgressShellLevel(0);
@@ -279,6 +289,7 @@ export class ProgressSave {
       blast: 0,
       knockback: 0,
       pierce: 0,
+      absorb: 0,
       hp: 0,
       speed: 0,
       flight: 0,
@@ -356,6 +367,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     knockback: requiredInt(value.knockback, 0, Tank.maxProgressKnockbackLevel) ?? 0,
     // Старые сохранения не писали пробивание: снаряд всегда рвался о первого.
     pierce: requiredInt(value.pierce, 0, Tank.maxProgressPierceLevel) ?? 0,
+    // Старые сохранения не писали поглощение: каждый патрон бил по броне.
+    absorb: requiredInt(value.absorb, 0, Tank.maxAbsorbChance) ?? 0,
     // Старые сохранения не писали здоровье: запас оставался базовым.
     hp: requiredInt(value.hp, 0, TankBaseHp.maxLevel) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,

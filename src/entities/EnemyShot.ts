@@ -12,6 +12,8 @@ export class EnemyShot extends Physics.Arcade.Image {
   readonly damage: number;
   // Скорость без темпа. launch запоминает её, syncPace умножает на текущий множитель.
   private flightSpeed = 0;
+  // Броня уже отвела этот выстрел. Повторное касание урона не наносит.
+  private bounced = false;
   // Узкий хитбокс по форме пули. Попадание в танк сцена проверяет отдельно, по координате.
   static readonly bodySize = { w: 14, h: 8 };
 
@@ -41,6 +43,19 @@ export class EnemyShot extends Physics.Arcade.Image {
     const body = this.body as Physics.Arcade.Body;
     body.setAllowGravity(false);
     body.setSize(EnemyShot.bodySize.w, EnemyShot.bodySize.h);
+  }
+
+  hasBounced(): boolean {
+    return this.bounced;
+  }
+
+  // Новый курс без хлопка выстрела: патрон уже в полёте.
+  bounce(angle: number): void {
+    this.bounced = true;
+    this.setRotation(angle);
+    // Поверх корпуса: иначе рикошет не виден, пока картинка ещё на силуэте.
+    this.setDepth(26);
+    this.syncPace();
   }
 
   // Запускает пулю под углом angle (радианы) со скоростью speed (пиксели в секунду).
