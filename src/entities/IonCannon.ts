@@ -27,7 +27,7 @@ export class IonCannon {
     // Пока подошва держит ту же цель. Первый удар — в момент накрытия.
     tickMs: 100,
     cooldownMs: 60_000,
-    // Сколько луч идёт от края до края.
+    // Сколько луч идёт от края до края без покупок. Магазины снимают до 3 с.
     sweepMs: 5_000,
     // Половина толщины столба. Кто ближе к оси, тот под лучом.
     radius: 24,
@@ -84,6 +84,57 @@ export class IonCannon {
       Math.max(0, Math.round(shopLevel)) * IonCannon.cooldownStepMs,
     );
     return Math.max(IonCannon.minCooldownMs, IonCannon.shop.cooldownMs - progressCut - shopCut);
+  }
+
+  // Вместе с магазином волны ход не короче 3 с. У каждого магазина свой запас в 1 с.
+  // Прогресс снимает по 0,2 с, партия — по 0,1 с.
+  static readonly minSweepMs = 3_000;
+  static readonly shopSweepStepMs = 100;
+  static readonly progressSweepStepMs = 200;
+  static readonly shopSweepCutMsMax = 1_000;
+  static readonly progressSweepCutMsMax = 1_000;
+  static progressSweepLevel = 0;
+  // Сколько шагов партия уже докупила в этом заходе. Прогресс читает это, чтобы карточка показывала текущий ход.
+  static shopSweepLevel = 0;
+
+  static setShopSweepLevel(level: number): void {
+    IonCannon.shopSweepLevel = Math.min(
+      IonCannon.maxShopSweepLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  static get maxShopSweepLevel(): number {
+    return IonCannon.shopSweepCutMsMax / IonCannon.shopSweepStepMs;
+  }
+
+  static get maxProgressSweepLevel(): number {
+    return IonCannon.progressSweepCutMsMax / IonCannon.progressSweepStepMs;
+  }
+
+  static setProgressSweepLevel(level: number): void {
+    IonCannon.progressSweepLevel = Math.min(
+      IonCannon.maxProgressSweepLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  // Свой запас прогресса уже выбран — следующий уровень ход не укорачивает.
+  static progressSweepShortens(progressLevel: number): boolean {
+    const shop = IonCannon.shopSweepLevel;
+    return IonCannon.sweepFor(shop, progressLevel + 1) < IonCannon.sweepFor(shop, progressLevel);
+  }
+
+  static sweepFor(shopLevel: number, progressLevel = IonCannon.progressSweepLevel): number {
+    const progressCut = Math.min(
+      IonCannon.progressSweepCutMsMax,
+      Math.max(0, Math.round(progressLevel)) * IonCannon.progressSweepStepMs,
+    );
+    const shopCut = Math.min(
+      IonCannon.shopSweepCutMsMax,
+      Math.max(0, Math.round(shopLevel)) * IonCannon.shopSweepStepMs,
+    );
+    return Math.max(IonCannon.minSweepMs, IonCannon.shop.sweepMs - progressCut - shopCut);
   }
 
   // Дольше минуты — как на иконке: 1:00, следующий шаг 59 с. Пол — 20 с.

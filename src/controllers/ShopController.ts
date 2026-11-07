@@ -70,6 +70,7 @@ export class ShopController {
   artilleryCooldownLevel = 0;
   ionOwned = false;
   ionCooldownLevel = 0;
+  ionSweepLevel = 0;
   minesOwned = false;
   minesCooldownLevel = 0;
   nuclearOwned = false;
@@ -101,6 +102,7 @@ export class ShopController {
     this.panel = new ShopPanel(scene, this, GAME);
     ArtilleryStrike.setShopCooldownLevel(0);
     IonCannon.setShopCooldownLevel(0);
+    IonCannon.setShopSweepLevel(0);
     Mines.setShopCooldownLevel(0);
     NuclearStrike.setShopCooldownLevel(0);
   }
@@ -123,6 +125,7 @@ export class ShopController {
       artilleryCooldown: this.artilleryCooldownLevel,
       ion: this.ionOwned,
       ionCooldown: this.ionCooldownLevel,
+      ionSweep: this.ionSweepLevel,
       mines: this.minesOwned,
       minesCooldown: this.minesCooldownLevel,
       nuclear: this.nuclearOwned,
@@ -174,6 +177,8 @@ export class ShopController {
     this.ionOwned = saved.ion;
     this.ionCooldownLevel = Math.min(saved.ionCooldown, IonCannon.maxShopCooldownLevel);
     IonCannon.setShopCooldownLevel(this.ionCooldownLevel);
+    this.ionSweepLevel = Math.min(saved.ionSweep, IonCannon.maxShopSweepLevel);
+    IonCannon.setShopSweepLevel(this.ionSweepLevel);
     this.minesOwned = saved.mines;
     this.minesCooldownLevel = Math.min(saved.minesCooldown, Mines.maxShopCooldownLevel);
     Mines.setShopCooldownLevel(this.minesCooldownLevel);
@@ -210,6 +215,8 @@ export class ShopController {
     this.ionOwned = false;
     this.ionCooldownLevel = 0;
     IonCannon.setShopCooldownLevel(0);
+    this.ionSweepLevel = 0;
+    IonCannon.setShopSweepLevel(0);
     this.minesOwned = false;
     this.minesCooldownLevel = 0;
     Mines.setShopCooldownLevel(0);
@@ -572,6 +579,27 @@ export class ShopController {
     this.refresh();
   }
 
+  // −0,10 с к ходу ионной пушки. Партия снимает свою 1 с и останавливается на 4 с без очков.
+  buyIonSweep(): void {
+    if (this.isPaused() || !this.ionOwned) {
+      return;
+    }
+    if (this.ionSweepLevel >= IonCannon.maxShopSweepLevel) {
+      return;
+    }
+    const now = IonCannon.sweepFor(this.ionSweepLevel);
+    if (IonCannon.sweepFor(this.ionSweepLevel + 1) >= now) {
+      return;
+    }
+    const cost = ShopController.ionSweepCost(this.ionSweepLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.ionSweepLevel += 1;
+    IonCannon.setShopSweepLevel(this.ionSweepLevel);
+    this.refresh();
+  }
+
   // Открывает клавишу 3. Падение и взрыв считает CombatSystem.
   buyNuclear(): void {
     const cost = shopPrice(NuclearStrike.shop.cost);
@@ -799,6 +827,12 @@ export class ShopController {
     return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
   }
 
+  // Первый шаг хода ионной пушки стоит 500. Дальше та же ступень 15%:
+  // 500, 575, 661, 760, …
+  private static ionSweepCost(level: number): number {
+    return shopPrice(Math.round(500 * 1.15 ** Math.max(0, level)));
+  }
+
   // Первая секунда отката мин стоит 1000. Дальше та же ступень 15%:
   // 1000, 1150, 1323, 1521, …
   private static minesCooldownCost(level: number): number {
@@ -919,6 +953,7 @@ export class ShopController {
             'после покупки',
           ),
           this.ionCooldownCard(coins),
+          this.ionSweepCard(coins),
         ]),
         this.tab('mines', 'Мина', [
           this.gearCard('mines', coins),
@@ -1348,6 +1383,35 @@ export class ShopController {
       info: maxed
         ? `ур. ${level} · ${IonCannon.cooldownLabel(now)}`
         : `ур. ${level} · ${IonCannon.cooldownLabel(now)}→${IonCannon.cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
+  private ionSweepCard(coins: number): ShopCardView {
+    const buy = () => this.buyIonSweep();
+    const level = this.ionSweepLevel;
+    const price = ShopController.ionSweepCost(level);
+    if (!this.ionOwned) {
+      return {
+        title: '−0.10 с хода',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = this.formatSeconds(IonCannon.sweepFor(level));
+    const next = this.formatSeconds(IonCannon.sweepFor(level + 1));
+    const maxed = level >= IonCannon.maxShopSweepLevel || IonCannon.sweepFor(level + 1) >= IonCannon.sweepFor(level);
+    return {
+      title: '−0.10 с хода',
+      buy,
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,

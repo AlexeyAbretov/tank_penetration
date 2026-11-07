@@ -32,6 +32,8 @@ type ArtillerySpot = { x: number; y: number; mark: ArtilleryMark };
 type IonRun = {
   course: IonCourse;
   elapsed: number;
+  // Ход, с которым столб вышел. Покупка в открытом магазине этот проход не ускоряет.
+  sweepMs: number;
   prev: WorldPoint;
   // Следующий удар, в миллисекундах хода столба. Нет записи — удар сразу.
   nextHit: Map<Infantry, number>;
@@ -612,6 +614,7 @@ export class CombatSystem implements Combat {
     this.ionRun = {
       course,
       elapsed: 0,
+      sweepMs: IonCannon.sweepFor(this.shop.ionSweepLevel),
       prev: from,
       nextHit: new Map(),
       beam,
@@ -630,7 +633,7 @@ export class CombatSystem implements Combat {
       return;
     }
     run.elapsed += delta;
-    const t = Math.min(1, run.elapsed / IonCannon.shop.sweepMs);
+    const t = Math.min(1, run.elapsed / run.sweepMs);
     const at = IonCannon.pointAt(run.course, t);
     IonCannon.paint(run.beam, at, run.course.minX, this.scene.time.now);
     revealScorchedPath(

@@ -69,6 +69,8 @@ export type SavedProgress = {
   artilleryCooldown: number;
   // Сколько раз укорочен откат ионной пушки. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   ionCooldown: number;
+  // Сколько раз укорочен ход ионной пушки. 0 — базовые 5 с. Прогресс сам снимает 1 с и останавливается на 4 с.
+  ionSweep: number;
   // Сколько раз укорочен откат мин. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   minesCooldown: number;
   // Сколько раз укорочен откат атомного взрыва. 0 — базовые 3 минуты. Прогресс сам останавливается на 2:30.
@@ -226,6 +228,7 @@ export class ProgressSave {
     progress.wireDamage = 0;
     progress.artilleryCooldown = 0;
     progress.ionCooldown = 0;
+    progress.ionSweep = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
     progress.autoFire = false;
@@ -255,6 +258,7 @@ export class ProgressSave {
     Mines.setProgressMineLevel(0);
     ArtilleryStrike.setProgressCooldownLevel(0);
     IonCannon.setProgressCooldownLevel(0);
+    IonCannon.setProgressSweepLevel(0);
     Mines.setProgressCooldownLevel(0);
     NuclearStrike.setProgressCooldownLevel(0);
     LaserDefense.setProgressCooldownLevel(0);
@@ -320,6 +324,7 @@ export class ProgressSave {
       wireDamage: 0,
       artilleryCooldown: 0,
       ionCooldown: 0,
+      ionSweep: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
       autoFire: false,
@@ -411,6 +416,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали откат ионной пушки: луч ждал базовую минуту.
     ionCooldown: requiredInt(value.ionCooldown, 0, IonCannon.maxProgressCooldownLevel) ?? 0,
+    // Старые сохранения не писали ход ионной пушки: пятно шло базовые 5 с.
+    ionSweep: requiredInt(value.ionSweep, 0, IonCannon.maxProgressSweepLevel) ?? 0,
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали откат атомного взрыва: бомба ждала базовые 3 минуты.
     nuclearCooldown: requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxProgressCooldownLevel) ?? 0,

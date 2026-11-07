@@ -45,6 +45,8 @@ export type ShopSave = {
   ion: boolean;
   // Уровни отката ионной пушки за эту партию. Старые сохранения читают 0.
   ionCooldown: number;
+  // Уровни хода ионной пушки за эту партию. Старые сохранения читают 0: пятно идёт 5 с.
+  ionSweep: number;
   mines: boolean;
   // Уровни отката мин за эту партию. Старые сохранения читают 0.
   minesCooldown: number;
@@ -244,6 +246,8 @@ function parseShop(value: unknown): ShopSave | null {
   // Старые сохранения не писали ионную пушку: этой покупки ещё не было.
   const ion = flag(value.ion) ?? false;
   const ionCooldown = requiredInt(value.ionCooldown, 0, IonCannon.maxShopCooldownLevel) ?? 0;
+  // Старые сохранения не писали ход ионной пушки: пятно шло базовые 5 с.
+  const ionSweep = requiredInt(value.ionSweep, 0, IonCannon.maxShopSweepLevel) ?? 0;
   const minesCooldown = requiredInt(value.minesCooldown, 0, Mines.maxShopCooldownLevel) ?? 0;
   const nuclearCooldown = requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxShopCooldownLevel) ?? 0;
   // Старые сохранения не писали урон партии у пулемёта, проволоки, огнемёта, РСЗО, артиллерии и мин.
@@ -283,6 +287,7 @@ function parseShop(value: unknown): ShopSave | null {
     artilleryCooldown,
     ion,
     ionCooldown,
+    ionSweep,
     mines,
     minesCooldown,
     nuclear,

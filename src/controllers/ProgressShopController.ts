@@ -52,6 +52,7 @@ type Stat =
   | 'wireDamage'
   | 'artilleryCooldown'
   | 'ionCooldown'
+  | 'ionSweep'
   | 'minesCooldown'
   | 'nuclearCooldown';
 
@@ -185,6 +186,10 @@ export class ProgressShopController {
 
   ionCooldownLevel(): number {
     return this.progress.ionCooldown;
+  }
+
+  ionSweepLevel(): number {
+    return this.progress.ionSweep;
   }
 
   minesCooldownLevel(): number {
@@ -455,6 +460,10 @@ export class ProgressShopController {
     this.buy('ionCooldown');
   }
 
+  private buyIonSweep(): void {
+    this.buy('ionSweep');
+  }
+
   private buyMinesCooldown(): void {
     this.buy('minesCooldown');
   }
@@ -610,6 +619,9 @@ export class ProgressShopController {
     if (stat === 'ionCooldown' && !IonCannon.progressCooldownShortens(level)) {
       return;
     }
+    if (stat === 'ionSweep' && !IonCannon.progressSweepShortens(level)) {
+      return;
+    }
     if (stat === 'minesCooldown' && !Mines.progressCooldownShortens(level)) {
       return;
     }
@@ -664,6 +676,9 @@ export class ProgressShopController {
     if (stat === 'ionCooldown') {
       IonCannon.setProgressCooldownLevel(this.progress.ionCooldown);
     }
+    if (stat === 'ionSweep') {
+      IonCannon.setProgressSweepLevel(this.progress.ionSweep);
+    }
     if (stat === 'minesCooldown') {
       Mines.setProgressCooldownLevel(this.progress.minesCooldown);
     }
@@ -712,6 +727,7 @@ export class ProgressShopController {
         this.tab('ion', 'Ионная пушка', [
           this.ionDamageCard(score),
           this.ionCooldownCard(score),
+          this.ionSweepCard(score),
           this.autoIonCard(score),
         ]),
         this.tab('mines', 'Мина', [
@@ -1193,6 +1209,24 @@ export class ProgressShopController {
     };
   }
 
+  private ionSweepCard(score: number): ProgressCardView {
+    const level = this.progress.ionSweep;
+    const price = this.price(level);
+    const now = IonCannon.sweepFor(IonCannon.shopSweepLevel, level);
+    const next = IonCannon.sweepFor(IonCannon.shopSweepLevel, level + 1);
+    const maxed = !IonCannon.progressSweepShortens(level);
+    const sweep = this.formatSeconds(now);
+    const ahead = this.formatSeconds(next);
+    return {
+      title: '−0.20 с хода',
+      buy: () => this.buyIonSweep(),
+      info: maxed ? `ур. ${level} · ${sweep}` : `ур. ${level} · ${sweep}→${ahead}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private minesCooldownCard(score: number): ProgressCardView {
     const level = this.progress.minesCooldown;
     const price = this.minesCooldownPrice(level);
@@ -1330,6 +1364,9 @@ export class ProgressShopController {
     }
     if (stat === 'ionCooldown') {
       return this.ionCooldownPrice(level);
+    }
+    if (stat === 'ionSweep') {
+      return this.price(level);
     }
     if (stat === 'minesCooldown') {
       return this.minesCooldownPrice(level);

@@ -64,6 +64,7 @@ export class DebugCombatSave extends CombatSave {
         artilleryCooldown: 0,
         ion: true,
         ionCooldown: 0,
+        ionSweep: 0,
         mines: true,
         minesCooldown: 0,
         nuclear: true,

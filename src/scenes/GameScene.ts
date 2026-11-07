@@ -198,6 +198,7 @@ export class GameScene extends Phaser.Scene {
     Mines.setProgressCooldownLevel(this.progressShop.minesCooldownLevel());
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
     IonCannon.setProgressCooldownLevel(this.progressShop.ionCooldownLevel());
+    IonCannon.setProgressSweepLevel(this.progressShop.ionSweepLevel());
     LaserDefense.setProgressCooldownLevel(this.progressShop.laserCooldownLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
