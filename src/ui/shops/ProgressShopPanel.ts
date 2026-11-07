@@ -44,13 +44,13 @@ export type ProgressShopDelegate = {
 };
 
 const PANEL_W = 980;
-const PANEL_H = 680;
+const PANEL_H = 704;
 
 const SIDE = 22;
 const TAB_W = 250;
 const TAB_H = 46;
 const TAB_GAP = 6;
-const CONTENT_TOP = -220;
+const CONTENT_TOP = -228;
 const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
 
 const CARD_GAP_X = 16;
@@ -59,10 +59,10 @@ const CARD_X = TAB_X + TAB_W / 2 + CARD_GAP_X + CARD_W / 2;
 const CARD_H = 92;
 const CARD_GAP = 10;
 
-const TITLE_Y = -302;
-const SCORE_Y = -258;
-const RULE_Y = -238;
-const BUTTON_Y = 292;
+const TITLE_Y = -310;
+const SCORE_Y = -266;
+const RULE_Y = -246;
+const BUTTON_Y = 314;
 const BUTTON_W = 260;
 const BUTTON_GAP = 30;
 // Пара стоит в колонке карточек. Иначе «Ресурсы» внизу закладок наезжает на «Новую игру».

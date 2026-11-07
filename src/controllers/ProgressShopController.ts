@@ -11,6 +11,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
+import { TankBaseHp } from '../entities/Tank/TankBaseHp';
 import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
 import {
@@ -31,6 +32,7 @@ type Stat =
   | 'blast'
   | 'knockback'
   | 'pierce'
+  | 'hp'
   | 'speed'
   | 'flight'
   | 'bullets'
@@ -101,6 +103,11 @@ export class ProgressShopController {
 
   pierceBonus(): number {
     return this.progress.pierce;
+  }
+
+  // Старт партии подставляет купленный запас до полоски и игрока.
+  syncTankHp(): void {
+    this.progressSave.syncHp();
   }
 
   coinBonus(): number {
@@ -346,6 +353,10 @@ export class ProgressShopController {
     this.buy('pierce');
   }
 
+  private buyHp(): void {
+    this.buy('hp');
+  }
+
   private buySpeed(): void {
     this.buy('speed');
   }
@@ -516,6 +527,9 @@ export class ProgressShopController {
     if (stat === 'pierce' && level >= Tank.maxProgressPierceLevel) {
       return;
     }
+    if (stat === 'hp' && level >= TankBaseHp.maxLevel) {
+      return;
+    }
     if (stat === 'speed' && level >= Tank.maxProgressSpeedLevel) {
       return;
     }
@@ -585,6 +599,9 @@ export class ProgressShopController {
     if (stat === 'pierce') {
       Tank.setProgressPierceLevel(this.progress.pierce);
     }
+    if (stat === 'hp') {
+      this.progressSave.applyHp(this.progress.hp);
+    }
     if (stat === 'salvoRockets') {
       RocketSalvo.setProgressRocketLevel(this.progress.salvoRockets);
     }
@@ -625,6 +642,7 @@ export class ProgressShopController {
           this.flightCard(score),
           this.knockbackCard(score),
           this.pierceCard(score),
+          this.hpCard(score),
           this.autoFireCard(score),
           this.autoAimCard(score),
         ]),
@@ -852,6 +870,22 @@ export class ProgressShopController {
       title: '+1% пробивание',
       buy: () => this.buyPierce(),
       info: maxed ? `ур. ${level} · ${now}%` : `ур. ${level} · ${now}%→${next}%`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private hpCard(score: number): ProgressCardView {
+    const level = this.progress.hp;
+    const price = this.hpPrice(level);
+    const now = TankBaseHp.hpForLevel(level);
+    const next = TankBaseHp.hpForLevel(level + 1);
+    const maxed = level >= TankBaseHp.maxLevel;
+    return {
+      title: '+10 здоровья',
+      buy: () => this.buyHp(),
+      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1148,6 +1182,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.pierceCost(level));
   }
 
+  private hpPrice(level: number): number {
+    return shopPrice(ProgressSave.hpCost(level));
+  }
+
   private countPrice(level: number): number {
     return shopPrice(ProgressSave.countCost(level));
   }
@@ -1191,6 +1229,9 @@ export class ProgressShopController {
     }
     if (stat === 'pierce') {
       return this.piercePrice(level);
+    }
+    if (stat === 'hp') {
+      return this.hpPrice(level);
     }
     if (stat === 'salvoRockets' || stat === 'artilleryShells' || stat === 'minesCount') {
       return this.countPrice(level);

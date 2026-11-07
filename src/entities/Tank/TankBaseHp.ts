@@ -1,12 +1,14 @@
 // Базовое здоровье танка в обычной партии.
 // Танк это число не читает: его берёт игрок.
-// Свой ключ, не ключ партии: «новая игра» стирает бой, а запас остаётся.
-// Менять запас будет покупка в магазине.
+// Свой ключ, не ключ партии: стирание боя это число не удаляет.
+// Магазин очков пишет сюда купленный запас. «Новая игра» возвращает базу.
 
 const STORAGE_KEY = 'tank-penetration-tank-hp';
 const DEFAULT_HP = 100;
 const MIN_HP = 100;
-const MAX_HP = 10_000;
+// Потолок покупки. Дебаг в openStore передаёт свой: поле настроек этим числом не зажато.
+const SHOP_MAX_HP = 500;
+const STEP = 10;
 
 type TankHpStore = {
   storageKey: string;
@@ -17,6 +19,9 @@ type TankHpStore = {
 };
 
 export class TankBaseHp {
+  static readonly step = STEP;
+  static readonly shopMax = SHOP_MAX_HP;
+
   static get min(): number {
     return this.store.min;
   }
@@ -25,11 +30,22 @@ export class TankBaseHp {
     return this.store.max;
   }
 
-  protected static store = openTankHpStore(STORAGE_KEY, DEFAULT_HP);
+  // Сколько покупок отделяют базу от потолка магазина.
+  static get maxLevel(): number {
+    return (TankBaseHp.shopMax - MIN_HP) / TankBaseHp.step;
+  }
 
-  // Дебаг-наследник открывает свой ключ и свой запас по умолчанию.
-  protected static openStore(storageKey: string, defaultHp: number): TankHpStore {
-    return openTankHpStore(storageKey, defaultHp);
+  // Запас после level покупок. Уровень выше потолка число не поднимает.
+  static hpForLevel(level: number): number {
+    const steps = Math.min(TankBaseHp.maxLevel, Math.max(0, Math.round(level)));
+    return MIN_HP + steps * TankBaseHp.step;
+  }
+
+  protected static store = openTankHpStore(STORAGE_KEY, DEFAULT_HP, SHOP_MAX_HP);
+
+  // Дебаг-наследник открывает свой ключ, свой запас по умолчанию и свой потолок.
+  protected static openStore(storageKey: string, defaultHp: number, maxHp: number): TankHpStore {
+    return openTankHpStore(storageKey, defaultHp, maxHp);
   }
 
   static currentOf(): number {
@@ -61,17 +77,17 @@ export class TankBaseHp {
   }
 }
 
-function openTankHpStore(storageKey: string, defaultHp: number): TankHpStore {
+function openTankHpStore(storageKey: string, defaultHp: number, maxHp: number): TankHpStore {
   return {
     storageKey,
     min: MIN_HP,
-    max: MAX_HP,
-    current: readTankHp(storageKey, defaultHp),
+    max: maxHp,
+    current: readTankHp(storageKey, defaultHp, maxHp),
     onApply: null,
   };
 }
 
-function readTankHp(storageKey: string, defaultHp: number): number {
+function readTankHp(storageKey: string, defaultHp: number, maxHp: number): number {
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw === null) {
@@ -81,7 +97,7 @@ function readTankHp(storageKey: string, defaultHp: number): number {
     if (!Number.isFinite(value)) {
       return defaultHp;
     }
-    return Math.min(MAX_HP, Math.max(MIN_HP, Math.trunc(value)));
+    return Math.min(maxHp, Math.max(MIN_HP, Math.trunc(value)));
   } catch {
     return defaultHp;
   }

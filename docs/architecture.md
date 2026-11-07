@@ -58,7 +58,7 @@
 
 **`GameScene`** держит очки и монеты этой партии, флаги поражения и настроек, глубину паузы и автозапись. На убийство она прибавляет 10 очков плюс постоянный бонус и монеты вида плюс постоянную монету. Сама попадания не считает: это делают бой и `ProjectileSystem` через колбэки `CombatCallbacks`.
 
-**`PlayerController`** владеет танком и числом здоровья базы. Запас новой партии читает у `TankBaseHp` (у дебага — свой наследник). При нуле запускает взрыв базы и экран поражения. Танк про магазин не знает.
+**`PlayerController`** владеет танком и числом здоровья базы. Запас новой партии читает у `TankBaseHp` (у дебага — свой наследник). Уровень этой покупки лежит в прогрессе и при старте обычной партии записывается в запас. Дебаг при старте оставляет запас поля в настройках и его потолок. При нуле запускает взрыв базы и экран поражения. Танк про магазин не знает.
 
 **`Tank`** — корпус, башня, ствол, перезарядка, полёт снаряда, радиус взрыва и шанс прошивания. Уровни скорости, полёта, взрыва, отталкивания и пробивания из магазина очков лежат статикой на классе: их ставят при старте партии и при покупке.
 
@@ -168,7 +168,7 @@
 | Попадание по врагу, проволока, свои постройки | `CombatSystem` | Сущность, если меняется её число |
 | Пуля и ракета врага по танку | Выпуск — сущность. Попадание — `ProjectileSystem` | Звук в `src/sounds`, если клип новый |
 | Цена монет | `shop` сущности или `ShopController.upgradeCost` / `knockbackCost` / `pierceCost` / `flightCost` / `artilleryCooldownCost` / `ionCooldownCost` / `minesCooldownCost` / `nuclearCooldownCost` | `README.md` |
-| Цена очков | `ProgressSave` (`cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`, `pierceCost`, `countCost`, `laserCooldownCost`, `autoFireCost`, `autoAimCost`, `autoArtilleryCost`, `autoIonCost`, `autoMinesCost`) | `README.md` |
+| Цена очков | `ProgressSave` (`cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`, `pierceCost`, `hpCost`, `countCost`, `laserCooldownCost`, `autoFireCost`, `autoAimCost`, `autoArtilleryCost`, `autoIonCost`, `autoMinesCost`) | `README.md` |
 | Новая кнопка витрины | Контроллер собирает карточку | Окно только если изменилась вёрстка карточки |
 | Новая клавиша способности | `CombatSystem` и иконка в `create()` сцены | Подсказка в `GameHud`, `README.md` |
 | Новый вид паузы | Класс `Pause` | Строка в `GameSceneFactory` |

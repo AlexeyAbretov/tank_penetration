@@ -175,6 +175,9 @@ export class GameScene extends Phaser.Scene {
     this.persistEnabled = false;
     this.autosaveMs = 0;
     this.defeatShop = false;
+    // Купленный запас до полоски: интерфейс и игрок читают уже новое число.
+    // Дебаг здесь свой запас не трогает — его держит поле в настройках.
+    this.progressShop.syncTankHp();
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
     Tank.setProgressFlightLevel(this.progressShop.flightLevel());
     MachineGun.setProgressSpeedLevel(this.progressShop.mgSpeedLevel());

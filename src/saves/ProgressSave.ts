@@ -9,6 +9,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
+import { TankBaseHp } from '../entities/Tank/TankBaseHp';
 
 const CAMPAIGN_KEY = 'tank-penetration-progress:v1';
 const SCORE_MAX = 100_000_000;
@@ -29,6 +30,8 @@ export type SavedProgress = {
   knockback: number;
   // Проценты шанса прошивания снарядом. 0 — снаряд всегда рвётся о первого.
   pierce: number;
+  // Сколько раз докуплено здоровье танка. 0 — базовый запас. Шаг и потолок считает TankBaseHp.
+  hp: number;
   speed: number;
   // Сколько раз укорочен полёт снаряда. 0 — базовые 2 с через поле.
   flight: number;
@@ -124,6 +127,12 @@ export class ProgressSave {
     return 300 + Math.max(0, level) * 300;
   }
 
+  // Первая прибавка здоровья стоит 1000. Каждая следующая — на 1000 × уже купленный уровень дороже:
+  // 1000, 2000, 3000, …
+  static hpCost(level: number): number {
+    return 1000 + Math.max(0, level) * 1000;
+  }
+
   // Одна покупка. Танк стреляет сам, пока включена иконка справа.
   static autoFireCost(): number {
     return 5_000;
@@ -180,6 +189,7 @@ export class ProgressSave {
     progress.blast = 0;
     progress.knockback = 0;
     progress.pierce = 0;
+    progress.hp = 0;
     progress.speed = 0;
     progress.flight = 0;
     progress.bullets = 0;
@@ -218,6 +228,7 @@ export class ProgressSave {
     Tank.setProgressBlastLevel(0);
     Tank.setProgressKnockbackLevel(0);
     Tank.setProgressPierceLevel(0);
+    this.forgetHp();
     RocketSalvo.setProgressRocketLevel(0);
     ArtilleryStrike.setProgressShellLevel(0);
     Mines.setProgressMineLevel(0);
@@ -242,6 +253,21 @@ export class ProgressSave {
     return CAMPAIGN_KEY;
   }
 
+  // Купленный запас. Дебаг пишет в свой ключ: поле настроек живёт отдельно.
+  applyHp(level: number): void {
+    TankBaseHp.set(TankBaseHp.hpForLevel(level));
+  }
+
+  // Старт партии подставляет запас до полоски. Дебаг этот вызов пропускает.
+  syncHp(): void {
+    this.applyHp(this.load().hp);
+  }
+
+  // «Новая игра» возвращает базу. Дебаг запас в настройках не трогает.
+  protected forgetHp(): void {
+    this.applyHp(0);
+  }
+
   protected empty(): SavedProgress {
     return {
       version: 1,
@@ -253,6 +279,7 @@ export class ProgressSave {
       blast: 0,
       knockback: 0,
       pierce: 0,
+      hp: 0,
       speed: 0,
       flight: 0,
       bullets: 0,
@@ -329,6 +356,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     knockback: requiredInt(value.knockback, 0, Tank.maxProgressKnockbackLevel) ?? 0,
     // Старые сохранения не писали пробивание: снаряд всегда рвался о первого.
     pierce: requiredInt(value.pierce, 0, Tank.maxProgressPierceLevel) ?? 0,
+    // Старые сохранения не писали здоровье: запас оставался базовым.
+    hp: requiredInt(value.hp, 0, TankBaseHp.maxLevel) ?? 0,
     speed: requiredInt(value.speed, 0, Tank.maxProgressSpeedLevel) ?? 0,
     // Старые сохранения не писали полёт: снаряд шёл базовые 2 с.
     flight: requiredInt(value.flight, 0, Tank.maxProgressFlightLevel) ?? 0,
