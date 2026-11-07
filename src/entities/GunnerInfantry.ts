@@ -81,14 +81,29 @@ export class GunnerInfantry extends RangedEnemy {
   // Дороже штурмовика: убивать стрелка выгоднее.
   static readonly coinReward = 2;
   readonly coinReward = GunnerInfantry.coinReward;
-  // Выстрел раз в 1.5 секунды.
+  // Пауза после последней пули очереди. Одиночный выстрел ждёт то же время.
   static readonly shotInterval = 1500;
+  // Одна пуля, пока волна меньше 20. Каждые 20 волн в очередь добавляется ещё одна.
+  static readonly burstMin = 1;
+  static readonly burstEvery = 20;
+  // Три — потолок: винтовка не становится станковым пулемётом.
+  static readonly burstMax = 3;
+  // Между пулями. Длиннее вспышки (100 мс) и отката (90 мс), чтобы выстрелы не слипались.
+  static readonly burstGap = 150;
+
+  // 1 + целые двадцатки номера волны, не больше burstMax.
+  // Волна 19 — одна пуля, 20 — две, 40 — три. Дальше потолок.
+  static burstFor(wave: number): number {
+    const extra = Math.floor(Math.max(0, wave) / GunnerInfantry.burstEvery);
+    return Math.min(GunnerInfantry.burstMax, GunnerInfantry.burstMin + extra);
+  }
   // Медленнее пули пикапа, но урон выше.
   static readonly shotSpeed = 420;
 
   // Рубеж остановки. 640 — центр поля шириной 1280.
   protected readonly holdX = 640;
   protected readonly fireDelay = GunnerInfantry.shotInterval;
+  protected override readonly burstGap = GunnerInfantry.burstGap;
   protected readonly bulletSpeed = GunnerInfantry.shotSpeed;
   // База выстрела. Прибавку волны добавляет предок.
   protected readonly shotDamage = 8;
@@ -176,6 +191,12 @@ export class GunnerInfantry extends RangedEnemy {
       frameRate: this.walkFps,
       repeat: -1,
     });
+  }
+
+  // Длина очереди на всю жизнь этого тела. Фабрика зовёт и при выходе, и при загрузке.
+  override setDamageWave(wave: number): void {
+    super.setDamageWave(wave);
+    this.burstCount = GunnerInfantry.burstFor(wave);
   }
 
   constructor(

@@ -24,6 +24,7 @@ import { BattleEffects } from '../sounds/BattleEffects';
 import { BattleMusic } from '../sounds/BattleMusic';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem } from '../types/CombatSystem';
+import { FocusPause } from '../controllers/FocusPause';
 import { PauseStack } from '../controllers/PauseStack';
 import { ProgressShopController } from '../controllers/ProgressShopController';
 import { PlayerController } from '../controllers/PlayerController';
@@ -138,6 +139,7 @@ export class GameScene extends Phaser.Scene {
       frame: { width: number; height: number },
       onMusic: (level: number) => void,
       onEffects: (level: number) => void,
+      onFocusPause: (on: boolean) => void,
       onClose: () => void,
     ) => SettingsPanel = SettingsPanel,
     // Игрок. Дебаг подставляет наследника со своим запасом здоровья.
@@ -436,10 +438,12 @@ export class GameScene extends Phaser.Scene {
         fx.setVolume(level);
         this.previewEffect();
       },
+      (on) => FocusPause.setEnabled(on),
       () => this.closeSettings(),
     );
     this.settings.setMusic(this.music.volume);
     this.settings.setEffects(fx.volume);
+    this.settings.setFocusPause(FocusPause.enabled);
 
     this.waves.bind(
       this,

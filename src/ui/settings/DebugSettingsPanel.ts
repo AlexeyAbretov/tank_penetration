@@ -16,16 +16,16 @@ import { TankDebugBaseHp } from '../../entities/Tank/TankDebugBaseHp';
 import { DebugEnemyFactory } from '../../entities/DebugEnemyFactory';
 import { SETTINGS_CONTENT_LEFT, SETTINGS_CONTENT_RIGHT, SettingsPanel } from './SettingsPanel';
 
-const WAVE_Y = 120;
-const HP_Y = 172;
-const TOGGLE_Y = 224;
-const PIERCE_Y = 276;
+const WAVE_Y = 176;
+const HP_Y = 228;
+const TOGGLE_Y = 280;
+const PIERCE_Y = 332;
 const INPUT_W = 100;
 const INPUT_H = 40;
 const GAP = 16;
 const TOGGLE_W = 72;
-const CARD_EXTRA = 184;
-const DONE_Y = 340;
+const CARD_EXTRA = 192;
+const DONE_Y = 396;
 // Те же края, что у дорожки и «0%».
 const CONTENT_RIGHT = SETTINGS_CONTENT_RIGHT;
 const CONTENT_LEFT = SETTINGS_CONTENT_LEFT;
@@ -46,9 +46,10 @@ export class DebugSettingsPanel extends SettingsPanel {
     frame: { width: number; height: number },
     onMusic: (level: number) => void,
     onEffects: (level: number) => void,
+    onFocusPause: (on: boolean) => void,
     onClose: () => void,
   ) {
-    super(scene, frame, onMusic, onEffects, () => {
+    super(scene, frame, onMusic, onEffects, onFocusPause, () => {
       this.commitHp();
       onClose();
     });

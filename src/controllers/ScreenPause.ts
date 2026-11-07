@@ -1,5 +1,6 @@
 // Обычная пауза: кнопка, Esc и плашка «ПАУЗА». Продолжает бой Esc и крестик.
 
+import { FocusPause } from './FocusPause';
 import type { Pause, PauseEnv } from './PauseStack';
 
 export class ScreenPause implements Pause {
@@ -53,8 +54,10 @@ export class ScreenPause implements Pause {
     }
   }
 
+  // Спрятанная вкладка. Выключенный переключатель в настройках паузу не ставит.
+  // Запись партии сцена делает раньше и от этого флага не зависит.
   onHidden(): void {
-    if (this.active || !this.env?.canPause()) {
+    if (!FocusPause.enabled || this.active || !this.env?.canPause()) {
       return;
     }
     this.enter();

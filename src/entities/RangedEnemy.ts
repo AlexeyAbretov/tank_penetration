@@ -14,8 +14,8 @@ export abstract class RangedEnemy extends Infantry {
   // Пауза между выстрелами, миллисекунды. Для очереди — пауза после последней пули.
   protected abstract readonly fireDelay: number;
   // Сколько пуль подряд. 1 — одиночный выстрел, между ними только fireDelay.
-  // Тип number: наследник ставит свою длину очереди.
-  protected readonly burstCount: number = 1;
+  // Наследник ставит свою длину. Стрелок переписывает её, когда фабрика сообщает волну.
+  protected burstCount = 1;
   // Пауза между пулями одной очереди. Одиночный выстрел это число не читает.
   protected readonly burstGap: number = 0;
   // Скорость пули, пиксели в секунду.

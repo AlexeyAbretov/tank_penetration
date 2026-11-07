@@ -1,15 +1,22 @@
-// Окно громкости. Бой на это время стоит, музыка играет:
+// Окно громкости и паузы при потере фокуса. Бой на это время стоит, музыка играет:
 // ползунок музыки сразу слышно. Закрывает его только кнопка «Готово».
 // Второй ползунок — эффекты. Музыку он не трогает.
+// Переключатель паузы только рисует флаг. Решает сцена, пишет FocusPause.
 
 import Phaser from 'phaser';
-import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
+import { fieldInk, fieldInkStroke, fieldMuted, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 
 const PANEL_W = 520;
-const PANEL_H = 400;
+// Ниже ползунков стоит переключатель. Верх карточки остаётся на −200, низ уезжает вниз.
+const PANEL_H = 448;
+const CARD_TOP = -200;
 const PANEL_HALF = PANEL_W / 2;
 const MUSIC_Y = -56;
 const EFFECTS_Y = 64;
+const PAUSE_Y = 116;
+const DONE_Y = 196;
+const FOCUS_W = 72;
+const FOCUS_H = 40;
 // Отступ карточки до контента. Дорожка, «0%» и строки дебага стоят в этих краях.
 const INSET = 24;
 const PERCENT_HALF = 18;
@@ -43,6 +50,8 @@ export class SettingsPanel {
   protected doneLabel!: Phaser.GameObjects.Text;
   private readonly music: Slider;
   private readonly effects: Slider;
+  private readonly focusLabel: Phaser.GameObjects.Text;
+  private focusOn = true;
   private dragging: Slider | null = null;
 
   constructor(
@@ -50,12 +59,14 @@ export class SettingsPanel {
     private readonly frame: { width: number; height: number },
     onMusic: (level: number) => void,
     onEffects: (level: number) => void,
+    onFocusPause: (on: boolean) => void,
     private readonly onClose: () => void,
   ) {
     this.dim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
 
     // Прямоугольник только ловит клик. Рисунок едет за ним, когда дебаг растит окно вниз.
-    this.card = scene.add.rectangle(0, 0, PANEL_W, PANEL_H, 0x000000, 0);
+    // Верх на прежнем месте: ползунки не прыгают, когда карточка выросла вниз.
+    this.card = scene.add.rectangle(0, CARD_TOP + PANEL_H / 2, PANEL_W, PANEL_H, 0x000000, 0);
     // Глушит клик по затемнению, когда курсор над самой карточкой.
     this.card.setInteractive();
     this.cardFace = scene.add.graphics();
@@ -76,6 +87,8 @@ export class SettingsPanel {
     const effectsLabel = label(scene, 20, 'Громкость эффектов');
     this.music = this.makeSlider(scene, MUSIC_Y, onMusic);
     this.effects = this.makeSlider(scene, EFFECTS_Y, onEffects);
+    const focusRow = this.makeFocusToggle(scene, onFocusPause);
+    this.focusLabel = focusRow.label;
 
     const onMove = (pointer: Phaser.Input.Pointer): void => {
       if (!this.dragging || !this.container.visible) {
@@ -93,13 +106,13 @@ export class SettingsPanel {
       scene.input.off('pointerup', onUp);
     });
 
-    this.doneFace = scene.add.graphics().setPosition(0, 148);
+    this.doneFace = scene.add.graphics().setPosition(0, DONE_Y);
     paintOrderBar(this.doneFace, 220, 48);
-    this.done = scene.add.rectangle(0, 148, 220, 48, 0x000000, 0);
+    this.done = scene.add.rectangle(0, DONE_Y, 220, 48, 0x000000, 0);
     this.done.setInteractive({ useHandCursor: true });
     this.done.on('pointerup', () => this.onClose());
     this.doneLabel = scene.add
-      .text(0, 148, 'ГОТОВО', {
+      .text(0, DONE_Y, 'ГОТОВО', {
         fontSize: '18px',
         color: fieldInk,
       })
@@ -116,6 +129,7 @@ export class SettingsPanel {
         effectsLabel,
         ...this.music.nodes,
         ...this.effects.nodes,
+        ...focusRow.nodes,
         this.doneFace,
         this.done,
         this.doneLabel,
@@ -137,6 +151,11 @@ export class SettingsPanel {
 
   setEffects(level: number): void {
     this.effects.paint(clamp01(level));
+  }
+
+  // Только рисунок. Флаг пишет сцена, когда кнопку реально нажали.
+  setFocusPause(on: boolean): void {
+    this.paintFocus(on);
   }
 
   setOpen(open: boolean): void {
@@ -195,6 +214,42 @@ export class SettingsPanel {
     });
     slider.nodes.push(track, fill, thumb, hit, valueText);
     return slider;
+  }
+
+  // Подпись слева, кнопка у правого края. ВКЛ — уход со вкладки ставит паузу.
+  private makeFocusToggle(
+    scene: Phaser.Scene,
+    onChange: (on: boolean) => void,
+  ): { nodes: Phaser.GameObjects.GameObject[]; label: Phaser.GameObjects.Text } {
+    const caption = scene.add
+      .text(SETTINGS_CONTENT_LEFT, PAUSE_Y, 'Пауза при потере фокуса', {
+        fontSize: '22px',
+        color: fieldPaper,
+      })
+      .setOrigin(0, 0.5);
+    const btnX = SETTINGS_CONTENT_RIGHT - FOCUS_W / 2;
+    const button = scene.add
+      .rectangle(btnX, PAUSE_Y, FOCUS_W, FOCUS_H, 0x1a2214)
+      .setStrokeStyle(2, 0x6e6240)
+      .setInteractive({ useHandCursor: true });
+    const value = scene.add
+      .text(btnX, PAUSE_Y, 'ВКЛ', {
+        fontSize: '22px',
+        color: fieldInk,
+      })
+      .setOrigin(0.5);
+    button.on('pointerup', () => {
+      const next = !this.focusOn;
+      this.paintFocus(next);
+      onChange(next);
+    });
+    return { nodes: [caption, button, value], label: value };
+  }
+
+  private paintFocus(on: boolean): void {
+    this.focusOn = on;
+    this.focusLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    this.focusLabel.setColor(on ? fieldInk : fieldMuted);
   }
 }
 
