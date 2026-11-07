@@ -24,6 +24,8 @@ export class IonCannon {
   static readonly shop = {
     cost: 100,
     damage: 50,
+    // Пока подошва держит ту же цель. Первый удар — в момент накрытия.
+    tickMs: 100,
     cooldownMs: 60_000,
     // Сколько луч идёт от края до края.
     sweepMs: 5_000,

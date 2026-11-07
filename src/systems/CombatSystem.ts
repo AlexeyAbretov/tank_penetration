@@ -33,7 +33,8 @@ type IonRun = {
   course: IonCourse;
   elapsed: number;
   prev: WorldPoint;
-  hit: Set<Infantry>;
+  // Следующий удар, в миллисекундах хода столба. Нет записи — удар сразу.
+  nextHit: Map<Infantry, number>;
   beam: Phaser.GameObjects.Graphics;
   earth: Phaser.GameObjects.Container;
   crater?: Phaser.GameObjects.Image;
@@ -612,7 +613,7 @@ export class CombatSystem implements Combat {
       course,
       elapsed: 0,
       prev: from,
-      hit: new Set(),
+      nextHit: new Map(),
       beam,
       earth,
       crater,
@@ -643,18 +644,31 @@ export class CombatSystem implements Combat {
     }
   }
 
-  // Один проход бьёт врага один раз, даже если столб несколько кадров стоит на нём.
+  // Подошва бьёт в момент накрытия и дальше с шагом tickMs, пока цель под ней.
+  // Вышла из пятна — следующая встреча снова бьёт сразу.
   private cutIon(run: IonRun, at: WorldPoint): void {
     const angle = IonCannon.columnAngle();
+    const period = IonCannon.shop.tickMs;
+    const covered = new Set<Infantry>();
     for (const unit of this.infantry.getChildren() as Infantry[]) {
-      if (!unit.active || unit.reachedWall || run.hit.has(unit)) {
+      if (!unit.active || unit.reachedWall) {
         continue;
       }
       if (!IonCannon.covers(unit.hitCenter(), run.prev, at, this.ionReach(unit))) {
         continue;
       }
-      run.hit.add(unit);
+      covered.add(unit);
+      const due = run.nextHit.get(unit);
+      if (due !== undefined && run.elapsed < due) {
+        continue;
+      }
+      run.nextHit.set(unit, run.elapsed + period);
       this.hurtIon(unit, angle);
+    }
+    for (const unit of run.nextHit.keys()) {
+      if (!covered.has(unit)) {
+        run.nextHit.delete(unit);
+      }
     }
   }
 
