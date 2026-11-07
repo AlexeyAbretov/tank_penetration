@@ -46,8 +46,9 @@ const PANEL_H = 680;
 
 const SIDE = 22;
 const TAB_W = 250;
-const TAB_H = 46;
-const TAB_GAP = 6;
+// Одиннадцать вкладок помещаются в левую колонку над нижним краем плашки.
+const TAB_H = 42;
+const TAB_GAP = 4;
 const CONTENT_TOP = -220;
 const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
 

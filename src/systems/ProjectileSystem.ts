@@ -1,4 +1,4 @@
-// Пули и ракеты врагов: уборка за экраном, урон по танку и поглощение.
+// Пули и ракеты врагов: уборка за экраном, урон по танку, поглощение и гашение на завесе.
 
 import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
@@ -17,6 +17,8 @@ export class ProjectileSystem {
     private readonly enemyShots: Phaser.Physics.Arcade.Group,
     private readonly onTankDamage: (amount: number) => void,
     private readonly effects: BattleEffects,
+    private readonly shieldFace: () => number | null,
+    private readonly onShield: (y: number) => void,
   ) {
     this.armorSparks = createArmorSparks(scene);
   }
@@ -29,6 +31,15 @@ export class ProjectileSystem {
       }
       if (shot.x < 0 || shot.x > GAME.width || shot.y < 0 || shot.y > GAME.bannerY) {
         shot.destroy();
+        return;
+      }
+      // Завеса стоит впереди брони. Входящий патрон гаснет на её правом крае.
+      // Уже отскочивший летит дальше: он бьёт врагов, а не базу.
+      const face = this.shieldFace();
+      if (face !== null && !shot.hasBounced() && shot.x <= face) {
+        const y = shot.y;
+        shot.destroy();
+        this.onShield(y);
         return;
       }
       if (!this.tank.containsPoint(shot.x, shot.y)) {

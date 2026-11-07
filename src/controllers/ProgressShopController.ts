@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
@@ -54,7 +55,9 @@ type Stat =
   | 'ionCooldown'
   | 'ionSweep'
   | 'minesCooldown'
-  | 'nuclearCooldown';
+  | 'nuclearCooldown'
+  | 'wallDuration'
+  | 'wallCooldown';
 
 export class ProgressShopController {
   // Панель и интерфейс живут только пока жива сцена. restart() их уничтожает, bind() собирает заново.
@@ -198,6 +201,14 @@ export class ProgressShopController {
 
   nuclearCooldownLevel(): number {
     return this.progress.nuclearCooldown;
+  }
+
+  wallDurationLevel(): number {
+    return this.progress.wallDuration;
+  }
+
+  wallCooldownLevel(): number {
+    return this.progress.wallCooldown;
   }
 
   autoFireOwned(): boolean {
@@ -472,6 +483,14 @@ export class ProgressShopController {
     this.buy('nuclearCooldown');
   }
 
+  private buyWallDuration(): void {
+    this.buy('wallDuration');
+  }
+
+  private buyWallCooldown(): void {
+    this.buy('wallCooldown');
+  }
+
   private buyAutoFire(): void {
     if (this.isPaused() || this.progress.autoFire) {
       return;
@@ -628,6 +647,12 @@ export class ProgressShopController {
     if (stat === 'nuclearCooldown' && !NuclearStrike.progressCooldownShortens(level)) {
       return;
     }
+    if (stat === 'wallDuration' && !EnergyWall.progressDurationLengthens(level)) {
+      return;
+    }
+    if (stat === 'wallCooldown' && !EnergyWall.progressCooldownShortens(level)) {
+      return;
+    }
     const cost = this.costFor(stat, level);
     if (this.progress.score < cost) {
       return;
@@ -685,6 +710,12 @@ export class ProgressShopController {
     if (stat === 'nuclearCooldown') {
       NuclearStrike.setProgressCooldownLevel(this.progress.nuclearCooldown);
     }
+    if (stat === 'wallDuration') {
+      EnergyWall.setProgressDurationLevel(this.progress.wallDuration);
+    }
+    if (stat === 'wallCooldown') {
+      EnergyWall.setProgressCooldownLevel(this.progress.wallCooldown);
+    }
     if (stat === 'laserCooldown') {
       LaserDefense.setProgressCooldownLevel(this.progress.laserCooldown);
     }
@@ -737,6 +768,10 @@ export class ProgressShopController {
           this.autoMinesCard(score),
         ]),
         this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
+        this.tab('wall', 'Энергетическая стена', [
+          this.wallDurationCard(score),
+          this.wallCooldownCard(score),
+        ]),
         this.tab('resources', 'Ресурсы', [
           this.coinsCard(score),
           this.pointsCard(score),
@@ -1263,6 +1298,42 @@ export class ProgressShopController {
     };
   }
 
+  private wallDurationCard(score: number): ProgressCardView {
+    const level = this.progress.wallDuration;
+    const price = this.wallDurationPrice(level);
+    const now = EnergyWall.durationFor(EnergyWall.shopDurationLevel, level);
+    const next = EnergyWall.durationFor(EnergyWall.shopDurationLevel, level + 1);
+    const maxed = !EnergyWall.progressDurationLengthens(level);
+    return {
+      title: '+0.10 с длительности',
+      buy: () => this.buyWallDuration(),
+      info: maxed
+        ? `ур. ${level} · ${EnergyWall.durationLabel(now)}`
+        : `ур. ${level} · ${EnergyWall.durationLabel(now)}→${EnergyWall.durationLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private wallCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.wallCooldown;
+    const price = this.wallCooldownPrice(level);
+    const now = EnergyWall.cooldownFor(EnergyWall.shopCooldownLevel, level);
+    const next = EnergyWall.cooldownFor(EnergyWall.shopCooldownLevel, level + 1);
+    const maxed = !EnergyWall.progressCooldownShortens(level);
+    return {
+      title: '−0.10 с перезарядки',
+      buy: () => this.buyWallCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${EnergyWall.cooldownLabel(now)}`
+        : `ур. ${level} · ${EnergyWall.cooldownLabel(now)}→${EnergyWall.cooldownLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private mgDamageCard(score: number): ProgressCardView {
     const level = this.progress.mgDamage;
     const price = this.mgDamagePrice(level);
@@ -1326,6 +1397,14 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.cost(level));
   }
 
+  private wallDurationPrice(level: number): number {
+    return shopPrice(ProgressSave.wallDurationCost(level));
+  }
+
+  private wallCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.wallCooldownCost(level));
+  }
+
   private laserCooldownPrice(level: number): number {
     return shopPrice(ProgressSave.laserCooldownCost(level));
   }
@@ -1373,6 +1452,12 @@ export class ProgressShopController {
     }
     if (stat === 'nuclearCooldown') {
       return this.nuclearCooldownPrice(level);
+    }
+    if (stat === 'wallDuration') {
+      return this.wallDurationPrice(level);
+    }
+    if (stat === 'wallCooldown') {
+      return this.wallCooldownPrice(level);
     }
     if (stat === 'laserCooldown') {
       return this.laserCooldownPrice(level);

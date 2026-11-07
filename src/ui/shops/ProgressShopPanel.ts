@@ -48,8 +48,9 @@ const PANEL_H = 704;
 
 const SIDE = 22;
 const TAB_W = 250;
-const TAB_H = 46;
-const TAB_GAP = 6;
+// Одиннадцать вкладок остаются над нижним краем плашки и не доезжают до кнопок.
+const TAB_H = 42;
+const TAB_GAP = 4;
 const CONTENT_TOP = -228;
 const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
 

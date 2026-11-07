@@ -5,6 +5,7 @@
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
@@ -53,6 +54,11 @@ export type ShopSave = {
   nuclear: boolean;
   // Уровни отката атомного взрыва за эту партию. Старые сохранения читают 0.
   nuclearCooldown: number;
+  wall: boolean;
+  // Уровни длительности стены за эту партию. Старые сохранения читают 0: завеса стоит 1 с.
+  wallDuration: number;
+  // Уровни отката стены за эту партию. Старые сохранения читают 0.
+  wallCooldown: number;
   mgDamage: number;
   // Уровни перезарядки пулемёта за эту партию. Старые сохранения читают 0: пауза 3 с.
   mgFireRate: number;
@@ -87,6 +93,7 @@ export type SavedRun = {
   minesCooldownMs: number;
   nuclearCooldownMs: number;
   ionCooldownMs: number;
+  wallCooldownMs: number;
   flameCooldownMs: number;
   flameWall: FlameWallSave | null;
   wave: number;
@@ -180,6 +187,8 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     requiredInt(value.nuclearCooldownMs, 0, NuclearStrike.shop.cooldownMs) ?? 0;
   // Старые сохранения не писали перезарядку ионной пушки: луча ещё не было.
   const ionCooldownMs = requiredInt(value.ionCooldownMs, 0, IonCannon.shop.cooldownMs) ?? 0;
+  // Старые сохранения не писали перезарядку стены: завесы ещё не было.
+  const wallCooldownMs = requiredInt(value.wallCooldownMs, 0, EnergyWall.shop.cooldownMs) ?? 0;
   // Старые сохранения не писали перезарядку огнемёта: струя просто ждёт новый заход.
   const flameCooldownMs = requiredInt(value.flameCooldownMs, 0, 60 * 60 * 1000) ?? 0;
   // Старые сохранения не писали стену огня: на поле её не было.
@@ -206,6 +215,7 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     minesCooldownMs,
     nuclearCooldownMs,
     ionCooldownMs,
+    wallCooldownMs,
     flameCooldownMs,
     flameWall,
     wave,
@@ -250,6 +260,10 @@ function parseShop(value: unknown): ShopSave | null {
   const ionSweep = requiredInt(value.ionSweep, 0, IonCannon.maxShopSweepLevel) ?? 0;
   const minesCooldown = requiredInt(value.minesCooldown, 0, Mines.maxShopCooldownLevel) ?? 0;
   const nuclearCooldown = requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxShopCooldownLevel) ?? 0;
+  // Старые сохранения не писали энергетическую стену: этой покупки ещё не было.
+  const wall = flag(value.wall) ?? false;
+  const wallDuration = requiredInt(value.wallDuration, 0, EnergyWall.maxShopDurationLevel) ?? 0;
+  const wallCooldown = requiredInt(value.wallCooldown, 0, EnergyWall.maxShopCooldownLevel) ?? 0;
   // Старые сохранения не писали урон партии у пулемёта, проволоки, огнемёта, РСЗО, артиллерии и мин.
   const mgDamage = requiredInt(value.mgDamage, 0, 500) ?? 0;
   // Старые сохранения не писали перезарядку и полёт пулемёта: пауза 3 с, полёт 2 с.
@@ -292,6 +306,9 @@ function parseShop(value: unknown): ShopSave | null {
     minesCooldown,
     nuclear,
     nuclearCooldown,
+    wall,
+    wallDuration,
+    wallCooldown,
     mgDamage,
     mgFireRate,
     mgFlight,

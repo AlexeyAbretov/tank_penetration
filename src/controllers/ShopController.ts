@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
 import { FlameTank } from '../entities/FlameTank';
@@ -20,7 +21,7 @@ import { ShopPanel, type ShopCardView, type ShopTabView, type ShopView } from '.
 import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
-type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'ion' | 'mines' | 'nuclear';
+type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'ion' | 'mines' | 'nuclear' | 'wall';
 
 type PermanentBonuses = {
   damage: number;
@@ -75,6 +76,9 @@ export class ShopController {
   minesCooldownLevel = 0;
   nuclearOwned = false;
   nuclearCooldownLevel = 0;
+  wallOwned = false;
+  wallDurationLevel = 0;
+  wallCooldownLevel = 0;
   mgDamageLevel = 0;
   mgFireRateLevel = 0;
   mgFlightLevel = 0;
@@ -105,6 +109,8 @@ export class ShopController {
     IonCannon.setShopSweepLevel(0);
     Mines.setShopCooldownLevel(0);
     NuclearStrike.setShopCooldownLevel(0);
+    EnergyWall.setShopDurationLevel(0);
+    EnergyWall.setShopCooldownLevel(0);
   }
 
   // Снимок покупок для сохранения партии. Монеты и номер волны пишет сцена, не этот метод.
@@ -130,6 +136,9 @@ export class ShopController {
       minesCooldown: this.minesCooldownLevel,
       nuclear: this.nuclearOwned,
       nuclearCooldown: this.nuclearCooldownLevel,
+      wall: this.wallOwned,
+      wallDuration: this.wallDurationLevel,
+      wallCooldown: this.wallCooldownLevel,
       mgDamage: this.mgDamageLevel,
       mgFireRate: this.mgFireRateLevel,
       mgFlight: this.mgFlightLevel,
@@ -185,6 +194,11 @@ export class ShopController {
     this.nuclearOwned = saved.nuclear;
     this.nuclearCooldownLevel = Math.min(saved.nuclearCooldown, NuclearStrike.maxShopCooldownLevel);
     NuclearStrike.setShopCooldownLevel(this.nuclearCooldownLevel);
+    this.wallOwned = saved.wall;
+    this.wallDurationLevel = Math.min(saved.wallDuration, EnergyWall.maxShopDurationLevel);
+    EnergyWall.setShopDurationLevel(this.wallDurationLevel);
+    this.wallCooldownLevel = Math.min(saved.wallCooldown, EnergyWall.maxShopCooldownLevel);
+    EnergyWall.setShopCooldownLevel(this.wallCooldownLevel);
     this.mgDamageLevel = saved.mgDamage;
     this.mgFireRateLevel = Math.min(saved.mgFireRate, MachineGun.maxFireRateLevel);
     this.mgFlightLevel = Math.min(saved.mgFlight, MachineGun.maxShopFlightLevel);
@@ -223,6 +237,11 @@ export class ShopController {
     this.nuclearOwned = false;
     this.nuclearCooldownLevel = 0;
     NuclearStrike.setShopCooldownLevel(0);
+    this.wallOwned = false;
+    this.wallDurationLevel = 0;
+    EnergyWall.setShopDurationLevel(0);
+    this.wallCooldownLevel = 0;
+    EnergyWall.setShopCooldownLevel(0);
     this.mgDamageLevel = 0;
     this.mgFireRateLevel = 0;
     this.mgFlightLevel = 0;
@@ -634,6 +653,61 @@ export class ShopController {
     this.refresh();
   }
 
+  // Открывает клавишу 5. Завесу и срок считает CombatSystem.
+  buyWall(): void {
+    const cost = shopPrice(EnergyWall.shop.cost);
+    if (this.isPaused() || this.wallOwned || this.economy.getCoins() < cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.wallOwned = true;
+    this.refresh();
+  }
+
+  // +0,10 с к завесе. Партия прибавляет свою 1 с и останавливается на 2 с без очков.
+  buyWallDuration(): void {
+    if (this.isPaused() || !this.wallOwned) {
+      return;
+    }
+    if (this.wallDurationLevel >= EnergyWall.maxShopDurationLevel) {
+      return;
+    }
+    const now = EnergyWall.durationFor(this.wallDurationLevel);
+    if (EnergyWall.durationFor(this.wallDurationLevel + 1) <= now) {
+      return;
+    }
+    const cost = ShopController.wallDurationCost(this.wallDurationLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.wallDurationLevel += 1;
+    EnergyWall.setShopDurationLevel(this.wallDurationLevel);
+    this.refresh();
+  }
+
+  // −0,10 с к откату стены. Партия снимает свои 0,5 с и останавливается на 2:59,5 без очков.
+  buyWallCooldown(): void {
+    if (this.isPaused() || !this.wallOwned) {
+      return;
+    }
+    if (this.wallCooldownLevel >= EnergyWall.maxShopCooldownLevel) {
+      return;
+    }
+    const now = EnergyWall.cooldownFor(this.wallCooldownLevel);
+    if (EnergyWall.cooldownFor(this.wallCooldownLevel + 1) >= now) {
+      return;
+    }
+    const cost = ShopController.wallCooldownCost(this.wallCooldownLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.wallCooldownLevel += 1;
+    EnergyWall.setShopCooldownLevel(this.wallCooldownLevel);
+    this.refresh();
+  }
+
   // Открывает клавишу 2. Постановку и подрыв считает CombatSystem.
   buyMines(): void {
     const cost = shopPrice(Mines.shop.cost);
@@ -845,6 +919,18 @@ export class ShopController {
     return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
   }
 
+  // Первый шаг длительности стены стоит 500. Дальше та же ступень 15%:
+  // 500, 575, 661, 760, …
+  private static wallDurationCost(level: number): number {
+    return shopPrice(Math.round(500 * 1.15 ** Math.max(0, level)));
+  }
+
+  // Первый шаг отката стены стоит 1000. Дальше та же ступень 15%:
+  // 1000, 1150, 1323, 1521, …
+  private static wallCooldownCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
   // Сумма партии и прогресса: число на карточке и потолок взрыва.
   // Номер кнопки и цена считают только покупки партии.
   private blastOfferLevel(): number {
@@ -970,6 +1056,11 @@ export class ShopController {
         this.tab('nuclear', 'Атомный взрыв', [
           this.gearCard('nuclear', coins),
           this.nuclearCooldownCard(coins),
+        ]),
+        this.tab('wall', 'Энергетическая стена', [
+          this.gearCard('wall', coins),
+          this.wallDurationCard(coins),
+          this.wallCooldownCard(coins),
         ]),
       ],
     };
@@ -1114,6 +1205,8 @@ export class ShopController {
         return this.minesCard(coins);
       case 'nuclear':
         return this.nuclearCard(coins);
+      case 'wall':
+        return this.wallCard(coins);
     }
   }
 
@@ -1526,6 +1619,94 @@ export class ShopController {
       info: maxed
         ? `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}`
         : `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}→${NuclearStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
+  private wallCard(coins: number): ShopCardView {
+    const price = shopPrice(EnergyWall.shop.cost);
+    const reload = EnergyWall.cooldownLabel(EnergyWall.cooldownFor(this.wallCooldownLevel));
+    const hold = EnergyWall.durationLabel(EnergyWall.durationFor(this.wallDurationLevel));
+    if (this.wallOwned) {
+      return {
+        title: 'Покупка',
+        buy: () => this.buyWall(),
+        info: `откат ${reload}`,
+        cost: '',
+        open: false,
+        canBuy: false,
+        owned: true,
+      };
+    }
+    return {
+      title: 'Покупка',
+      buy: () => this.buyWall(),
+      info: `весь урон · ${hold} · ${reload}`,
+      cost: this.coin(price),
+      open: true,
+      canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private wallDurationCard(coins: number): ShopCardView {
+    const buy = () => this.buyWallDuration();
+    const level = this.wallDurationLevel;
+    const price = ShopController.wallDurationCost(level);
+    if (!this.wallOwned) {
+      return {
+        title: '+0.10 с длительности',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = EnergyWall.durationFor(level);
+    const next = EnergyWall.durationFor(level + 1);
+    const maxed = level >= EnergyWall.maxShopDurationLevel || next <= now;
+    return {
+      title: '+0.10 с длительности',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${EnergyWall.durationLabel(now)}`
+        : `ур. ${level} · ${EnergyWall.durationLabel(now)}→${EnergyWall.durationLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
+  private wallCooldownCard(coins: number): ShopCardView {
+    const buy = () => this.buyWallCooldown();
+    const level = this.wallCooldownLevel;
+    const price = ShopController.wallCooldownCost(level);
+    if (!this.wallOwned) {
+      return {
+        title: '−0.10 с перезарядки',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = EnergyWall.cooldownFor(level);
+    const next = EnergyWall.cooldownFor(level + 1);
+    const maxed = level >= EnergyWall.maxShopCooldownLevel || next >= now;
+    return {
+      title: '−0.10 с перезарядки',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${EnergyWall.cooldownLabel(now)}`
+        : `ур. ${level} · ${EnergyWall.cooldownLabel(now)}→${EnergyWall.cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,

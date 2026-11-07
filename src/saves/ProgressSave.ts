@@ -2,6 +2,7 @@
 // а эти уровни и непотраченный score остаются в localStorage.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
@@ -75,6 +76,10 @@ export type SavedProgress = {
   minesCooldown: number;
   // Сколько раз укорочен откат атомного взрыва. 0 — базовые 3 минуты. Прогресс сам останавливается на 2:30.
   nuclearCooldown: number;
+  // Сколько раз удлинена энергетическая стена. 0 — базовая 1 с. Прогресс сам прибавляет 1 с и останавливается на 2 с.
+  wallDuration: number;
+  // Сколько раз укорочен откат энергетической стены. 0 — базовые 3 минуты. Прогресс сам снимает 0,5 с.
+  wallCooldown: number;
   // Куплена ли автострельба. Танк стреляет сам, пока включена иконка справа.
   autoFire: boolean;
   // Выключатель уже купленной автострельбы. Пока false, танк ждёт левую кнопку.
@@ -177,6 +182,18 @@ export class ProgressSave {
     return 20_000;
   }
 
+  // Первая десятая секунды стены стоит 2000. Каждая следующая — на 2000 × уже купленный уровень дороже:
+  // 2000, 4000, 6000, …
+  static wallDurationCost(level: number): number {
+    return 2000 + Math.max(0, level) * 2000;
+  }
+
+  // Первая десятая секунды отката стены стоит 3000. Каждая следующая — на 3000 × уже купленный уровень дороже:
+  // 3000, 6000, 9000, …
+  static wallCooldownCost(level: number): number {
+    return 3000 + Math.max(0, level) * 3000;
+  }
+
   // Первая секунда перезарядки лазера стоит 5000, вторая — 50000.
   static laserCooldownCost(level: number): number {
     return Math.max(0, level) < 1 ? 5_000 : 50_000;
@@ -231,6 +248,8 @@ export class ProgressSave {
     progress.ionSweep = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
+    progress.wallDuration = 0;
+    progress.wallCooldown = 0;
     progress.autoFire = false;
     progress.autoFireOn = false;
     progress.autoAim = false;
@@ -261,6 +280,8 @@ export class ProgressSave {
     IonCannon.setProgressSweepLevel(0);
     Mines.setProgressCooldownLevel(0);
     NuclearStrike.setProgressCooldownLevel(0);
+    EnergyWall.setProgressDurationLevel(0);
+    EnergyWall.setProgressCooldownLevel(0);
     LaserDefense.setProgressCooldownLevel(0);
   }
 
@@ -327,6 +348,8 @@ export class ProgressSave {
       ionSweep: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
+      wallDuration: 0,
+      wallCooldown: 0,
       autoFire: false,
       autoFireOn: false,
       autoAim: false,
@@ -421,6 +444,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали откат атомного взрыва: бомба ждала базовые 3 минуты.
     nuclearCooldown: requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxProgressCooldownLevel) ?? 0,
+    // Старые сохранения не писали стену: завеса ждала базовую секунду и базовые 3 минуты.
+    wallDuration: requiredInt(value.wallDuration, 0, EnergyWall.maxProgressDurationLevel) ?? 0,
+    wallCooldown: requiredInt(value.wallCooldown, 0, EnergyWall.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали автострельбу: она жила в партии и умирала с базой.
     autoFire: value.autoFire === true,
     autoFireOn: value.autoFire === true && value.autoFireOn !== false,

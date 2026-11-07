@@ -1,4 +1,5 @@
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
@@ -38,6 +39,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   Mines.preload(scene);
   ArtilleryStrike.preload(scene);
   IonCannon.preload(scene);
+  EnergyWall.preload(scene);
   AutoAim.preload(scene);
   AutoFire.preload(scene);
   AutoShop.preload(scene);

@@ -1,9 +1,10 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, ионная пушка, мины, атомный взрыв, контакт с базой и урон отскочившего чужого выстрела.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, ионная пушка, мины, атомный взрыв, энергетическая стена, контакт с базой и урон отскочившего чужого выстрела.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
+import { EnergyWall } from '../entities/EnergyWall';
 import { EnemyShot } from '../entities/EnemyShot';
 import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
@@ -126,6 +127,11 @@ export class CombatSystem implements Combat {
   private readonly ionKeys: Phaser.Input.Keyboard.Key[] = [];
   // Клик по иконке ионной пушки. Сбрасывается в том же кадре, даже если луч ещё на перезарядке.
   private ionFromIcon = false;
+  private wallCooldownMs = 0;
+  private readonly wallKeys: Phaser.Input.Keyboard.Key[] = [];
+  // Клик по иконке стены. Сбрасывается в том же кадре, даже если завеса ещё на перезарядке.
+  private wallFromIcon = false;
+  private readonly wall: EnergyWall;
   private ionRun?: IonRun;
   // Столб уже гаснет, полоса ещё на поле. Поражение снимает и то и другое сразу.
   private ionFade?: {
@@ -190,7 +196,12 @@ export class CombatSystem implements Combat {
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_FOUR),
       );
+      this.wallKeys.push(
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_FIVE),
+      );
     }
+    this.wall = new EnergyWall(scene);
     // Дебаг-наследник здесь включает рамки хитбоксов. В обычной партии метод пуст.
     this.afterConstruct();
   }
@@ -235,6 +246,23 @@ export class CombatSystem implements Combat {
 
   setIonCooldown(ms: number): void {
     this.ionCooldownMs = Math.min(this.ionSpan(), Math.max(0, ms));
+  }
+
+  get wallCooldown(): number {
+    return this.wallCooldownMs;
+  }
+
+  setWallCooldown(ms: number): void {
+    this.wallCooldownMs = Math.min(this.wallSpan(), Math.max(0, ms));
+  }
+
+  // Правый край завесы. Пока её нет, чужой выстрел летит до танка.
+  shieldFace(): number | null {
+    return this.wall.face();
+  }
+
+  shieldGlint(y: number): void {
+    this.wall.glint(y);
   }
 
   // Живая цель остаётся, даже если к танку подошёл кто-то ближе. Труп и дошедший до базы уже не цель.
@@ -283,6 +311,10 @@ export class CombatSystem implements Combat {
     return IonCannon.cooldownFor(this.shop.ionCooldownLevel);
   }
 
+  private wallSpan(): number {
+    return EnergyWall.cooldownFor(this.shop.wallCooldownLevel);
+  }
+
   // Сколько миллисекунд гриб ещё будет на поле. Магазин волны ждёт это, чтобы не закрыть взрыв.
   nuclearCloudLeft(): number {
     return Math.max(0, this.nuclearCloudUntil - this.scene.time.now);
@@ -308,11 +340,18 @@ export class CombatSystem implements Combat {
     this.ionFromIcon = true;
   }
 
+  // Иконка стены на HUD. Сработает в tickWall, если бой идёт и перезарядка кончилась.
+  requestWall(): void {
+    this.wallFromIcon = true;
+  }
+
   clearProjectiles(): void {
     this.strikeFromIcon = false;
     this.mineFromIcon = false;
     this.nuclearFromIcon = false;
     this.ionFromIcon = false;
+    this.wallFromIcon = false;
+    this.wall.drop();
     this.artilleryReadyMs = 0;
     this.minesReadyMs = 0;
     this.ionReadyMs = 0;
@@ -598,6 +637,41 @@ export class CombatSystem implements Combat {
     const fromIcon = this.ionFromIcon;
     this.ionFromIcon = false;
     return fromIcon || this.ionKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  // Перезарядка идёт и в магазине. Завеса — только в бою, по клавише 5 или по иконке.
+  // Уже стоящая стена в магазине не замирает: срок догорает сам.
+  tickWall(delta: number, canFire: boolean): void {
+    this.wall.tick(delta);
+    if (!this.shop.wallOwned) {
+      this.wallFromIcon = false;
+      return;
+    }
+    const span = this.wallSpan();
+    this.wallCooldownMs = Math.min(span, Math.max(0, this.wallCooldownMs - delta));
+    if (!this.wallPressed()) {
+      return;
+    }
+    this.useWall(canFire);
+  }
+
+  protected useWall(canFire: boolean): void {
+    if (!canFire || this.wallCooldownMs > 0 || this.wall.up()) {
+      return;
+    }
+    this.wallCooldownMs = this.wallSpan();
+    this.wall.raise(
+      BarbedWire.bounds.face + EnergyWall.ahead,
+      EnergyWall.durationFor(this.shop.wallDurationLevel),
+    );
+    // Тот же клип, что у луча: короткое включение энергии.
+    this.effects.laserShot.play();
+  }
+
+  private wallPressed(): boolean {
+    const fromIcon = this.wallFromIcon;
+    this.wallFromIcon = false;
+    return fromIcon || this.wallKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
   }
 
   private launchIon(): void {
@@ -1762,6 +1836,10 @@ export class CombatSystem implements Combat {
       this.effects.assaultExplosion.play();
     }
     unit.kill();
+    // Завеса забирает удар целиком: солдат всё равно сгорает о броню, здоровье базы стоит.
+    if (this.wall.up()) {
+      return;
+    }
     this.callbacks.onBaseHit(unit.touchDamage());
   }
 

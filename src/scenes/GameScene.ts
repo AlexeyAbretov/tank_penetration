@@ -8,6 +8,7 @@ import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
 import { AutoShop } from '../entities/AutoShop';
+import { EnergyWall } from '../entities/EnergyWall';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -45,7 +46,7 @@ export class GameScene extends Phaser.Scene {
 
   // Танк и число здоровья базы.
   private player!: PlayerController;
-  // Снаряды танка, попадания, проволока, пулемёт, артиллерия, мины и атомный взрыв.
+  // Снаряды танка, попадания, проволока, пулемёт, артиллерия, мины, атомный взрыв и энергетическая стена.
   private combat!: CombatSystem;
   // Выстрелы, взрывы и крики. Музыка сюда не входит: у неё свой ползунок.
   private fx?: BattleEffects;
@@ -199,6 +200,8 @@ export class GameScene extends Phaser.Scene {
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
     IonCannon.setProgressCooldownLevel(this.progressShop.ionCooldownLevel());
     IonCannon.setProgressSweepLevel(this.progressShop.ionSweepLevel());
+    EnergyWall.setProgressDurationLevel(this.progressShop.wallDurationLevel());
+    EnergyWall.setProgressCooldownLevel(this.progressShop.wallCooldownLevel());
     LaserDefense.setProgressCooldownLevel(this.progressShop.laserCooldownLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
@@ -240,6 +243,13 @@ export class GameScene extends Phaser.Scene {
         hint: '4 — луч',
         cooldownMs: IonCannon.shop.cooldownMs,
         iconRadius: IonCannon.iconRadius,
+      },
+      {
+        id: 'wall',
+        texture: EnergyWall.iconKey,
+        hint: '5 — стена',
+        cooldownMs: EnergyWall.shop.cooldownMs,
+        iconRadius: EnergyWall.iconRadius,
       },
     ]);
     this.progressShop.bind(this, () => {
@@ -311,6 +321,12 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       this.combat.requestIon();
+    });
+    this.hud.onAbility('wall', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.combat.requestWall();
     });
     this.hud.onAutoApply('artillery', () => {
       if (this.blocksPlay()) {
@@ -470,6 +486,8 @@ export class GameScene extends Phaser.Scene {
       this.enemyShots,
       (amount) => this.onBaseHit(amount),
       fx,
+      () => this.combat.shieldFace(),
+      (y) => this.combat.shieldGlint(y),
     );
 
     this.applyCameraFx();
@@ -585,13 +603,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fighting = !this.shop.shopOpen;
-    // Перезарядка артиллерии, ионной пушки, мин и атомного взрыва идёт и в магазине. Вызов — только когда fighting.
-    // Секунда автоприменения тикает там же. Сам удар ждёт закрытого магазина. Уже пущенный луч не замирает.
+    // Перезарядка артиллерии, ионной пушки, мин, атомного взрыва и стены идёт и в магазине. Вызов — только когда fighting.
+    // Секунда автоприменения тикает там же. Сам удар ждёт закрытого магазина. Уже пущенный луч и стоящая стена не замирают.
     this.applyAutoStrikes();
     this.combat.tickArtillery(delta, fighting);
     this.combat.tickMines(delta, fighting);
     this.combat.tickNuclear(delta, fighting);
     this.combat.tickIon(delta, fighting);
+    this.combat.tickWall(delta, fighting);
     this.hud.setAbility(
       'artillery',
       this.shop.artilleryOwned,
@@ -615,6 +634,12 @@ export class GameScene extends Phaser.Scene {
       this.shop.ionOwned,
       this.combat.ionCooldown,
       IonCannon.cooldownFor(this.shop.ionCooldownLevel),
+    );
+    this.hud.setAbility(
+      'wall',
+      this.shop.wallOwned,
+      this.combat.wallCooldown,
+      EnergyWall.cooldownFor(this.shop.wallCooldownLevel),
     );
     this.paintAutoStrikes();
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
@@ -954,6 +979,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.setMinesCooldown(saved.minesCooldownMs);
     this.combat.setNuclearCooldown(saved.nuclearCooldownMs);
     this.combat.setIonCooldown(saved.ionCooldownMs);
+    this.combat.setWallCooldown(saved.wallCooldownMs);
     this.combat.setFlameCooldown(saved.flameCooldownMs);
     this.combat.restoreMines(saved.plantedMines);
     this.combat.restoreFlameWall(saved.flameWall);
@@ -997,6 +1023,7 @@ export class GameScene extends Phaser.Scene {
       minesCooldownMs: Math.round(this.combat.minesCooldown),
       nuclearCooldownMs: Math.round(this.combat.nuclearCooldown),
       ionCooldownMs: Math.round(this.combat.ionCooldown),
+      wallCooldownMs: Math.round(this.combat.wallCooldown),
       flameCooldownMs: Math.round(this.combat.flameCooldown),
       flameWall: this.combat.captureFlameWall(),
       plantedMines: this.combat.captureMines(),

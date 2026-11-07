@@ -13,6 +13,7 @@ import { LaserDefense } from '../entities/LaserDefense';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
+import { EnergyWall } from '../entities/EnergyWall';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { EnemyShot } from '../entities/EnemyShot';
@@ -41,6 +42,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   AutoShop.ensureTextures(scene);
   Mines.ensureTextures(scene);
   NuclearStrike.ensureTextures(scene);
+  EnergyWall.ensureTextures(scene);
   AssaultInfantry.ensureTextures(scene);
   GunnerInfantry.ensureTextures(scene);
   RocketInfantry.ensureTextures(scene);
