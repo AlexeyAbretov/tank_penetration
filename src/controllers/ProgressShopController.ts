@@ -235,6 +235,23 @@ export class ProgressShopController {
     this.progressSave.save(this.progress);
   }
 
+  autoShopOwned(): boolean {
+    return this.progress.autoShop;
+  }
+
+  // Куплено и не выключено иконкой справа. Магазин волны тогда тратит монеты сам.
+  autoShopEnabled(): boolean {
+    return this.progress.autoShop && this.progress.autoShopOn;
+  }
+
+  toggleAutoShop(): void {
+    if (this.paused || !this.progress.autoShop) {
+      return;
+    }
+    this.progress.autoShopOn = !this.progress.autoShopOn;
+    this.progressSave.save(this.progress);
+  }
+
   autoArtilleryOwned(): boolean {
     return this.progress.autoArtillery;
   }
@@ -477,6 +494,21 @@ export class ProgressShopController {
     this.panel.refresh(this.view());
   }
 
+  private buyAutoShop(): void {
+    if (this.isPaused() || this.progress.autoShop) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoShopCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoShop = true;
+    this.progress.autoShopOn = true;
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
+  }
+
   private buyAutoArtillery(): void {
     if (this.isPaused() || this.progress.autoArtillery) {
       return;
@@ -689,7 +721,11 @@ export class ProgressShopController {
           this.autoMinesCard(score),
         ]),
         this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
-        this.tab('resources', 'Ресурсы', [this.coinsCard(score), this.pointsCard(score)]),
+        this.tab('resources', 'Ресурсы', [
+          this.coinsCard(score),
+          this.pointsCard(score),
+          this.autoShopCard(score),
+        ]),
       ],
     };
   }
@@ -719,6 +755,20 @@ export class ProgressShopController {
       title: 'автонаведение',
       buy: () => this.buyAutoAim(),
       info: owned ? 'держит одну цель' : 'башня сама держит врага',
+      cost: this.coin(price),
+      open: !owned,
+      owned,
+      canBuy: !owned && score >= price,
+    };
+  }
+
+  private autoShopCard(score: number): ProgressCardView {
+    const owned = this.progress.autoShop;
+    const price = shopPrice(ProgressSave.autoShopCost());
+    return {
+      title: 'автопокупка',
+      buy: () => this.buyAutoShop(),
+      info: owned ? 'через 1 с на следующую волну' : 'магазин волны тратит монеты',
       cost: this.coin(price),
       open: !owned,
       owned,

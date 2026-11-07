@@ -6,6 +6,7 @@ import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
+import { AutoShop } from '../entities/AutoShop';
 import { BarbedWire } from '../entities/BarbedWire';
 import { FlameTank } from '../entities/FlameTank';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -37,6 +38,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   IonCannon.ensureTextures(scene);
   AutoAim.ensureTextures(scene);
   AutoFire.ensureTextures(scene);
+  AutoShop.ensureTextures(scene);
   Mines.ensureTextures(scene);
   NuclearStrike.ensureTextures(scene);
   AssaultInfantry.ensureTextures(scene);

@@ -7,6 +7,7 @@ import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
+import { AutoShop } from '../entities/AutoShop';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -84,6 +85,8 @@ export class GameScene extends Phaser.Scene {
   private persistEnabled = false;
   // Сколько миллисекунд прошло с прошлой автозаписи. Порог — в touchAutosave.
   private autosaveMs = 0;
+  // Секунда автопокупки после открытия магазина волны. Снятие выключателя её убирает.
+  private shopAutoTimer?: Phaser.Time.TimerEvent;
   // Одна функция на pagehide и beforeunload, чтобы снять оба слушателя одним и тем же объектом.
   private readonly onPageHide = (): void => {
     this.writeSave();
@@ -257,6 +260,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.hud.installAutoFire(AutoFire.iconKey);
     this.hud.installAutoAim(AutoAim.iconKey);
+    this.hud.installAutoShop(AutoShop.iconKey);
     this.hud.onAutoAim(() => {
       if (this.blocksPlay()) {
         return;
@@ -265,6 +269,22 @@ export class GameScene extends Phaser.Scene {
       this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
     });
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
+    this.hud.onAutoShop(() => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.progressShop.toggleAutoShop();
+      this.hud.setAutoShopToggle(this.progressShop.autoShopOwned(), this.progressShop.autoShopEnabled());
+      if (!this.shop.shopOpen) {
+        return;
+      }
+      if (this.progressShop.autoShopEnabled()) {
+        this.armShopAutoBuy();
+      } else {
+        this.cancelShopAutoBuy();
+      }
+    });
+    this.hud.setAutoShopToggle(this.progressShop.autoShopOwned(), this.progressShop.autoShopEnabled());
     this.hud.onAbility('artillery', () => {
       if (this.blocksPlay()) {
         return;
@@ -371,7 +391,10 @@ export class GameScene extends Phaser.Scene {
         wire: this.progressShop.wireDamageBonus(),
         ion: this.progressShop.ionDamageBonus(),
       },
-      () => this.waves.beginNextWave(),
+      () => {
+        this.cancelShopAutoBuy();
+        this.waves.beginNextWave();
+      },
       // Любая покупка сразу пишет партию, не дожидаясь автозаписи раз в 400 мс.
       () => this.writeSave(),
     );
@@ -495,7 +518,32 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       this.shop.open();
+      this.armShopAutoBuy();
     });
+  }
+
+  // Секунда после появления магазина волны. Выключенная автопокупка секунду не ставит.
+  private armShopAutoBuy(): void {
+    this.cancelShopAutoBuy();
+    if (!this.shop.shopOpen || !this.progressShop.autoShopEnabled()) {
+      return;
+    }
+    this.shopAutoTimer = this.time.delayedCall(1000, () => {
+      this.shopAutoTimer = undefined;
+      if (!this.shop.shopOpen || !this.progressShop.autoShopEnabled()) {
+        return;
+      }
+      if (this.player.isGameOver || this.defeatShop) {
+        return;
+      }
+      this.shop.spendTankThenGun();
+      this.shop.closeAndContinue();
+    });
+  }
+
+  private cancelShopAutoBuy(): void {
+    this.shopAutoTimer?.remove(false);
+    this.shopAutoTimer = undefined;
   }
 
   // Кадр боя. delta — миллисекунды с прошлого кадра, его забирают системы.
@@ -565,6 +613,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.paintAutoStrikes();
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
+    this.hud.setAutoShopToggle(this.progressShop.autoShopOwned(), this.progressShop.autoShopEnabled());
     this.paintAutoFire();
     if (!fighting) {
       return;
@@ -576,7 +625,7 @@ export class GameScene extends Phaser.Scene {
     const locked = this.progressShop.autoAimEnabled() ? this.combat.aimPoint() : null;
     this.player.tick(delta, locked?.x ?? pointer.worldX, locked?.y ?? pointer.worldY);
 
-    // Клик по кнопкам темпа, паузы, автострельбы, автонаведения, урона врагов, клавиш, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
+    // Клик по кнопкам темпа, паузы, автострельбы, автонаведения, автопокупки, урона врагов, клавиш, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
     this.combat.tick(
       delta,
       !this.hud.coversHaste(pointer) &&
@@ -584,6 +633,7 @@ export class GameScene extends Phaser.Scene {
         !this.hud.coversSettings(pointer) &&
         !this.hud.coversAutoFire(pointer) &&
         !this.hud.coversAutoAim(pointer) &&
+        !this.hud.coversAutoShop(pointer) &&
         !this.hud.coversEnemyDamage(pointer) &&
         !this.hud.coversAbility(pointer) &&
         !this.hud.coversKeys(pointer),
@@ -854,6 +904,7 @@ export class GameScene extends Phaser.Scene {
 
   // Экран после гибели. Партия к этому моменту уже стёрта, здесь только окно очков.
   private openDefeatShop(): void {
+    this.cancelShopAutoBuy();
     this.defeatShop = true;
     this.hud.hideKeys();
     this.closeSettings();
@@ -906,6 +957,7 @@ export class GameScene extends Phaser.Scene {
     if (saved.phase === 'shop') {
       this.waves.resumeShop(saved.wave);
       this.shop.open();
+      this.armShopAutoBuy();
       return;
     }
     this.waves.resumeCombat(saved.wave, saved.spawned, saved.enemies);

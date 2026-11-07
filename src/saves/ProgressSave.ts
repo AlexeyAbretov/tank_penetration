@@ -81,6 +81,10 @@ export type SavedProgress = {
   autoAim: boolean;
   // Выключатель уже купленного автонаведения. Пока false, башню ведёт курсор.
   autoAimOn: boolean;
+  // Куплена ли автопокупка. Магазин волны сам тратит монеты и уходит на следующую.
+  autoShop: boolean;
+  // Выключатель уже купленной автопокупки. Пока false, окно магазина волны ждёт игрока.
+  autoShopOn: boolean;
   // Куплено ли автоприменение артиллерии. Удар сам через секунду после готовности.
   autoArtillery: boolean;
   // Выключатель уже купленного автоприменения. Пока false, удар ждёт клавишу или иконку.
@@ -148,6 +152,11 @@ export class ProgressSave {
 
   // Одна покупка. Башня сама держит ближайшего врага и не бросает его, пока он жив.
   static autoAimCost(): number {
+    return 50_000;
+  }
+
+  // Одна покупка. Магазин волны через секунду тратит монеты и сам открывает следующую.
+  static autoShopCost(): number {
     return 50_000;
   }
 
@@ -223,6 +232,8 @@ export class ProgressSave {
     progress.autoFireOn = false;
     progress.autoAim = false;
     progress.autoAimOn = false;
+    progress.autoShop = false;
+    progress.autoShopOn = false;
     progress.autoArtillery = false;
     progress.autoArtilleryOn = false;
     progress.autoMines = false;
@@ -315,6 +326,8 @@ export class ProgressSave {
       autoFireOn: false,
       autoAim: false,
       autoAimOn: false,
+      autoShop: false,
+      autoShopOn: false,
       autoArtillery: false,
       autoArtilleryOn: false,
       autoMines: false,
@@ -407,6 +420,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали автонаведение: башню вёл курсор.
     autoAim: value.autoAim === true,
     autoAimOn: value.autoAim === true && value.autoAimOn !== false,
+    // Старые сохранения не писали автопокупку: магазин волны ждал кнопку.
+    autoShop: value.autoShop === true,
+    autoShopOn: value.autoShop === true && value.autoShopOn !== false,
     // Старые сохранения не писали автоприменение: удар и мины ждали клавишу.
     autoArtillery: value.autoArtillery === true,
     autoArtilleryOn: value.autoArtillery === true && value.autoArtilleryOn !== false,

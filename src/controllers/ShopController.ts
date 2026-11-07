@@ -86,6 +86,8 @@ export class ShopController {
   shopOpen = false;
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
   private paused = false;
+  // Пачка автопокупки. Пока true, каждая ступень не пишет партию и не перерисовывает окно.
+  private batch = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -245,9 +247,54 @@ export class ShopController {
     this.panel.setPaused(paused);
   }
 
+  // Тот же порядок кнопок, но после каждых трёх покупок танка — одна пулемёту, если ствол уже стоит.
+  // Здоровья в этом магазине нет: после взрыва идут полёт, отталкивание и пробивание.
+  // «Пуля» и «урон» пулемёта здесь одна кнопка «+1 урон», дальше перезарядка и полёт.
+  // Окно и запись — один раз в конце.
+  spendTankThenGun(): void {
+    if (!this.shopOpen || this.isPaused()) {
+      return;
+    }
+    const tank = [
+      () => this.buyDamage(),
+      () => this.buyFireRate(),
+      () => this.buyBlast(),
+      () => this.buyFlight(),
+      () => this.buyKnockback(),
+      () => this.buyPierce(),
+    ];
+    const gun = [
+      () => this.buyMgDamage(),
+      () => this.buyMgFireRate(),
+      () => this.buyMgFlight(),
+    ];
+    this.batch = true;
+    try {
+      let tankBuys = 0;
+      for (;;) {
+        if (this.machineGunOwned && tankBuys >= 3 && this.buyFirst(gun)) {
+          tankBuys = 0;
+          continue;
+        }
+        if (this.buyFirst(tank)) {
+          tankBuys += 1;
+          continue;
+        }
+        if (this.machineGunOwned && this.buyFirst(gun)) {
+          tankBuys = 0;
+          continue;
+        }
+        break;
+      }
+    } finally {
+      this.batch = false;
+    }
+    this.refresh();
+  }
+
   // «Следующая волна». На паузе кнопка молчит: иначе бой стартовал бы под плашкой «ПАУЗА».
   closeAndContinue(): void {
-    if (this.isPaused()) {
+    if (!this.shopOpen || this.isPaused()) {
       return;
     }
     this.panel.hide();
@@ -686,6 +733,18 @@ export class ShopController {
     return this.paused;
   }
 
+  // Первая кнопка списка, на которую хватает монет. false — ни одна не списала.
+  private buyFirst(offers: ReadonlyArray<() => void>): boolean {
+    const before = this.economy.getCoins();
+    for (const offer of offers) {
+      offer();
+      if (this.economy.getCoins() < before) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Окно уже открыто: подпись и серые кнопки читают новое число монет.
   refreshCoins(): void {
     if (!this.shopOpen) {
@@ -695,6 +754,9 @@ export class ShopController {
   }
 
   private refresh(): void {
+    if (this.batch) {
+      return;
+    }
     this.hud.setCoins(this.economy.getCoins());
     this.syncTankStats();
     this.panel.refresh(this.view());

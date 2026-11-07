@@ -2,6 +2,7 @@ import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
+import { AutoShop } from '../entities/AutoShop';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
@@ -39,6 +40,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   IonCannon.preload(scene);
   AutoAim.preload(scene);
   AutoFire.preload(scene);
+  AutoShop.preload(scene);
   AssaultInfantry.preload(scene);
   GunnerInfantry.preload(scene);
   PickupTruck.preload(scene);

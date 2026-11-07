@@ -142,6 +142,10 @@ export class GameHud {
   private autoAimGlow?: Phaser.GameObjects.Image;
   private autoAimOwned = false;
   private autoAimRequest?: () => void;
+  private autoShopRoot?: Phaser.GameObjects.Container;
+  private autoShopGlow?: Phaser.GameObjects.Image;
+  private autoShopOwned = false;
+  private autoShopRequest?: () => void;
   private autoApplies: AutoApplyBadge[] = [];
   private newGameRequest?: () => void;
 
@@ -401,8 +405,11 @@ export class GameHud {
     this.settingsFace.setPosition(settingsX, y);
     this.settingsGear.setPosition(settingsX, y);
     // Тот же ряд, что у способностей, у правого края. Широкое окно сдвигает его вместе с полем.
-    this.autoFireRoot?.setPosition(this.edgeIconX(1), this.frame.bannerY - 48);
-    this.autoAimRoot?.setPosition(this.edgeIconX(0), this.frame.bannerY - 48);
+    // Автопокупка, пока её нет, места не занимает: автонаведение остаётся крайним.
+    const shopSlot = this.autoShopOwned ? 1 : 0;
+    this.autoShopRoot?.setPosition(this.edgeIconX(0), this.frame.bannerY - 48);
+    this.autoAimRoot?.setPosition(this.edgeIconX(shopSlot), this.frame.bannerY - 48);
+    this.autoFireRoot?.setPosition(this.edgeIconX(shopSlot + 1), this.frame.bannerY - 48);
     this.placeAutoApplies();
 
     this.hpFrame.setPosition(hpCenter, 28);
@@ -496,7 +503,7 @@ export class GameHud {
   }
 
   // Картинка уже прогрета. Слева от автонаведения, на той же высоте, что способности.
-  // Глубина как у ударов: магазин волны её накрывает. Автонаведение остаётся выше, оно у края экрана.
+  // Глубина как у ударов: магазин волны её накрывает.
   installAutoFire(texture: string): void {
     if (this.autoFireRoot) {
       return;
@@ -507,7 +514,7 @@ export class GameHud {
     this.autoFireGlow = icon.glow;
   }
 
-  // Картинка уже прогрета. Крайняя справа на ряду способностей.
+  // Картинка уже прогрета. Крайняя справа, пока нет автопокупки. Купленная сдвигает этот круг влево.
   installAutoAim(texture: string): void {
     if (this.autoAimRoot) {
       return;
@@ -538,6 +545,11 @@ export class GameHud {
     return { root, glow };
   }
 
+  // Индекс автострельбы. Купленная автопокупка сдвигает весь ряд на один круг влево.
+  protected fireIconFromRight(): number {
+    return this.autoShopOwned ? 2 : 1;
+  }
+
   // Шаг 88 — как у иконок ударов слева. 0 стоит у правого края.
   protected edgeIconX(fromRight: number): number {
     return this.frame.width - 56 - fromRight * 88;
@@ -545,6 +557,31 @@ export class GameHud {
 
   onAutoAim(request: () => void): void {
     this.autoAimRequest = request;
+  }
+
+  // Картинка уже прогрета. Крайняя справа и выше магазина волны: за секунду её ещё можно выключить.
+  installAutoShop(texture: string): void {
+    if (this.autoShopRoot) {
+      return;
+    }
+    const icon = this.bindRoundIcon(texture, 0, 80);
+    icon.root.on('pointerup', () => this.autoShopRequest?.());
+    this.autoShopRoot = icon.root;
+    this.autoShopGlow = icon.glow;
+  }
+
+  onAutoShop(request: () => void): void {
+    this.autoShopRequest = request;
+  }
+
+  // Кнопка появляется после покупки и встаёт у правого края. Остальные круги сдвигаются влево.
+  setAutoShopToggle(owned: boolean, enabled: boolean): void {
+    if (this.autoShopOwned !== owned) {
+      this.autoShopOwned = owned;
+      this.layout();
+      this.syncControls();
+    }
+    this.showRoundToggle(this.autoShopRoot, this.autoShopGlow, owned, enabled);
   }
 
   // Скрытая кнопка не занимает место: до покупки курсор над ней всё ещё стреляет.
@@ -728,6 +765,12 @@ export class GameHud {
   }
 
   // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
+  coversAutoShop(pointer: Phaser.Input.Pointer): boolean {
+    const root = this.autoShopRoot;
+    return !!root && root.visible && root.getBounds().contains(pointer.worldX, pointer.worldY);
+  }
+
+  // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.
   coversAutoAim(pointer: Phaser.Input.Pointer): boolean {
     const root = this.autoAimRoot;
     return !!root && root.visible && root.getBounds().contains(pointer.worldX, pointer.worldY);
@@ -808,11 +851,14 @@ export class GameHud {
   // Строки окна. Купленная способность дописывает свою, пока её нет — в списке её нет.
   protected controlHints(): readonly string[] {
     const hints = ['мышь — прицел', 'ЛКМ — огонь', '+ — темп', 'Esc — пауза', 'шестерёнка — звук'];
+    if (this.autoShopOwned) {
+      hints.push('иконка справа — автопокупка');
+    }
     if (this.autoFireOwned) {
       hints.push('иконка справа — автострельба');
     }
     if (this.autoAimOwned) {
-      hints.push('иконка у края — автонаведение');
+      hints.push(this.autoShopOwned ? 'слева от автопокупки — автонаведение' : 'иконка у края — автонаведение');
     }
     for (const icon of this.abilities) {
       if (icon.owned) {

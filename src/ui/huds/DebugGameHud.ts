@@ -54,7 +54,7 @@ export class DebugGameHud extends GameHud {
 
     // Сразу левее автострельбы. Та же глубина: магазин волны накрывает круг, как магазин очков.
     EnemyDamage.ensureTextures(scene);
-    const icon = this.bindRoundIcon(EnemyDamage.iconKey, 2, 53);
+    const icon = this.bindRoundIcon(EnemyDamage.iconKey, this.fireIconFromRight() + 1, 53);
     this.enemyDamageRoot = icon.root;
     this.enemyDamageGlow = icon.glow;
     this.showRoundToggle(icon.root, icon.glow, true, EnemyDamage.isEnabled);
@@ -65,7 +65,7 @@ export class DebugGameHud extends GameHud {
 
   override layout(): void {
     super.layout();
-    this.enemyDamageRoot.setPosition(this.edgeIconX(2), this.frame.bannerY - 48);
+    this.enemyDamageRoot.setPosition(this.edgeIconX(this.fireIconFromRight() + 1), this.frame.bannerY - 48);
     this.debugLabel.setX(this.frame.width / 2);
   }
 
