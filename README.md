@@ -188,7 +188,7 @@ npm run dev
    - `RangedEnemy` — общая стрельба для тех, кто доходит до рубежа и встаёт. Суперсолдат этот класс не наследует: у него свой цикл «бежать и дать очередь».
    - `EnemyFactory` — кто именно выйдет в этой волне и с каким здоровьем.
    - `EnemyShot` и `Rocket` — вражеские снаряды.
-   - `AutoAim`, `AutoFire`, `AutoShop`, `BarbedWire`, `MachineGun`, `LaserDefense`, `FlameTank`, `RocketSalvo`, `ArtilleryStrike`, `IonCannon`, `Mines`, `NuclearStrike` — покупки. Автострельба, автонаведение и автопокупка — иконки и запасной рисунок, все три лежат в прогрессе. Иконка ионной пушки тоже запасной рисунок: файла в `public` у неё нет.
+   - `AutoAim`, `AutoFire`, `AutoShop`, `BarbedWire`, `MachineGun`, `LaserDefense`, `FlameTank`, `RocketSalvo`, `ArtilleryStrike`, `IonCannon`, `Mines`, `NuclearStrike` — покупки. Автострельба, автонаведение и автопокупка — иконки и запасной рисунок, все три лежат в прогрессе. Иконка ионной пушки лежит в `public`, запасной круг печётся, только если файла нет.
 7. `src/ui/huds/GameHud.ts` — счёт, волна, монеты, полоска HP, баннер, иконки способностей, выключатели автоприменения на иконках артиллерии, ионной пушки и мин, выключатели автострельбы, автонаведения и автопокупки, кнопка «КЛАВИШИ» и экран паузы. `src/ui/shops/ShopPanel.ts` и `ProgressShopPanel.ts` — витрины. `src/ui/settings/SettingsPanel.ts` — окно громкости.
 8. `src/gfx/` — цвета, рисование запасных спрайтов, огонь, воронки, гриб, искры и разрез спрайта. `ensureGameTextures.ts` запекает картинки перед боем.
 9. `src/saves/CombatSave.ts` — запись партии. `ProgressSave` — очки и постоянные уровни. `src/shopPrice.ts` подменяет любую цену на 1 в сборке `build:html:gift`.

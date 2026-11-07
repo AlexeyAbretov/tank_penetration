@@ -17,6 +17,8 @@ export type IonCourse = {
 
 export class IonCannon {
   static readonly iconKey = 'ion-icon';
+  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  static readonly iconPath = 'assets/ion-icon.png';
   static readonly iconRadius = 30;
 
   static readonly shop = {
@@ -95,15 +97,16 @@ export class IonCannon {
     return `${min}:${secText}`;
   }
 
-  // Отдельного файла в public нет: иконку печёт ensureTextures уже в create.
   static preload(scene: Phaser.Scene): void {
     if (scene.textures.exists(IonCannon.iconKey)) {
       return;
     }
+    scene.load.image(IonCannon.iconKey, IonCannon.iconPath);
   }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(IonCannon.iconKey)) {
+      scene.textures.get(IonCannon.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
       return;
     }
     bake(scene, IonCannon.iconKey, 64, 64, (g) => IonCannon.renderIcon(g));
