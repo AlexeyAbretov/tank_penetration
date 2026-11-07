@@ -1,9 +1,10 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, ионная пушка, мины, атомный взрыв и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, ионная пушка, мины, атомный взрыв, контакт с базой и урон отскочившего чужого выстрела.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
+import { EnemyShot } from '../entities/EnemyShot';
 import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
 import { IonCannon, type IonCourse } from '../entities/IonCannon';
@@ -83,6 +84,8 @@ export class CombatSystem implements Combat {
   private readonly blast: Phaser.GameObjects.Particles.ParticleEmitter;
   protected readonly shells: Phaser.Physics.Arcade.Group;
   private readonly shellFlights = new Map<Phaser.Physics.Arcade.Image, ShellFlight>();
+  // Кого отскочивший выстрел уже ранил. Пока он летит сквозь фигуру, удар не повторяется.
+  private readonly ricochetStruck = new Map<EnemyShot, Set<Infantry>>();
   private readonly mgShots: Phaser.Physics.Arcade.Group;
   private mgCooldown = 0;
   // Сколько пуль ещё осталось в текущей очереди. 0 — очередь не начата.
@@ -1083,6 +1086,7 @@ export class CombatSystem implements Combat {
     this.tickSalvo(delta);
     this.resolveMgHits();
     this.cleanupMgShots();
+    this.resolveRicochetHits();
     this.snareOnWire(delta);
     this.checkBaseReach();
   }
@@ -1623,6 +1627,49 @@ export class CombatSystem implements Combat {
       return null;
     }
     return t;
+  }
+
+  // Отскочивший патрон и ракета ранят каждого на пути своим уроном и летят дальше.
+  // Стрелявший ничем не выделен: круг попадания тот же, что у пули пулемёта.
+  private resolveRicochetHits(): void {
+    const units = [...this.infantry.getChildren()] as Infantry[];
+    const live = new Set<EnemyShot>();
+    for (const obj of [...this.enemyShots.getChildren()]) {
+      const shot = obj as EnemyShot;
+      if (!shot.active || !shot.hasBounced()) {
+        continue;
+      }
+      live.add(shot);
+      const step = this.mgStep(shot);
+      let struck = this.ricochetStruck.get(shot);
+      if (!struck) {
+        struck = new Set();
+        this.ricochetStruck.set(shot, struck);
+      }
+      const rocket = shot instanceof Rocket;
+      for (const unit of units) {
+        if (!unit.active || unit.reachedWall || struck.has(unit)) {
+          continue;
+        }
+        const center = unit.hitCenter();
+        if (this.reachAlong(step, center.x, center.y, unit.shellRadius()) === null) {
+          continue;
+        }
+        struck.add(unit);
+        if (rocket) {
+          Rocket.burstAt(this.scene, center.x, center.y);
+          this.effects.rocketSounds.playHit();
+        } else {
+          this.effects.impacts.play();
+        }
+        this.hurtInfantry(unit, shot.damage);
+      }
+    }
+    for (const shot of this.ricochetStruck.keys()) {
+      if (!live.has(shot)) {
+        this.ricochetStruck.delete(shot);
+      }
+    }
   }
 
   private cleanupMgShots(): void {

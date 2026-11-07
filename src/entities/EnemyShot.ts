@@ -12,7 +12,7 @@ export class EnemyShot extends Physics.Arcade.Image {
   readonly damage: number;
   // Скорость без темпа. launch запоминает её, syncPace умножает на текущий множитель.
   private flightSpeed = 0;
-  // Броня уже отвела этот выстрел. Повторное касание урона не наносит.
+  // Броня уже отвела этот выстрел. Повторное касание танка урона не наносит.
   private bounced = false;
   // Узкий хитбокс по форме пули. Попадание в танк сцена проверяет отдельно, по координате.
   static readonly bodySize = { w: 14, h: 8 };

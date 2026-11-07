@@ -70,7 +70,8 @@ export class ProjectileSystem {
     return Math.random() * 100 < chance;
   }
 
-  // Урона нет. Патрон меняет курс и выходит из силуэта, ракета не рвётся.
+  // Танку урона нет. Патрон меняет курс и выходит из силуэта, ракета не рвётся.
+  // Каждый враг на обратном пути получает урон этого выстрела: это считает бой.
   private ricochet(shot: EnemyShot, x: number, y: number, travel: number, isRocket: boolean): void {
     const angle = this.deflectAngle(x, y, travel);
     shot.bounce(angle);
