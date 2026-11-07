@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
 import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
@@ -19,7 +20,7 @@ import { ShopPanel, type ShopCardView, type ShopTabView, type ShopView } from '.
 import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
-type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'mines' | 'nuclear';
+type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'ion' | 'mines' | 'nuclear';
 
 type PermanentBonuses = {
   damage: number;
@@ -38,6 +39,7 @@ type PermanentBonuses = {
   salvo: number;
   artillery: number;
   mines: number;
+  ion: number;
 };
 
 type Economy = {
@@ -66,6 +68,8 @@ export class ShopController {
   salvo?: RocketSalvo;
   artilleryOwned = false;
   artilleryCooldownLevel = 0;
+  ionOwned = false;
+  ionCooldownLevel = 0;
   minesOwned = false;
   minesCooldownLevel = 0;
   nuclearOwned = false;
@@ -77,6 +81,7 @@ export class ShopController {
   flameDamageLevel = 0;
   salvoDamageLevel = 0;
   artilleryDamageLevel = 0;
+  ionDamageLevel = 0;
   minesDamageLevel = 0;
   shopOpen = false;
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
@@ -93,6 +98,7 @@ export class ShopController {
   ) {
     this.panel = new ShopPanel(scene, this, GAME);
     ArtilleryStrike.setShopCooldownLevel(0);
+    IonCannon.setShopCooldownLevel(0);
     Mines.setShopCooldownLevel(0);
     NuclearStrike.setShopCooldownLevel(0);
   }
@@ -113,6 +119,8 @@ export class ShopController {
       salvo: this.salvoOwned,
       artillery: this.artilleryOwned,
       artilleryCooldown: this.artilleryCooldownLevel,
+      ion: this.ionOwned,
+      ionCooldown: this.ionCooldownLevel,
       mines: this.minesOwned,
       minesCooldown: this.minesCooldownLevel,
       nuclear: this.nuclearOwned,
@@ -124,6 +132,7 @@ export class ShopController {
       flameDamage: this.flameDamageLevel,
       salvoDamage: this.salvoDamageLevel,
       artilleryDamage: this.artilleryDamageLevel,
+      ionDamage: this.ionDamageLevel,
       minesDamage: this.minesDamageLevel,
     };
   }
@@ -160,6 +169,9 @@ export class ShopController {
     this.artilleryOwned = saved.artillery;
     this.artilleryCooldownLevel = Math.min(saved.artilleryCooldown, ArtilleryStrike.maxShopCooldownLevel);
     ArtilleryStrike.setShopCooldownLevel(this.artilleryCooldownLevel);
+    this.ionOwned = saved.ion;
+    this.ionCooldownLevel = Math.min(saved.ionCooldown, IonCannon.maxShopCooldownLevel);
+    IonCannon.setShopCooldownLevel(this.ionCooldownLevel);
     this.minesOwned = saved.mines;
     this.minesCooldownLevel = Math.min(saved.minesCooldown, Mines.maxShopCooldownLevel);
     Mines.setShopCooldownLevel(this.minesCooldownLevel);
@@ -173,6 +185,7 @@ export class ShopController {
     this.flameDamageLevel = saved.flameDamage;
     this.salvoDamageLevel = saved.salvoDamage;
     this.artilleryDamageLevel = saved.artilleryDamage;
+    this.ionDamageLevel = saved.ionDamage;
     this.minesDamageLevel = saved.minesDamage;
   }
 
@@ -192,6 +205,9 @@ export class ShopController {
     this.artilleryOwned = false;
     this.artilleryCooldownLevel = 0;
     ArtilleryStrike.setShopCooldownLevel(0);
+    this.ionOwned = false;
+    this.ionCooldownLevel = 0;
+    IonCannon.setShopCooldownLevel(0);
     this.minesOwned = false;
     this.minesCooldownLevel = 0;
     Mines.setShopCooldownLevel(0);
@@ -205,6 +221,7 @@ export class ShopController {
     this.flameDamageLevel = 0;
     this.salvoDamageLevel = 0;
     this.artilleryDamageLevel = 0;
+    this.ionDamageLevel = 0;
     this.minesDamageLevel = 0;
     this.wire = undefined;
     this.machineGun = undefined;
@@ -474,6 +491,40 @@ export class ShopController {
     this.refresh();
   }
 
+  // Открывает клавишу 4. Ход луча считает CombatSystem.
+  buyIon(): void {
+    const cost = shopPrice(IonCannon.shop.cost);
+    if (this.isPaused() || this.ionOwned || this.economy.getCoins() < cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.ionOwned = true;
+    this.refresh();
+  }
+
+  // −1 с к откату ионной пушки. Партия снимает свои 20 с и останавливается на 40 с без очков.
+  buyIonCooldown(): void {
+    if (this.isPaused() || !this.ionOwned) {
+      return;
+    }
+    if (this.ionCooldownLevel >= IonCannon.maxShopCooldownLevel) {
+      return;
+    }
+    const now = IonCannon.cooldownFor(this.ionCooldownLevel);
+    if (IonCannon.cooldownFor(this.ionCooldownLevel + 1) >= now) {
+      return;
+    }
+    const cost = ShopController.ionCooldownCost(this.ionCooldownLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.ionCooldownLevel += 1;
+    IonCannon.setShopCooldownLevel(this.ionCooldownLevel);
+    this.refresh();
+  }
+
   // Открывает клавишу 3. Падение и взрыв считает CombatSystem.
   buyNuclear(): void {
     const cost = shopPrice(NuclearStrike.shop.cost);
@@ -606,6 +657,12 @@ export class ShopController {
     });
   }
 
+  buyIonDamage(): void {
+    this.buyDamageLevel(this.ionOwned, this.ionDamageLevel, (level) => {
+      this.ionDamageLevel = level;
+    });
+  }
+
   buyMinesDamage(): void {
     this.buyDamageLevel(this.minesOwned, this.minesDamageLevel, (level) => {
       this.minesDamageLevel = level;
@@ -674,6 +731,12 @@ export class ShopController {
     return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
   }
 
+  // Первая секунда отката ионной пушки стоит 1000. Дальше та же ступень 15%:
+  // 1000, 1150, 1323, 1521, …
+  private static ionCooldownCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
   // Первая секунда отката мин стоит 1000. Дальше та же ступень 15%:
   // 1000, 1150, 1323, 1521, …
   private static minesCooldownCost(level: number): number {
@@ -710,6 +773,10 @@ export class ShopController {
 
   private artilleryDamageOfferLevel(): number {
     return this.artilleryDamageLevel + this.bonuses.artillery;
+  }
+
+  private ionDamageOfferLevel(): number {
+    return this.ionDamageLevel + this.bonuses.ion;
   }
 
   private minesDamageOfferLevel(): number {
@@ -778,6 +845,18 @@ export class ShopController {
             'после покупки',
           ),
           this.artilleryCooldownCard(coins),
+        ]),
+        this.tab('ion', 'Ионная пушка', [
+          this.gearCard('ion', coins),
+          this.weaponDamageCard(
+            this.ionDamageLevel,
+            IonCannon.shop.damage + this.ionDamageOfferLevel(),
+            () => this.buyIonDamage(),
+            coins,
+            this.ionOwned,
+            'после покупки',
+          ),
+          this.ionCooldownCard(coins),
         ]),
         this.tab('mines', 'Мина', [
           this.gearCard('mines', coins),
@@ -932,6 +1011,8 @@ export class ShopController {
         );
       case 'artillery':
         return this.artilleryCard(coins);
+      case 'ion':
+        return this.ionCard(coins);
       case 'mines':
         return this.minesCard(coins);
       case 'nuclear':
@@ -1148,6 +1229,63 @@ export class ShopController {
       info: maxed
         ? `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}`
         : `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}→${ArtilleryStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
+  private ionCard(coins: number): ShopCardView {
+    const offer = IonCannon.shop;
+    const price = shopPrice(offer.cost);
+    const reload = IonCannon.cooldownLabel(IonCannon.cooldownFor(this.ionCooldownLevel));
+    if (this.ionOwned) {
+      return {
+        title: 'Покупка',
+        buy: () => this.buyIon(),
+        info: `откат ${reload}`,
+        cost: '',
+        open: false,
+        canBuy: false,
+        owned: true,
+      };
+    }
+    return {
+      title: 'Покупка',
+      buy: () => this.buyIon(),
+      info: `${offer.damage + this.bonuses.ion} · откат ${reload}`,
+      cost: this.coin(price),
+      open: true,
+      canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private ionCooldownCard(coins: number): ShopCardView {
+    const buy = () => this.buyIonCooldown();
+    const level = this.ionCooldownLevel;
+    const price = ShopController.ionCooldownCost(level);
+    if (!this.ionOwned) {
+      return {
+        title: '−1 с перезарядки',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = IonCannon.cooldownFor(level);
+    const next = IonCannon.cooldownFor(level + 1);
+    const maxed = level >= IonCannon.maxShopCooldownLevel || next >= now;
+    return {
+      title: '−1 с перезарядки',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${IonCannon.cooldownLabel(now)}`
+        : `ур. ${level} · ${IonCannon.cooldownLabel(now)}→${IonCannon.cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,

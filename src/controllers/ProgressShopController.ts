@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -43,9 +44,11 @@ type Stat =
   | 'minesCount'
   | 'salvoDamage'
   | 'artilleryDamage'
+  | 'ionDamage'
   | 'minesDamage'
   | 'wireDamage'
   | 'artilleryCooldown'
+  | 'ionCooldown'
   | 'minesCooldown'
   | 'nuclearCooldown';
 
@@ -152,6 +155,10 @@ export class ProgressShopController {
     return this.progress.artilleryDamage;
   }
 
+  ionDamageBonus(): number {
+    return this.progress.ionDamage;
+  }
+
   minesDamageBonus(): number {
     return this.progress.minesDamage;
   }
@@ -162,6 +169,10 @@ export class ProgressShopController {
 
   artilleryCooldownLevel(): number {
     return this.progress.artilleryCooldown;
+  }
+
+  ionCooldownLevel(): number {
+    return this.progress.ionCooldown;
   }
 
   minesCooldownLevel(): number {
@@ -243,6 +254,23 @@ export class ProgressShopController {
       return;
     }
     this.progress.autoMinesOn = !this.progress.autoMinesOn;
+    this.progressSave.save(this.progress);
+  }
+
+  autoIonOwned(): boolean {
+    return this.progress.autoIon;
+  }
+
+  // Куплено и включено выключателем на иконке луча.
+  autoIonEnabled(): boolean {
+    return this.progress.autoIon && this.progress.autoIonOn;
+  }
+
+  toggleAutoIon(): void {
+    if (this.paused || !this.progress.autoIon) {
+      return;
+    }
+    this.progress.autoIonOn = !this.progress.autoIonOn;
     this.progressSave.save(this.progress);
   }
 
@@ -370,6 +398,10 @@ export class ProgressShopController {
     this.buy('artilleryDamage');
   }
 
+  private buyIonDamage(): void {
+    this.buy('ionDamage');
+  }
+
   private buyMinesDamage(): void {
     this.buy('minesDamage');
   }
@@ -380,6 +412,10 @@ export class ProgressShopController {
 
   private buyArtilleryCooldown(): void {
     this.buy('artilleryCooldown');
+  }
+
+  private buyIonCooldown(): void {
+    this.buy('ionCooldown');
   }
 
   private buyMinesCooldown(): void {
@@ -451,6 +487,21 @@ export class ProgressShopController {
     this.panel.refresh(this.view());
   }
 
+  private buyAutoIon(): void {
+    if (this.isPaused() || this.progress.autoIon) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoIonCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoIon = true;
+    this.progress.autoIonOn = true;
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -498,6 +549,9 @@ export class ProgressShopController {
     if (stat === 'artilleryCooldown' && !ArtilleryStrike.progressCooldownShortens(level)) {
       return;
     }
+    if (stat === 'ionCooldown' && !IonCannon.progressCooldownShortens(level)) {
+      return;
+    }
     if (stat === 'minesCooldown' && !Mines.progressCooldownShortens(level)) {
       return;
     }
@@ -543,6 +597,9 @@ export class ProgressShopController {
     if (stat === 'artilleryCooldown') {
       ArtilleryStrike.setProgressCooldownLevel(this.progress.artilleryCooldown);
     }
+    if (stat === 'ionCooldown') {
+      IonCannon.setProgressCooldownLevel(this.progress.ionCooldown);
+    }
     if (stat === 'minesCooldown') {
       Mines.setProgressCooldownLevel(this.progress.minesCooldown);
     }
@@ -585,6 +642,11 @@ export class ProgressShopController {
           this.artilleryDamageCard(score),
           this.artilleryCooldownCard(score),
           this.autoArtilleryCard(score),
+        ]),
+        this.tab('ion', 'Ионная пушка', [
+          this.ionDamageCard(score),
+          this.ionCooldownCard(score),
+          this.autoIonCard(score),
         ]),
         this.tab('mines', 'Мина', [
           this.minesCountCard(score),
@@ -637,6 +699,20 @@ export class ProgressShopController {
       title: 'автоприменение',
       buy: () => this.buyAutoArtillery(),
       info: 'удар сам через 1 с',
+      cost: this.coin(price),
+      open: !owned,
+      owned,
+      canBuy: !owned && score >= price,
+    };
+  }
+
+  private autoIonCard(score: number): ProgressCardView {
+    const owned = this.progress.autoIon;
+    const price = shopPrice(ProgressSave.autoIonCost());
+    return {
+      title: 'автоприменение',
+      buy: () => this.buyAutoIon(),
+      info: 'луч сам через 1 с',
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -902,6 +978,15 @@ export class ProgressShopController {
     );
   }
 
+  private ionDamageCard(score: number): ProgressCardView {
+    return this.damageCardFor(
+      this.progress.ionDamage,
+      IonCannon.shop.damage,
+      score,
+      () => this.buyIonDamage(),
+    );
+  }
+
   private minesDamageCard(score: number): ProgressCardView {
     return this.damageCardFor(this.progress.minesDamage, Mines.shop.damage, score, () => this.buyMinesDamage());
   }
@@ -968,6 +1053,24 @@ export class ProgressShopController {
       info: maxed
         ? `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}`
         : `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}→${ArtilleryStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private ionCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.ionCooldown;
+    const price = this.ionCooldownPrice(level);
+    const now = IonCannon.cooldownFor(IonCannon.shopCooldownLevel, level);
+    const next = IonCannon.cooldownFor(IonCannon.shopCooldownLevel, level + 1);
+    const maxed = !IonCannon.progressCooldownShortens(level);
+    return {
+      title: '−1 с перезарядки',
+      buy: () => this.buyIonCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${IonCannon.cooldownLabel(now)}`
+        : `ур. ${level} · ${IonCannon.cooldownLabel(now)}→${IonCannon.cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1053,6 +1156,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.cost(level));
   }
 
+  private ionCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.cost(level));
+  }
+
   private minesCooldownPrice(level: number): number {
     return shopPrice(ProgressSave.cost(level));
   }
@@ -1073,6 +1180,7 @@ export class ProgressShopController {
       stat === 'mgDamage' ||
       stat === 'salvoDamage' ||
       stat === 'artilleryDamage' ||
+      stat === 'ionDamage' ||
       stat === 'minesDamage' ||
       stat === 'wireDamage'
     ) {
@@ -1089,6 +1197,9 @@ export class ProgressShopController {
     }
     if (stat === 'artilleryCooldown') {
       return this.artilleryCooldownPrice(level);
+    }
+    if (stat === 'ionCooldown') {
+      return this.ionCooldownPrice(level);
     }
     if (stat === 'minesCooldown') {
       return this.minesCooldownPrice(level);

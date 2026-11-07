@@ -15,9 +15,15 @@ export const craterImages = {
 export const craterScale = 0.55;
 // Самая широкая чаша — камни, 243 px. Полэтого — запас, чтобы край не вылез за линию.
 export const craterWidth = 243;
+// Самая высокая чаша — 97 px. Полэтого по вертикали, чтобы верх и низ не ушли за кадр.
+export const craterHeight = 97;
 
 export function craterReach(): number {
   return (craterWidth * craterScale) / 2;
+}
+
+export function craterHalfHeight(): number {
+  return (craterHeight * craterScale) / 2;
 }
 
 // Атомный взрыв не берёт вал (картинка 3): у него другая высота чаши.
@@ -41,36 +47,59 @@ export function ensureCraters(scene: Phaser.Scene): void {
   }
 }
 
+const craterFadeMs = 400;
+
 type CraterPlace = {
   keys?: readonly string[];
   scale?: number;
   // Ширина на поле. Масштаб считается от выбранного кадра, чтобы 0–2 легли одним размером.
   width?: number;
   fadeMs?: number;
+  // Чаша остаётся на поле. Срок задаёт вызывающий через fadeCrater.
+  hold?: boolean;
 };
 
-// Случайная чаша. Гаснет сама: последние fadeMs — затухание.
+// Случайная чаша. Без hold гаснет сама: последние fadeMs — затухание.
 export function placeCrater(
   scene: Phaser.Scene,
   x: number,
   y: number,
   lifeMs: number,
   place?: CraterPlace,
-): void {
+): Phaser.GameObjects.Image | undefined {
   const keys = place?.keys ?? Object.keys(craterImages);
   const key = keys[Phaser.Math.Between(0, keys.length - 1)];
-  if (!scene.textures.exists(key)) {
+  if (!key || !scene.textures.exists(key)) {
     return;
   }
   const frame = scene.textures.get(key).get();
   const scale = place?.width ? place.width / frame.width : (place?.scale ?? craterScale);
-  const fadeMs = place?.fadeMs ?? 400;
+  const fadeMs = place?.fadeMs ?? craterFadeMs;
   const crater = scene.add.image(x, y, key).setDepth(3).setScale(scale);
+  if (!place?.hold) {
+    fadeCrater(scene, crater, lifeMs, fadeMs);
+  }
+  return crater;
+}
+
+// Последние fadeMs срока чаша тает. К этому моменту она уже стоит на поле.
+export function fadeCrater(
+  scene: Phaser.Scene,
+  crater: Phaser.GameObjects.Image,
+  lifeMs: number,
+  fadeMs = craterFadeMs,
+): void {
+  const fade = Math.min(fadeMs, Math.max(0, lifeMs));
+  scene.tweens.killTweensOf(crater);
   scene.tweens.add({
     targets: crater,
     alpha: 0,
-    delay: Math.max(0, lifeMs - fadeMs),
-    duration: fadeMs,
-    onComplete: () => crater.destroy(),
+    delay: Math.max(0, lifeMs - fade),
+    duration: fade,
+    onComplete: () => {
+      if (crater.scene) {
+        crater.destroy();
+      }
+    },
   });
 }

@@ -1,5 +1,5 @@
 // Дебаг-партия. Тот же формат, что у обычной, но свой ключ в localStorage.
-// Пустая запись уже с купленными пулемётом, лазером, огнемётом, РСЗО, артиллерией, минами и атомным взрывом.
+// Пустая запись уже с купленными пулемётом, лазером, огнемётом, РСЗО, артиллерией, ионной пушкой, минами и атомным взрывом.
 // Монеты за них не списываются: магазин просто поднимает флаги через restore.
 
 import { TankDebugBaseHp } from '../entities/Tank/TankDebugBaseHp';
@@ -17,6 +17,7 @@ export class DebugCombatSave extends CombatSave {
       saved.shop.laser = true;
       saved.shop.flame = true;
       saved.shop.salvo = true;
+      saved.shop.ion = true;
     }
     return saved;
   }
@@ -39,6 +40,7 @@ export class DebugCombatSave extends CombatSave {
       artilleryCooldownMs: 0,
       minesCooldownMs: 0,
       nuclearCooldownMs: 0,
+      ionCooldownMs: 0,
       flameCooldownMs: 0,
       flameWall: null,
       plantedMines: [],
@@ -60,6 +62,8 @@ export class DebugCombatSave extends CombatSave {
         salvo: true,
         artillery: true,
         artilleryCooldown: 0,
+        ion: true,
+        ionCooldown: 0,
         mines: true,
         minesCooldown: 0,
         nuclear: true,
@@ -71,6 +75,7 @@ export class DebugCombatSave extends CombatSave {
         flameDamage: 0,
         salvoDamage: 0,
         artilleryDamage: 0,
+        ionDamage: 0,
         minesDamage: 0,
       },
     };

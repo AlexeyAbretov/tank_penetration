@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
 import { BarbedWire } from '../entities/BarbedWire';
@@ -33,6 +34,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   RocketSalvo.ensureTextures(scene);
   BarbedWire.ensureTextures(scene);
   ArtilleryStrike.ensureTextures(scene);
+  IonCannon.ensureTextures(scene);
   AutoAim.ensureTextures(scene);
   AutoFire.ensureTextures(scene);
   Mines.ensureTextures(scene);

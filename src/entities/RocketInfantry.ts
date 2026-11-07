@@ -275,6 +275,10 @@ export class RocketInfantry extends RangedEnemy {
     }
   }
 
+  protected override severGear(): readonly Phaser.GameObjects.Image[] {
+    return [this.launcher];
+  }
+
   // Руки с трубой — отдельный спрайт. На трупе гранатомёт уже лежит рядом с телом.
   protected override onDie(slain: boolean): void {
     if (!slain) {

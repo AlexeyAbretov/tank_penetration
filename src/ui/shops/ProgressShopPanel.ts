@@ -64,7 +64,11 @@ const SCORE_Y = -258;
 const RULE_Y = -238;
 const BUTTON_Y = 292;
 const BUTTON_W = 260;
-const BUTTON_X = 145;
+const BUTTON_GAP = 30;
+// Пара стоит в колонке карточек. Иначе «Ресурсы» внизу закладок наезжает на «Новую игру».
+const BUTTON_PAIR = BUTTON_W * 2 + BUTTON_GAP;
+const FRESH_X = CARD_X - BUTTON_PAIR / 2 + BUTTON_W / 2;
+const NEXT_X = CARD_X + BUTTON_PAIR / 2 - BUTTON_W / 2;
 
 const BRASS = 0xc4a15a;
 
@@ -144,8 +148,8 @@ export class ProgressShopPanel {
       this.scoreText,
     ]);
 
-    const fresh = this.makeButton(scene, -BUTTON_X, BUTTON_Y, BUTTON_W, 'НОВАЯ ИГРА', () => shop.wipeAndRestart());
-    const next = this.makeButton(scene, BUTTON_X, BUTTON_Y, BUTTON_W, 'В БОЙ', () => shop.closeAndRestart());
+    const fresh = this.makeButton(scene, FRESH_X, BUTTON_Y, BUTTON_W, 'НОВАЯ ИГРА', () => shop.wipeAndRestart());
+    const next = this.makeButton(scene, NEXT_X, BUTTON_Y, BUTTON_W, 'В БОЙ', () => shop.closeAndRestart());
     this.container.add([fresh, next]);
 
     // Выше игрового UI и окна между волнами. Пауза (90) остаётся сверху.

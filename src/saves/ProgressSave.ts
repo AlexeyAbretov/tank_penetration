@@ -2,6 +2,7 @@
 // а эти уровни и непотраченный score остаются в localStorage.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { IonCannon } from '../entities/IonCannon';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
@@ -53,12 +54,16 @@ export type SavedProgress = {
   salvoDamage: number;
   // Сколько раз докуплен урон снаряда артиллерии. 0 — базовый урон. Потолка нет. Цена как у урона пули.
   artilleryDamage: number;
+  // Сколько раз докуплен урон ионной пушки. 0 — базовый урон. Потолка нет. Цена как у урона пули.
+  ionDamage: number;
   // Сколько раз докуплен урон мины. 0 — базовый урон. Потолка нет. Цена как у урона пули.
   minesDamage: number;
   // Сколько раз докуплен урон колючей проволоки. 0 — базовый урон. Потолка нет. Цена как у урона пули.
   wireDamage: number;
   // Сколько раз укорочен откат артиллерии. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   artilleryCooldown: number;
+  // Сколько раз укорочен откат ионной пушки. 0 — базовая минута. Прогресс сам останавливается на 40 с.
+  ionCooldown: number;
   // Сколько раз укорочен откат мин. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   minesCooldown: number;
   // Сколько раз укорочен откат атомного взрыва. 0 — базовые 3 минуты. Прогресс сам останавливается на 2:30.
@@ -79,6 +84,10 @@ export type SavedProgress = {
   autoMines: boolean;
   // Выключатель уже купленного автоприменения. Пока false, мины ждут клавишу или иконку.
   autoMinesOn: boolean;
+  // Куплено ли автоприменение ионной пушки. Луч сам через секунду после готовности.
+  autoIon: boolean;
+  // Выключатель уже купленного автоприменения. Пока false, луч ждёт клавишу или иконку.
+  autoIonOn: boolean;
 };
 
 export class ProgressSave {
@@ -135,6 +144,11 @@ export class ProgressSave {
     return 20_000;
   }
 
+  // Одна покупка. Ионная пушка сама бьёт через секунду после готовности, пока включён выключатель на иконке.
+  static autoIonCost(): number {
+    return 20_000;
+  }
+
   // Первая секунда перезарядки лазера стоит 5000, вторая — 50000.
   static laserCooldownCost(level: number): number {
     return Math.max(0, level) < 1 ? 5_000 : 50_000;
@@ -179,9 +193,11 @@ export class ProgressSave {
     progress.minesCount = 0;
     progress.salvoDamage = 0;
     progress.artilleryDamage = 0;
+    progress.ionDamage = 0;
     progress.minesDamage = 0;
     progress.wireDamage = 0;
     progress.artilleryCooldown = 0;
+    progress.ionCooldown = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
     progress.autoFire = false;
@@ -192,6 +208,8 @@ export class ProgressSave {
     progress.autoArtilleryOn = false;
     progress.autoMines = false;
     progress.autoMinesOn = false;
+    progress.autoIon = false;
+    progress.autoIonOn = false;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressFlightLevel(0);
@@ -204,6 +222,7 @@ export class ProgressSave {
     ArtilleryStrike.setProgressShellLevel(0);
     Mines.setProgressMineLevel(0);
     ArtilleryStrike.setProgressCooldownLevel(0);
+    IonCannon.setProgressCooldownLevel(0);
     Mines.setProgressCooldownLevel(0);
     NuclearStrike.setProgressCooldownLevel(0);
     LaserDefense.setProgressCooldownLevel(0);
@@ -247,9 +266,11 @@ export class ProgressSave {
       minesCount: 0,
       salvoDamage: 0,
       artilleryDamage: 0,
+      ionDamage: 0,
       minesDamage: 0,
       wireDamage: 0,
       artilleryCooldown: 0,
+      ionCooldown: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
       autoFire: false,
@@ -260,6 +281,8 @@ export class ProgressSave {
       autoArtilleryOn: false,
       autoMines: false,
       autoMinesOn: false,
+      autoIon: false,
+      autoIonOn: false,
     };
   }
 
@@ -324,11 +347,15 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали урон ракет, снарядов и мин: бил базовый урон.
     salvoDamage: requiredInt(value.salvoDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     artilleryDamage: requiredInt(value.artilleryDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    // Старые сохранения не писали урон ионной пушки: бил базовый урон.
+    ionDamage: requiredInt(value.ionDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     minesDamage: requiredInt(value.minesDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     // Старые сохранения не писали урон проволоки: рана оставалась базовой.
     wireDamage: requiredInt(value.wireDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
     artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxProgressCooldownLevel) ?? 0,
+    // Старые сохранения не писали откат ионной пушки: луч ждал базовую минуту.
+    ionCooldown: requiredInt(value.ionCooldown, 0, IonCannon.maxProgressCooldownLevel) ?? 0,
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали откат атомного взрыва: бомба ждала базовые 3 минуты.
     nuclearCooldown: requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxProgressCooldownLevel) ?? 0,
@@ -343,6 +370,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     autoArtilleryOn: value.autoArtillery === true && value.autoArtilleryOn !== false,
     autoMines: value.autoMines === true,
     autoMinesOn: value.autoMines === true && value.autoMinesOn !== false,
+    // Старые сохранения не писали автоприменение луча: он ждал клавишу.
+    autoIon: value.autoIon === true,
+    autoIonOn: value.autoIon === true && value.autoIonOn !== false,
   };
 }
 

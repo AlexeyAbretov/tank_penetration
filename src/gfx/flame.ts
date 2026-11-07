@@ -262,7 +262,7 @@ function ensureScorchedEarth(scene: Phaser.Scene): boolean {
   return true;
 }
 
-// Куски фотографии ложатся по дуге оснований и сходятся в одну полосу.
+// Куски фотографии по дуге костров. Дуга уже вся на поле, поэтому куски ставятся заново.
 export function syncScorchedEarth(
   scene: Phaser.Scene,
   earth: Phaser.GameObjects.Container,
@@ -327,6 +327,133 @@ function scorchSamples(points: Point[]): Array<Point & { angle: number }> {
     });
   }
   return samples;
+}
+
+let scorchPathSeq = 0;
+
+type ScorchStrip = {
+  src: Uint8ClampedArray;
+  frame: ImageData;
+  width: number;
+  height: number;
+  texture: Phaser.Textures.CanvasTexture;
+};
+
+// Прямая полоса на весь ход. На экран попадает только пройденная часть, передний край рваный.
+export function layScorchedPath(
+  scene: Phaser.Scene,
+  earth: Phaser.GameObjects.Container,
+  from: Point,
+  to: Point,
+): void {
+  if (!ensureScorchedEarth(scene)) {
+    return;
+  }
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const pathLength = Math.hypot(dx, dy);
+  if (pathLength < 1) {
+    return;
+  }
+  const source = scene.textures.get(scorchedEarth.sheetKey).getSourceImage() as CanvasImageSource;
+  const width = Math.ceil(pathLength);
+  const height = scorchedEarth.thick;
+  const baked = document.createElement('canvas');
+  baked.width = width;
+  baked.height = height;
+  const bakedCtx = baked.getContext('2d', { willReadFrequently: true });
+  if (!bakedCtx) {
+    return;
+  }
+  const scale = height / scorchedEarth.frame.h;
+  const drawW = scorchedEarth.frame.w * scale;
+  const step = drawW * scorchedEarth.along;
+  bakedCtx.imageSmoothingEnabled = true;
+  let x = 0;
+  let frame = 0;
+  while (x < width) {
+    const sx = (frame % scorchedEarth.frames) * scorchedEarth.frame.w;
+    bakedCtx.drawImage(
+      source,
+      sx,
+      0,
+      scorchedEarth.frame.w,
+      scorchedEarth.frame.h,
+      x,
+      0,
+      drawW,
+      height,
+    );
+    x += step;
+    frame += 1;
+  }
+  const key = `scorch-path-${scorchPathSeq}`;
+  scorchPathSeq += 1;
+  const texture = scene.textures.createCanvas(key, width, height);
+  if (!texture) {
+    return;
+  }
+  texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  const strip: ScorchStrip = {
+    src: bakedCtx.getImageData(0, 0, width, height).data,
+    frame: texture.context.createImageData(width, height),
+    width,
+    height,
+    texture,
+  };
+  earth.setData('strip', strip);
+  const image = scene.add.image(from.x, from.y, key).setOrigin(0, 0.5);
+  image.setRotation(Math.atan2(dy, dx));
+  earth.add(image);
+  earth.once(Phaser.GameObjects.Events.DESTROY, () => {
+    if (scene.textures.exists(key)) {
+      scene.textures.remove(key);
+    }
+  });
+}
+
+// Открывает полосу до пятна. Кромка короче у краёв полосы и гуляет по ширине, уже открытое не сдвигается.
+export function revealScorchedPath(earth: Phaser.GameObjects.Container, traveled: number): void {
+  const strip = earth.getData('strip') as ScorchStrip | undefined;
+  if (!strip || traveled < 1) {
+    return;
+  }
+  const src = strip.src;
+  const dst = strip.frame.data;
+  const width = strip.width;
+  const height = strip.height;
+  const fade = 14;
+  const limit = Math.min(width, traveled);
+  for (let y = 0; y < height; y += 1) {
+    const reach = limit - scorchFront(y, height);
+    const row = y * width;
+    for (let x = 0; x < width; x += 1) {
+      const index = (row + x) * 4;
+      const srcAlpha = src[index + 3] ?? 0;
+      if (srcAlpha === 0 || x >= reach) {
+        dst[index + 3] = 0;
+        continue;
+      }
+      const remain = reach - x;
+      const keep = remain >= fade ? 1 : remain / fade;
+      dst[index] = src[index] ?? 0;
+      dst[index + 1] = src[index + 1] ?? 0;
+      dst[index + 2] = src[index + 2] ?? 0;
+      dst[index + 3] = srcAlpha * keep;
+    }
+  }
+  strip.texture.context.putImageData(strip.frame, 0, 0);
+  strip.texture.refresh();
+}
+
+// Насколько эта строка отстаёт от пятна. Середина почти доходит, края и отдельные зубцы отстают.
+function scorchFront(y: number, height: number): number {
+  const mid = (height - 1) * 0.5;
+  const side = Math.abs(y - mid) / Math.max(1, mid);
+  const lobe = Math.sin(y * 0.23) * 0.6 + Math.sin(y * 0.71 + 1.7) * 0.4;
+  const grain = Math.sin(y * 12.9898) * 43758.5453;
+  const tear = grain - Math.floor(grain);
+  return side * side * 34 + (lobe * 0.5 + 0.5) * 20 + tear * 14;
 }
 
 export function inStream(px: number, py: number, from: Point, to: Point): boolean {

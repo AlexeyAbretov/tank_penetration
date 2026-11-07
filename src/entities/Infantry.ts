@@ -6,6 +6,7 @@
 
 import Phaser from 'phaser';
 import { enemyHasteOf, GAME, isDebugRun } from '../gameConfig';
+import { bisectImage } from '../gfx/bisect';
 import { floatDamage } from '../gfx/damageFloat';
 import { scatterGibs, type GibBit } from '../gfx/gibs';
 import type { SoldierLook } from '../gfx/looks';
@@ -43,6 +44,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   };
   // Сколько убитый солдат лежит в луже, прежде чем спрайт удалится.
   private static readonly corpseMs = 5000;
+  // Угол столба, если добила ионная пушка. null — обычная смерть.
+  private cutAngle: number | null = null;
   // Ширина полоски HP. Суперсолдат ставит свою после вызова super: у него запас больше.
   protected hpBarWidth = 30;
   // Текущее здоровье. Уменьшается, когда попадает снаряд танка.
@@ -93,6 +96,12 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   // Радиус круга для снаряда танка.
   shellRadius(): number {
     return this.hitRadius;
+  }
+
+  // Круг, который должна задеть подошва ионной пушки. null — хватает радиуса самого пятна.
+  // Крупный вид возвращает свой круг: иначе пятно берёт только середину корпуса.
+  ionSole(): number | null {
+    return null;
   }
 
   // Пуля берёт тот же круг, что снаряд. Тесная середина торса оставляла винтовку,
@@ -374,6 +383,39 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     return null;
   }
 
+  // Ионный столб режет вдоль своего наклона. Оружие отдельной картинкой наследник отдаёт сюда:
+  // иначе ствол останется целым рядом с разрезанным телом.
+  sever(angle: number): void {
+    this.cutAngle = angle;
+    this.kill();
+  }
+
+  // Кадр, который уйдёт в разрез. Пусто — режется то, что сейчас на спрайте.
+  protected prepareSever(): void {}
+
+  protected severGear(): readonly Phaser.GameObjects.Image[] {
+    return [];
+  }
+
+  // Линия, на которую ложатся половины. null — кусок уже на земле и только разъезжается.
+  // Низ кадра в мире: у солдата это подошва, оружие падает на ту же линию.
+  protected severGround(): number | null {
+    const frame = this.frame;
+    const ox = this.originX * frame.width;
+    const oy = this.originY * frame.height;
+    const lx = (frame.width * 0.5 - ox) * this.scaleX;
+    const ly = (frame.height - oy) * this.scaleY;
+    const cos = Math.cos(this.rotation);
+    const sin = Math.sin(this.rotation);
+    return this.y + lx * sin + ly * cos;
+  }
+
+  // Половины уже лежат на поле. Наследник сажает на них то, что должно ехать вместе с разрезом.
+  protected rideSever(
+    _angle: number,
+    _halves: readonly [Phaser.GameObjects.Image, Phaser.GameObjects.Image],
+  ): void {}
+
   // Куски кадра, если добила мина, артиллерия или залп. null — ложится целиком.
   // Пикап возвращает null: лужа крови ему не нужна, кузов он ломает в своём kill.
   protected blastBits(): GibBit[] | null {
@@ -410,6 +452,30 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.hpLabel?.setVisible(false);
 
     const slain = this.hp <= 0;
+    const angle = slain ? this.cutAngle : null;
+    this.cutAngle = null;
+    if (angle !== null) {
+      this.prepareSever();
+    }
+    const ground = angle !== null ? this.severGround() : null;
+    const halves = angle !== null ? bisectImage(this.scene, this, angle, Infantry.corpseMs, ground) : null;
+    if (halves && angle !== null) {
+      for (const piece of this.severGear()) {
+        if (piece.active && piece.visible) {
+          bisectImage(this.scene, piece, angle, Infantry.corpseMs, ground);
+        }
+      }
+      this.onDie(true);
+      this.rideSever(angle, halves);
+      this.setVisible(false);
+      // Группа пехоты в этом же обходе ещё идёт по списку: уничтожать спрайт сразу нельзя.
+      this.scene.time.delayedCall(0, () => {
+        if (this.active) {
+          this.destroy();
+        }
+      });
+      return;
+    }
     this.onDie(slain);
     const bits = slain && blastAt ? this.blastBits() : null;
     if (blastAt && bits && bits.length > 0) {

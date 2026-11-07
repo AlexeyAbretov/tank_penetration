@@ -260,6 +260,10 @@ export class GunnerInfantry extends RangedEnemy {
     }
   }
 
+  protected override severGear(): readonly Phaser.GameObjects.Image[] {
+    return [this.rifle];
+  }
+
   // На трупе ствол уже лежит рядом с телом, отдельная картинка рук не нужна.
   protected override onDie(slain: boolean): void {
     if (!slain) {

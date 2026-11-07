@@ -167,6 +167,10 @@ export class SuperSoldier extends Infantry {
     return this.displayHeight * this.originY * 0.5 + SuperSoldier.crownPad;
   }
 
+  override ionSole(): number {
+    return this.shellRadius();
+  }
+
   // Урон одной пули этого выхода. Считается по номеру появления и дальше не меняется.
   private readonly bulletDamage: number;
   // Пулемёт — отдельная картинка. Так отдача двигает ствол, а тело остаётся на месте.
@@ -368,6 +372,10 @@ export class SuperSoldier extends Infantry {
 
   protected override corpseTexture(): string | null {
     return SuperSoldier.corpseKey;
+  }
+
+  protected override severGear(): readonly Phaser.GameObjects.Image[] {
+    return [this.gun];
   }
 
   protected override onDie(slain: boolean): void {

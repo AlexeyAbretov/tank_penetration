@@ -7,15 +7,18 @@ export type CombatSystem = {
   readonly artilleryCooldown: number;
   readonly minesCooldown: number;
   readonly nuclearCooldown: number;
+  readonly ionCooldown: number;
   readonly flameCooldown: number;
   setArtilleryCooldown(ms: number): void;
   setMinesCooldown(ms: number): void;
   setNuclearCooldown(ms: number): void;
+  setIonCooldown(ms: number): void;
   setFlameCooldown(ms: number): void;
   nuclearCloudLeft(): number;
   requestArtillery(): void;
   requestMines(): void;
   requestNuclear(): void;
+  requestIon(): void;
   clearProjectiles(): void;
   captureMines(): { x: number; y: number }[];
   restoreMines(spots: { x: number; y: number }[]): void;
@@ -25,6 +28,7 @@ export type CombatSystem = {
   tickArtillery(delta: number, canFire: boolean): void;
   tickMines(delta: number, canFire: boolean): void;
   tickNuclear(delta: number, canFire: boolean): void;
+  tickIon(delta: number, canFire: boolean): void;
   tick(delta: number, allowFire?: boolean): void;
   // Сцена приносит флаг прогресса: бой магазин очков не читает.
   setAutoFire(on: boolean): void;
@@ -32,6 +36,8 @@ export type CombatSystem = {
   setAutoArtillery(on: boolean): void;
   // Куплено и включено: мины сами через секунду после готовности.
   setAutoMines(on: boolean): void;
+  // Куплено и включено: ионная пушка сама через секунду после готовности.
+  setAutoIon(on: boolean): void;
   // Точка живой цели автонаведения. Та же, пока она не погибла. null — на поле никого.
   aimPoint(): WorldPoint | null;
 };

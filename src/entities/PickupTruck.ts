@@ -104,12 +104,18 @@ export class PickupTruck extends RangedEnemy {
   static readonly coinReward = 3;
   readonly coinReward = PickupTruck.coinReward;
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Столб снял спрайт, а дым остался на половине капота и гаснет вместе с ней.
+  private smokeFollows = false;
   // Половинки и колёса после разрыва. Живут, пока спрайт машины не снимут с поля.
   private readonly debris: Phaser.GameObjects.GameObject[] = [];
   private readonly debrisKeys: string[] = [];
   // Зона попадания шире солдатской (46): снаряд задевает машину с большего расстояния.
   // override: у родителя Infantry это поле уже есть, здесь мы задаём своё значение.
   override readonly hitRadius: number = 86;
+
+  override ionSole(): number {
+    return this.shellRadius();
+  }
   protected readonly holdX = 640;
   protected readonly fireDelay = PickupTruck.shotInterval;
   protected override readonly burstCount = PickupTruck.burstCount;
@@ -183,7 +189,9 @@ export class PickupTruck extends RangedEnemy {
     this.once('destroy', () => {
       this.scene.tweens.killTweensOf(this.recoil);
       this.gun.destroy();
-      this.smoke?.destroy();
+      if (!this.smokeFollows) {
+        this.smoke?.destroy();
+      }
       this.clearDebris();
     });
     this.syncGun();
@@ -196,6 +204,75 @@ export class PickupTruck extends RangedEnemy {
 
   protected override corpseTexture(): string | null {
     return PickupTruck.corpseKey;
+  }
+
+  // Столб режет сгоревший кадр, не ход с колёсами. Ствол на обломках уже нарисован, живой не режем.
+  protected override prepareSever(): void {
+    this.setTexture(PickupTruck.corpseKey);
+    this.setOrigin(PickupTruck.placed.originX, PickupTruck.placed.originY);
+  }
+
+  protected override severGear(): readonly Phaser.GameObjects.Image[] {
+    return [];
+  }
+
+  // Остов уже лежит на колёсах. Столб только режет его, набок машина не валится.
+  protected override severGround(): number | null {
+    return null;
+  }
+
+  // Дым из щели капота едет с той половиной, на которой щель осталась.
+  protected override rideSever(
+    angle: number,
+    halves: readonly [Phaser.GameObjects.Image, Phaser.GameObjects.Image],
+  ): void {
+    const smoke = this.smoke;
+    const hood = halves[this.hoodSide(angle) >= 0 ? 0 : 1];
+    if (!smoke || !hood) {
+      return;
+    }
+    this.smokeFollows = true;
+    const scene = this.scene;
+    const place = () => {
+      if (!smoke.scene || !hood.active) {
+        return;
+      }
+      const ox = hood.originX * PickupTruck.frame.w;
+      const oy = hood.originY * PickupTruck.frame.h;
+      const lx = (PickupTruck.flame.x - ox) * hood.scaleX;
+      const ly = (PickupTruck.flame.y - oy) * hood.scaleY;
+      const cos = Math.cos(hood.rotation);
+      const sin = Math.sin(hood.rotation);
+      smoke.setPosition(hood.x + lx * cos - ly * sin, hood.y + lx * sin + ly * cos);
+    };
+    const follow = () => {
+      if (!smoke.scene || !hood.active) {
+        scene.events.off(Phaser.Scenes.Events.UPDATE, follow);
+        return;
+      }
+      place();
+    };
+    place();
+    scene.events.on(Phaser.Scenes.Events.UPDATE, follow);
+    hood.once('destroy', () => {
+      scene.events.off(Phaser.Scenes.Events.UPDATE, follow);
+      if (smoke.scene) {
+        smoke.destroy();
+      }
+    });
+  }
+
+  // Знак как у разреза: положительный — первая половина, отрицательный — вторая.
+  private hoodSide(angle: number): number {
+    const ox = this.originX * PickupTruck.frame.w;
+    const oy = this.originY * PickupTruck.frame.h;
+    const lx = (PickupTruck.flame.x - ox) * this.scaleX;
+    const ly = (PickupTruck.flame.y - oy) * this.scaleY;
+    const cos = Math.cos(this.rotation);
+    const sin = Math.sin(this.rotation);
+    const wx = lx * cos - ly * sin;
+    const wy = lx * sin + ly * cos;
+    return wx * -Math.sin(angle) + wy * Math.cos(angle);
   }
 
   // Взрыв в момент гибели, потом на поле остаётся текстура разбитой машины.
@@ -214,7 +291,8 @@ export class PickupTruck extends RangedEnemy {
   }
 
   // Мина, артиллерия и залп передают центр разрыва. От них кузов расходится по шву,
-  // колёса выкатываются. Пуля и огонь этот центр не передают: остаётся целый остов.
+  // колёса выкатываются. Столб ионной пушки режет тот же сгоревший кадр вдоль луча.
+  // Пуля и огонь этот центр не передают: остаётся целый остов.
   override kill(blastAt?: WorldPoint): void {
     if (this.reachedWall || this.hp > 0 || !blastAt) {
       super.kill(blastAt);
@@ -701,7 +779,10 @@ export class PickupTruck extends RangedEnemy {
   }
 
   // Вспышка по центру машины. Обломки уже под ней: вспышка гаснет, корпус остаётся.
+  // Второй клуб отложен. Ионный разрез снимает спрайт на следующем кадре,
+  // поэтому точка и сцена берутся сразу: иначе таймер трогает уже снятую машину и цикл игры обрывается.
   private playDeathBlast(): void {
+    const scene = this.scene;
     const scale = this.scaleX;
     const at = (px: number, py: number) => ({
       x: this.x + (px - PickupTruck.placed.originX * PickupTruck.frame.w) * scale,
@@ -709,10 +790,10 @@ export class PickupTruck extends RangedEnemy {
     });
     // Два клуба: капот и кабина. Картинки взрыва нет, клубы рисует burstAt.
     const nose = at(40, 34);
-    PickupTruck.burstAt(this.scene, nose.x, nose.y);
-    this.scene.time.delayedCall(90, () => {
-      const cab = at(78, 36);
-      PickupTruck.burstAt(this.scene, cab.x, cab.y);
+    const cab = at(78, 36);
+    PickupTruck.burstAt(scene, nose.x, nose.y);
+    scene.time.delayedCall(90, () => {
+      PickupTruck.burstAt(scene, cab.x, cab.y);
     });
   }
 

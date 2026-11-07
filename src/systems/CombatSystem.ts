@@ -1,4 +1,4 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, мины, атомный взрыв и контакт с базой.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, ионная пушка, мины, атомный взрыв и контакт с базой.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
@@ -6,6 +6,7 @@ import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
+import { IonCannon, type IonCourse } from '../entities/IonCannon';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines, PlantedMine, type MineKeepOut } from '../entities/Mines';
@@ -16,8 +17,8 @@ import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { airBurstAt } from '../gfx/airBurst';
-import { craterReach } from '../gfx/craters';
-import { clearBurns, ignite, inPatch, inStream, placeCampfires, syncFlameStream, syncScorchedEarth, tickBurns } from '../gfx/flame';
+import { craterHalfHeight, craterReach, fadeCrater, placeCrater } from '../gfx/craters';
+import { clearBurns, ignite, inPatch, inStream, layScorchedPath, placeCampfires, revealScorchedPath, syncFlameStream, syncScorchedEarth, tickBurns } from '../gfx/flame';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from '../sounds/BoomSounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
@@ -27,6 +28,16 @@ import type { CombatSystem as Combat } from '../types/CombatSystem';
 import type { WorldPoint } from '../types/WorldPoint';
 
 type ArtillerySpot = { x: number; y: number; mark: ArtilleryMark };
+
+type IonRun = {
+  course: IonCourse;
+  elapsed: number;
+  prev: WorldPoint;
+  hit: Set<Infantry>;
+  beam: Phaser.GameObjects.Graphics;
+  earth: Phaser.GameObjects.Container;
+  crater?: Phaser.GameObjects.Image;
+};
 
 // pierce — ближайший враг получит урон без взрыва, снаряд полетит дальше.
 // passed — кого этот снаряд уже прошил. Повторно его не бьём и осколками того же разрыва не задеваем.
@@ -105,6 +116,21 @@ export class CombatSystem implements Combat {
   private nuclearToken = 0;
   // Момент, когда гриб атомного удара уже погас. 0 — облака на поле нет.
   private nuclearCloudUntil = 0;
+  private ionCooldownMs = 0;
+  private readonly ionKeys: Phaser.Input.Keyboard.Key[] = [];
+  // Клик по иконке ионной пушки. Сбрасывается в том же кадре, даже если луч ещё на перезарядке.
+  private ionFromIcon = false;
+  private ionRun?: IonRun;
+  // Столб уже гаснет, полоса ещё на поле. Поражение снимает и то и другое сразу.
+  private ionFade?: {
+    beam: Phaser.GameObjects.Graphics;
+    earth: Phaser.GameObjects.Container;
+    crater?: Phaser.GameObjects.Image;
+  };
+  private readonly ionScars: Phaser.GameObjects.Container[] = [];
+  private readonly ionCraters: Phaser.GameObjects.Image[] = [];
+  private autoIon = false;
+  private ionReadyMs = 0;
   // Кого башня держит при автонаведении. Ближний новичок не перебивает, пока этот жив.
   private aimLock: Infantry | null = null;
   // Сцена ставит из прогресса. Куплено и включено — танк стреляет без левой кнопки.
@@ -133,6 +159,7 @@ export class CombatSystem implements Combat {
     private readonly progressArtilleryDamage: number,
     private readonly progressMinesDamage: number,
     private readonly progressWireDamage: number,
+    private readonly progressIonDamage: number,
     private readonly laserShots: number,
     private readonly effects: BattleEffects,
   ) {
@@ -152,6 +179,10 @@ export class CombatSystem implements Combat {
       this.nuclearKeys.push(
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_THREE),
+      );
+      this.ionKeys.push(
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_FOUR),
       );
     }
     // Дебаг-наследник здесь включает рамки хитбоксов. В обычной партии метод пуст.
@@ -190,6 +221,14 @@ export class CombatSystem implements Combat {
 
   setNuclearCooldown(ms: number): void {
     this.nuclearCooldownMs = Math.min(this.nuclearSpan(), Math.max(0, ms));
+  }
+
+  get ionCooldown(): number {
+    return this.ionCooldownMs;
+  }
+
+  setIonCooldown(ms: number): void {
+    this.ionCooldownMs = Math.min(this.ionSpan(), Math.max(0, ms));
   }
 
   // Живая цель остаётся, даже если к танку подошёл кто-то ближе. Труп и дошедший до базы уже не цель.
@@ -234,6 +273,10 @@ export class CombatSystem implements Combat {
     return NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel);
   }
 
+  private ionSpan(): number {
+    return IonCannon.cooldownFor(this.shop.ionCooldownLevel);
+  }
+
   // Сколько миллисекунд гриб ещё будет на поле. Магазин волны ждёт это, чтобы не закрыть взрыв.
   nuclearCloudLeft(): number {
     return Math.max(0, this.nuclearCloudUntil - this.scene.time.now);
@@ -254,18 +297,28 @@ export class CombatSystem implements Combat {
     this.nuclearFromIcon = true;
   }
 
+  // Иконка на HUD просит луч. Сработает в tickIon, если бой идёт и перезарядка кончилась.
+  requestIon(): void {
+    this.ionFromIcon = true;
+  }
+
   clearProjectiles(): void {
     this.strikeFromIcon = false;
     this.mineFromIcon = false;
     this.nuclearFromIcon = false;
+    this.ionFromIcon = false;
     this.artilleryReadyMs = 0;
     this.minesReadyMs = 0;
+    this.ionReadyMs = 0;
     this.shells.clear(true, true);
     this.shellFlights.clear();
     this.mgShots.clear(true, true);
     this.mgBurstLeft = 0;
     this.cancelArtillery();
     this.cancelNuclear();
+    this.cancelIon(false);
+    this.clearIonScars();
+    this.clearIonCraters();
     this.clearMines();
     this.stopFlame();
     clearBurns();
@@ -322,6 +375,14 @@ export class CombatSystem implements Combat {
       this.minesReadyMs = 0;
     }
     this.autoMines = on;
+  }
+
+  // Выключенное положение сбрасывает уже накопленную секунду: следующее включение ждёт её заново.
+  setAutoIon(on: boolean): void {
+    if (!on) {
+      this.ionReadyMs = 0;
+    }
+    this.autoIon = on;
   }
 
   // ЛКМ и автострельба. Флаг прогресса сцена уже положила в setAutoFire.
@@ -457,6 +518,272 @@ export class CombatSystem implements Combat {
     }
     this.nuclearCooldownMs = this.nuclearSpan();
     this.launchNuclear();
+  }
+
+  // Перезарядка идёт и в магазине. Луч — в бою, по клавише 4, по иконке или сам через секунду после готовности.
+  // Уже идущий столб в магазине не замирает: пятно доходит до второго края.
+  tickIon(delta: number, canFire: boolean): void {
+    this.stepIon(delta);
+    if (!this.shop.ionOwned) {
+      this.ionFromIcon = false;
+      this.ionReadyMs = 0;
+      return;
+    }
+    const span = this.ionSpan();
+    this.ionCooldownMs = Math.min(span, Math.max(0, this.ionCooldownMs - delta));
+    if (this.ionPressed()) {
+      this.useIon(canFire);
+      if (this.ionCooldownMs > 0) {
+        this.ionReadyMs = 0;
+        return;
+      }
+    }
+    this.tickAutoIon(delta, canFire);
+  }
+
+  protected useIon(canFire: boolean): void {
+    if (!canFire || this.ionCooldownMs > 0) {
+      return;
+    }
+    this.commitIon();
+  }
+
+  private tickAutoIon(delta: number, canFire: boolean): void {
+    if (!this.autoIon || this.ionCooldownMs > 0) {
+      this.ionReadyMs = 0;
+      return;
+    }
+    if (this.ionReadyMs < AUTO_APPLY_DELAY_MS) {
+      this.ionReadyMs += delta;
+    }
+    if (!canFire || this.ionReadyMs < AUTO_APPLY_DELAY_MS) {
+      return;
+    }
+    this.commitIon();
+    this.ionReadyMs = 0;
+  }
+
+  private commitIon(): void {
+    this.ionCooldownMs = this.ionSpan();
+    this.launchIon();
+  }
+
+  // Правый край купленной проволоки. Без неё левый край поля не закрыт.
+  private ionLimitX(): number {
+    return this.shop.wireOwned ? BarbedWire.bounds.face : 0;
+  }
+
+  // Место одного живого врага. Пушка проводит через него прямую и дальше эту точку не спрашивает.
+  private ionMark(): WorldPoint | null {
+    const alive: Infantry[] = [];
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (unit.active && !unit.reachedWall) {
+        alive.push(unit);
+      }
+    }
+    if (alive.length === 0) {
+      return null;
+    }
+    const unit = alive[Phaser.Math.Between(0, alive.length - 1)];
+    return unit ? unit.hitCenter() : null;
+  }
+
+  private ionPressed(): boolean {
+    const fromIcon = this.ionFromIcon;
+    this.ionFromIcon = false;
+    return fromIcon || this.ionKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  private launchIon(): void {
+    this.cancelIon(true);
+    const course = IonCannon.course(
+      this.ionLimitX(),
+      this.ionMark(),
+      Math.ceil(craterReach()),
+      Math.ceil(craterHalfHeight()),
+    );
+    const beam = this.scene.add.graphics().setDepth(19).setBlendMode(Phaser.BlendModes.ADD);
+    const earth = this.scene.add.container(0, 0).setDepth(1);
+    const from = { x: course.from.x, y: course.from.y };
+    layScorchedPath(this.scene, earth, course.from, course.to);
+    const craterAt = this.ionCraterPoint(from);
+    const crater = placeCrater(this.scene, craterAt.x, craterAt.y, 0, { hold: true });
+    this.ionRun = {
+      course,
+      elapsed: 0,
+      prev: from,
+      hit: new Set(),
+      beam,
+      earth,
+      crater,
+    };
+    IonCannon.paint(beam, from, course.minX, this.scene.time.now);
+    this.cutIon(this.ionRun, from);
+    this.scene.cameras.main.shake(180, 0.0025);
+    this.effects.laserShot.play();
+  }
+
+  private stepIon(delta: number): void {
+    const run = this.ionRun;
+    if (!run) {
+      return;
+    }
+    run.elapsed += delta;
+    const t = Math.min(1, run.elapsed / IonCannon.shop.sweepMs);
+    const at = IonCannon.pointAt(run.course, t);
+    IonCannon.paint(run.beam, at, run.course.minX, this.scene.time.now);
+    revealScorchedPath(
+      run.earth,
+      Phaser.Math.Distance.Between(run.course.from.x, run.course.from.y, at.x, at.y),
+    );
+    this.cutIon(run, at);
+    run.prev = at;
+    if (t >= 1) {
+      this.finishIon();
+    }
+  }
+
+  // Один проход бьёт врага один раз, даже если столб несколько кадров стоит на нём.
+  private cutIon(run: IonRun, at: WorldPoint): void {
+    const angle = IonCannon.columnAngle();
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (!unit.active || unit.reachedWall || run.hit.has(unit)) {
+        continue;
+      }
+      if (!IonCannon.covers(unit.hitCenter(), run.prev, at, this.ionReach(unit))) {
+        continue;
+      }
+      run.hit.add(unit);
+      this.hurtIon(unit, angle);
+    }
+  }
+
+  // У солдата подошва должна дойти до центра торса. Крупный вид отдаёт свой круг.
+  private ionReach(unit: Infantry): number {
+    return unit.ionSole() ?? IonCannon.shop.radius;
+  }
+
+  // Луч не передаёт центр разрыва: убитый режется пополам, а не разлетается осколками.
+  private hurtIon(unit: Infantry, angle: number): void {
+    if (!unit.hit(this.ionDamage())) {
+      return;
+    }
+    this.callbacks.onKill(unit.coinReward);
+    if (unit instanceof PickupTruck) {
+      this.effects.pickupExplosion.play();
+    } else {
+      this.effects.infantryDeath.play();
+    }
+    unit.sever(angle);
+  }
+
+  private finishIon(): void {
+    const run = this.ionRun;
+    if (!run) {
+      return;
+    }
+    this.ionRun = undefined;
+    this.ionFade = { beam: run.beam, earth: run.earth, crater: run.crater };
+    this.scene.tweens.add({
+      targets: run.beam,
+      alpha: 0,
+      duration: 420,
+      onComplete: () => {
+        if (this.ionFade?.beam === run.beam) {
+          this.ionFade = undefined;
+        }
+        run.beam.destroy();
+        this.retireIonEarth(run.earth);
+        this.retireIonCrater(run.crater);
+      },
+    });
+  }
+
+  // keepEarth: луч оборван новым пуском, полоса доживает свой срок. Иначе поле чистят сразу.
+  private cancelIon(keepEarth: boolean): void {
+    this.dropIonFade(keepEarth);
+    const run = this.ionRun;
+    if (!run) {
+      return;
+    }
+    this.ionRun = undefined;
+    this.scene.tweens.killTweensOf(run.beam);
+    run.beam.destroy();
+    if (keepEarth) {
+      this.retireIonEarth(run.earth);
+      this.retireIonCrater(run.crater);
+      return;
+    }
+    run.earth.destroy();
+    run.crater?.destroy();
+  }
+
+  private dropIonFade(keepEarth: boolean): void {
+    const fade = this.ionFade;
+    if (!fade) {
+      return;
+    }
+    this.ionFade = undefined;
+    this.scene.tweens.killTweensOf(fade.beam);
+    fade.beam.destroy();
+    if (keepEarth) {
+      this.retireIonEarth(fade.earth);
+      this.retireIonCrater(fade.crater);
+      return;
+    }
+    fade.earth.destroy();
+    fade.crater?.destroy();
+  }
+
+  // Срок идёт после погасшего столба. Повторный пуск старую полосу не стирает.
+  private retireIonEarth(earth: Phaser.GameObjects.Container): void {
+    this.ionScars.push(earth);
+    this.scene.time.delayedCall(IonCannon.shop.scorchMs, () => {
+      const index = this.ionScars.indexOf(earth);
+      if (index >= 0) {
+        this.ionScars.splice(index, 1);
+      }
+      if (earth.scene) {
+        earth.destroy();
+      }
+    });
+  }
+
+  private clearIonScars(): void {
+    const pending = this.ionScars.splice(0);
+    for (const earth of pending) {
+      if (earth.scene) {
+        earth.destroy();
+      }
+    }
+  }
+
+  // Воронка в точке появления. Срок начинается, когда столб уже погас.
+  private retireIonCrater(crater: Phaser.GameObjects.Image | undefined): void {
+    if (!crater?.scene) {
+      return;
+    }
+    this.ionCraters.push(crater);
+    fadeCrater(this.scene, crater, IonCannon.shop.craterMs);
+  }
+
+  // Чаша не заходит на витки: центр сдвигается вправо, если луч встал у проволоки.
+  private ionCraterPoint(from: WorldPoint): WorldPoint {
+    if (!this.shop.wireOwned) {
+      return from;
+    }
+    const minX = Math.ceil(BarbedWire.bounds.face + craterReach());
+    return { x: Math.max(from.x, minX), y: from.y };
+  }
+
+  private clearIonCraters(): void {
+    const pending = this.ionCraters.splice(0);
+    for (const crater of pending) {
+      this.scene.tweens.killTweensOf(crater);
+      if (crater.scene) {
+        crater.destroy();
+      }
+    }
   }
 
   private strikePressed(): boolean {
@@ -1393,6 +1720,10 @@ export class CombatSystem implements Combat {
 
   private minesDamage(): number {
     return Mines.shop.damage + this.shop.minesDamageLevel + this.progressMinesDamage;
+  }
+
+  private ionDamage(): number {
+    return IonCannon.shop.damage + this.shop.ionDamageLevel + this.progressIonDamage;
   }
 
   // База проволоки плюс покупки партии и постоянный урон из магазина очков.

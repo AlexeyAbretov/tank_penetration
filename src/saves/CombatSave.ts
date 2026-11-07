@@ -5,6 +5,7 @@
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { IonCannon } from '../entities/IonCannon';
 import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
@@ -41,6 +42,9 @@ export type ShopSave = {
   artillery: boolean;
   // Уровни отката артиллерии за эту партию. Старые сохранения читают 0.
   artilleryCooldown: number;
+  ion: boolean;
+  // Уровни отката ионной пушки за эту партию. Старые сохранения читают 0.
+  ionCooldown: number;
   mines: boolean;
   // Уровни отката мин за эту партию. Старые сохранения читают 0.
   minesCooldown: number;
@@ -56,6 +60,7 @@ export type ShopSave = {
   flameDamage: number;
   salvoDamage: number;
   artilleryDamage: number;
+  ionDamage: number;
   minesDamage: number;
 };
 
@@ -79,6 +84,7 @@ export type SavedRun = {
   artilleryCooldownMs: number;
   minesCooldownMs: number;
   nuclearCooldownMs: number;
+  ionCooldownMs: number;
   flameCooldownMs: number;
   flameWall: FlameWallSave | null;
   wave: number;
@@ -170,6 +176,8 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
   const minesCooldownMs = requiredInt(value.minesCooldownMs, 0, Mines.shop.cooldownMs) ?? 0;
   const nuclearCooldownMs =
     requiredInt(value.nuclearCooldownMs, 0, NuclearStrike.shop.cooldownMs) ?? 0;
+  // Старые сохранения не писали перезарядку ионной пушки: луча ещё не было.
+  const ionCooldownMs = requiredInt(value.ionCooldownMs, 0, IonCannon.shop.cooldownMs) ?? 0;
   // Старые сохранения не писали перезарядку огнемёта: струя просто ждёт новый заход.
   const flameCooldownMs = requiredInt(value.flameCooldownMs, 0, 60 * 60 * 1000) ?? 0;
   // Старые сохранения не писали стену огня: на поле её не было.
@@ -195,6 +203,7 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     artilleryCooldownMs,
     minesCooldownMs,
     nuclearCooldownMs,
+    ionCooldownMs,
     flameCooldownMs,
     flameWall,
     wave,
@@ -232,6 +241,9 @@ function parseShop(value: unknown): ShopSave | null {
   const nuclear = flag(value.nuclear) ?? false;
   // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
   const artilleryCooldown = requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxShopCooldownLevel) ?? 0;
+  // Старые сохранения не писали ионную пушку: этой покупки ещё не было.
+  const ion = flag(value.ion) ?? false;
+  const ionCooldown = requiredInt(value.ionCooldown, 0, IonCannon.maxShopCooldownLevel) ?? 0;
   const minesCooldown = requiredInt(value.minesCooldown, 0, Mines.maxShopCooldownLevel) ?? 0;
   const nuclearCooldown = requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxShopCooldownLevel) ?? 0;
   // Старые сохранения не писали урон партии у пулемёта, проволоки, огнемёта, РСЗО, артиллерии и мин.
@@ -243,6 +255,7 @@ function parseShop(value: unknown): ShopSave | null {
   const flameDamage = requiredInt(value.flameDamage, 0, 500) ?? 0;
   const salvoDamage = requiredInt(value.salvoDamage, 0, 500) ?? 0;
   const artilleryDamage = requiredInt(value.artilleryDamage, 0, 500) ?? 0;
+  const ionDamage = requiredInt(value.ionDamage, 0, 500) ?? 0;
   const minesDamage = requiredInt(value.minesDamage, 0, 500) ?? 0;
   if (
     blast === null ||
@@ -268,6 +281,8 @@ function parseShop(value: unknown): ShopSave | null {
     salvo,
     artillery,
     artilleryCooldown,
+    ion,
+    ionCooldown,
     mines,
     minesCooldown,
     nuclear,
@@ -279,6 +294,7 @@ function parseShop(value: unknown): ShopSave | null {
     flameDamage,
     salvoDamage,
     artilleryDamage,
+    ionDamage,
     minesDamage,
   };
 }

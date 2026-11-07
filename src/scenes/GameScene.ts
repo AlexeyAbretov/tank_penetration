@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
 import { EnemyShot } from '../entities/EnemyShot';
@@ -123,6 +124,7 @@ export class GameScene extends Phaser.Scene {
       progressArtilleryDamage: number,
       progressMinesDamage: number,
       progressWireDamage: number,
+      progressIonDamage: number,
       laserShots: number,
       effects: BattleEffects,
     ) => CombatSystem,
@@ -186,6 +188,7 @@ export class GameScene extends Phaser.Scene {
     ArtilleryStrike.setProgressCooldownLevel(this.progressShop.artilleryCooldownLevel());
     Mines.setProgressCooldownLevel(this.progressShop.minesCooldownLevel());
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
+    IonCannon.setProgressCooldownLevel(this.progressShop.ionCooldownLevel());
     LaserDefense.setProgressCooldownLevel(this.progressShop.laserCooldownLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
@@ -220,6 +223,13 @@ export class GameScene extends Phaser.Scene {
         hint: '3 — атом',
         cooldownMs: NuclearStrike.shop.cooldownMs,
         iconRadius: NuclearStrike.iconRadius,
+      },
+      {
+        id: 'ion',
+        texture: IonCannon.iconKey,
+        hint: '4 — луч',
+        cooldownMs: IonCannon.shop.cooldownMs,
+        iconRadius: IonCannon.iconRadius,
       },
     ]);
     this.progressShop.bind(this, () => {
@@ -269,6 +279,12 @@ export class GameScene extends Phaser.Scene {
       }
       this.combat.requestNuclear();
     });
+    this.hud.onAbility('ion', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.combat.requestIon();
+    });
     this.hud.onAutoApply('artillery', () => {
       if (this.blocksPlay()) {
         return;
@@ -282,6 +298,14 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       this.progressShop.toggleAutoMines();
+      this.applyAutoStrikes();
+      this.paintAutoStrikes();
+    });
+    this.hud.onAutoApply('ion', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.progressShop.toggleAutoIon();
       this.applyAutoStrikes();
       this.paintAutoStrikes();
     });
@@ -341,6 +365,7 @@ export class GameScene extends Phaser.Scene {
         artillery: this.progressShop.artilleryDamageBonus(),
         mines: this.progressShop.minesDamageBonus(),
         wire: this.progressShop.wireDamageBonus(),
+        ion: this.progressShop.ionDamageBonus(),
       },
       () => this.waves.beginNextWave(),
       // Любая покупка сразу пишет партию, не дожидаясь автозаписи раз в 400 мс.
@@ -367,6 +392,7 @@ export class GameScene extends Phaser.Scene {
       this.progressShop.artilleryDamageBonus(),
       this.progressShop.minesDamageBonus(),
       this.progressShop.wireDamageBonus(),
+      this.progressShop.ionDamageBonus(),
       this.progressShop.laserShotCount(),
       fx,
     );
@@ -502,12 +528,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fighting = !this.shop.shopOpen;
-    // Перезарядка артиллерии, мин и атомного взрыва идёт и в магазине. Вызов — только когда fighting.
-    // Секунда автоприменения тикает там же. Сам удар ждёт закрытого магазина.
+    // Перезарядка артиллерии, ионной пушки, мин и атомного взрыва идёт и в магазине. Вызов — только когда fighting.
+    // Секунда автоприменения тикает там же. Сам удар ждёт закрытого магазина. Уже пущенный луч не замирает.
     this.applyAutoStrikes();
     this.combat.tickArtillery(delta, fighting);
     this.combat.tickMines(delta, fighting);
     this.combat.tickNuclear(delta, fighting);
+    this.combat.tickIon(delta, fighting);
     this.hud.setAbility(
       'artillery',
       this.shop.artilleryOwned,
@@ -525,6 +552,12 @@ export class GameScene extends Phaser.Scene {
       this.shop.nuclearOwned,
       this.combat.nuclearCooldown,
       NuclearStrike.cooldownFor(this.shop.nuclearCooldownLevel),
+    );
+    this.hud.setAbility(
+      'ion',
+      this.shop.ionOwned,
+      this.combat.ionCooldown,
+      IonCannon.cooldownFor(this.shop.ionCooldownLevel),
     );
     this.paintAutoStrikes();
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
@@ -560,11 +593,13 @@ export class GameScene extends Phaser.Scene {
   private applyAutoStrikes(): void {
     this.combat.setAutoArtillery(this.progressShop.autoArtilleryEnabled());
     this.combat.setAutoMines(this.progressShop.autoMinesEnabled());
+    this.combat.setAutoIon(this.progressShop.autoIonEnabled());
   }
 
   private paintAutoStrikes(): void {
     this.hud.setAutoApply('artillery', this.progressShop.autoArtilleryOwned(), this.progressShop.autoArtilleryEnabled());
     this.hud.setAutoApply('mines', this.progressShop.autoMinesOwned(), this.progressShop.autoMinesEnabled());
+    this.hud.setAutoApply('ion', this.progressShop.autoIonOwned(), this.progressShop.autoIonEnabled());
   }
 
   // Иконка справа и выстрел без ЛКМ читают одну и ту же покупку прогресса.
@@ -858,6 +893,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.setArtilleryCooldown(saved.artilleryCooldownMs);
     this.combat.setMinesCooldown(saved.minesCooldownMs);
     this.combat.setNuclearCooldown(saved.nuclearCooldownMs);
+    this.combat.setIonCooldown(saved.ionCooldownMs);
     this.combat.setFlameCooldown(saved.flameCooldownMs);
     this.combat.restoreMines(saved.plantedMines);
     this.combat.restoreFlameWall(saved.flameWall);
@@ -899,6 +935,7 @@ export class GameScene extends Phaser.Scene {
       artilleryCooldownMs: Math.round(this.combat.artilleryCooldown),
       minesCooldownMs: Math.round(this.combat.minesCooldown),
       nuclearCooldownMs: Math.round(this.combat.nuclearCooldown),
+      ionCooldownMs: Math.round(this.combat.ionCooldown),
       flameCooldownMs: Math.round(this.combat.flameCooldown),
       flameWall: this.combat.captureFlameWall(),
       plantedMines: this.combat.captureMines(),
