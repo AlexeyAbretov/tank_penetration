@@ -154,6 +154,9 @@ export class GameHud {
   protected readonly plateSize = 40;
   protected readonly plateGap = 6;
   protected readonly plateY = 28;
+  // Шаг и отступ ряда способностей. Один и тот же слева и справа.
+  private readonly skillStep = 88;
+  private readonly skillInset = 56;
   protected readonly statusStyle = {
     fontSize: '18px',
     stroke: '#2a0a08',
@@ -404,12 +407,8 @@ export class GameHud {
     this.settingsPlate.setPosition(settingsX, y);
     this.settingsFace.setPosition(settingsX, y);
     this.settingsGear.setPosition(settingsX, y);
-    // Тот же ряд, что у способностей, у правого края. Широкое окно сдвигает его вместе с полем.
-    // Автопокупка, пока её нет, места не занимает: автонаведение остаётся крайним.
-    const shopSlot = this.autoShopOwned ? 1 : 0;
-    this.autoShopRoot?.setPosition(this.edgeIconX(0), this.frame.bannerY - 48);
-    this.autoAimRoot?.setPosition(this.edgeIconX(shopSlot), this.frame.bannerY - 48);
-    this.autoFireRoot?.setPosition(this.edgeIconX(shopSlot + 1), this.frame.bannerY - 48);
+    // Широкое окно сдвигает ряд вместе с полем. Некупленный круг слот не держит.
+    this.placeSkillRow();
     this.placeAutoApplies();
 
     this.hpFrame.setPosition(hpCenter, 28);
@@ -502,7 +501,7 @@ export class GameHud {
     this.autoFireRequest = request;
   }
 
-  // Картинка уже прогрета. Слева от автонаведения, на той же высоте, что способности.
+  // Картинка уже прогрета. Правый ряд, на той же высоте, что удары.
   // Глубина как у ударов: магазин волны её накрывает.
   installAutoFire(texture: string): void {
     if (this.autoFireRoot) {
@@ -514,7 +513,7 @@ export class GameHud {
     this.autoFireGlow = icon.glow;
   }
 
-  // Картинка уже прогрета. Крайняя справа, пока нет автопокупки. Купленная сдвигает этот круг влево.
+  // Картинка уже прогрета. В правом ряду между автопокупкой и автострельбой, если те куплены.
   installAutoAim(texture: string): void {
     if (this.autoAimRoot) {
       return;
@@ -539,20 +538,49 @@ export class GameHud {
       .setAlpha(0.5)
       .setVisible(false);
     const root = scene.add
-      .container(this.edgeIconX(fromRight), this.frame.bannerY - 48, [glyph, glow])
+      .container(this.edgeIconX(fromRight), this.skillY(), [glyph, glow])
       .setDepth(depth)
       .setVisible(false);
     return { root, glow };
   }
 
-  // Индекс автострельбы. Купленная автопокупка сдвигает весь ряд на один круг влево.
-  protected fireIconFromRight(): number {
-    return this.autoShopOwned ? 2 : 1;
+  // Купленные круги правого ряда, от края влево: автопокупка, автонаведение, автострельба.
+  protected rightSkillRoots(): Phaser.GameObjects.Container[] {
+    const roots: Phaser.GameObjects.Container[] = [];
+    const take = (owned: boolean, root?: Phaser.GameObjects.Container): void => {
+      if (owned && root) {
+        roots.push(root);
+      }
+    };
+    take(this.autoShopOwned, this.autoShopRoot);
+    take(this.autoAimOwned, this.autoAimRoot);
+    take(this.autoFireOwned, this.autoFireRoot);
+    return roots;
   }
 
-  // Шаг 88 — как у иконок ударов слева. 0 стоит у правого края.
+  // 0 стоит у правого края. Шаг тот же, что у ударов слева.
   protected edgeIconX(fromRight: number): number {
-    return this.frame.width - 56 - fromRight * 88;
+    return this.frame.width - this.skillInset - fromRight * this.skillStep;
+  }
+
+  protected skillY(): number {
+    return this.frame.bannerY - 48;
+  }
+
+  // Слева купленные удары идут от края вправо. Справа круги — от края влево. Дыр между ними нет.
+  private placeSkillRow(): void {
+    const y = this.skillY();
+    let fromLeft = 0;
+    for (const icon of this.abilities) {
+      if (!icon.owned) {
+        continue;
+      }
+      icon.root.setPosition(this.skillInset + fromLeft * this.skillStep, y);
+      fromLeft += 1;
+    }
+    this.rightSkillRoots().forEach((root, fromRight) => {
+      root.setPosition(this.edgeIconX(fromRight), y);
+    });
   }
 
   onAutoAim(request: () => void): void {
@@ -588,6 +616,7 @@ export class GameHud {
   setAutoAimToggle(owned: boolean, enabled: boolean): void {
     if (this.autoAimOwned !== owned) {
       this.autoAimOwned = owned;
+      this.layout();
       this.syncControls();
     }
     this.showRoundToggle(this.autoAimRoot, this.autoAimGlow, owned, enabled);
@@ -643,6 +672,7 @@ export class GameHud {
   setAutoFireToggle(owned: boolean, enabled: boolean): void {
     if (this.autoFireOwned !== owned) {
       this.autoFireOwned = owned;
+      this.layout();
       this.syncControls();
     }
     this.showRoundToggle(this.autoFireRoot, this.autoFireGlow, owned, enabled);
@@ -947,7 +977,7 @@ export class GameHud {
     return scene.add.container(0, 0, [hit, mark]);
   }
 
-  // Ряд над баннером, слева направо. index 0 — первая иконка у края поля.
+  // Ряд над баннером. Пока круг скрыт, место черновое: купленные соберёт placeSkillRow.
   private makeAbility(scene: Phaser.Scene, index: number, spec: HudAbility): AbilityIcon {
     const glyph = scene.add.image(0, 0, spec.texture);
     // Вторая копия в сложении светлит только готовую кнопку. На перезарядке её нет.
@@ -962,7 +992,7 @@ export class GameHud {
       })
       .setOrigin(0.5);
     const root = scene.add
-      .container(56 + index * 88, this.frame.bannerY - 48, [glyph, glow, sweep, time])
+      .container(this.skillInset + index * this.skillStep, this.skillY(), [glyph, glow, sweep, time])
       .setDepth(53)
       .setVisible(false);
     const icon: AbilityIcon = {
@@ -1067,6 +1097,7 @@ export class GameHud {
     if (icon.owned !== owned) {
       icon.owned = owned;
       icon.root.setVisible(owned);
+      this.layout();
       this.syncControls();
       if (owned) {
         if (!icon.root.input?.enabled) {
