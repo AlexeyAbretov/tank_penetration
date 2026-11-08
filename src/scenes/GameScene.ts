@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { BomberStrike } from '../entities/BomberStrike';
 import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
 import { AutoFire } from '../entities/AutoFire';
@@ -130,6 +131,7 @@ export class GameScene extends Phaser.Scene {
       progressMinesDamage: number,
       progressWireDamage: number,
       progressIonDamage: number,
+      progressBomberDamage: number,
       laserShots: number,
       effects: BattleEffects,
     ) => CombatSystem,
@@ -203,6 +205,7 @@ export class GameScene extends Phaser.Scene {
     IonCannon.setProgressWidthLevel(this.progressShop.ionWidthLevel());
     EnergyWall.setProgressDurationLevel(this.progressShop.wallDurationLevel());
     EnergyWall.setProgressCooldownLevel(this.progressShop.wallCooldownLevel());
+    BomberStrike.setProgressCooldownLevel(this.progressShop.bomberCooldownLevel());
     LaserDefense.setProgressCooldownLevel(this.progressShop.laserCooldownLevel());
 
     // Фон на глубине 0. Враги, снаряды и интерфейс рисуются выше.
@@ -251,6 +254,13 @@ export class GameScene extends Phaser.Scene {
         hint: '5 — стена',
         cooldownMs: EnergyWall.shop.cooldownMs,
         iconRadius: EnergyWall.iconRadius,
+      },
+      {
+        id: 'bomber',
+        texture: BomberStrike.iconKey,
+        hint: '6 — бомбы',
+        cooldownMs: BomberStrike.shop.cooldownMs,
+        iconRadius: BomberStrike.iconRadius,
       },
     ]);
     this.progressShop.bind(this, () => {
@@ -329,6 +339,12 @@ export class GameScene extends Phaser.Scene {
       }
       this.combat.requestWall();
     });
+    this.hud.onAbility('bomber', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.combat.requestBomber();
+    });
     this.hud.onAutoApply('artillery', () => {
       if (this.blocksPlay()) {
         return;
@@ -350,6 +366,14 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       this.progressShop.toggleAutoIon();
+      this.applyAutoStrikes();
+      this.paintAutoStrikes();
+    });
+    this.hud.onAutoApply('bomber', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.progressShop.toggleAutoBomber();
       this.applyAutoStrikes();
       this.paintAutoStrikes();
     });
@@ -410,6 +434,7 @@ export class GameScene extends Phaser.Scene {
         mines: this.progressShop.minesDamageBonus(),
         wire: this.progressShop.wireDamageBonus(),
         ion: this.progressShop.ionDamageBonus(),
+        bomber: this.progressShop.bomberDamageBonus(),
       },
       () => {
         this.cancelShopAutoBuy();
@@ -440,6 +465,7 @@ export class GameScene extends Phaser.Scene {
       this.progressShop.minesDamageBonus(),
       this.progressShop.wireDamageBonus(),
       this.progressShop.ionDamageBonus(),
+      this.progressShop.bomberDamageBonus(),
       this.progressShop.laserShotCount(),
       fx,
     );
@@ -534,9 +560,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Конец волны. Панель выходит, когда последний разрыв доиграл.
-  // Гриб, если он ещё стоит дольше разрыва, держит её до своего конца.
+  // Гриб и вспышка бомбы, если они ещё стоят дольше разрыва, держат её до своего конца.
   private openWaveShop(): void {
-    const wait = Math.max(boom.goneMs, this.combat.nuclearCloudLeft());
+    const wait = Math.max(boom.goneMs, this.combat.nuclearCloudLeft(), this.combat.bomberBlastLeft());
     this.time.delayedCall(wait, () => {
       if (this.player.isGameOver || this.defeatShop || this.shop.shopOpen) {
         return;
@@ -604,14 +630,15 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fighting = !this.shop.shopOpen;
-    // Перезарядка артиллерии, ионной пушки, мин, атомного взрыва и стены идёт и в магазине. Вызов — только когда fighting.
-    // Секунда автоприменения тикает там же. Сам удар ждёт закрытого магазина. Уже пущенный луч и стоящая стена не замирают.
+    // Перезарядка артиллерии, ионной пушки, мин, атомного взрыва, стены и бомбардировщика идёт и в магазине. Вызов — только когда fighting.
+    // Секунда автоприменения тикает там же. Сам удар, постановка, луч и пролёт ждут закрытого магазина. Уже пущенный луч, стоящая стена и летящий самолёт не замирают.
     this.applyAutoStrikes();
     this.combat.tickArtillery(delta, fighting);
     this.combat.tickMines(delta, fighting);
     this.combat.tickNuclear(delta, fighting);
     this.combat.tickIon(delta, fighting);
     this.combat.tickWall(delta, fighting);
+    this.combat.tickBomber(delta, fighting);
     this.hud.setAbility(
       'artillery',
       this.shop.artilleryOwned,
@@ -641,6 +668,12 @@ export class GameScene extends Phaser.Scene {
       this.shop.wallOwned,
       this.combat.wallCooldown,
       EnergyWall.cooldownFor(this.shop.wallCooldownLevel),
+    );
+    this.hud.setAbility(
+      'bomber',
+      this.shop.bomberOwned,
+      this.combat.bomberCooldown,
+      BomberStrike.cooldownFor(this.shop.bomberCooldownLevel),
     );
     this.paintAutoStrikes();
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
@@ -679,12 +712,14 @@ export class GameScene extends Phaser.Scene {
     this.combat.setAutoArtillery(this.progressShop.autoArtilleryEnabled());
     this.combat.setAutoMines(this.progressShop.autoMinesEnabled());
     this.combat.setAutoIon(this.progressShop.autoIonEnabled());
+    this.combat.setAutoBomber(this.progressShop.autoBomberEnabled());
   }
 
   private paintAutoStrikes(): void {
     this.hud.setAutoApply('artillery', this.progressShop.autoArtilleryOwned(), this.progressShop.autoArtilleryEnabled());
     this.hud.setAutoApply('mines', this.progressShop.autoMinesOwned(), this.progressShop.autoMinesEnabled());
     this.hud.setAutoApply('ion', this.progressShop.autoIonOwned(), this.progressShop.autoIonEnabled());
+    this.hud.setAutoApply('bomber', this.progressShop.autoBomberOwned(), this.progressShop.autoBomberEnabled());
   }
 
   // Иконка справа и выстрел без ЛКМ читают одну и ту же покупку прогресса.
@@ -981,6 +1016,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.setNuclearCooldown(saved.nuclearCooldownMs);
     this.combat.setIonCooldown(saved.ionCooldownMs);
     this.combat.setWallCooldown(saved.wallCooldownMs);
+    this.combat.setBomberCooldown(saved.bomberCooldownMs);
     this.combat.setFlameCooldown(saved.flameCooldownMs);
     this.combat.restoreMines(saved.plantedMines);
     this.combat.restoreFlameWall(saved.flameWall);
@@ -1025,6 +1061,7 @@ export class GameScene extends Phaser.Scene {
       nuclearCooldownMs: Math.round(this.combat.nuclearCooldown),
       ionCooldownMs: Math.round(this.combat.ionCooldown),
       wallCooldownMs: Math.round(this.combat.wallCooldown),
+      bomberCooldownMs: Math.round(this.combat.bomberCooldown),
       flameCooldownMs: Math.round(this.combat.flameCooldown),
       flameWall: this.combat.captureFlameWall(),
       plantedMines: this.combat.captureMines(),

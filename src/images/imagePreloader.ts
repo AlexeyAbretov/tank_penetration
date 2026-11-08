@@ -1,4 +1,5 @@
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { AutoAim } from '../entities/AutoAim';
@@ -19,6 +20,7 @@ import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
 import { preloadAirBurst } from '../gfx/airBurst';
 import { preloadCampfire, preloadFlameStream, preloadScorchedEarth } from '../gfx/flame';
+import { preloadBombBoom } from '../gfx/bombBoom';
 import { preloadBoom } from '../gfx/boom';
 import { preloadCraters } from '../gfx/craters';
 import { preloadNuke } from '../gfx/nuke';
@@ -38,6 +40,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   NuclearStrike.preload(scene);
   Mines.preload(scene);
   ArtilleryStrike.preload(scene);
+  BomberStrike.preload(scene);
   IonCannon.preload(scene);
   EnergyWall.preload(scene);
   AutoAim.preload(scene);
@@ -51,6 +54,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   preloadTankBoom(scene);
   preloadNuke(scene);
   preloadBoom(scene);
+  preloadBombBoom(scene);
   preloadCampfire(scene);
   preloadFlameStream(scene);
   preloadScorchedEarth(scene);

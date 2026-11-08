@@ -290,7 +290,7 @@ export class PickupTruck extends RangedEnemy {
     this.smoke = PickupTruck.smokeAt(this.scene, this.x + anchor.x, this.y + anchor.y, this.scaleX);
   }
 
-  // Мина, артиллерия и залп передают центр разрыва. От них кузов расходится по шву,
+  // Мина, артиллерия, залп и авиабомба передают центр разрыва. От них кузов расходится по шву,
   // колёса выкатываются. Столб ионной пушки режет тот же сгоревший кадр вдоль луча.
   // Пуля и огонь этот центр не передают: остаётся целый остов.
   override kill(blastAt?: WorldPoint): void {

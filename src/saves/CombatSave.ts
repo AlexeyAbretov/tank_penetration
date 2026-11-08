@@ -5,6 +5,7 @@
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { MachineGun } from '../entities/MachineGun';
@@ -70,6 +71,11 @@ export type ShopSave = {
   artilleryDamage: number;
   ionDamage: number;
   minesDamage: number;
+  bomber: boolean;
+  // Уровни отката бомбардировщика за эту партию. Старые сохранения читают 0.
+  bomberCooldown: number;
+  // Уровни урона авиабомбы за эту партию. Старые сохранения читают 0.
+  bomberDamage: number;
 };
 
 export type PlantedMineSave = {
@@ -94,6 +100,7 @@ export type SavedRun = {
   nuclearCooldownMs: number;
   ionCooldownMs: number;
   wallCooldownMs: number;
+  bomberCooldownMs: number;
   flameCooldownMs: number;
   flameWall: FlameWallSave | null;
   wave: number;
@@ -189,6 +196,8 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
   const ionCooldownMs = requiredInt(value.ionCooldownMs, 0, IonCannon.shop.cooldownMs) ?? 0;
   // Старые сохранения не писали перезарядку стены: завесы ещё не было.
   const wallCooldownMs = requiredInt(value.wallCooldownMs, 0, EnergyWall.shop.cooldownMs) ?? 0;
+  // Старые сохранения не писали перезарядку бомбардировщика: пролёта ещё не было.
+  const bomberCooldownMs = requiredInt(value.bomberCooldownMs, 0, BomberStrike.shop.cooldownMs) ?? 0;
   // Старые сохранения не писали перезарядку огнемёта: струя просто ждёт новый заход.
   const flameCooldownMs = requiredInt(value.flameCooldownMs, 0, 60 * 60 * 1000) ?? 0;
   // Старые сохранения не писали стену огня: на поле её не было.
@@ -216,6 +225,7 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     nuclearCooldownMs,
     ionCooldownMs,
     wallCooldownMs,
+    bomberCooldownMs,
     flameCooldownMs,
     flameWall,
     wave,
@@ -275,6 +285,10 @@ function parseShop(value: unknown): ShopSave | null {
   const artilleryDamage = requiredInt(value.artilleryDamage, 0, 500) ?? 0;
   const ionDamage = requiredInt(value.ionDamage, 0, 500) ?? 0;
   const minesDamage = requiredInt(value.minesDamage, 0, 500) ?? 0;
+  // Старые сохранения не писали бомбардировщик: этой покупки ещё не было.
+  const bomber = flag(value.bomber) ?? false;
+  const bomberCooldown = requiredInt(value.bomberCooldown, 0, BomberStrike.maxShopCooldownLevel) ?? 0;
+  const bomberDamage = requiredInt(value.bomberDamage, 0, 500) ?? 0;
   if (
     blast === null ||
     damage === null ||
@@ -318,6 +332,9 @@ function parseShop(value: unknown): ShopSave | null {
     artilleryDamage,
     ionDamage,
     minesDamage,
+    bomber,
+    bomberCooldown,
+    bomberDamage,
   };
 }
 

@@ -172,12 +172,17 @@ export class EnergyWall {
     return this.leftMs > 0;
   }
 
-  // Правый край полосы. Выстрел левее этой линии уже за завесой.
+  // Правый край полосы при уже выбранном центре. За этой линией — поле врагов.
+  static outerFace(centerX: number): number {
+    return centerX + EnergyWall.thickness / 2;
+  }
+
+  // Правый край стоящей полосы. Выстрел левее этой линии уже за завесой.
   face(): number | null {
     if (this.leftMs <= 0) {
       return null;
     }
-    return this.x + EnergyWall.thickness / 2;
+    return EnergyWall.outerFace(this.x);
   }
 
   // centerX — середина полосы. Длительность уже с обоими магазинами.

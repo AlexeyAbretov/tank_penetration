@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
@@ -58,7 +59,9 @@ type Stat =
   | 'minesCooldown'
   | 'nuclearCooldown'
   | 'wallDuration'
-  | 'wallCooldown';
+  | 'wallCooldown'
+  | 'bomberDamage'
+  | 'bomberCooldown';
 
 export class ProgressShopController {
   // Панель и интерфейс живут только пока жива сцена. restart() их уничтожает, bind() собирает заново.
@@ -182,6 +185,14 @@ export class ProgressShopController {
 
   wireDamageBonus(): number {
     return this.progress.wireDamage;
+  }
+
+  bomberDamageBonus(): number {
+    return this.progress.bomberDamage;
+  }
+
+  bomberCooldownLevel(): number {
+    return this.progress.bomberCooldown;
   }
 
   artilleryCooldownLevel(): number {
@@ -324,6 +335,23 @@ export class ProgressShopController {
     this.progressSave.save(this.progress);
   }
 
+  autoBomberOwned(): boolean {
+    return this.progress.autoBomber;
+  }
+
+  // Куплено и включено выключателем на иконке бомбардировщика.
+  autoBomberEnabled(): boolean {
+    return this.progress.autoBomber && this.progress.autoBomberOn;
+  }
+
+  toggleAutoBomber(): void {
+    if (this.paused || !this.progress.autoBomber) {
+      return;
+    }
+    this.progress.autoBomberOn = !this.progress.autoBomberOn;
+    this.progressSave.save(this.progress);
+  }
+
   isAwaitingShop(): boolean {
     return this.progress.awaitingShop;
   }
@@ -454,6 +482,14 @@ export class ProgressShopController {
 
   private buyArtilleryDamage(): void {
     this.buy('artilleryDamage');
+  }
+
+  private buyBomberDamage(): void {
+    this.buy('bomberDamage');
+  }
+
+  private buyBomberCooldown(): void {
+    this.buy('bomberCooldown');
   }
 
   private buyIonDamage(): void {
@@ -591,6 +627,21 @@ export class ProgressShopController {
     this.panel.refresh(this.view());
   }
 
+  private buyAutoBomber(): void {
+    if (this.isPaused() || this.progress.autoBomber) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoBomberCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoBomber = true;
+    this.progress.autoBomberOn = true;
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -665,6 +716,9 @@ export class ProgressShopController {
     if (stat === 'wallCooldown' && !EnergyWall.progressCooldownShortens(level)) {
       return;
     }
+    if (stat === 'bomberCooldown' && !BomberStrike.progressCooldownShortens(level)) {
+      return;
+    }
     const cost = this.costFor(stat, level);
     if (this.progress.score < cost) {
       return;
@@ -731,6 +785,9 @@ export class ProgressShopController {
     if (stat === 'wallCooldown') {
       EnergyWall.setProgressCooldownLevel(this.progress.wallCooldown);
     }
+    if (stat === 'bomberCooldown') {
+      BomberStrike.setProgressCooldownLevel(this.progress.bomberCooldown);
+    }
     if (stat === 'laserCooldown') {
       LaserDefense.setProgressCooldownLevel(this.progress.laserCooldown);
     }
@@ -787,6 +844,11 @@ export class ProgressShopController {
         this.tab('wall', 'Энергетическая стена', [
           this.wallDurationCard(score),
           this.wallCooldownCard(score),
+        ]),
+        this.tab('bomber', 'Бомбардировщик', [
+          this.bomberDamageCard(score),
+          this.bomberCooldownCard(score),
+          this.autoBomberCard(score),
         ]),
         this.tab('resources', 'Ресурсы', [
           this.coinsCard(score),
@@ -864,6 +926,20 @@ export class ProgressShopController {
       title: 'автоприменение',
       buy: () => this.buyAutoIon(),
       info: 'луч сам через 1 с',
+      cost: this.coin(price),
+      open: !owned,
+      owned,
+      canBuy: !owned && score >= price,
+    };
+  }
+
+  private autoBomberCard(score: number): ProgressCardView {
+    const owned = this.progress.autoBomber;
+    const price = shopPrice(ProgressSave.autoBomberCost());
+    return {
+      title: 'автоприменение',
+      buy: () => this.buyAutoBomber(),
+      info: 'пролёт сам через 1 с',
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -1152,6 +1228,33 @@ export class ProgressShopController {
     );
   }
 
+  private bomberDamageCard(score: number): ProgressCardView {
+    return this.damageCardFor(
+      this.progress.bomberDamage,
+      BomberStrike.shop.damage,
+      score,
+      () => this.buyBomberDamage(),
+    );
+  }
+
+  private bomberCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.bomberCooldown;
+    const price = this.bomberCooldownPrice(level);
+    const now = BomberStrike.cooldownFor(BomberStrike.shopCooldownLevel, level);
+    const next = BomberStrike.cooldownFor(BomberStrike.shopCooldownLevel, level + 1);
+    const maxed = !BomberStrike.progressCooldownShortens(level);
+    return {
+      title: '−0,1 мин перезарядки',
+      buy: () => this.buyBomberCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${BomberStrike.cooldownLabel(now)}`
+        : `ур. ${level} · ${BomberStrike.cooldownLabel(now)}→${BomberStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private artilleryDamageCard(score: number): ProgressCardView {
     return this.damageCardFor(
       this.progress.artilleryDamage,
@@ -1417,6 +1520,11 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.cost(level));
   }
 
+  // Та же лестница, что у отката артиллерии: 500, 1000, 1500…
+  private bomberCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.cost(level));
+  }
+
   private ionCooldownPrice(level: number): number {
     return shopPrice(ProgressSave.cost(level));
   }
@@ -1455,7 +1563,8 @@ export class ProgressShopController {
       stat === 'artilleryDamage' ||
       stat === 'ionDamage' ||
       stat === 'minesDamage' ||
-      stat === 'wireDamage'
+      stat === 'wireDamage' ||
+      stat === 'bomberDamage'
     ) {
       return this.mgDamagePrice(level);
     }
@@ -1476,6 +1585,9 @@ export class ProgressShopController {
     }
     if (stat === 'artilleryCooldown') {
       return this.artilleryCooldownPrice(level);
+    }
+    if (stat === 'bomberCooldown') {
+      return this.bomberCooldownPrice(level);
     }
     if (stat === 'ionCooldown') {
       return this.ionCooldownPrice(level);

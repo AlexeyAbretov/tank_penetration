@@ -1,7 +1,8 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, ионная пушка, мины, атомный взрыв, энергетическая стена, контакт с базой и урон отскочившего чужого выстрела.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, бомбардировщик, ионная пушка, мины, атомный взрыв, энергетическая стена, контакт с базой и урон отскочившего чужого выстрела.
 
 import Phaser from 'phaser';
 import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
+import { BomberStrike, type BomberFlight } from '../entities/BomberStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { EnergyWall } from '../entities/EnergyWall';
@@ -19,6 +20,7 @@ import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { airBurstAt } from '../gfx/airBurst';
+import { bombBoom } from '../gfx/bombBoom';
 import { craterHalfHeight, craterReach, fadeCrater, placeCrater } from '../gfx/craters';
 import { clearBurns, ignite, inPatch, inStream, layScorchedPath, placeCampfires, revealScorchedPath, syncFlameStream, syncScorchedEarth, tickBurns } from '../gfx/flame';
 import { createShellBlast } from '../gfx/particles';
@@ -131,6 +133,13 @@ export class CombatSystem implements Combat {
   private readonly wallKeys: Phaser.Input.Keyboard.Key[] = [];
   // Клик по иконке стены. Сбрасывается в том же кадре, даже если завеса ещё на перезарядке.
   private wallFromIcon = false;
+  private bomberCooldownMs = 0;
+  private readonly bomberKeys: Phaser.Input.Keyboard.Key[] = [];
+  // Клик по иконке бомбардировщика. Сбрасывается в том же кадре, даже если пролёт ещё на перезарядке.
+  private bomberFromIcon = false;
+  private bomberFlight?: BomberFlight;
+  // Момент, когда последний разрыв бомбы уже погас. 0 — вспышки на поле нет.
+  private bomberBlastUntil = 0;
   private readonly wall: EnergyWall;
   private ionRun?: IonRun;
   // Столб уже гаснет, полоса ещё на поле. Поражение снимает и то и другое сразу.
@@ -150,9 +159,11 @@ export class CombatSystem implements Combat {
   // Куплено и включено — удар и мины сами через секунду после конца перезарядки.
   private autoArtillery = false;
   private autoMines = false;
+  private autoBomber = false;
   // Сколько миллисекунд способность уже готова. Секунда идёт и в магазине волны.
   private artilleryReadyMs = 0;
   private minesReadyMs = 0;
+  private bomberReadyMs = 0;
 
   constructor(
     protected readonly scene: Phaser.Scene,
@@ -172,6 +183,7 @@ export class CombatSystem implements Combat {
     private readonly progressMinesDamage: number,
     private readonly progressWireDamage: number,
     private readonly progressIonDamage: number,
+    private readonly progressBomberDamage: number,
     private readonly laserShots: number,
     private readonly effects: BattleEffects,
   ) {
@@ -199,6 +211,10 @@ export class CombatSystem implements Combat {
       this.wallKeys.push(
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_FIVE),
+      );
+      this.bomberKeys.push(
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SIX),
       );
     }
     this.wall = new EnergyWall(scene);
@@ -254,6 +270,14 @@ export class CombatSystem implements Combat {
 
   setWallCooldown(ms: number): void {
     this.wallCooldownMs = Math.min(this.wallSpan(), Math.max(0, ms));
+  }
+
+  get bomberCooldown(): number {
+    return this.bomberCooldownMs;
+  }
+
+  setBomberCooldown(ms: number): void {
+    this.bomberCooldownMs = Math.min(this.bomberSpan(), Math.max(0, ms));
   }
 
   // Правый край завесы. Пока её нет, чужой выстрел летит до танка.
@@ -315,9 +339,18 @@ export class CombatSystem implements Combat {
     return EnergyWall.cooldownFor(this.shop.wallCooldownLevel);
   }
 
+  private bomberSpan(): number {
+    return BomberStrike.cooldownFor(this.shop.bomberCooldownLevel);
+  }
+
   // Сколько миллисекунд гриб ещё будет на поле. Магазин волны ждёт это, чтобы не закрыть взрыв.
   nuclearCloudLeft(): number {
     return Math.max(0, this.nuclearCloudUntil - this.scene.time.now);
+  }
+
+  // Сколько миллисекунд вспышка бомбы ещё будет на поле. Магазин волны ждёт это, чтобы не закрыть разрыв.
+  bomberBlastLeft(): number {
+    return Math.max(0, this.bomberBlastUntil - this.scene.time.now);
   }
 
   // Иконка на HUD просит удар. Сработает в tickArtillery, если бой идёт и перезарядка кончилась.
@@ -345,21 +378,29 @@ export class CombatSystem implements Combat {
     this.wallFromIcon = true;
   }
 
+  // Иконка на HUD просит пролёт. Сработает в tickBomber, если бой идёт и перезарядка кончилась.
+  requestBomber(): void {
+    this.bomberFromIcon = true;
+  }
+
   clearProjectiles(): void {
     this.strikeFromIcon = false;
     this.mineFromIcon = false;
     this.nuclearFromIcon = false;
     this.ionFromIcon = false;
     this.wallFromIcon = false;
+    this.bomberFromIcon = false;
     this.wall.drop();
     this.artilleryReadyMs = 0;
     this.minesReadyMs = 0;
     this.ionReadyMs = 0;
+    this.bomberReadyMs = 0;
     this.shells.clear(true, true);
     this.shellFlights.clear();
     this.mgShots.clear(true, true);
     this.mgBurstLeft = 0;
     this.cancelArtillery();
+    this.cancelBomber();
     this.cancelNuclear();
     this.cancelIon(false);
     this.clearIonScars();
@@ -428,6 +469,14 @@ export class CombatSystem implements Combat {
       this.ionReadyMs = 0;
     }
     this.autoIon = on;
+  }
+
+  // Выключенное положение сбрасывает уже накопленную секунду: следующее включение ждёт её заново.
+  setAutoBomber(on: boolean): void {
+    if (!on) {
+      this.bomberReadyMs = 0;
+    }
+    this.autoBomber = on;
   }
 
   // ЛКМ и автострельба. Флаг прогресса сцена уже положила в setAutoFire.
@@ -672,6 +721,97 @@ export class CombatSystem implements Combat {
     const fromIcon = this.wallFromIcon;
     this.wallFromIcon = false;
     return fromIcon || this.wallKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  // Перезарядка идёт и в магазине. Пролёт — в бою, по клавише 6, по иконке или сам через секунду после готовности.
+  tickBomber(delta: number, canFire: boolean): void {
+    if (!this.shop.bomberOwned) {
+      this.bomberFromIcon = false;
+      this.bomberReadyMs = 0;
+      return;
+    }
+    const span = this.bomberSpan();
+    this.bomberCooldownMs = Math.min(span, Math.max(0, this.bomberCooldownMs - delta));
+    if (this.bomberPressed()) {
+      this.useBomber(canFire);
+      if (this.bomberCooldownMs > 0) {
+        this.bomberReadyMs = 0;
+        return;
+      }
+    }
+    this.tickAutoBomber(delta, canFire);
+  }
+
+  // Готовность — конец перезарядки. Секунда тикает и в магазине волны, пролёт выходит в бою.
+  private tickAutoBomber(delta: number, canFire: boolean): void {
+    if (!this.autoBomber || this.bomberCooldownMs > 0) {
+      this.bomberReadyMs = 0;
+      return;
+    }
+    if (this.bomberReadyMs < AUTO_APPLY_DELAY_MS) {
+      this.bomberReadyMs += delta;
+    }
+    if (!canFire || this.bomberReadyMs < AUTO_APPLY_DELAY_MS) {
+      return;
+    }
+    this.commitBomber();
+    this.bomberReadyMs = 0;
+  }
+
+  protected useBomber(canFire: boolean): void {
+    if (!canFire || this.bomberCooldownMs > 0) {
+      return;
+    }
+    this.commitBomber();
+  }
+
+  private commitBomber(): void {
+    this.bomberCooldownMs = this.bomberSpan();
+    this.launchBomber();
+  }
+
+  private bomberPressed(): boolean {
+    const fromIcon = this.bomberFromIcon;
+    this.bomberFromIcon = false;
+    return fromIcon || this.bomberKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  // Высота — случайный живой. Пустое поле берёт случайную высоту в той же полосе.
+  // По горизонтали бомбы идут от правого края места завесы до края поля, даже если завеса сейчас не стоит.
+  private launchBomber(): void {
+    this.cancelBomber();
+    const pastX = EnergyWall.outerFace(BarbedWire.bounds.face + EnergyWall.ahead);
+    const points = BomberStrike.impacts(pastX, this.bomberHeight());
+    this.bomberFlight = BomberStrike.pass(this.scene, points, (x, y) => this.detonateBomb(x, y));
+  }
+
+  private bomberHeight(): number {
+    const field = BomberStrike.field;
+    const living = (this.infantry.getChildren() as Infantry[]).filter((unit) => unit.active && !unit.reachedWall);
+    if (living.length === 0) {
+      return Phaser.Math.Between(field.minY, field.maxY);
+    }
+    const unit = living[Phaser.Math.Between(0, living.length - 1)];
+    return unit.y;
+  }
+
+  private detonateBomb(x: number, y: number): void {
+    BomberStrike.boom(this.scene, x, y);
+    this.bomberBlastUntil = Math.max(this.bomberBlastUntil, this.scene.time.now + bombBoom.goneMs);
+    const radius = BomberStrike.shop.blastRadius;
+    (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
+      if (!unit.active || unit.reachedWall) {
+        return;
+      }
+      if (this.inBlast(unit, x, y, radius)) {
+        this.hurtInfantry(unit, this.bomberDamage(), false, { x, y });
+      }
+    });
+  }
+
+  private cancelBomber(): void {
+    this.bomberFlight?.cancel();
+    this.bomberFlight = undefined;
   }
 
   private launchIon(): void {
@@ -1887,6 +2027,10 @@ export class CombatSystem implements Combat {
 
   private ionDamage(): number {
     return IonCannon.shop.damage + this.shop.ionDamageLevel + this.progressIonDamage;
+  }
+
+  private bomberDamage(): number {
+    return BomberStrike.shop.damage + this.shop.bomberDamageLevel + this.progressBomberDamage;
   }
 
   // База проволоки плюс покупки партии и постоянный урон из магазина очков.

@@ -13,7 +13,7 @@ import { CombatSystem } from './CombatSystem';
 
 const DOUBLE_MS = 400;
 
-type AbilityTap = 'artillery' | 'mines' | 'nuclear' | 'ion' | 'wall';
+type AbilityTap = 'artillery' | 'mines' | 'nuclear' | 'ion' | 'wall' | 'bomber';
 type WeaponTap = QuietWeapon;
 
 export class DebugCombatSystem extends CombatSystem {
@@ -23,6 +23,7 @@ export class DebugCombatSystem extends CombatSystem {
     nuclear: -1,
     ion: -1,
     wall: -1,
+    bomber: -1,
   };
   private readonly weaponAt: Record<WeaponTap, number> = {
     tank: -1,
@@ -152,6 +153,14 @@ export class DebugCombatSystem extends CombatSystem {
       return;
     }
     super.useWall(canFire);
+  }
+
+  protected override useBomber(canFire: boolean): void {
+    if (this.resetsCooldown('bomber', this.bomberCooldown > 0)) {
+      this.setBomberCooldown(0);
+      return;
+    }
+    super.useBomber(canFire);
   }
 
   private resetsCooldown(ability: AbilityTap, cooling: boolean): boolean {

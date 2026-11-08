@@ -2,6 +2,7 @@
 // а эти уровни и непотраченный score остаются в localStorage.
 
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -82,6 +83,10 @@ export type SavedProgress = {
   wallDuration: number;
   // Сколько раз укорочен откат энергетической стены. 0 — базовые 3 минуты. Прогресс сам снимает 0,5 с.
   wallCooldown: number;
+  // Сколько раз докуплен урон авиабомбы. 0 — базовый урон. Потолка нет. Цена как у урона пули.
+  bomberDamage: number;
+  // Сколько раз укорочен откат бомбардировщика. 0 — базовые 3 минуты. Прогресс сам снимает 1 минуту.
+  bomberCooldown: number;
   // Куплена ли автострельба. Танк стреляет сам, пока включена иконка справа.
   autoFire: boolean;
   // Выключатель уже купленной автострельбы. Пока false, танк ждёт левую кнопку.
@@ -106,6 +111,10 @@ export type SavedProgress = {
   autoIon: boolean;
   // Выключатель уже купленного автоприменения. Пока false, луч ждёт клавишу или иконку.
   autoIonOn: boolean;
+  // Куплено ли автоприменение бомбардировщика. Пролёт сам через секунду после готовности.
+  autoBomber: boolean;
+  // Выключатель уже купленного автоприменения. Пока false, пролёт ждёт клавишу или иконку.
+  autoBomberOn: boolean;
 };
 
 export class ProgressSave {
@@ -184,6 +193,11 @@ export class ProgressSave {
     return 20_000;
   }
 
+  // Одна покупка. Бомбардировщик сам летит через секунду после готовности, пока включён выключатель на иконке.
+  static autoBomberCost(): number {
+    return 20_000;
+  }
+
   // Первая десятая секунды стены стоит 2000. Каждая следующая — на 2000 × уже купленный уровень дороже:
   // 2000, 4000, 6000, …
   static wallDurationCost(level: number): number {
@@ -259,6 +273,8 @@ export class ProgressSave {
     progress.nuclearCooldown = 0;
     progress.wallDuration = 0;
     progress.wallCooldown = 0;
+    progress.bomberDamage = 0;
+    progress.bomberCooldown = 0;
     progress.autoFire = false;
     progress.autoFireOn = false;
     progress.autoAim = false;
@@ -271,6 +287,8 @@ export class ProgressSave {
     progress.autoMinesOn = false;
     progress.autoIon = false;
     progress.autoIonOn = false;
+    progress.autoBomber = false;
+    progress.autoBomberOn = false;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressFlightLevel(0);
@@ -361,6 +379,8 @@ export class ProgressSave {
       nuclearCooldown: 0,
       wallDuration: 0,
       wallCooldown: 0,
+      bomberDamage: 0,
+      bomberCooldown: 0,
       autoFire: false,
       autoFireOn: false,
       autoAim: false,
@@ -373,6 +393,8 @@ export class ProgressSave {
       autoMinesOn: false,
       autoIon: false,
       autoIonOn: false,
+      autoBomber: false,
+      autoBomberOn: false,
     };
   }
 
@@ -460,6 +482,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали стену: завеса ждала базовую секунду и базовые 3 минуты.
     wallDuration: requiredInt(value.wallDuration, 0, EnergyWall.maxProgressDurationLevel) ?? 0,
     wallCooldown: requiredInt(value.wallCooldown, 0, EnergyWall.maxProgressCooldownLevel) ?? 0,
+    // Старые сохранения не писали бомбардировщик: бомба била бы базовым уроном и ждала 3 минуты.
+    bomberDamage: requiredInt(value.bomberDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    bomberCooldown: requiredInt(value.bomberCooldown, 0, BomberStrike.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали автострельбу: она жила в партии и умирала с базой.
     autoFire: value.autoFire === true,
     autoFireOn: value.autoFire === true && value.autoFireOn !== false,
@@ -477,6 +502,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали автоприменение луча: он ждал клавишу.
     autoIon: value.autoIon === true,
     autoIonOn: value.autoIon === true && value.autoIonOn !== false,
+    // Старые сохранения не писали автоприменение пролёта: он ждал клавишу.
+    autoBomber: value.autoBomber === true,
+    autoBomberOn: value.autoBomber === true && value.autoBomberOn !== false,
   };
 }
 

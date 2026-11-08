@@ -271,7 +271,7 @@ export class GameHud {
 
     // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
     this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
-    this.autoApplies = ['artillery', 'mines', 'ion'].map((id) => this.makeAutoApply(scene, id));
+    this.autoApplies = ['artillery', 'mines', 'ion', 'bomber'].map((id) => this.makeAutoApply(scene, id));
 
     // Справа на ленте. Прямоугольник только ловит клик: рисунок — отдельная пластина.
     const keysX = frame.width - 56;
@@ -903,6 +903,9 @@ export class GameHud {
     }
     if (this.autoApplyShown('ion')) {
       hints.push('выключатель луча — автоприменение');
+    }
+    if (this.autoApplyShown('bomber')) {
+      hints.push('выключатель бомб — автоприменение');
     }
     return hints;
   }

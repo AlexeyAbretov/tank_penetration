@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
@@ -21,7 +22,7 @@ import { ShopPanel, type ShopCardView, type ShopTabView, type ShopView } from '.
 import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
-type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'ion' | 'mines' | 'nuclear' | 'wall';
+type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'ion' | 'mines' | 'nuclear' | 'wall' | 'bomber';
 
 type PermanentBonuses = {
   damage: number;
@@ -41,6 +42,8 @@ type PermanentBonuses = {
   artillery: number;
   mines: number;
   ion: number;
+  // Постоянный урон авиабомбы. К урону на карточке прибавляется, лестницу цены не двигает.
+  bomber: number;
 };
 
 type Economy = {
@@ -88,6 +91,9 @@ export class ShopController {
   artilleryDamageLevel = 0;
   ionDamageLevel = 0;
   minesDamageLevel = 0;
+  bomberOwned = false;
+  bomberCooldownLevel = 0;
+  bomberDamageLevel = 0;
   shopOpen = false;
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
   private paused = false;
@@ -111,6 +117,7 @@ export class ShopController {
     NuclearStrike.setShopCooldownLevel(0);
     EnergyWall.setShopDurationLevel(0);
     EnergyWall.setShopCooldownLevel(0);
+    BomberStrike.setShopCooldownLevel(0);
   }
 
   // Снимок покупок для сохранения партии. Монеты и номер волны пишет сцена, не этот метод.
@@ -148,6 +155,9 @@ export class ShopController {
       artilleryDamage: this.artilleryDamageLevel,
       ionDamage: this.ionDamageLevel,
       minesDamage: this.minesDamageLevel,
+      bomber: this.bomberOwned,
+      bomberCooldown: this.bomberCooldownLevel,
+      bomberDamage: this.bomberDamageLevel,
     };
   }
 
@@ -208,6 +218,10 @@ export class ShopController {
     this.artilleryDamageLevel = saved.artilleryDamage;
     this.ionDamageLevel = saved.ionDamage;
     this.minesDamageLevel = saved.minesDamage;
+    this.bomberOwned = saved.bomber;
+    this.bomberCooldownLevel = Math.min(saved.bomberCooldown, BomberStrike.maxShopCooldownLevel);
+    BomberStrike.setShopCooldownLevel(this.bomberCooldownLevel);
+    this.bomberDamageLevel = saved.bomberDamage;
   }
 
   // Чистая партия: уровни и постройки обнуляются. Предметы на поле убирает перезапуск сцены.
@@ -251,6 +265,10 @@ export class ShopController {
     this.artilleryDamageLevel = 0;
     this.ionDamageLevel = 0;
     this.minesDamageLevel = 0;
+    this.bomberOwned = false;
+    this.bomberCooldownLevel = 0;
+    BomberStrike.setShopCooldownLevel(0);
+    this.bomberDamageLevel = 0;
     this.wire = undefined;
     this.machineGun = undefined;
     this.laser = undefined;
@@ -818,6 +836,46 @@ export class ShopController {
     });
   }
 
+  // Открывает клавишу 6. Пролёт и перезарядку считает CombatSystem.
+  buyBomber(): void {
+    const cost = shopPrice(BomberStrike.shop.cost);
+    if (this.isPaused() || this.bomberOwned || this.economy.getCoins() < cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.bomberOwned = true;
+    this.refresh();
+  }
+
+  // −0,1 мин к откату бомбардировщика. Партия снимает свою минуту и останавливается на 2:00 без очков.
+  buyBomberCooldown(): void {
+    if (this.isPaused() || !this.bomberOwned) {
+      return;
+    }
+    if (this.bomberCooldownLevel >= BomberStrike.maxShopCooldownLevel) {
+      return;
+    }
+    const now = BomberStrike.cooldownFor(this.bomberCooldownLevel);
+    if (BomberStrike.cooldownFor(this.bomberCooldownLevel + 1) >= now) {
+      return;
+    }
+    const cost = ShopController.bomberCooldownCost(this.bomberCooldownLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.bomberCooldownLevel += 1;
+    BomberStrike.setShopCooldownLevel(this.bomberCooldownLevel);
+    this.refresh();
+  }
+
+  buyBomberDamage(): void {
+    this.buyDamageLevel(this.bomberOwned, this.bomberDamageLevel, (level) => {
+      this.bomberDamageLevel = level;
+    });
+  }
+
   // Строка характеристик над полем: урон и взрыв партии плюс постоянные уровни.
   syncTankStats(): void {
     this.hud.setTankStats(
@@ -895,6 +953,11 @@ export class ShopController {
     return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
   }
 
+  // Та же лестница, что у отката артиллерии: 1000, 1150, 1323…
+  private static bomberCooldownCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
   // Первая секунда отката ионной пушки стоит 1000. Дальше та же ступень 15%:
   // 1000, 1150, 1323, 1521, …
   private static ionCooldownCost(level: number): number {
@@ -963,6 +1026,10 @@ export class ShopController {
 
   private minesDamageOfferLevel(): number {
     return this.minesDamageLevel + this.bonuses.mines;
+  }
+
+  private bomberDamageOfferLevel(): number {
+    return this.bomberDamageLevel + this.bonuses.bomber;
   }
 
   private view(): ShopView {
@@ -1061,6 +1128,18 @@ export class ShopController {
           this.gearCard('wall', coins),
           this.wallDurationCard(coins),
           this.wallCooldownCard(coins),
+        ]),
+        this.tab('bomber', 'Бомбардировщик', [
+          this.gearCard('bomber', coins),
+          this.weaponDamageCard(
+            this.bomberDamageLevel,
+            BomberStrike.shop.damage + this.bomberDamageOfferLevel(),
+            () => this.buyBomberDamage(),
+            coins,
+            this.bomberOwned,
+            'после покупки',
+          ),
+          this.bomberCooldownCard(coins),
         ]),
       ],
     };
@@ -1199,6 +1278,8 @@ export class ShopController {
         );
       case 'artillery':
         return this.artilleryCard(coins);
+      case 'bomber':
+        return this.bomberCard(coins);
       case 'ion':
         return this.ionCard(coins);
       case 'mines':
@@ -1391,6 +1472,69 @@ export class ShopController {
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  // Та же плоскость, что у завесы в бою: карточка показывает, сколько бомб ляжет на текущую ширину поля.
+  private bomberBombCount(): number {
+    const pastX = EnergyWall.outerFace(BarbedWire.bounds.face + EnergyWall.ahead);
+    return BomberStrike.impacts(pastX, 0).length;
+  }
+
+  private bomberCard(coins: number): ShopCardView {
+    const offer = BomberStrike.shop;
+    const price = shopPrice(offer.cost);
+    const reload = BomberStrike.cooldownLabel(BomberStrike.cooldownFor(this.bomberCooldownLevel));
+    if (this.bomberOwned) {
+      return {
+        title: 'Покупка',
+        buy: () => this.buyBomber(),
+        info: `откат ${reload}`,
+        cost: '',
+        open: false,
+        canBuy: false,
+        owned: true,
+      };
+    }
+    return {
+      title: 'Покупка',
+      buy: () => this.buyBomber(),
+      info: `${this.bomberBombCount()}×${offer.damage + this.bonuses.bomber} · откат ${reload}`,
+      cost: this.coin(price),
+      open: true,
+      canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private bomberCooldownCard(coins: number): ShopCardView {
+    const buy = () => this.buyBomberCooldown();
+    const level = this.bomberCooldownLevel;
+    const price = ShopController.bomberCooldownCost(level);
+    if (!this.bomberOwned) {
+      return {
+        title: '−0,1 мин перезарядки',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = BomberStrike.cooldownFor(level);
+    const next = BomberStrike.cooldownFor(level + 1);
+    const maxed = level >= BomberStrike.maxShopCooldownLevel || next >= now;
+    return {
+      title: '−0,1 мин перезарядки',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${BomberStrike.cooldownLabel(now)}`
+        : `ур. ${level} · ${BomberStrike.cooldownLabel(now)}→${BomberStrike.cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
       owned: false,
     };
   }
