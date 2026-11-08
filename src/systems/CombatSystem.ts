@@ -39,7 +39,7 @@ type IonRun = {
   prev: WorldPoint;
   // Следующий удар, в миллисекундах хода столба. Нет записи — удар сразу.
   nextHit: Map<Infantry, number>;
-  beam: Phaser.GameObjects.Graphics;
+  beam: Phaser.GameObjects.Sprite;
   earth: Phaser.GameObjects.Container;
   crater?: Phaser.GameObjects.Image;
 };
@@ -135,7 +135,7 @@ export class CombatSystem implements Combat {
   private ionRun?: IonRun;
   // Столб уже гаснет, полоса ещё на поле. Поражение снимает и то и другое сразу.
   private ionFade?: {
-    beam: Phaser.GameObjects.Graphics;
+    beam: Phaser.GameObjects.Sprite;
     earth: Phaser.GameObjects.Container;
     crater?: Phaser.GameObjects.Image;
   };
@@ -682,9 +682,9 @@ export class CombatSystem implements Combat {
       Math.ceil(craterReach()),
       Math.ceil(craterHalfHeight()),
     );
-    const beam = this.scene.add.graphics().setDepth(19).setBlendMode(Phaser.BlendModes.ADD);
-    const earth = this.scene.add.container(0, 0).setDepth(1);
     const from = { x: course.from.x, y: course.from.y };
+    const beam = this.scene.add.sprite(from.x, from.y, IonCannon.beamKey).setDepth(19);
+    const earth = this.scene.add.container(0, 0).setDepth(1);
     layScorchedPath(this.scene, earth, course.from, course.to);
     const craterAt = this.ionCraterPoint(from);
     const crater = placeCrater(this.scene, craterAt.x, craterAt.y, 0, { hold: true });
@@ -698,7 +698,14 @@ export class CombatSystem implements Combat {
       earth,
       crater,
     };
-    IonCannon.paint(beam, from, course.minX, this.scene.time.now);
+    IonCannon.poseBeam(beam, from);
+    beam.play(IonCannon.beamGrowKey);
+    beam.once(Phaser.Animations.Events.ANIMATION_COMPLETE, (anim: Phaser.Animations.Animation) => {
+      if (anim.key !== IonCannon.beamGrowKey || !beam.active || this.ionRun?.beam !== beam) {
+        return;
+      }
+      beam.play(IonCannon.beamHoldKey);
+    });
     this.cutIon(this.ionRun, from);
     this.scene.cameras.main.shake(180, 0.0025);
     this.effects.laserShot.play();
@@ -712,7 +719,7 @@ export class CombatSystem implements Combat {
     run.elapsed += delta;
     const t = Math.min(1, run.elapsed / run.sweepMs);
     const at = IonCannon.pointAt(run.course, t);
-    IonCannon.paint(run.beam, at, run.course.minX, this.scene.time.now);
+    IonCannon.poseBeam(run.beam, at);
     revealScorchedPath(
       run.earth,
       Phaser.Math.Distance.Between(run.course.from.x, run.course.from.y, at.x, at.y),
@@ -778,18 +785,30 @@ export class CombatSystem implements Combat {
     }
     this.ionRun = undefined;
     this.ionFade = { beam: run.beam, earth: run.earth, crater: run.crater };
-    this.scene.tweens.add({
-      targets: run.beam,
-      alpha: 0,
-      duration: 420,
-      onComplete: () => {
-        if (this.ionFade?.beam === run.beam) {
-          this.ionFade = undefined;
-        }
-        run.beam.destroy();
-        this.retireIonEarth(run.earth);
-        this.retireIonCrater(run.crater);
-      },
+    this.playIonFade(run.beam, () => {
+      if (this.ionFade?.beam !== run.beam) {
+        return;
+      }
+      this.ionFade = undefined;
+      run.beam.destroy();
+      this.retireIonEarth(run.earth);
+      this.retireIonCrater(run.crater);
+    });
+  }
+
+  // Верх столба уходит вверх. Подошва гаснет последней, потом начинается срок полосы.
+  private playIonFade(beam: Phaser.GameObjects.Sprite, done: () => void): void {
+    if (!beam.active || !this.scene.anims.exists(IonCannon.beamFadeKey)) {
+      done();
+      return;
+    }
+    beam.off(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    beam.play(IonCannon.beamFadeKey);
+    beam.once(Phaser.Animations.Events.ANIMATION_COMPLETE, (anim: Phaser.Animations.Animation) => {
+      if (anim.key !== IonCannon.beamFadeKey) {
+        return;
+      }
+      done();
     });
   }
 

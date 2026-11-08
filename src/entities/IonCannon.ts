@@ -17,9 +17,20 @@ export type IonCourse = {
 
 export class IonCannon {
   static readonly iconKey = 'ion-icon';
-  // Путь буквальный: singlefile-сборка подменяет его на data:.
+  // Пути буквальные: singlefile-сборка подменяет каждый на data:.
   static readonly iconPath = 'assets/ion-icon.png';
   static readonly iconRadius = 30;
+  static readonly beamKey = 'ion-beam';
+  static readonly beamPath = 'assets/ion-beam.png';
+  // Лист 36 кадров 128×256. 0–13 падение и вспышка удара, 14–26 полный столбик, 27–35 верх уходит.
+  static readonly beamFrame = { w: 128, h: 256 };
+  static readonly beamFps = 33;
+  static readonly beamGrow = { start: 0, end: 13 };
+  static readonly beamHold = { start: 14, end: 26 };
+  static readonly beamFade = { start: 27, end: 35 };
+  static readonly beamGrowKey = 'ion-beam-grow';
+  static readonly beamHoldKey = 'ion-beam-hold';
+  static readonly beamFadeKey = 'ion-beam-fade';
 
   static readonly shop = {
     cost: 100,
@@ -151,18 +162,39 @@ export class IonCannon {
   }
 
   static preload(scene: Phaser.Scene): void {
-    if (scene.textures.exists(IonCannon.iconKey)) {
-      return;
+    if (!scene.textures.exists(IonCannon.iconKey)) {
+      scene.load.image(IonCannon.iconKey, IonCannon.iconPath);
     }
-    scene.load.image(IonCannon.iconKey, IonCannon.iconPath);
+    if (!scene.textures.exists(IonCannon.beamKey)) {
+      scene.load.spritesheet(IonCannon.beamKey, IonCannon.beamPath, {
+        frameWidth: IonCannon.beamFrame.w,
+        frameHeight: IonCannon.beamFrame.h,
+      });
+    }
   }
 
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(IonCannon.iconKey)) {
       scene.textures.get(IonCannon.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    } else {
+      bake(scene, IonCannon.iconKey, 64, 64, (g) => IonCannon.renderIcon(g));
+    }
+    if (!scene.textures.exists(IonCannon.beamKey)) {
       return;
     }
-    bake(scene, IonCannon.iconKey, 64, 64, (g) => IonCannon.renderIcon(g));
+    scene.textures.get(IonCannon.beamKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    IonCannon.ensureBeamAnim(scene, IonCannon.beamGrowKey, IonCannon.beamGrow, 0);
+    IonCannon.ensureBeamAnim(scene, IonCannon.beamHoldKey, IonCannon.beamHold, -1);
+    IonCannon.ensureBeamAnim(scene, IonCannon.beamFadeKey, IonCannon.beamFade, 0);
+  }
+
+  // Низ кадра — подошва. Высота тянется от неба до пятна, ширина кадра не растягивается.
+  static poseBeam(beam: Phaser.GameObjects.Sprite, at: WorldPoint): void {
+    const sky = IonCannon.skyPoint(at);
+    const height = Math.max(1, at.y - sky.y);
+    beam.setPosition(at.x, at.y);
+    beam.setOrigin(0.5, 1);
+    beam.setScale(1, height / IonCannon.beamFrame.h);
   }
 
   // through — место одного живого врага в момент пуска. Прямая через него упирается в два края.
@@ -224,37 +256,21 @@ export class IonCannon {
     return false;
   }
 
-  // Столб. Выжженную полосу под ним рисует общий след, не эта картинка.
-  static paint(
-    beam: Phaser.GameObjects.Graphics,
-    at: WorldPoint,
-    minX: number,
-    now: number,
+  private static ensureBeamAnim(
+    scene: Phaser.Scene,
+    key: string,
+    range: { start: number; end: number },
+    repeat: number,
   ): void {
-    const sky = IonCannon.skyPoint(at);
-    const pulse = 0.5 + 0.5 * Math.sin(now * 0.04);
-    const radius = IonCannon.shop.radius;
-    beam.clear();
-    beam.lineStyle(radius * 2, 0x2f7bff, 0.28 + pulse * 0.12);
-    beam.lineBetween(sky.x, sky.y, at.x, at.y);
-    beam.lineStyle(14, 0x8adfff, 0.72);
-    beam.lineBetween(sky.x, sky.y, at.x, at.y);
-    beam.lineStyle(4, 0xf4fdff, 0.95);
-    beam.lineBetween(sky.x, sky.y, at.x, at.y);
-    beam.fillStyle(0xb7f4ff, 0.45);
-    beam.fillEllipse(at.x, at.y, radius * 2.4, radius * 0.7);
-    beam.fillStyle(0xffffff, 0.95);
-    beam.fillCircle(at.x, at.y, 4);
-    for (let i = 0; i < 3; i += 1) {
-      const spin = now * 0.01 + i * 2.1;
-      const reach = 8 + i * 6;
-      beam.fillStyle(0xd8f6ff, 0.65);
-      beam.fillCircle(
-        Math.max(minX, at.x + Math.cos(spin) * reach),
-        at.y + Math.sin(spin) * reach * 0.35,
-        1.6,
-      );
+    if (scene.anims.exists(key)) {
+      scene.anims.remove(key);
     }
+    scene.anims.create({
+      key,
+      frames: scene.anims.generateFrameNumbers(IonCannon.beamKey, range),
+      frameRate: IonCannon.beamFps,
+      repeat,
+    });
   }
 
   private static courseRandom(
