@@ -2,6 +2,7 @@
 // Едет по линии танка игрока к середине поля, встаёт и бьёт прямой наводкой. До проволоки не доходит.
 // Гусеница прокручивается на ходу, каждый каток крутится целиком, и остаются две колеи на всю длину ленты, каждую толщиной с неё. Ствол отдельный: отдача сдвигает его в башню.
 // Корпус дрожит от мотора. С кормы идёт чёрный дым на юго-восток.
+// При гибели живой корпус сменяется сгоревшим остовом. Дым идёт из пролома башни.
 
 import Phaser, { Scene } from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
@@ -24,9 +25,11 @@ export class HeavyTank extends RangedEnemy {
   static readonly gunKey = 'heavy-tank-gun';
   static readonly flashKey = 'heavy-tank-shot';
   static readonly trackKey = 'heavy-tank-track';
+  static readonly corpseKey = 'heavy-tank-wreck';
   static readonly imagePath = 'assets/heavy-tank.png';
   static readonly gunPath = 'assets/heavy-tank-gun.png';
   static readonly flashPath = 'assets/heavy-tank-shot.png';
+  static readonly wreckPath = 'assets/heavy-tank-wreck.png';
 
   static readonly frame = { w: 256, h: 128 };
   static readonly gunFrame = { w: 256, h: 128 };
@@ -41,6 +44,13 @@ export class HeavyTank extends RangedEnemy {
     bodyX: 50,
     bodyY: 32,
   };
+  // Остов на том же холсте, но рисунок сдвинут относительно живого корпуса.
+  // Живой якорь (143, 112) приходится на пиксель остова (146, 111): гусеница остаётся на той же земле.
+  static readonly wreckFit = { originX: 146 / 256, originY: 111 / 128 };
+  // Пролом крыши башни. Столб дыма стоит здесь, пока остов лежит.
+  static readonly wreckFlame = { x: 148, y: 40 };
+  // Тот же срок, что труп пехоты.
+  static readonly wreckMs = 5000;
   // Левая грань башни, строки 34–53: посадочное место высотой 20 px. Ось по его середине.
   static readonly breech = { x: 107, y: 44 };
   // Казённик на кадре занимает 108 px по высоте. 0.17 сажает его в срез, не выше и не ниже грани.
@@ -163,17 +173,18 @@ export class HeavyTank extends RangedEnemy {
     scene.load.image(this.textureKey, this.imagePath);
     scene.load.image(this.gunKey, this.gunPath);
     scene.load.image(this.flashKey, this.flashPath);
+    scene.load.image(this.corpseKey, this.wreckPath);
     scene.load.image(HeavyShell.textureKey, HeavyShell.imagePath);
     HeavyShell.preload(scene);
   }
 
   static ensureTextures(scene: Scene): void {
-    for (const key of [this.textureKey, this.gunKey, this.flashKey, HeavyShell.textureKey]) {
+    for (const key of [this.textureKey, this.corpseKey, this.gunKey, this.flashKey, HeavyShell.textureKey]) {
       if (!scene.textures.exists(key)) {
         continue;
       }
       const filter =
-        key === this.textureKey
+        key === this.textureKey || key === this.corpseKey
           ? Phaser.Textures.FilterMode.NEAREST
           : Phaser.Textures.FilterMode.LINEAR;
       scene.textures.get(key).setFilter(filter);
@@ -434,8 +445,35 @@ export class HeavyTank extends RangedEnemy {
     return dead;
   }
 
+  protected override corpseTexture(): string | null {
+    return HeavyTank.corpseKey;
+  }
+
+  // Столб режет сгоревший корпус. Живой ствол отдельно не режем: на остове он уже сломан.
+  protected override prepareSever(): void {
+    if (!this.scene.textures.exists(HeavyTank.corpseKey)) {
+      return;
+    }
+    this.setTexture(HeavyTank.corpseKey);
+    this.seatWreck();
+  }
+
   protected override severGear(): readonly Phaser.GameObjects.Image[] {
-    return this.gun.active && this.gun.visible ? [this.gun] : [];
+    return [];
+  }
+
+  // Остов уже стоит на гусенице. Столб только разводит половины, корпус набок не валится.
+  protected override severGround(): number | null {
+    return null;
+  }
+
+  // Лежащая картинка сдвинута относительно живого кадра. Опора после смены текстуры сажает гусеницу на землю.
+  override kill(blastAt?: WorldPoint): void {
+    const wasAlive = !this.reachedWall;
+    super.kill(blastAt);
+    if (wasAlive && this.active && this.texture.key === HeavyTank.corpseKey) {
+      this.seatWreck();
+    }
   }
 
   protected override onDie(slain: boolean): void {
@@ -455,12 +493,33 @@ export class HeavyTank extends RangedEnemy {
     if (!slain) {
       return;
     }
-    this.setTint(0x6a5848);
     const nose = this.x - 50;
     const rear = this.x + 36;
     const chest = this.y - 36;
     vehicleDeathBlast(this.scene, { x: nose, y: chest }, { x: rear, y: chest - 8 });
-    wreckSmokeAt(this.scene, this.x + 10, this.y - 48, this.scaleX);
+    const at = this.wreckPoint();
+    const smoke = wreckSmokeAt(this.scene, at.x, at.y, this.scaleX);
+    this.scene.time.delayedCall(HeavyTank.wreckMs, () => {
+      if (smoke.scene) {
+        smoke.destroy();
+      }
+    });
+  }
+
+  private seatWreck(): void {
+    const fit = HeavyTank.wreckFit;
+    this.setOrigin(fit.originX, fit.originY);
+  }
+
+  // Пролом башни в мире. Считает по опоре остова, а не по якорю ещё живого корпуса.
+  private wreckPoint(): { x: number; y: number } {
+    const frame = HeavyTank.frame;
+    const fit = HeavyTank.wreckFit;
+    const flame = HeavyTank.wreckFlame;
+    return {
+      x: this.x + (flame.x - fit.originX * frame.w) * this.scaleX,
+      y: this.y + (flame.y - fit.originY * frame.h) * this.scaleY,
+    };
   }
 
   protected override pinDepth(): void {

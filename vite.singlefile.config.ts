@@ -86,6 +86,7 @@ const packedFiles = [
   ['assets/super-gun.png', 'image/png'],
   ['assets/super-corpse.png', 'image/png'],
   ['assets/heavy-tank.png', 'image/png'],
+  ['assets/heavy-tank-wreck.png', 'image/png'],
   ['assets/heavy-tank-gun.png', 'image/png'],
   ['assets/heavy-tank-shot.png', 'image/png'],
   ['assets/heavy-tank-shell.png', 'image/png'],
