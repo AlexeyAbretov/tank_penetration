@@ -130,6 +130,36 @@ export class IonCannon {
     );
   }
 
+  // Ширина столба и подошвы. 0 — картинка как есть. Шаг 10% от базы, потолок 2,5 раза.
+  static readonly widthStep = 0.1;
+  static readonly widthMax = 2.5;
+  static progressWidthLevel = 0;
+
+  static get maxProgressWidthLevel(): number {
+    return Math.round((IonCannon.widthMax - 1) / IonCannon.widthStep);
+  }
+
+  static setProgressWidthLevel(level: number): void {
+    IonCannon.progressWidthLevel = Math.min(
+      IonCannon.maxProgressWidthLevel,
+      Math.max(0, Math.round(level)),
+    );
+  }
+
+  static widthScale(level = IonCannon.progressWidthLevel): number {
+    const steps = Math.min(IonCannon.maxProgressWidthLevel, Math.max(0, Math.round(level)));
+    return 1 + steps * IonCannon.widthStep;
+  }
+
+  // Подошва растёт вместе со столбом. База — радиус без покупок.
+  static reach(level = IonCannon.progressWidthLevel): number {
+    return IonCannon.shop.radius * IonCannon.widthScale(level);
+  }
+
+  static progressWidthGrows(level: number): boolean {
+    return level < IonCannon.maxProgressWidthLevel;
+  }
+
   // Свой запас прогресса уже выбран — следующий уровень ход не укорачивает.
   static progressSweepShortens(progressLevel: number): boolean {
     const shop = IonCannon.shopSweepLevel;
@@ -188,13 +218,13 @@ export class IonCannon {
     IonCannon.ensureBeamAnim(scene, IonCannon.beamFadeKey, IonCannon.beamFade, 0);
   }
 
-  // Низ кадра — подошва. Высота тянется от неба до пятна, ширина кадра не растягивается.
+  // Низ кадра — подошва. Высота тянется от неба до пятна, ширина — купленный множитель.
   static poseBeam(beam: Phaser.GameObjects.Sprite, at: WorldPoint): void {
     const sky = IonCannon.skyPoint(at);
     const height = Math.max(1, at.y - sky.y);
     beam.setPosition(at.x, at.y);
     beam.setOrigin(0.5, 1);
-    beam.setScale(1, height / IonCannon.beamFrame.h);
+    beam.setScale(IonCannon.widthScale(), height / IonCannon.beamFrame.h);
   }
 
   // through — место одного живого врага в момент пуска. Прямая через него упирается в два края.
@@ -209,7 +239,7 @@ export class IonCannon {
   static course(limitX: number, through: WorldPoint | null, insetX = 0, insetY = 0): IonCourse {
     const width = Math.max(1, Math.round(GAME.width));
     const floorY = GAME.bannerY;
-    const margin = limitX > 0 ? Math.ceil(IonCannon.shop.radius * 1.2) : 0;
+    const margin = limitX > 0 ? Math.ceil(IonCannon.reach() * 1.2) : 0;
     const minX = Phaser.Math.Clamp(Math.ceil(limitX) + margin, 0, width - 1);
     const padX = Math.max(0, insetX);
     const padY = Math.max(0, insetY);
@@ -241,7 +271,7 @@ export class IonCannon {
   // reach — насколько близко к центру цели считается попадание. У солдата это радиус пятна,
   // у крупной цели бой передаёт её круг, иначе пятно берёт только середину.
   // Шаг меньше радиуса пятна, чтобы рывок кадра никого не перепрыгнул.
-  static covers(point: WorldPoint, from: WorldPoint, to: WorldPoint, reach = IonCannon.shop.radius): boolean {
+  static covers(point: WorldPoint, from: WorldPoint, to: WorldPoint, reach = IonCannon.reach()): boolean {
     const reach2 = reach * reach;
     const span = Phaser.Math.Distance.Between(from.x, from.y, to.x, to.y);
     const steps = Math.max(1, Math.ceil(span / (IonCannon.shop.radius * 0.75)));

@@ -170,7 +170,7 @@
 | Попадание по врагу, проволока, свои постройки | `CombatSystem` | Сущность, если меняется её число |
 | Пуля и ракета врага по танку | Выпуск — сущность. Попадание — `ProjectileSystem` | Звук в `src/sounds`, если клип новый |
 | Цена монет | `shop` сущности или `ShopController.upgradeCost` / `knockbackCost` / `pierceCost` / `flightCost` / `artilleryCooldownCost` / `ionCooldownCost` / `ionSweepCost` / `minesCooldownCost` / `nuclearCooldownCost` / `wallDurationCost` / `wallCooldownCost` | `README.md` |
-| Цена очков | `ProgressSave` (`cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`, `pierceCost`, `absorbCost`, `hpCost`, `countCost`, `laserCooldownCost`, `autoFireCost`, `autoAimCost`, `autoShopCost`, `autoArtilleryCost`, `autoIonCost`, `autoMinesCost`, `wallDurationCost`, `wallCooldownCost`) | `README.md` |
+| Цена очков | `ProgressSave` (`cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`, `pierceCost`, `absorbCost`, `hpCost`, `countCost`, `laserCooldownCost`, `autoFireCost`, `autoAimCost`, `autoShopCost`, `autoArtilleryCost`, `autoIonCost`, `autoMinesCost`, `wallDurationCost`, `wallCooldownCost`, `ionWidthCost`) | `README.md` |
 | Новая кнопка витрины | Контроллер собирает карточку | Окно только если изменилась вёрстка карточки |
 | Новая клавиша способности | `CombatSystem` и иконка в `create()` сцены | Подсказка в `GameHud`, `README.md` |
 | Новый вид паузы | Класс `Pause` | Строка в `GameSceneFactory` |

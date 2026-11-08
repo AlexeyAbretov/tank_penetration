@@ -759,9 +759,11 @@ export class CombatSystem implements Combat {
     }
   }
 
-  // У солдата подошва должна дойти до центра торса. Крупный вид отдаёт свой круг.
+  // У солдата подошва растёт с шириной луча. Крупный вид отдаёт свой круг, если он шире подошвы.
   private ionReach(unit: Infantry): number {
-    return unit.ionSole() ?? IonCannon.shop.radius;
+    const sole = IonCannon.reach();
+    const body = unit.ionSole();
+    return body === null ? sole : Math.max(sole, body);
   }
 
   // Луч не передаёт центр разрыва: убитый режется пополам, а не разлетается осколками.

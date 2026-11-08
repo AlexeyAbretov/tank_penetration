@@ -200,6 +200,7 @@ export class GameScene extends Phaser.Scene {
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
     IonCannon.setProgressCooldownLevel(this.progressShop.ionCooldownLevel());
     IonCannon.setProgressSweepLevel(this.progressShop.ionSweepLevel());
+    IonCannon.setProgressWidthLevel(this.progressShop.ionWidthLevel());
     EnergyWall.setProgressDurationLevel(this.progressShop.wallDurationLevel());
     EnergyWall.setProgressCooldownLevel(this.progressShop.wallCooldownLevel());
     LaserDefense.setProgressCooldownLevel(this.progressShop.laserCooldownLevel());

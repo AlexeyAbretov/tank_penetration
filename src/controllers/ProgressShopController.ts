@@ -54,6 +54,7 @@ type Stat =
   | 'artilleryCooldown'
   | 'ionCooldown'
   | 'ionSweep'
+  | 'ionWidth'
   | 'minesCooldown'
   | 'nuclearCooldown'
   | 'wallDuration'
@@ -193,6 +194,10 @@ export class ProgressShopController {
 
   ionSweepLevel(): number {
     return this.progress.ionSweep;
+  }
+
+  ionWidthLevel(): number {
+    return this.progress.ionWidth;
   }
 
   minesCooldownLevel(): number {
@@ -475,6 +480,10 @@ export class ProgressShopController {
     this.buy('ionSweep');
   }
 
+  private buyIonWidth(): void {
+    this.buy('ionWidth');
+  }
+
   private buyMinesCooldown(): void {
     this.buy('minesCooldown');
   }
@@ -641,6 +650,9 @@ export class ProgressShopController {
     if (stat === 'ionSweep' && !IonCannon.progressSweepShortens(level)) {
       return;
     }
+    if (stat === 'ionWidth' && !IonCannon.progressWidthGrows(level)) {
+      return;
+    }
     if (stat === 'minesCooldown' && !Mines.progressCooldownShortens(level)) {
       return;
     }
@@ -704,6 +716,9 @@ export class ProgressShopController {
     if (stat === 'ionSweep') {
       IonCannon.setProgressSweepLevel(this.progress.ionSweep);
     }
+    if (stat === 'ionWidth') {
+      IonCannon.setProgressWidthLevel(this.progress.ionWidth);
+    }
     if (stat === 'minesCooldown') {
       Mines.setProgressCooldownLevel(this.progress.minesCooldown);
     }
@@ -759,6 +774,7 @@ export class ProgressShopController {
           this.ionDamageCard(score),
           this.ionCooldownCard(score),
           this.ionSweepCard(score),
+          this.ionWidthCard(score),
           this.autoIonCard(score),
         ]),
         this.tab('mines', 'Мина', [
@@ -1262,6 +1278,22 @@ export class ProgressShopController {
     };
   }
 
+  private ionWidthCard(score: number): ProgressCardView {
+    const level = this.progress.ionWidth;
+    const price = this.ionWidthPrice(level);
+    const now = IonCannon.widthScale(level).toFixed(1);
+    const next = IonCannon.widthScale(level + 1).toFixed(1);
+    const maxed = !IonCannon.progressWidthGrows(level);
+    return {
+      title: '+10% ширины',
+      buy: () => this.buyIonWidth(),
+      info: maxed ? `ур. ${level} · ×${now}` : `ур. ${level} · ×${now}→×${next}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private minesCooldownCard(score: number): ProgressCardView {
     const level = this.progress.minesCooldown;
     const price = this.minesCooldownPrice(level);
@@ -1389,6 +1421,10 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.cost(level));
   }
 
+  private ionWidthPrice(level: number): number {
+    return shopPrice(ProgressSave.ionWidthCost(level));
+  }
+
   private minesCooldownPrice(level: number): number {
     return shopPrice(ProgressSave.cost(level));
   }
@@ -1446,6 +1482,9 @@ export class ProgressShopController {
     }
     if (stat === 'ionSweep') {
       return this.price(level);
+    }
+    if (stat === 'ionWidth') {
+      return this.ionWidthPrice(level);
     }
     if (stat === 'minesCooldown') {
       return this.minesCooldownPrice(level);

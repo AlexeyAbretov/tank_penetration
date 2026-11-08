@@ -72,6 +72,8 @@ export type SavedProgress = {
   ionCooldown: number;
   // Сколько раз укорочен ход ионной пушки. 0 — базовые 5 с. Прогресс сам снимает 1 с и останавливается на 4 с.
   ionSweep: number;
+  // Сколько раз расширен луч. 0 — базовая ширина. Шаг 10%, потолок 2,5 раза.
+  ionWidth: number;
   // Сколько раз укорочен откат мин. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   minesCooldown: number;
   // Сколько раз укорочен откат атомного взрыва. 0 — базовые 3 минуты. Прогресс сам останавливается на 2:30.
@@ -194,6 +196,12 @@ export class ProgressSave {
     return 3000 + Math.max(0, level) * 3000;
   }
 
+  // Первые 10% ширины луча стоят 3000. Каждая следующая покупка — на 3000 × уже купленный уровень дороже:
+  // 3000, 6000, 9000, …
+  static ionWidthCost(level: number): number {
+    return 3000 + Math.max(0, level) * 3000;
+  }
+
   // Первая секунда перезарядки лазера стоит 5000, вторая — 50000.
   static laserCooldownCost(level: number): number {
     return Math.max(0, level) < 1 ? 5_000 : 50_000;
@@ -246,6 +254,7 @@ export class ProgressSave {
     progress.artilleryCooldown = 0;
     progress.ionCooldown = 0;
     progress.ionSweep = 0;
+    progress.ionWidth = 0;
     progress.minesCooldown = 0;
     progress.nuclearCooldown = 0;
     progress.wallDuration = 0;
@@ -278,6 +287,7 @@ export class ProgressSave {
     ArtilleryStrike.setProgressCooldownLevel(0);
     IonCannon.setProgressCooldownLevel(0);
     IonCannon.setProgressSweepLevel(0);
+    IonCannon.setProgressWidthLevel(0);
     Mines.setProgressCooldownLevel(0);
     NuclearStrike.setProgressCooldownLevel(0);
     EnergyWall.setProgressDurationLevel(0);
@@ -346,6 +356,7 @@ export class ProgressSave {
       artilleryCooldown: 0,
       ionCooldown: 0,
       ionSweep: 0,
+      ionWidth: 0,
       minesCooldown: 0,
       nuclearCooldown: 0,
       wallDuration: 0,
@@ -441,6 +452,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     ionCooldown: requiredInt(value.ionCooldown, 0, IonCannon.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали ход ионной пушки: пятно шло базовые 5 с.
     ionSweep: requiredInt(value.ionSweep, 0, IonCannon.maxProgressSweepLevel) ?? 0,
+    // Старые сохранения не писали ширину луча: столб оставался базовым.
+    ionWidth: requiredInt(value.ionWidth, 0, IonCannon.maxProgressWidthLevel) ?? 0,
     minesCooldown: requiredInt(value.minesCooldown, 0, Mines.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали откат атомного взрыва: бомба ждала базовые 3 минуты.
     nuclearCooldown: requiredInt(value.nuclearCooldown, 0, NuclearStrike.maxProgressCooldownLevel) ?? 0,
