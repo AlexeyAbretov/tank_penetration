@@ -1,5 +1,5 @@
-// Взрыв пикапа из public/audio/pickup_exposion.mp3.
-// В файле срезаны тишина в начале и пустой хвост: удар совпадает со вспышкой.
+// Взрыв машины из public/audio/pickup_exposion.mp3.
+// Клип общий: его играют пикап и багги. В файле срезаны тишина в начале и пустой хвост.
 // Несколько машин могут погибнуть почти вместе, поэтому у каждой свой звук.
 // Пауза и гибель базы глушат его вместе с выстрелом.
 // Рестарт сцены звуки общего менеджера не удаляет, поэтому нужен destroy.
@@ -13,7 +13,7 @@ const GAIN = 0.72;
 
 type Clip = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
 
-export class PickupExplosion {
+export class VehicleExplosion {
   private readonly active: Clip[] = [];
 
   constructor(
@@ -24,7 +24,7 @@ export class PickupExplosion {
   }
 
   play(): void {
-    const boom = this.scene.sound.add('pickup-explosion', { volume: this.loudness() }) as Clip;
+    const boom = this.scene.sound.add('vehicle-explosion', { volume: this.loudness() }) as Clip;
     this.active.push(boom);
     boom.once('complete', () => this.release(boom));
     boom.play();

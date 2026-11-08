@@ -94,6 +94,8 @@ const packedFiles = [
   ['assets/pickup-aim.png', 'image/png'],
   ['assets/pickup-gun.png', 'image/png'],
   ['assets/pickup-wreck.png', 'image/png'],
+  ['assets/buggy-0.png', 'image/png'],
+  ['assets/buggy-wreck.png', 'image/png'],
   ['audio/TRACK_01.mp3', 'audio/mpeg'],
   ['audio/boss.mp3', 'audio/mpeg'],
   ['audio/tank_shot.mp3', 'audio/mpeg'],

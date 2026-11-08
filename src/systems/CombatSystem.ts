@@ -15,6 +15,7 @@ import { MachineGun } from '../entities/MachineGun';
 import { Mines, PlantedMine, type MineKeepOut } from '../entities/Mines';
 import { NuclearStrike, type NuclearFlight } from '../entities/NuclearStrike';
 import { PickupTruck } from '../entities/PickupTruck';
+import { RocketBuggy } from '../entities/RocketBuggy';
 import { Rocket } from '../entities/Rocket';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
@@ -912,8 +913,8 @@ export class CombatSystem implements Combat {
       return;
     }
     this.callbacks.onKill(unit.coinReward);
-    if (unit instanceof PickupTruck) {
-      this.effects.pickupExplosion.play();
+    if (this.isVehicle(unit)) {
+      this.effects.vehicleExplosion.play();
     } else {
       this.effects.infantryDeath.play();
     }
@@ -1968,6 +1969,11 @@ export class CombatSystem implements Combat {
     };
   }
 
+  // Пикап и багги делят один клип гибели. Пехота кричит отдельно.
+  private isVehicle(unit: Infantry): boolean {
+    return unit instanceof PickupTruck || unit instanceof RocketBuggy;
+  }
+
   // blastAt — центр мины, артиллерии или залпа. Пуля, огонь и проволока точку не передают:
   // от них солдат ложится целиком.
   private hurtInfantry(
@@ -1980,8 +1986,8 @@ export class CombatSystem implements Combat {
       this.callbacks.onKill(unit.coinReward);
       // Пикап — техника: свой взрыв, не крик пехоты.
       // Дошедший до базы сюда не попадает: его убивает hitBase.
-      if (unit instanceof PickupTruck) {
-        this.effects.pickupExplosion.play();
+      if (this.isVehicle(unit)) {
+        this.effects.vehicleExplosion.play();
       } else {
         this.effects.infantryDeath.play();
       }

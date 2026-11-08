@@ -14,7 +14,7 @@ import { ImpactSounds } from './ImpactSounds';
 import { InfantryDeath } from './InfantryDeath';
 import { LaserShot } from './LaserShot';
 import { NuclearExplosion } from './NuclearExplosion';
-import { PickupExplosion } from './PickupExplosion';
+import { VehicleExplosion } from './VehicleExplosion';
 import { RocketBurst } from './RocketBurst';
 import { RocketSounds } from './RocketSounds';
 import { TankDeath } from './TankDeath';
@@ -40,7 +40,7 @@ export class BattleEffects {
   readonly nuclearExplosion: NuclearExplosion;
   readonly impacts: ImpactSounds;
   readonly assaultExplosion: AssaultExplosion;
-  readonly pickupExplosion: PickupExplosion;
+  readonly vehicleExplosion: VehicleExplosion;
   readonly infantryDeath: InfantryDeath;
   readonly tankDeath: TankDeath;
   private readonly gain: EffectsVolume;
@@ -59,7 +59,7 @@ export class BattleEffects {
     this.nuclearExplosion = new NuclearExplosion(scene, this.gain);
     this.impacts = new ImpactSounds(scene, this.gain);
     this.assaultExplosion = new AssaultExplosion(scene, this.gain);
-    this.pickupExplosion = new PickupExplosion(scene, this.gain);
+    this.vehicleExplosion = new VehicleExplosion(scene, this.gain);
     this.infantryDeath = new InfantryDeath(scene, this.gain);
     this.tankDeath = new TankDeath(scene, this.gain);
     // Взрыв базы сюда не входит: пауза до него не доходит, stop при гибели его не обрывает.
@@ -75,7 +75,7 @@ export class BattleEffects {
       this.nuclearExplosion,
       this.impacts,
       this.assaultExplosion,
-      this.pickupExplosion,
+      this.vehicleExplosion,
       this.infantryDeath,
     ];
   }

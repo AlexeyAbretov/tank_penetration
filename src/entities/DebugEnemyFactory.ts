@@ -1,11 +1,12 @@
 // Дебаг-круг волн. Наследует появление юнитов у обычной фабрики и подменяет состав.
-// Круг из шести волн. 1–4 — один вид: штурмовик, стрелок, пикап, ракетчик.
-// 5-я — все эти виды по одному, без босса. 6-я — босс. Дальше круг сначала: 11 и 12, 17 и 18.
+// Круг длиннее списка видов на две волны: сначала каждый вид своей волной,
+// потом смешанная, потом босс. С багги это семь: 1–5 один вид, 6-я все по одному, 7-я босс.
+// Дальше круг сначала: 13 и 14, 20 и 21.
 // Обычных в волне по умолчанию трое. Поле в настройках пишет число в localStorage, потолок 50.
 // Смешанная волна и босс это число не читают. Здоровье и скорость растут с номером волны.
 // Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
-// Босс толстеет и бьёт больнее с каждым своим выходом: 6-я волна — первое появление, 12-я — второе.
-// Число на поле то же, что в партии: три выхода на одном составе, потолок пять. Появление здесь — волна / 6.
+// Босс толстеет и бьёт больнее с каждым своим выходом: 7-я волна — первое появление, 14-я — второе.
+// Число на поле то же, что в партии: три выхода на одном составе, потолок пять. Появление здесь — волна / длину круга.
 // Монеты считает та же касса, что в партии: номер выхода умножается на 25, тела делят сумму.
 
 import { AssaultInfantry } from './AssaultInfantry';
@@ -14,6 +15,7 @@ import type { EnemySaveKind } from '../types/EnemySave';
 import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
 import { PickupTruck } from './PickupTruck';
+import { RocketBuggy } from './RocketBuggy';
 import { RocketInfantry } from './RocketInfantry';
 import { SuperSoldier } from './SuperSoldier';
 import type { SpawnContext } from '../types/SpawnContext';
@@ -22,15 +24,17 @@ type EnemyKind =
   | typeof AssaultInfantry
   | typeof GunnerInfantry
   | typeof PickupTruck
+  | typeof RocketBuggy
   | typeof RocketInfantry
   | typeof SuperSoldier;
 
-// Виды смешанной волны и круг обычных волн. Суперсолдат сюда не входит: он только на 6-й.
+// Виды смешанной волны и круг обычных волн. Суперсолдат сюда не входит: он замыкает круг.
 const REGULAR: EnemyKind[] = [
   AssaultInfantry,
   GunnerInfantry,
   PickupTruck,
   RocketInfantry,
+  RocketBuggy,
 ];
 
 // Свой ключ, не ключ партии: «новая игра» стирает бой, а размер волны остаётся.
@@ -64,12 +68,13 @@ export class DebugEnemyFactory extends EnemyFactory {
   }
 
   static isBossWave(wave: number): boolean {
-    return wave > 0 && wave % 6 === 0;
+    return wave > 0 && wave % this.cycle() === 0;
   }
 
-  // 5, 11, 17… Волна перед боссом в том же круге из шести.
+  // Волна перед боссом в том же круге. С пятью видами это 6, 13, 20…
   static isMixedWave(wave: number): boolean {
-    return wave > 0 && wave % 6 === 5;
+    const cycle = this.cycle();
+    return wave > 0 && wave % cycle === cycle - 1;
   }
 
   static count(wave: number): number {
@@ -105,6 +110,9 @@ export class DebugEnemyFactory extends EnemyFactory {
     if (kind === RocketInfantry) {
       return RocketInfantry.coinReward;
     }
+    if (kind === RocketBuggy) {
+      return RocketBuggy.coinReward;
+    }
     return AssaultInfantry.coinReward;
   }
 
@@ -127,12 +135,12 @@ export class DebugEnemyFactory extends EnemyFactory {
     return Math.max(1, wave);
   }
 
-  // Босс выходит на 6, 12, 18… Запас считает номер появления, не номер волны обычной партии.
+  // Босс замыкает круг. Запас считает номер появления, не номер волны обычной партии.
   protected static bossAppearance(wave: number): number {
-    return Math.max(1, Math.floor(wave / 6));
+    return Math.max(1, Math.floor(wave / this.cycle()));
   }
 
-  // Обычная волна — один из первых четырёх слотов круга.
+  // Обычная волна — один слот круга, пока не дошли до смешанной.
   // Смешанная отдаёт вид по месту в очереди. Добавка с клавиши A идёт по тому же списку.
   private static kindAt(wave: number, index: number): EnemyKind {
     if (this.isBossWave(wave)) {
@@ -141,8 +149,13 @@ export class DebugEnemyFactory extends EnemyFactory {
     if (this.isMixedWave(wave)) {
       return REGULAR[index % REGULAR.length] ?? AssaultInfantry;
     }
-    const slot = (Math.max(1, wave) - 1) % 6;
+    const slot = (Math.max(1, wave) - 1) % this.cycle();
     return REGULAR[slot] ?? AssaultInfantry;
+  }
+
+  // Виды по одному, затем смешанная, затем босс.
+  private static cycle(): number {
+    return REGULAR.length + 2;
   }
 
   private static kindOfSave(kind: EnemySaveKind): EnemyKind {
@@ -154,6 +167,9 @@ export class DebugEnemyFactory extends EnemyFactory {
     }
     if (kind === 'rocket') {
       return RocketInfantry;
+    }
+    if (kind === 'buggy') {
+      return RocketBuggy;
     }
     if (kind === 'super') {
       return SuperSoldier;

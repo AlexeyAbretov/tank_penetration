@@ -12,6 +12,8 @@ import {
 } from '../gfx/looks';
 import { ejectCasing } from '../gfx/casing';
 import { bake } from '../gfx/textures';
+import { vehicleDeathBlast } from '../gfx/vehicleBlast';
+import { wreckSmokeAt } from '../gfx/wreckSmoke';
 import type { WorldPoint } from '../types/WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
 
@@ -287,7 +289,7 @@ export class PickupTruck extends RangedEnemy {
     }
     this.playDeathBlast();
     const anchor = PickupTruck.smokeAnchor(this.scaleX);
-    this.smoke = PickupTruck.smokeAt(this.scene, this.x + anchor.x, this.y + anchor.y, this.scaleX);
+    this.smoke = wreckSmokeAt(this.scene, this.x + anchor.x, this.y + anchor.y, this.scaleX);
   }
 
   // Мина, артиллерия, залп и авиабомба передают центр разрыва. От них кузов расходится по шву,
@@ -745,39 +747,6 @@ export class PickupTruck extends RangedEnemy {
     };
   }
 
-  // Непрерывный столб. Эмиттер живёт, пока его не уничтожат вместе с обломками.
-  static smokeAt(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    scale = 1,
-  ): Phaser.GameObjects.Particles.ParticleEmitter {
-    const key = 'smoke-puff';
-    if (!scene.textures.exists(key)) {
-      bake(scene, key, 32, 32, (g) => {
-        g.fillStyle(0xffffff, 0.18);
-        g.fillCircle(16, 16, 15);
-        g.fillStyle(0xffffff, 0.4);
-        g.fillCircle(16, 16, 9);
-        g.fillStyle(0xffffff, 0.75);
-        g.fillCircle(16, 16, 4);
-      });
-    }
-    const smoke = scene.add.particles(x, y, key, {
-      lifespan: { min: 900, max: 1700 },
-      frequency: 110,
-      quantity: 1,
-      speed: { min: 10 * scale, max: 28 * scale },
-      angle: { min: -105, max: -75 },
-      scale: { start: 0.35 * scale, end: 1.6 * scale },
-      alpha: { start: 0.72, end: 0 },
-      color: [0xd8d0c4, 0xa09890, 0x6a645c],
-      gravityY: -18 * scale,
-    });
-    smoke.setDepth(12);
-    return smoke;
-  }
-
   // Вспышка по центру машины. Обломки уже под ней: вспышка гаснет, корпус остаётся.
   // Второй клуб отложен. Ионный разрез снимает спрайт на следующем кадре,
   // поэтому точка и сцена берутся сразу: иначе таймер трогает уже снятую машину и цикл игры обрывается.
@@ -788,71 +757,10 @@ export class PickupTruck extends RangedEnemy {
       x: this.x + (px - PickupTruck.placed.originX * PickupTruck.frame.w) * scale,
       y: this.y + (py - PickupTruck.placed.originY * PickupTruck.frame.h) * scale,
     });
-    // Два клуба: капот и кабина. Картинки взрыва нет, клубы рисует burstAt.
+    // Два клуба: капот и кабина. Точки снимаются сразу, вспышку рисует общий взрыв машины.
     const nose = at(40, 34);
     const cab = at(78, 36);
-    PickupTruck.burstAt(scene, nose.x, nose.y);
-    scene.time.delayedCall(90, () => {
-      PickupTruck.burstAt(scene, cab.x, cab.y);
-    });
-  }
-
-  // Один клуб взрыва. scale увеличивает радиус, скорость и осколки.
-  static burstAt(scene: Phaser.Scene, x: number, y: number, scale = 1): void {
-    const sparkKey = 'spark';
-    const muzzleKey = 'muzzle';
-    if (!scene.textures.exists(sparkKey)) {
-      bake(scene, sparkKey, 12, 12, (g) => {
-        g.fillStyle(0xffffff);
-        g.fillCircle(6, 6, 5);
-      });
-    }
-    const sparks = scene.add.particles(x, y, sparkKey, {
-      lifespan: { min: 280, max: 640 },
-      speed: { min: 40 * scale, max: 420 * scale },
-      scale: { start: 1.7 * scale, end: 0 },
-      alpha: { start: 1, end: 0 },
-      blendMode: Phaser.BlendModes.ADD,
-      color: [0xfff6d0, 0xff8a22, 0xff2a10],
-      gravityY: 460 * scale,
-      emitting: false,
-    });
-    sparks.setDepth(18);
-    sparks.explode(32);
-    scene.time.delayedCall(700, () => sparks.destroy());
-
-    const fire = scene.add.circle(x, y, 26 * scale, 0xff4a12, 0.95).setDepth(17);
-    const core = scene.add.circle(x, y, 12 * scale, 0xfff4c8, 1).setDepth(19);
-    const flash = scene.add.image(x, y, muzzleKey).setDepth(18).setBlendMode(Phaser.BlendModes.ADD);
-    flash.setScale(1.6 * scale);
-    scene.tweens.add({
-      targets: [fire, core, flash],
-      alpha: 0,
-      scale: 3.4 * scale,
-      duration: 320,
-      onComplete: () => {
-        fire.destroy();
-        core.destroy();
-        flash.destroy();
-      },
-    });
-
-    for (let i = 0; i < 5; i += 1) {
-      const bit = scene.add
-        .rectangle(x, y, 10 * scale, 4 * scale, i % 2 === 0 ? 0x3a4a24 : 0x1a1c16)
-        .setDepth(16);
-      const angle = Phaser.Math.FloatBetween(-Math.PI * 0.9, -Math.PI * 0.1);
-      const dist = Phaser.Math.Between(50, 150) * scale;
-      scene.tweens.add({
-        targets: bit,
-        x: x + Math.cos(angle) * dist,
-        y: y + Math.sin(angle) * dist + 36 * scale,
-        angle: Phaser.Math.Between(-160, 160),
-        alpha: 0,
-        duration: 460,
-        onComplete: () => bit.destroy(),
-      });
-    }
+    vehicleDeathBlast(scene, nose, cab);
   }
 
   // Ствол в своих координатах. ox и oy сдвигают рисунок: для текстуры ствола это вырез из кадра машины.

@@ -6,7 +6,7 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     // tank_dead — гибель базы.
     // assault_explosion — штурмовик дошёл до брони.
     // infantry_dead0..1 — крик пехоты, убитой танком. impact0..2 — удар снаряда по врагу.
-    // pickup_exposion — гибель пикапа.
+    // pickup_exposion — гибель пикапа и багги.
     // rocket_shot — пуск ракеты. rocket_hit_tank — её взрыв о броню.
     // rocket_burst — разрыв в воздухе, когда лазер её сбивает. Из середины записи, тишина срезана.
     // artillery_shot — хлопок батареи. artillery_explosion — разрыв снаряда и мины.
@@ -20,7 +20,7 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     scene.load.audio('bullet-hit-tank', 'audio/bullet_hit_tank.mp3');
     scene.load.audio('tank-dead', 'audio/tank_dead.mp3');
     scene.load.audio('assault-explosion', 'audio/assault_explosion.mp3');
-    scene.load.audio('pickup-explosion', 'audio/pickup_exposion.mp3');
+    scene.load.audio('vehicle-explosion', 'audio/pickup_exposion.mp3');
     scene.load.audio('infantry-dead-0', 'audio/infantry_dead0.mp3');
     scene.load.audio('infantry-dead-1', 'audio/infantry_dead1.mp3');
     scene.load.audio('impact-0', 'audio/impact0.mp3');
