@@ -3,7 +3,7 @@
 
 // Короткое имя вида для сохранения партии. Имя класса после сборки Vite может измениться,
 // поэтому в localStorage пишется эта строка, а не AssaultInfantry.
-export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket', 'buggy', 'super'] as const;
+export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket', 'buggy', 'heli', 'super'] as const;
 export type EnemySaveKind = (typeof ENEMY_KINDS)[number];
 
 export type EnemySave = {

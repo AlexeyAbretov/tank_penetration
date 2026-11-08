@@ -1,15 +1,16 @@
 // Дебаг-круг волн. Наследует появление юнитов у обычной фабрики и подменяет состав.
 // Круг длиннее списка видов на две волны: сначала каждый вид своей волной,
-// потом смешанная, потом босс. С багги это семь: 1–5 один вид, 6-я все по одному, 7-я босс.
-// Дальше круг сначала: 13 и 14, 20 и 21.
+// потом смешанная, потом босс. С вертолётом это восемь: 1–6 один вид, 7-я все по одному, 8-я босс.
+// Дальше круг сначала: 15 и 16, 23 и 24.
 // Обычных в волне по умолчанию трое. Поле в настройках пишет число в localStorage, потолок 50.
 // Смешанная волна и босс это число не читают. Здоровье и скорость растут с номером волны.
 // Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
-// Босс толстеет и бьёт больнее с каждым своим выходом: 7-я волна — первое появление, 14-я — второе.
+// Босс толстеет и бьёт больнее с каждым своим выходом: 8-я волна — первое появление, 16-я — второе.
 // Число на поле то же, что в партии: три выхода на одном составе, потолок пять. Появление здесь — волна / длину круга.
 // Монеты считает та же касса, что в партии: номер выхода умножается на 25, тела делят сумму.
 
 import { AssaultInfantry } from './AssaultInfantry';
+import { Helicopter } from './Helicopter';
 import { EnemyFactory } from './EnemyFactory';
 import type { EnemySaveKind } from '../types/EnemySave';
 import { GunnerInfantry } from './GunnerInfantry';
@@ -23,6 +24,7 @@ import type { SpawnContext } from '../types/SpawnContext';
 type EnemyKind =
   | typeof AssaultInfantry
   | typeof GunnerInfantry
+  | typeof Helicopter
   | typeof PickupTruck
   | typeof RocketBuggy
   | typeof RocketInfantry
@@ -35,6 +37,7 @@ const REGULAR: EnemyKind[] = [
   PickupTruck,
   RocketInfantry,
   RocketBuggy,
+  Helicopter,
 ];
 
 // Свой ключ, не ключ партии: «новая игра» стирает бой, а размер волны остаётся.
@@ -113,6 +116,9 @@ export class DebugEnemyFactory extends EnemyFactory {
     if (kind === RocketBuggy) {
       return RocketBuggy.coinReward;
     }
+    if (kind === Helicopter) {
+      return Helicopter.coinReward;
+    }
     return AssaultInfantry.coinReward;
   }
 
@@ -170,6 +176,9 @@ export class DebugEnemyFactory extends EnemyFactory {
     }
     if (kind === 'buggy') {
       return RocketBuggy;
+    }
+    if (kind === 'heli') {
+      return Helicopter;
     }
     if (kind === 'super') {
       return SuperSoldier;

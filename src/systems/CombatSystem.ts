@@ -8,6 +8,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { EnergyWall } from '../entities/EnergyWall';
 import { EnemyShot } from '../entities/EnemyShot';
 import { FlameTank } from '../entities/FlameTank';
+import { Helicopter } from '../entities/Helicopter';
 import { Infantry } from '../entities/Infantry';
 import { IonCannon, type IonCourse } from '../entities/IonCannon';
 import { LaserDefense } from '../entities/LaserDefense';
@@ -993,6 +994,9 @@ export class CombatSystem implements Combat {
 
   // Луч не передаёт центр разрыва: убитый режется пополам, а не разлетается осколками.
   private hurtIon(unit: Infantry, angle: number): void {
+    if (!unit.takes('ion')) {
+      return;
+    }
     if (!unit.hit(this.ionDamage())) {
       return;
     }
@@ -1355,6 +1359,9 @@ export class CombatSystem implements Combat {
         return;
       }
       // Крик на каждого солдата забил бы взрыв. Монеты всё равно начисляются.
+      if (!unit.takes('nuclear')) {
+        return;
+      }
       if (unit.hit(1_000_000)) {
         this.callbacks.onKill(unit.coinReward);
         unit.kill();
@@ -1449,7 +1456,7 @@ export class CombatSystem implements Combat {
 
   // Урон снаряда и отталкивание из магазинов. Мёртвого уже не двигаем.
   private shellHit(unit: Infantry): void {
-    this.hurtInfantry(unit);
+    this.hurtInfantry(unit, this.shellDamage(), false, undefined, 'shell');
     if (!unit.active || unit.reachedWall) {
       return;
     }
@@ -1507,7 +1514,7 @@ export class CombatSystem implements Combat {
     if (flight?.pierce) {
       flight.pierce = false;
       flight.passed = unit;
-      this.hurtInfantry(unit);
+      this.hurtInfantry(unit, this.shellDamage(), false, undefined, 'shell');
       return;
     }
     this.detonateShell(shell, unit);
@@ -1772,7 +1779,7 @@ export class CombatSystem implements Combat {
     hit: Set<Infantry>,
   ): void {
     for (const unit of this.infantry.getChildren() as Infantry[]) {
-      if (!this.flameTarget(unit) || hit.has(unit)) {
+      if (!this.flameTarget(unit) || hit.has(unit) || !unit.takes('other')) {
         continue;
       }
       const center = unit.hitCenter();
@@ -1789,7 +1796,7 @@ export class CombatSystem implements Combat {
 
   private scorchPatch(patch: FlamePatch): void {
     for (const unit of this.infantry.getChildren() as Infantry[]) {
-      if (!this.flameTarget(unit) || patch.hit.has(unit)) {
+      if (!this.flameTarget(unit) || patch.hit.has(unit) || !unit.takes('other')) {
         continue;
       }
       const center = unit.hitCenter();
@@ -1918,7 +1925,7 @@ export class CombatSystem implements Combat {
       bullet.destroy();
       // Пуля долетела до круга попадания.
       this.effects.impacts.play();
-      this.hurtInfantry(struck, this.mgDamage());
+      this.hurtInfantry(struck, this.mgDamage(), false, undefined, 'mg');
     }
   }
 
@@ -2055,9 +2062,9 @@ export class CombatSystem implements Combat {
     };
   }
 
-  // Пикап и багги делят один клип гибели. Пехота кричит отдельно.
+  // Пикап, багги и вертолёт делят один клип гибели. Пехота кричит отдельно.
   private isVehicle(unit: Infantry): boolean {
-    return unit instanceof PickupTruck || unit instanceof RocketBuggy;
+    return unit instanceof PickupTruck || unit instanceof RocketBuggy || unit instanceof Helicopter;
   }
 
   // blastAt — центр мины, артиллерии или залпа. Пуля, огонь и проволока точку не передают:
@@ -2067,7 +2074,11 @@ export class CombatSystem implements Combat {
     damage = this.shellDamage(),
     wire = false,
     blastAt?: WorldPoint,
+    strike: 'shell' | 'mg' | 'ion' | 'nuclear' | 'other' = 'other',
   ): void {
+    if (!unit.takes(strike)) {
+      return;
+    }
     if (unit.hit(damage, wire)) {
       this.callbacks.onKill(unit.coinReward);
       // Пикап — техника: свой взрыв, не крик пехоты.

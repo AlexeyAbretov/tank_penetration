@@ -1,8 +1,8 @@
 // Пехотинец — общий предок всех врагов.
 // Это абстрактный класс: сам по себе на поле не появляется.
-// От него наследуют штурмовик, стрелок, ракетчик, пикап, багги и суперсолдат.
+// От него наследуют штурмовик, стрелок, ракетчик, пикап, багги, вертолёт и суперсолдат.
 // Стрелок, ракетчик, пикап и багги идут через RangedEnemy: доходят до рубежа и стреляют.
-// Суперсолдат наследует Infantry напрямую и бегает по своему циклу.
+// Суперсолдат и вертолёт наследуют Infantry напрямую и ходят по своему циклу.
 
 import Phaser from 'phaser';
 import { enemyHasteOf, GAME, isDebugRun } from '../gameConfig';
@@ -332,6 +332,12 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     return true;
   }
 
+  // Какое оружие снимает здоровье. Обычный враг принимает всё.
+  // Вертолёт оставляет снаряд танка, пулемёт, ионную пушку и атомный взрыв.
+  takes(_strike: 'shell' | 'mg' | 'ion' | 'nuclear' | 'other'): boolean {
+    return true;
+  }
+
   // Наносит урон. Возвращает true, если после удара здоровья не осталось — сцена тогда вызовет kill.
   // wire: удар колючки. У него своя красная вспышка, не бледный оттенок снаряда.
   hit(damage: number = Infantry.shellDamage, wire = false): boolean {
@@ -527,11 +533,13 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     const top = this.y - this.displayHeight * this.originY - 10;
     const width = this.hpBarWidth;
     this.barBg.setPosition(this.x, top);
-    this.barBg.width = width;
+    // setSize, не присвоение width: иначе опора остаётся от ширины создания (30),
+    // и у широкой полоски цвет не доходит до правого края даже при полном запасе.
+    this.barBg.setSize(width, 5);
     // Цветная полоска растёт вправо от левого края, поэтому левый край — на половине ширины левее центра.
     this.barFill.setPosition(this.x - width / 2, top);
     // При полном HP ширина полоски целиком, при половине — половина, при нуле — 0.
-    this.barFill.width = width * (this.hp / this.maxHp);
+    this.barFill.setSize(width * (this.hp / this.maxHp), 5);
     if (this.hpLabel) {
       // Низ цифры чуть выше полоски, по её центру.
       this.hpLabel.setPosition(this.x, top - 5);

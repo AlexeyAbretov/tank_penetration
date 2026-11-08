@@ -6,6 +6,7 @@
 import { AssaultInfantry } from './AssaultInfantry';
 import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
+import { Helicopter } from './Helicopter';
 import { PickupTruck } from './PickupTruck';
 import { RocketBuggy } from './RocketBuggy';
 import { RocketInfantry } from './RocketInfantry';
@@ -22,6 +23,7 @@ export { ENEMY_KINDS } from '../types/EnemySave';
 type EnemyKind =
   | typeof AssaultInfantry
   | typeof GunnerInfantry
+  | typeof Helicopter
   | typeof PickupTruck
   | typeof RocketBuggy
   | typeof RocketInfantry
@@ -29,9 +31,9 @@ type EnemyKind =
 
 export class EnemyFactory {
   // Техника со своим debutWave. В пул шагов попадает по возрастанию этой волны.
-  // Пикап дебютирует на 10-й, ракетчик на 20-й, багги на 30-й. pool() сортирует по этому номеру,
-  // поэтому порядок в массиве на круг не влияет.
-  private static readonly vehicles: EnemyKind[] = [PickupTruck, RocketInfantry, RocketBuggy];
+  // Пикап дебютирует на 10-й, ракетчик на 20-й, багги на 30-й, вертолёт на 40-й.
+  // pool() сортирует по этому номеру, поэтому порядок в массиве на круг не влияет.
+  private static readonly vehicles: EnemyKind[] = [PickupTruck, RocketInfantry, RocketBuggy, Helicopter];
 
   static readonly wave = {
     // Штурмовиков в самой первой волне.
@@ -104,6 +106,9 @@ export class EnemyFactory {
     if (unit instanceof RocketBuggy) {
       return 'buggy';
     }
+    if (unit instanceof Helicopter) {
+      return 'heli';
+    }
     if (unit instanceof PickupTruck) {
       return 'truck';
     }
@@ -150,6 +155,8 @@ export class EnemyFactory {
       unit = new PickupTruck(scene, x, y, rankHp, shots, fireTarget);
     } else if (kind === 'buggy') {
       unit = new RocketBuggy(scene, x, y, rankHp, shots, fireTarget);
+    } else if (kind === 'heli') {
+      unit = new Helicopter(scene, x, y, rankHp, shots, fireTarget);
     } else {
       unit = new RocketInfantry(scene, x, y, rankHp, shots, fireTarget);
     }
@@ -166,6 +173,9 @@ export class EnemyFactory {
     }
     if (kind === RocketBuggy) {
       return RocketBuggy.debutWave;
+    }
+    if (kind === Helicopter) {
+      return Helicopter.debutWave;
     }
     if (kind === RocketInfantry) {
       return RocketInfantry.debutWave;
@@ -215,6 +225,12 @@ export class EnemyFactory {
       return this.arm(unit, wave, rank);
     }
 
+    if (kind === Helicopter) {
+      const rank = this.growthRank(wave, Helicopter.debutWave);
+      const unit = new Helicopter(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
+      return this.arm(unit, wave, rank);
+    }
+
     const rank = this.growthRank(wave, RocketInfantry.debutWave);
     const unit = new RocketInfantry(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
     return this.arm(unit, wave, rank);
@@ -248,7 +264,7 @@ export class EnemyFactory {
     // Боссы подменяют весь отряд. Сколько их — bossCount.
     // Расчёт волны 11 и дальше всё равно дойдёт до номера 10
     // в цикле ниже, поэтому дебют пикапа на босс-волне в поздний отряд попадает.
-    // То же с ракетчиком и багги: волна 21 доходит до номера 20, волна 31 — до 30.
+    // То же с ракетчиком, багги и вертолётом: волна 21 доходит до номера 20, 31 — до 30, 41 — до 40.
     if (this.isBossWave(wave)) {
       const bosses: EnemyKind[] = [];
       const total = this.bossCount(wave);
@@ -300,7 +316,7 @@ export class EnemyFactory {
         continue;
       }
 
-      // Волна первого выхода пикапа, ракетчика или багги. Очередной «шаг» в этот номер не идёт.
+      // Волна первого выхода пикапа, ракетчика, багги или вертолёта. Очередной «шаг» в этот номер не идёт.
       const vehicleDebut = this.vehicles.find((kind) => this.debutWave(kind) === w);
       if (vehicleDebut) {
         push(vehicleDebut);

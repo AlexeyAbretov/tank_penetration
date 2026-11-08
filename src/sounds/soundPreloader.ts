@@ -6,7 +6,7 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     // tank_dead — гибель базы.
     // assault_explosion — штурмовик дошёл до брони.
     // infantry_dead0..1 — крик пехоты, убитой танком. impact0..2 — удар снаряда по врагу.
-    // pickup_exposion — гибель пикапа и багги.
+    // pickup_exposion — гибель пикапа, багги и вертолёта.
     // rocket_shot — пуск ракеты. rocket_hit_tank — её взрыв о броню.
     // rocket_burst — разрыв в воздухе, когда лазер её сбивает. Из середины записи, тишина срезана.
     // artillery_shot — хлопок батареи. artillery_explosion — разрыв снаряда и мины.
