@@ -1,11 +1,11 @@
 // Тяжёлый танк: босс чётных десятков и сосед суперсолдата, когда боссов уже несколько.
 // Едет по линии танка игрока к середине поля, встаёт и бьёт прямой наводкой. До проволоки не доходит.
-// Гусеница прокручивается на ходу, каждый каток крутится целиком, и остаются две колеи на всю длину ленты, каждую толщиной с неё. Ствол отдельный: отдача сдвигает его в башню.
+// Гусеница прокручивается на ходу, каждый каток крутится целиком, и остаются две колеи на всю длину ленты, каждую толщиной с неё. После загрузки след дорисовывается от правого края поля: путь туда известен. При гибели колеи гаснут. Ствол отдельный: отдача сдвигает его в башню.
 // Корпус дрожит от мотора. С кормы идёт чёрный дым на юго-восток.
 // При гибели живой корпус сменяется сгоревшим остовом. Дым идёт из пролома башни.
 
 import Phaser, { Scene } from 'phaser';
-import { enemyHasteOf } from '../gameConfig';
+import { GAME, enemyHasteOf } from '../gameConfig';
 import { ejectCasing } from '../gfx/casing';
 import { exhaustAt, idleShift } from '../gfx/engine';
 import { bake } from '../gfx/textures';
@@ -84,6 +84,8 @@ export class HeavyTank extends RangedEnemy {
   static readonly rutTop = 70;
   // Повтор башмаков. Полоса длиннее этого куска и кладёт его встык.
   static readonly rutStep = 16;
+  // След живого хода. После гибели он гаснет и не остаётся следующим волнам.
+  static readonly rutFadeMs = 500;
   // Правый край ядра у среза ствола. Середина ядра на оси орудия, не на кончике звезды.
   static readonly flashOrigin = { x: 217 / 256, y: 64 / 128 };
   static readonly flashScale = 0.5;
@@ -322,6 +324,7 @@ export class HeavyTank extends RangedEnemy {
       scene.events.off(Phaser.Scenes.Events.POST_UPDATE, rumble);
       this.gun.destroy();
       this.track.destroy();
+      this.releaseRuts();
       for (const roller of this.rollers) {
         if (roller.image.active) {
           roller.image.destroy();
@@ -418,7 +421,8 @@ export class HeavyTank extends RangedEnemy {
     const step = rolling ? (HeavyTank.trackRoll * delta * haste) / 1000 : 0;
     this.poseTrack(step);
     this.poseRollers(step);
-    if (rolling) {
+    // Стоящий после загрузки тоже кладёт колею: он уже проехал путь от правого края.
+    if (!this.reachedWall) {
       this.layRut();
     }
     if (this.reachedWall) {
@@ -484,6 +488,9 @@ export class HeavyTank extends RangedEnemy {
     }
     if (this.track.active) {
       this.track.setVisible(false);
+    }
+    if (slain) {
+      this.fadeRuts();
     }
     for (const roller of this.rollers) {
       if (roller.image.active) {
@@ -721,14 +728,48 @@ export class HeavyTank extends RangedEnemy {
     }
   }
 
+  // След хода гаснет в момент гибели. Дальше полосы живут своим твином и к корпусу уже не привязаны.
+  private fadeRuts(): void {
+    const ribbons = this.rutRibbon;
+    this.rutRibbon = [];
+    for (const ribbon of ribbons) {
+      if (!ribbon.active) {
+        continue;
+      }
+      this.scene.tweens.add({
+        targets: ribbon,
+        alpha: 0,
+        duration: HeavyTank.rutFadeMs,
+        onComplete: () => {
+          if (ribbon.scene) {
+            ribbon.destroy();
+          }
+        },
+      });
+    }
+  }
+
+  // Колеи, которые гибель ещё не отдала гаснуть. Иначе они остаются после снятия корпуса.
+  private releaseRuts(): void {
+    for (const ribbon of this.rutRibbon) {
+      if (!ribbon.active) {
+        continue;
+      }
+      this.scene.tweens.killTweensOf(ribbon);
+      ribbon.destroy();
+    }
+    this.rutRibbon = [];
+  }
+
   // Обе колеи на всю длину ленты. Полоса растёт только влево, уже проеханное не разрывается.
+  // Правый край фиксируется один раз: на ходу это корма ленты, после загрузки — край поля, если танк уже левее.
   private layRut(): void {
     HeavyTank.ensureRut(this.scene);
     const front = this.trackFront();
     const span = HeavyTank.trackBand.w * this.scaleX;
     const lanes = this.rutLanes();
     if (this.rutRibbon.length === 0) {
-      this.rutRear = front + span;
+      this.rutRear = Math.max(front + span, this.pathRear());
       this.rutRibbon = lanes.map((y) => this.rutRibbonAt(front, y, span));
     }
     const width = Math.max(span, this.rutRear - front);
@@ -751,6 +792,11 @@ export class HeavyTank extends RangedEnemy {
     ribbon.setOrigin(0, 0.5);
     ribbon.setDepth(3);
     return ribbon;
+  }
+
+  // Танк въезжает с правого края и едет только влево. После загрузки этот край — корма уже проеханного следа.
+  private pathRear(): number {
+    return GAME.width;
   }
 
   // Левый край ленты: танк смотрит влево, это начало гусеницы.
