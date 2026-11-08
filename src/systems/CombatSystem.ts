@@ -157,14 +157,16 @@ export class CombatSystem implements Combat {
   private aimLock: Infantry | null = null;
   // Сцена ставит из прогресса. Куплено и включено — танк стреляет без левой кнопки.
   protected autoFire = false;
-  // Куплено и включено — удар и мины сами через секунду после конца перезарядки.
+  // Куплено и включено — удар, мины, пролёт и завеса сами через секунду после конца перезарядки.
   private autoArtillery = false;
   private autoMines = false;
   private autoBomber = false;
+  private autoWall = false;
   // Сколько миллисекунд способность уже готова. Секунда идёт и в магазине волны.
   private artilleryReadyMs = 0;
   private minesReadyMs = 0;
   private bomberReadyMs = 0;
+  private wallReadyMs = 0;
 
   constructor(
     protected readonly scene: Phaser.Scene,
@@ -396,6 +398,7 @@ export class CombatSystem implements Combat {
     this.minesReadyMs = 0;
     this.ionReadyMs = 0;
     this.bomberReadyMs = 0;
+    this.wallReadyMs = 0;
     this.shells.clear(true, true);
     this.shellFlights.clear();
     this.mgShots.clear(true, true);
@@ -478,6 +481,14 @@ export class CombatSystem implements Combat {
       this.bomberReadyMs = 0;
     }
     this.autoBomber = on;
+  }
+
+  // Выключенное положение сбрасывает уже накопленную секунду: следующее включение ждёт её заново.
+  setAutoWall(on: boolean): void {
+    if (!on) {
+      this.wallReadyMs = 0;
+    }
+    this.autoWall = on;
   }
 
   // ЛКМ и автострельба. Флаг прогресса сцена уже положила в setAutoFire.
@@ -689,26 +700,91 @@ export class CombatSystem implements Combat {
     return fromIcon || this.ionKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
   }
 
-  // Перезарядка идёт и в магазине. Завеса — только в бою, по клавише 5 или по иконке.
+  // Перезарядка идёт и в магазине. Завеса — в бою, по клавише 5, по иконке или сама через секунду после готовности.
   // Уже стоящая стена в магазине не замирает: срок догорает сам.
   tickWall(delta: number, canFire: boolean): void {
     this.wall.tick(delta);
     if (!this.shop.wallOwned) {
       this.wallFromIcon = false;
+      this.wallReadyMs = 0;
       return;
     }
     const span = this.wallSpan();
     this.wallCooldownMs = Math.min(span, Math.max(0, this.wallCooldownMs - delta));
-    if (!this.wallPressed()) {
+    if (this.wallPressed()) {
+      this.useWall(canFire);
+      if (this.wallCooldownMs > 0) {
+        this.wallReadyMs = 0;
+        return;
+      }
+    }
+    this.tickAutoWall(delta, canFire);
+  }
+
+  // Готовность — конец перезарядки. Секунда тикает и в магазине волны.
+  // Завеса встаёт в бою, только если входящий выстрел дойдёт до правого края, пока она стоит.
+  // Иначе откат не начинается и проверка повторяется.
+  private tickAutoWall(delta: number, canFire: boolean): void {
+    if (!this.autoWall || this.wallCooldownMs > 0) {
+      this.wallReadyMs = 0;
       return;
     }
-    this.useWall(canFire);
+    if (this.wallReadyMs < AUTO_APPLY_DELAY_MS) {
+      this.wallReadyMs += delta;
+    }
+    if (!canFire || this.wallReadyMs < AUTO_APPLY_DELAY_MS || this.wall.up()) {
+      return;
+    }
+    if (!this.wallCanAbsorb()) {
+      return;
+    }
+    this.commitWall();
+    this.wallReadyMs = 0;
+  }
+
+  // Отскочивший патрон завеса не гасит. Далёкий, который не долетит за её срок, откат не тратит.
+  private wallCanAbsorb(): boolean {
+    const face = EnergyWall.outerFace(BarbedWire.bounds.face + EnergyWall.ahead);
+    const durationMs = EnergyWall.durationFor(this.shop.wallDurationLevel);
+    for (const obj of this.enemyShots.getChildren()) {
+      if (!(obj instanceof EnemyShot) || !obj.active || obj.hasBounced()) {
+        continue;
+      }
+      if (this.curtainCatches(obj, face, durationMs)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Уже на линии или левее неё завеса гасит выстрел сразу. Справа — только если он дойдёт, не выйдя за поле.
+  private curtainCatches(shot: EnemyShot, face: number, durationMs: number): boolean {
+    if (shot.x < 0 || shot.x > GAME.width || shot.y < 0 || shot.y > GAME.bannerY) {
+      return false;
+    }
+    if (shot.x <= face) {
+      return true;
+    }
+    const body = shot.body as Phaser.Physics.Arcade.Body | null;
+    if (!body || body.velocity.x >= 0) {
+      return false;
+    }
+    const arriveMs = ((shot.x - face) / -body.velocity.x) * 1000;
+    if (arriveMs > durationMs) {
+      return false;
+    }
+    const y = shot.y + body.velocity.y * (arriveMs / 1000);
+    return y >= 0 && y <= GAME.bannerY;
   }
 
   protected useWall(canFire: boolean): void {
     if (!canFire || this.wallCooldownMs > 0 || this.wall.up()) {
       return;
     }
+    this.commitWall();
+  }
+
+  private commitWall(): void {
     this.wallCooldownMs = this.wallSpan();
     this.wall.raise(
       BarbedWire.bounds.face + EnergyWall.ahead,

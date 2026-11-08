@@ -115,6 +115,10 @@ export type SavedProgress = {
   autoBomber: boolean;
   // Выключатель уже купленного автоприменения. Пока false, пролёт ждёт клавишу или иконку.
   autoBomberOn: boolean;
+  // Куплено ли автоприменение энергетической стены. Завеса сама через секунду после готовности, если входящий выстрел успеет погаснуть на ней.
+  autoWall: boolean;
+  // Выключатель уже купленного автоприменения. Пока false, завеса ждёт клавишу или иконку.
+  autoWallOn: boolean;
 };
 
 export class ProgressSave {
@@ -195,6 +199,11 @@ export class ProgressSave {
 
   // Одна покупка. Бомбардировщик сам летит через секунду после готовности, пока включён выключатель на иконке.
   static autoBomberCost(): number {
+    return 20_000;
+  }
+
+  // Одна покупка. Завеса сама встаёт через секунду после готовности, если входящий выстрел долетит, пока она стоит.
+  static autoWallCost(): number {
     return 20_000;
   }
 
@@ -289,6 +298,8 @@ export class ProgressSave {
     progress.autoIonOn = false;
     progress.autoBomber = false;
     progress.autoBomberOn = false;
+    progress.autoWall = false;
+    progress.autoWallOn = false;
     this.save(progress);
     Tank.setProgressSpeedLevel(0);
     Tank.setProgressFlightLevel(0);
@@ -395,6 +406,8 @@ export class ProgressSave {
       autoIonOn: false,
       autoBomber: false,
       autoBomberOn: false,
+      autoWall: false,
+      autoWallOn: false,
     };
   }
 
@@ -505,6 +518,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали автоприменение пролёта: он ждал клавишу.
     autoBomber: value.autoBomber === true,
     autoBomberOn: value.autoBomber === true && value.autoBomberOn !== false,
+    // Старые сохранения не писали автоприменение завесы: она ждала клавишу.
+    autoWall: value.autoWall === true,
+    autoWallOn: value.autoWall === true && value.autoWallOn !== false,
   };
 }
 

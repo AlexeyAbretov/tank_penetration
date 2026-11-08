@@ -52,6 +52,8 @@ export type CombatSystem = {
   setAutoIon(on: boolean): void;
   // Куплено и включено: бомбардировщик сам через секунду после готовности.
   setAutoBomber(on: boolean): void;
+  // Куплено и включено: завеса сама через секунду после готовности.
+  setAutoWall(on: boolean): void;
   // Точка живой цели автонаведения. Та же, пока она не погибла. null — на поле никого.
   aimPoint(): WorldPoint | null;
 };

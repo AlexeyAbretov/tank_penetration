@@ -377,6 +377,14 @@ export class GameScene extends Phaser.Scene {
       this.applyAutoStrikes();
       this.paintAutoStrikes();
     });
+    this.hud.onAutoApply('wall', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.progressShop.toggleAutoWall();
+      this.applyAutoStrikes();
+      this.paintAutoStrikes();
+    });
     // Стирает и партию, и постоянные улучшения. Кнопка живёт на плашке паузы.
     this.hud.onNewGame(() => this.restartRun());
     const keyboard = this.input.keyboard;
@@ -631,7 +639,7 @@ export class GameScene extends Phaser.Scene {
 
     const fighting = !this.shop.shopOpen;
     // Перезарядка артиллерии, ионной пушки, мин, атомного взрыва, стены и бомбардировщика идёт и в магазине. Вызов — только когда fighting.
-    // Секунда автоприменения тикает там же. Сам удар, постановка, луч и пролёт ждут закрытого магазина. Уже пущенный луч, стоящая стена и летящий самолёт не замирают.
+    // Секунда автоприменения тикает там же. Сам удар, постановка, луч, завеса и пролёт ждут закрытого магазина. Уже пущенный луч, стоящая стена и летящий самолёт не замирают.
     this.applyAutoStrikes();
     this.combat.tickArtillery(delta, fighting);
     this.combat.tickMines(delta, fighting);
@@ -713,6 +721,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.setAutoMines(this.progressShop.autoMinesEnabled());
     this.combat.setAutoIon(this.progressShop.autoIonEnabled());
     this.combat.setAutoBomber(this.progressShop.autoBomberEnabled());
+    this.combat.setAutoWall(this.progressShop.autoWallEnabled());
   }
 
   private paintAutoStrikes(): void {
@@ -720,6 +729,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.setAutoApply('mines', this.progressShop.autoMinesOwned(), this.progressShop.autoMinesEnabled());
     this.hud.setAutoApply('ion', this.progressShop.autoIonOwned(), this.progressShop.autoIonEnabled());
     this.hud.setAutoApply('bomber', this.progressShop.autoBomberOwned(), this.progressShop.autoBomberEnabled());
+    this.hud.setAutoApply('wall', this.progressShop.autoWallOwned(), this.progressShop.autoWallEnabled());
   }
 
   // Иконка справа и выстрел без ЛКМ читают одну и ту же покупку прогресса.

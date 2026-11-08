@@ -352,6 +352,23 @@ export class ProgressShopController {
     this.progressSave.save(this.progress);
   }
 
+  autoWallOwned(): boolean {
+    return this.progress.autoWall;
+  }
+
+  // Куплено и включено выключателем на иконке стены.
+  autoWallEnabled(): boolean {
+    return this.progress.autoWall && this.progress.autoWallOn;
+  }
+
+  toggleAutoWall(): void {
+    if (this.paused || !this.progress.autoWall) {
+      return;
+    }
+    this.progress.autoWallOn = !this.progress.autoWallOn;
+    this.progressSave.save(this.progress);
+  }
+
   isAwaitingShop(): boolean {
     return this.progress.awaitingShop;
   }
@@ -642,6 +659,21 @@ export class ProgressShopController {
     this.panel.refresh(this.view());
   }
 
+  private buyAutoWall(): void {
+    if (this.isPaused() || this.progress.autoWall) {
+      return;
+    }
+    const cost = shopPrice(ProgressSave.autoWallCost());
+    if (this.progress.score < cost) {
+      return;
+    }
+    this.progress.score -= cost;
+    this.progress.autoWall = true;
+    this.progress.autoWallOn = true;
+    this.progressSave.save(this.progress);
+    this.panel.refresh(this.view());
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -844,6 +876,7 @@ export class ProgressShopController {
         this.tab('wall', 'Энергетическая стена', [
           this.wallDurationCard(score),
           this.wallCooldownCard(score),
+          this.autoWallCard(score),
         ]),
         this.tab('bomber', 'Бомбардировщик', [
           this.bomberDamageCard(score),
@@ -940,6 +973,20 @@ export class ProgressShopController {
       title: 'автоприменение',
       buy: () => this.buyAutoBomber(),
       info: 'пролёт сам через 1 с',
+      cost: this.coin(price),
+      open: !owned,
+      owned,
+      canBuy: !owned && score >= price,
+    };
+  }
+
+  private autoWallCard(score: number): ProgressCardView {
+    const owned = this.progress.autoWall;
+    const price = shopPrice(ProgressSave.autoWallCost());
+    return {
+      title: 'автоприменение',
+      buy: () => this.buyAutoWall(),
+      info: 'гасит входящий выстрел',
       cost: this.coin(price),
       open: !owned,
       owned,
