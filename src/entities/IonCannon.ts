@@ -23,14 +23,21 @@ export class IonCannon {
   static readonly beamKey = 'ion-beam';
   static readonly beamPath = 'assets/ion-beam.png';
   // Лист 36 кадров 128×256. 0–13 падение и вспышка удара, 14–26 полный столбик, 27–35 верх уходит.
+  // Кадр 5 — подошва впервые доходит до низа листа. До него в кадре только небо.
   static readonly beamFrame = { w: 128, h: 256 };
   static readonly beamFps = 33;
+  static readonly groundFrame = 5;
   static readonly beamGrow = { start: 0, end: 13 };
   static readonly beamHold = { start: 14, end: 26 };
   static readonly beamFade = { start: 27, end: 35 };
   static readonly beamGrowKey = 'ion-beam-grow';
   static readonly beamHoldKey = 'ion-beam-hold';
   static readonly beamFadeKey = 'ion-beam-fade';
+
+  // Сколько миллисекунд падения проходит, прежде чем подошва бьёт в землю.
+  static get groundHitMs(): number {
+    return (IonCannon.groundFrame / IonCannon.beamFps) * 1000;
+  }
 
   static readonly shop = {
     cost: 100,

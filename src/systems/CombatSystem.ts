@@ -39,6 +39,8 @@ type IonRun = {
   elapsed: number;
   // Ход, с которым столб вышел. Покупка в открытом магазине этот проход не ускоряет.
   sweepMs: number;
+  // Подошва ещё не коснулась земли. Удар звучит один раз за ход.
+  hitGround: boolean;
   prev: WorldPoint;
   // Следующий удар, в миллисекундах хода столба. Нет записи — удар сразу.
   nextHit: Map<Infantry, number>;
@@ -909,6 +911,7 @@ export class CombatSystem implements Combat {
       course,
       elapsed: 0,
       sweepMs: IonCannon.sweepFor(this.shop.ionSweepLevel),
+      hitGround: false,
       prev: from,
       nextHit: new Map(),
       beam,
@@ -925,7 +928,8 @@ export class CombatSystem implements Combat {
     });
     this.cutIon(this.ionRun, from);
     this.scene.cameras.main.shake(180, 0.0025);
-    this.effects.laserShot.play();
+    this.effects.ionCannon.playAppear();
+    this.effects.ionCannon.startSweep();
   }
 
   private stepIon(delta: number): void {
@@ -934,6 +938,10 @@ export class CombatSystem implements Combat {
       return;
     }
     run.elapsed += delta;
+    if (!run.hitGround && run.elapsed >= IonCannon.groundHitMs) {
+      run.hitGround = true;
+      this.effects.ionCannon.playImpact();
+    }
     const t = Math.min(1, run.elapsed / run.sweepMs);
     const at = IonCannon.pointAt(run.course, t);
     IonCannon.poseBeam(run.beam, at);
@@ -1003,6 +1011,7 @@ export class CombatSystem implements Combat {
       return;
     }
     this.ionRun = undefined;
+    this.effects.ionCannon.stopSweep();
     this.ionFade = { beam: run.beam, earth: run.earth, crater: run.crater };
     this.playIonFade(run.beam, () => {
       if (this.ionFade?.beam !== run.beam) {
@@ -1033,6 +1042,7 @@ export class CombatSystem implements Combat {
 
   // keepEarth: луч оборван новым пуском, полоса доживает свой срок. Иначе поле чистят сразу.
   private cancelIon(keepEarth: boolean): void {
+    this.effects.ionCannon.stopSweep();
     this.dropIonFade(keepEarth);
     const run = this.ionRun;
     if (!run) {

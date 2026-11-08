@@ -12,6 +12,7 @@ import { EffectsVolume } from './EffectsVolume';
 import { GunnerShot } from './GunnerShot';
 import { ImpactSounds } from './ImpactSounds';
 import { InfantryDeath } from './InfantryDeath';
+import { IonCannonSounds } from './IonCannonSounds';
 import { LaserShot } from './LaserShot';
 import { NuclearExplosion } from './NuclearExplosion';
 import { VehicleExplosion } from './VehicleExplosion';
@@ -32,6 +33,7 @@ export class BattleEffects {
   readonly tankShot: TankShot;
   readonly tankMgShot: TankMgShot;
   readonly laserShot: LaserShot;
+  readonly ionCannon: IonCannonSounds;
   readonly rocketBurst: RocketBurst;
   readonly gunnerShot: GunnerShot;
   readonly bulletHit: BulletHitTank;
@@ -51,6 +53,7 @@ export class BattleEffects {
     this.tankShot = new TankShot(scene, this.gain);
     this.tankMgShot = new TankMgShot(scene, this.gain);
     this.laserShot = new LaserShot(scene, this.gain);
+    this.ionCannon = new IonCannonSounds(scene, this.gain);
     this.rocketBurst = new RocketBurst(scene, this.gain);
     this.gunnerShot = new GunnerShot(scene, this.gain);
     this.bulletHit = new BulletHitTank(scene, this.gain);
@@ -67,6 +70,7 @@ export class BattleEffects {
       this.tankShot,
       this.tankMgShot,
       this.laserShot,
+      this.ionCannon,
       this.rocketBurst,
       this.gunnerShot,
       this.bulletHit,
