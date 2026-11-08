@@ -8,6 +8,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { EnergyWall } from '../entities/EnergyWall';
 import { EnemyShot } from '../entities/EnemyShot';
 import { FlameTank } from '../entities/FlameTank';
+import { HeavyTank } from '../entities/HeavyTank';
 import { Helicopter } from '../entities/Helicopter';
 import { Infantry } from '../entities/Infantry';
 import { IonCannon, type IonCourse } from '../entities/IonCannon';
@@ -2064,7 +2065,12 @@ export class CombatSystem implements Combat {
 
   // Пикап, багги и вертолёт делят один клип гибели. Пехота кричит отдельно.
   private isVehicle(unit: Infantry): boolean {
-    return unit instanceof PickupTruck || unit instanceof RocketBuggy || unit instanceof Helicopter;
+    return (
+      unit instanceof PickupTruck ||
+      unit instanceof RocketBuggy ||
+      unit instanceof Helicopter ||
+      unit instanceof HeavyTank
+    );
   }
 
   // blastAt — центр мины, артиллерии или залпа. Пуля, огонь и проволока точку не передают:

@@ -6,6 +6,7 @@
 import { AssaultInfantry } from './AssaultInfantry';
 import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
+import { HeavyTank } from './HeavyTank';
 import { Helicopter } from './Helicopter';
 import { PickupTruck } from './PickupTruck';
 import { RocketBuggy } from './RocketBuggy';
@@ -23,6 +24,7 @@ export { ENEMY_KINDS } from '../types/EnemySave';
 type EnemyKind =
   | typeof AssaultInfantry
   | typeof GunnerInfantry
+  | typeof HeavyTank
   | typeof Helicopter
   | typeof PickupTruck
   | typeof RocketBuggy
@@ -71,7 +73,8 @@ export class EnemyFactory {
     return Math.max(this.timing.minGap, this.timing.spawnGap - steps * 28);
   }
 
-  // 10, 20, 30… На экран выходят только суперсолдаты.
+  // 10, 20, 30… На экран выходят боссы: нечётный выход — суперсолдат, чётный — тяжёлый танк.
+  // Со второго тела на поле оба: чётные места очереди держит ведущий, нечётные — другой.
   // Сколько — считает bossCount. Внутри roster более поздняя волна этот номер
   // всё равно проигрывает, чтобы дебют пикапа на 10-й и ракетчика на 20-й не потерялся.
   static isBossWave(wave: number): boolean {
@@ -121,6 +124,9 @@ export class EnemyFactory {
     if (unit instanceof SuperSoldier) {
       return 'super';
     }
+    if (unit instanceof HeavyTank) {
+      return 'tank';
+    }
     if (unit instanceof AssaultInfantry) {
       return 'assault';
     }
@@ -145,6 +151,13 @@ export class EnemyFactory {
       const count = this.bossCount(ctx.wave);
       const hp = SuperSoldier.hpForAppearance(appearance);
       return new SuperSoldier(scene, x, y, hp, shots, fireTarget, appearance, slot, count);
+    }
+    if (kind === 'tank') {
+      const showing = this.tankShowing(ctx.wave);
+      const purse = this.bossAppearance(ctx.wave);
+      const count = this.bossCount(ctx.wave);
+      const hp = HeavyTank.hpForAppearance(showing);
+      return new HeavyTank(scene, x, y, hp, shots, fireTarget, showing, purse, slot, count);
     }
     let unit: Infantry;
     if (kind === 'assault') {
@@ -185,8 +198,9 @@ export class EnemyFactory {
 
   // Здоровье и ранг скорости. Штурмовик растёт от номера волны.
   // Остальные на своей первой волне получают ранг 1, дальше +1 за волну.
-  // Суперсолдат: первый выход всегда 100 здоровья и 1 урона, дальше +500 и +1 за каждое следующее появление.
-  // Монеты — касса выхода, поделённая на число тел. Скорость остаётся на ранге 1.
+  // Суперсолдат: запас и урон от номера босс-волны. Первый такой номер — 100 и 1, дальше +500 и +1.
+  // Тяжёлый танк: запас и урон от своего выхода. Первый — 2000 и 50, дальше +500 и +1.
+  // Монеты — одна касса волны на все тела. Скорость обоих боссов остаётся на ранге 1.
   // Остальные прибавляют 1 урона каждые 10 волн: на 10-й уже +1, на 20-й +2.
   // Дебаг-наследник считает ранг по номеру своей волны, без дебюта обычной партии.
   protected static spawnUnit(kind: EnemyKind, ctx: SpawnContext, slot = 0): Infantry {
@@ -197,6 +211,16 @@ export class EnemyFactory {
       const count = this.bossCount(wave);
       const hp = SuperSoldier.hpForAppearance(appearance);
       const unit = new SuperSoldier(scene, x, y, hp, shots, fireTarget, appearance, slot, count);
+      unit.setPaceWave(1);
+      return unit;
+    }
+
+    if (kind === HeavyTank) {
+      const showing = this.tankShowing(wave);
+      const purse = this.bossAppearance(wave);
+      const count = this.bossCount(wave);
+      const hp = HeavyTank.hpForAppearance(showing);
+      const unit = new HeavyTank(scene, x, y, hp, shots, fireTarget, showing, purse, slot, count);
       unit.setPaceWave(1);
       return unit;
     }
@@ -251,6 +275,53 @@ export class EnemyFactory {
     return SuperSoldier.appearanceOn(wave);
   }
 
+  // Какой по счёту выход именно танка. Дебаг подменяет: там номер своего круга.
+  protected static tankShowing(wave: number): number {
+    return HeavyTank.appearanceOn(wave);
+  }
+
+  // Ведущий чередуется. Пока тело одно, на поле только он.
+  // Дальше чётные места очереди — ведущий, нечётные — второй босс.
+  // Тяжёлый танк на волне один: место, которое досталось бы второму танку, занимает суперсолдат.
+  protected static bossKindAt(wave: number, slot: number): EnemyKind {
+    const lead = this.bossAppearance(wave) % 2 === 1 ? SuperSoldier : HeavyTank;
+    const kind =
+      this.bossCount(wave) < 2 || slot % 2 === 0
+        ? lead
+        : lead === SuperSoldier
+          ? HeavyTank
+          : SuperSoldier;
+    if (kind !== HeavyTank) {
+      return kind;
+    }
+    const firstTank = lead === HeavyTank ? 0 : 1;
+    return slot === firstTank ? HeavyTank : SuperSoldier;
+  }
+
+  // Имя на баннере. null — это не босс-волна.
+  static bossTitle(wave: number): string | null {
+    if (!this.isBossWave(wave)) {
+      return null;
+    }
+    const total = this.bossCount(wave);
+    let tank = false;
+    let soldier = false;
+    for (let i = 0; i < total; i += 1) {
+      if (this.bossKindAt(wave, i) === HeavyTank) {
+        tank = true;
+      } else {
+        soldier = true;
+      }
+    }
+    if (tank && soldier) {
+      return 'СУПЕРСОЛДАТ И ТЯЖЁЛЫЙ ТАНК';
+    }
+    if (tank) {
+      return 'ТЯЖЁЛЫЙ ТАНК';
+    }
+    return 'СУПЕРСОЛДАТ';
+  }
+
   protected static growthRank(wave: number, debutWave: number): number {
     return Infantry.growthRank(wave, debutWave);
   }
@@ -269,7 +340,7 @@ export class EnemyFactory {
       const bosses: EnemyKind[] = [];
       const total = this.bossCount(wave);
       for (let i = 0; i < total; i += 1) {
-        bosses.push(SuperSoldier);
+        bosses.push(this.bossKindAt(wave, i));
       }
       return bosses;
     }

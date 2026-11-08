@@ -16,25 +16,29 @@ export function idleShift(ms: number, gain = 1): { x: number; y: number } {
   };
 }
 
-// Редкий серый выхлоп. По умолчанию назад и вверх: машина смотрит вправо, корма слева.
-// southwest — струя на юго-запад, вниз и назад.
+// Редкий выхлоп. По умолчанию назад и вверх: машина смотрит вправо, корма слева.
+// true — струя на юго-запад, вниз и назад. 'southeast' — вниз и вправо, корма машины, которая смотрит влево.
+// soot — чёрный дым. Обычный выхлоп остаётся серым.
 export function exhaustAt(
   scene: Phaser.Scene,
   x: number,
   y: number,
   scale = 1,
-  southwest = false,
+  drift: boolean | 'southeast' = false,
+  soot = false,
 ): Phaser.GameObjects.Particles.ParticleEmitter {
+  const southeast = drift === 'southeast';
+  const down = drift === true || southeast;
   const engine = scene.add.particles(x, y, puffKey(scene), {
     lifespan: { min: 900, max: 1600 },
     frequency: 40,
     quantity: 2,
     speed: { min: 12 * scale, max: 30 * scale },
-    angle: southwest ? { min: 105, max: 165 } : { min: -165, max: -105 },
+    angle: southeast ? { min: 20, max: 70 } : down ? { min: 105, max: 165 } : { min: -165, max: -105 },
     scale: { start: 0.4 * scale, end: 1.55 * scale },
-    alpha: { start: 0.72, end: 0 },
-    color: [0xe6e2da, 0xb4aea6, 0x7c766e],
-    gravityY: (southwest ? 18 : -18) * scale,
+    alpha: { start: soot ? 0.9 : 0.72, end: 0 },
+    color: soot ? [0x2a2a2a, 0x121212, 0x050505] : [0xe6e2da, 0xb4aea6, 0x7c766e],
+    gravityY: (down ? 18 : -18) * scale,
   });
   engine.setDepth(26);
   return engine;

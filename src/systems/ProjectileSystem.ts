@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
+import { HeavyShell } from '../entities/HeavyShell';
 import { Rocket } from '../entities/Rocket';
 import { Tank, type PartBox } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
@@ -61,7 +62,10 @@ export class ProjectileSystem {
       }
       shot.destroy();
 
-      if (isRocket) {
+      if (shot instanceof HeavyShell) {
+        HeavyShell.burstAt(this.scene, x, y);
+        this.effects.bulletHit.play();
+      } else if (isRocket) {
         Rocket.burstAt(this.scene, x, y);
         this.effects.rocketSounds.playHit();
       } else {

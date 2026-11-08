@@ -13,6 +13,8 @@ export type EnemyWaves = {
   count(wave: number): number;
   spawnGap(wave: number): number;
   isBossWave(wave: number): boolean;
+  // Подпись под словом «БОСС». null — обычная волна, баннер пишет номер.
+  bossTitle(wave: number): string | null;
   kindOf(unit: WaveUnit): EnemySaveKind | null;
   create(index: number, ctx: SpawnContext): WaveUnit;
   restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, pace: number, slot?: number): WaveUnit;

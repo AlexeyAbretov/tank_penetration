@@ -34,7 +34,7 @@ export class WaveManager {
   private onProgress!: () => void;
   // Сцена обновляет номер волны, при необходимости баннер и включает музыку.
   // banner — показать объявление; без него номер обновляется тихо (магазин, середина боя).
-  private onWaveBegan!: (wave: number, banner?: { boss: boolean }) => void;
+  private onWaveBegan!: (wave: number, banner?: { boss: boolean; title: string | null }) => void;
   // Очки и монеты за убийство. Обычная волна сюда не пишет: награду даёт бой.
   // Дебаг-пропуск зовёт сам: враг умирает без попадания, а невышедший вообще не появляется.
   protected onKill: (coinReward: number) => void = () => {};
@@ -58,7 +58,7 @@ export class WaveManager {
     isGameOver: () => boolean,
     onWaveCleared: () => void,
     onProgress: () => void,
-    onWaveBegan: (wave: number, banner?: { boss: boolean }) => void,
+    onWaveBegan: (wave: number, banner?: { boss: boolean; title: string | null }) => void,
     onKill: (coinReward: number) => void,
   ): void {
     this.scene = scene;
@@ -141,7 +141,10 @@ export class WaveManager {
     this.remainingToSpawn = total - already;
     if (already === 0) {
       // Волна записана, но никто ещё не вышел: снова объявляем и ждём announceMs.
-      this.onWaveBegan(wave, { boss: this.enemies.isBossWave(wave) });
+      this.onWaveBegan(wave, {
+        boss: this.enemies.isBossWave(wave),
+        title: this.enemies.bossTitle(wave),
+      });
       this.callLater(this.enemies.timing.announceMs, () => {
         if (this.isGameOver()) {
           return;
@@ -178,7 +181,10 @@ export class WaveManager {
     this.awaitingClear = false;
     // Длина списка на этот номер. Босс-волна даёт 1.
     this.remainingToSpawn = this.enemies.count(this.wave);
-    this.onWaveBegan(this.wave, { boss: this.enemies.isBossWave(this.wave) });
+    this.onWaveBegan(this.wave, {
+      boss: this.enemies.isBossWave(this.wave),
+      title: this.enemies.bossTitle(this.wave),
+    });
 
     // Пишем волну сразу, до выхода врагов. Закрытие вкладки на баннере не откатит номер.
     this.onProgress();

@@ -508,7 +508,7 @@ export class GameScene extends Phaser.Scene {
       (wave, banner) => {
         this.hud.setWave(wave);
         if (banner) {
-          this.hud.showWaveBanner(wave, banner.boss);
+          this.hud.showWaveBanner(wave, banner.boss, banner.title);
         }
         this.music.playForWave(wave);
       },

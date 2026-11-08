@@ -853,9 +853,12 @@ export class GameHud {
     this.hpFill.width = 236 * (hp / this.maxHp);
   }
 
-  showWaveBanner(wave: number, boss = false): void {
+  showWaveBanner(wave: number, boss = false, title: string | null = null): void {
     const scene = this.waveBanner.scene;
-    this.waveBanner.setText(boss ? 'БОСС' : `ВОЛНА ${wave}`);
+    const name = boss ? (title ? `БОСС\n${title}` : 'БОСС') : `ВОЛНА ${wave}`;
+    this.waveBanner.setText(name);
+    this.waveBanner.setFontSize(boss && title ? 40 : 56);
+    this.waveBanner.setLineSpacing(6);
     this.waveBanner.setColor(boss ? '#ff5a48' : '#f3d56a');
     this.waveBanner.setAlpha(1);
     this.waveBanner.setScale(0.86);
