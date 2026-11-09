@@ -6,9 +6,6 @@ import Phaser from 'phaser';
 import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BomberStrike } from '../entities/BomberStrike';
 import { IonCannon } from '../entities/IonCannon';
-import { AutoAim } from '../entities/AutoAim';
-import { AutoFire } from '../entities/AutoFire';
-import { AutoShop } from '../entities/AutoShop';
 import { EnergyWall } from '../entities/EnergyWall';
 import { EnemyShot } from '../entities/EnemyShot';
 import { Infantry } from '../entities/Infantry';
@@ -34,10 +31,12 @@ import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { CombatSave, type SavedRun } from '../saves/CombatSave';
 import { ShopController } from '../controllers/ShopController';
 import { WaveManager } from '../systems/WaveManager';
-import { GameHud, type HudAbility, type HudFrame } from '../ui/huds/GameHud';
+import { GameHud } from '../ui/huds/GameHud';
 import { SettingsPanel } from '../ui/settings/SettingsPanel';
 import { preloadImages } from '../images/imagePreloader';
 import { preloadSounds } from '../sounds/soundPreloader';
+import { HudAbility, HudFrame } from '../ui/huds/GameHud.types';
+import { AbilityList } from '../abilities';
 
 export class GameScene extends Phaser.Scene {
   // Группа пуль врагов. Group — список спрайтов с физикой, по которому системы ходят циклом.
@@ -220,54 +219,14 @@ export class GameScene extends Phaser.Scene {
 
     // Следующая покупка — ещё одна строка. Порядок слева направо.
     this.hud = new this.Hud(this, GAME, this.Player.baseHp(), [
-      {
-        id: 'artillery',
-        texture: ArtilleryStrike.iconKey,
-        hint: '1 — удар',
-        cooldownMs: ArtilleryStrike.shop.cooldownMs,
-        iconRadius: ArtilleryStrike.iconRadius,
-      },
-      {
-        id: 'mines',
-        texture: Mines.iconKey,
-        hint: '2 — мины',
-        cooldownMs: Mines.shop.cooldownMs,
-        iconRadius: Mines.iconRadius,
-      },
-      {
-        id: 'nuclear',
-        texture: NuclearStrike.iconKey,
-        hint: '3 — атом',
-        cooldownMs: NuclearStrike.shop.cooldownMs,
-        iconRadius: NuclearStrike.iconRadius,
-      },
-      {
-        id: 'ion',
-        texture: IonCannon.iconKey,
-        hint: '4 — луч',
-        cooldownMs: IonCannon.shop.cooldownMs,
-        iconRadius: IonCannon.iconRadius,
-      },
-      {
-        id: 'wall',
-        texture: EnergyWall.iconKey,
-        hint: '5 — стена',
-        cooldownMs: EnergyWall.shop.cooldownMs,
-        iconRadius: EnergyWall.iconRadius,
-      },
-      {
-        id: 'bomber',
-        texture: BomberStrike.iconKey,
-        hint: '6 — бомбы',
-        cooldownMs: BomberStrike.shop.cooldownMs,
-        iconRadius: BomberStrike.iconRadius,
-      },
+      ...AbilityList
     ]);
     this.progressShop.bind(this, () => {
       // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
       this.persistEnabled = false;
       this.scene.restart();
-    }, this.hud);
+    });
+    this.hud.setAutoFireMode(this.progressShop.autoFireEnabled());
     this.hud.setHaste(1);
     this.hud.onHasteCycle(() => {
       if (!this.pauses.blocking && !this.defeatShop) {
@@ -282,9 +241,6 @@ export class GameScene extends Phaser.Scene {
       this.progressShop.toggleAutoFire();
       this.paintAutoFire();
     });
-    this.hud.installAutoFire(AutoFire.iconKey);
-    this.hud.installAutoAim(AutoAim.iconKey);
-    this.hud.installAutoShop(AutoShop.iconKey);
     this.hud.onAutoAim(() => {
       if (this.blocksPlay()) {
         return;
@@ -734,7 +690,7 @@ export class GameScene extends Phaser.Scene {
 
   // Иконка справа и выстрел без ЛКМ читают одну и ту же покупку прогресса.
   // Слово в строке над полем пишет сам магазин очков.
-  private paintAutoFire(): void {
+  public paintAutoFire(): void {
     const enabled = this.progressShop.autoFireEnabled();
     this.hud.setAutoFireToggle(this.progressShop.autoFireOwned(), enabled);
     this.combat.setAutoFire(enabled);

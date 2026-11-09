@@ -1,12 +1,16 @@
 import Phaser from 'phaser';
-import { EnemyDamage } from '../../debug/EnemyDamage';
-import { GameHud, type HudAbility, type HudFrame } from './GameHud';
+
+import { GameHud } from './GameHud';
+import { HudAbility, HudFrame } from './GameHud.types';
+
+import { EnemyDamageDebugAbilityIcon, EnemyDamageDebugAbility } from '../../abilities';
 
 export class DebugGameHud extends GameHud {
   // Картинка урона врагов. Общий список её не грузит: обычная партия этот класс не импортирует.
   static override preload(scene: Phaser.Scene): void {
     super.preload(scene);
-    EnemyDamage.preload(scene);
+
+    EnemyDamageDebugAbilityIcon.preload(scene);
   }
 
   private readonly debugLabel: Phaser.GameObjects.Text;
@@ -47,24 +51,26 @@ export class DebugGameHud extends GameHud {
       }
       this.debugLabel.setText(on ? 'DEBUG  ПАУЗА' : 'DEBUG');
     };
+
     scene.events.on('quiet-pause', onQuietPause);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.events.off('quiet-pause', onQuietPause);
     });
 
-    // Следующий круг влево после купленных правых иконок. Та же глубина: магазин волны накрывает круг.
-    EnemyDamage.ensureTextures(scene);
-    const icon = this.bindRoundIcon(EnemyDamage.iconKey, this.rightSkillRoots().length, 53);
+    const icon = this.bindRoundIcon(EnemyDamageDebugAbilityIcon.iconKey, this.rightSkillRoots().length, 53);
+    
     this.enemyDamageRoot = icon.root;
     this.enemyDamageGlow = icon.glow;
-    this.showRoundToggle(icon.root, icon.glow, true, EnemyDamage.isEnabled);
+    this.showRoundToggle(icon.root, icon.glow, true, EnemyDamageDebugAbility.isEnabled);
+
     icon.root.on('pointerup', () => {
-      this.showRoundToggle(this.enemyDamageRoot, this.enemyDamageGlow, true, EnemyDamage.toggle());
+      this.showRoundToggle(this.enemyDamageRoot, this.enemyDamageGlow, true, EnemyDamageDebugAbility.toggle());
     });
   }
 
   override layout(): void {
     super.layout();
+
     this.enemyDamageRoot.setPosition(this.edgeIconX(this.rightSkillRoots().length), this.skillY());
     this.debugLabel.setX(this.frame.width / 2);
   }

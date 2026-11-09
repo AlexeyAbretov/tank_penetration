@@ -1,49 +1,11 @@
 // Счёт, полоска HP, баннер волны и окно клавиш. Плашка поражения — магазин между проигрышами.
 
 import Phaser from 'phaser';
-import { bake } from '../../gfx/textures';
+
+import { AbilityIcon, AutoApplyBadge, HudAbility, HudFrame } from './GameHud.types';
+
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
-
-// Размер холста и линия баннера. Сцена передаёт их сама, HUD не читает gameConfig.
-export type HudFrame = {
-  width: number;
-  height: number;
-  bannerY: number;
-};
-
-// Иконка способности. Картинка и перезарядка приходят от сущности, подпись — от сцены.
-export type HudAbility = {
-  id: string;
-  texture: string;
-  hint: string;
-  cooldownMs: number;
-  iconRadius: number;
-};
-
-// Иконка покупки над баннером: картинка, затемнение перезарядки и цифра секунд.
-type AbilityIcon = {
-  id: string;
-  root: Phaser.GameObjects.Container;
-  glow: Phaser.GameObjects.Image;
-  sweep: Phaser.GameObjects.Graphics;
-  time: Phaser.GameObjects.Text;
-  lit: boolean;
-  owned: boolean;
-  hint: string;
-  cooldownMs: number;
-  iconRadius: number;
-  request?: () => void;
-};
-
-// Знак питания на ободе иконки удара или мин. Покупка в прогрессе, включение — здесь.
-type AutoApplyBadge = {
-  id: string;
-  root: Phaser.GameObjects.Container;
-  disc: Phaser.GameObjects.Graphics;
-  shown: boolean;
-  enabled: boolean;
-  request?: () => void;
-};
+import { AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon } from '../../abilities';
 
 const AUTO_POWER_HIT = 16;
 
@@ -53,9 +15,14 @@ export class GameHud {
 
   // Качает плитку ленты. Сам загрузчик сцены этот путь не знает.
   static preload(scene: Phaser.Scene): void {
+    AutoAimAbilityIcon.preload(scene);
+    AutoFireAbilityIcon.preload(scene);
+    AutoShopAbilityIcon.preload(scene);
+
     if (scene.textures.exists(GameHud.bannerKey)) {
       return;
     }
+
     scene.load.image(GameHud.bannerKey, 'assets/banner.png');
   }
 
@@ -63,30 +30,16 @@ export class GameHud {
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(GameHud.bannerKey)) {
       scene.textures.get(GameHud.bannerKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+
       return;
     }
-    bake(scene, GameHud.bannerKey, 1280, 86, (g) => {
-      g.fillStyle(0x5a0c0c);
-      g.fillRect(0, 8, 1280, 78);
-      g.fillStyle(0x8a1810);
-      g.fillRect(0, 14, 1280, 62);
-      g.lineStyle(6, 0xc9a227, 1);
-      g.strokeRect(8, 10, 1264, 70);
-      g.lineStyle(2, 0xf0d56a, 1);
-      g.strokeRect(16, 16, 1248, 58);
-      for (let x = 40; x < 1240; x += 48) {
-        g.fillStyle(0xf0d56a);
-        g.fillCircle(x, 12, 3);
-        g.fillCircle(x, 78, 3);
-      }
-    });
   }
 
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waveText: Phaser.GameObjects.Text;
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly tankStatsText: Phaser.GameObjects.Text;
-  // Числа строки над полем. Слово «авто» или «ЛКМ» к ним дописывает магазин очков.
+  // Числа строки над полем.
   private tankStats = {
     damage: 0,
     blastRadius: 0,
@@ -168,6 +121,7 @@ export class GameHud {
     this.maxHp = maxHp;
 
     GameHud.ensureTextures(scene);
+
     this.banner = scene.add
       .tileSprite(frame.width / 2, 677, frame.width, 86, GameHud.bannerKey)
       .setOrigin(0.5)
@@ -372,7 +326,12 @@ export class GameHud {
     const pauseClose = this.makeCornerClose(scene, () => this.resumeRequest?.());
     pauseClose.setPosition(pauseW / 2 - 40, pausePlateY - pauseH / 2 + 38);
     this.pauseOverlay.add([this.pauseDim, pausePlate, pauseRule, pauseTitle, pauseHint, fresh, pauseClose]);
+    
     this.placeHud();
+
+    this.installAutoAim(AutoAimAbilityIcon.iconKey);
+    this.installAutoFire(AutoFireAbilityIcon.iconKey);
+    this.installAutoShop(AutoShopAbilityIcon.iconKey);
   }
 
   // Широкое окно сдвигает правый край. Полоска, кнопки и затемнения едут за ним.
@@ -428,21 +387,25 @@ export class GameHud {
 
   setScore(score: number): void {
     this.scoreText.setText(`SCORE  ${score}`);
+
     this.layoutStatus();
   }
 
   setWave(wave: number): void {
     this.waveText.setText(`WAVE  ${wave}`);
+
     this.layoutStatus();
   }
 
   setCoins(coins: number): void {
     this.coinsText.setText(`COINS  ${coins}`);
+
     this.layoutStatus();
   }
 
   private layoutStatus(): void {
     const gap = 32;
+
     this.waveText.setX(this.scoreText.x + this.scoreText.width + gap);
     this.coinsText.setX(this.waveText.x + this.waveText.width + gap);
   }
@@ -507,8 +470,11 @@ export class GameHud {
     if (this.autoFireRoot) {
       return;
     }
+
     const icon = this.bindRoundIcon(texture, 1, 53);
+
     icon.root.on('pointerup', () => this.autoFireRequest?.());
+
     this.autoFireRoot = icon.root;
     this.autoFireGlow = icon.glow;
   }
@@ -518,8 +484,11 @@ export class GameHud {
     if (this.autoAimRoot) {
       return;
     }
+
     const icon = this.bindRoundIcon(texture, 0, 53);
+
     icon.root.on('pointerup', () => this.autoAimRequest?.());
+
     this.autoAimRoot = icon.root;
     this.autoAimGlow = icon.glow;
   }
@@ -592,8 +561,11 @@ export class GameHud {
     if (this.autoShopRoot) {
       return;
     }
+
     const icon = this.bindRoundIcon(texture, 0, 80);
+
     icon.root.on('pointerup', () => this.autoShopRequest?.());
+
     this.autoShopRoot = icon.root;
     this.autoShopGlow = icon.glow;
   }

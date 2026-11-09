@@ -1,9 +1,9 @@
 // Дебаг-игрок. Запас берёт из настройки, танк это число не читает.
 // «Готово» в настройках меняет и полоску, и текущее здоровье.
-
-import { EnemyDamage } from '../debug/EnemyDamage';
-import { TankDebugBaseHp } from '../entities/Tank/TankDebugBaseHp';
 import { PlayerController } from './PlayerController';
+
+import { EnemyDamageDebugAbility } from '../abilities';
+import { TankDebugBaseHp } from '../entities';
 
 export class DebugPlayerController extends PlayerController {
   static override baseHp(): number {
@@ -17,9 +17,10 @@ export class DebugPlayerController extends PlayerController {
 
   // Выключенный урон врагов не трогает полоску. Искры и взрывы остаются: их считает снаряд.
   override damage(amount: number): void {
-    if (!EnemyDamage.isEnabled) {
+    if (!EnemyDamageDebugAbility.isEnabled) {
       return;
     }
+
     super.damage(amount);
   }
 }

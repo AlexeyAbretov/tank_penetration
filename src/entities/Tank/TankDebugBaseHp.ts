@@ -6,10 +6,10 @@
 
 import { TankBaseHp } from './TankBaseHp';
 
-const STORAGE_KEY = 'tank-penetration-tank-hp:debug';
-const DEFAULT_HP = 500;
-const MAX_HP = 10_000;
-
 export class TankDebugBaseHp extends TankBaseHp {
-  protected static override store = TankBaseHp.openStore(STORAGE_KEY, DEFAULT_HP, MAX_HP);
+  protected static override storageKey = 'tank-penetration-tank-hp:debug';
+  protected static override shopMax = 10_000;
+  protected static override defaultHp = 500;
+
+  protected static override store = this.openTankHpStore(this.storageKey, this.defaultHp, this.shopMax);
 }

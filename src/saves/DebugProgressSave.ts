@@ -41,8 +41,10 @@ export class DebugProgressSave extends ProgressSave {
     if (progress.autoFire) {
       return;
     }
+
     progress.autoFire = true;
     progress.autoFireOn = true;
+    
     this.save(progress);
   }
 }

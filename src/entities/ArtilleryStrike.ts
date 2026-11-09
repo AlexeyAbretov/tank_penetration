@@ -135,14 +135,21 @@ export class ArtilleryStrike {
   }
 
   static ensureTextures(scene: Phaser.Scene): void {
-    if (scene.textures.exists(ArtilleryStrike.iconKey)) {
-      scene.textures.get(ArtilleryStrike.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    } else {
-      bake(scene, ArtilleryStrike.iconKey, 64, 64, (g) => ArtilleryStrike.renderIcon(g));
-    }
     if (!scene.textures.exists(ArtilleryStrike.shellKey)) {
       bake(scene, ArtilleryStrike.shellKey, 16, 40, (g) => ArtilleryStrike.renderShell(g));
     }
+  }
+
+  // Носик у нижнего края: origin спрайта стоит на острие.
+  private static renderShell(g: Phaser.GameObjects.Graphics): void {
+    g.fillStyle(0xff2200, 0.35);
+    g.fillEllipse(8, 18, 14, 34);
+    g.fillStyle(0xff6600, 0.9);
+    g.fillRoundedRect(4, 2, 8, 24, 3);
+    g.fillStyle(0xffee66);
+    g.fillTriangle(2, 22, 14, 22, 8, 38);
+    g.fillStyle(0xffffff);
+    g.fillCircle(8, 8, 2.5);
   }
 
   // Точки с зазором, чтобы воронки не легли друг на друга.
@@ -269,9 +276,6 @@ export class ArtilleryStrike {
 
   // Трубка факела и мягкое пятно для огня и дыма. Пятно белое: цвет задаёт tint частиц.
   private static ensureFlareTextures(scene: Phaser.Scene): void {
-    // if (!scene.textures.exists(ArtilleryStrike.flareKey)) {
-    //   bake(scene, ArtilleryStrike.flareKey, 64, 18, (g) => ArtilleryStrike.renderFlare(g));
-    // }
     if (!scene.textures.exists(ArtilleryStrike.flarePuffKey)) {
       // Вытянутый клок, не круг: по ветру читается полоса, а не шар.
       bake(scene, ArtilleryStrike.flarePuffKey, 64, 28, (g) => {
@@ -291,38 +295,5 @@ export class ArtilleryStrike {
       x: Phaser.Math.Between(minX, field.maxX),
       y: Phaser.Math.Between(field.minY, field.maxY),
     };
-  }
-
-  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x2a0c0c);
-    g.fillCircle(32, 32, ArtilleryStrike.iconRadius);
-    g.fillStyle(0x5a1210);
-    g.fillCircle(32, 32, 26);
-    g.lineStyle(3, 0xf0d56a, 1);
-    g.strokeCircle(32, 32, 28);
-
-    g.fillStyle(0x1a0806);
-    g.fillEllipse(32, 46, 28, 12);
-    g.fillStyle(0xff4a12);
-    g.fillCircle(32, 42, 8);
-    g.fillStyle(0xffe080);
-    g.fillCircle(32, 41, 4);
-
-    // Один снаряд сверху, чтобы значок не читался как цифры.
-    g.fillStyle(0xf0d56a);
-    g.fillRoundedRect(28, 8, 8, 18, 2);
-    g.fillTriangle(26, 24, 38, 24, 32, 32);
-  }
-
-  // Носик у нижнего края: origin спрайта стоит на острие.
-  private static renderShell(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0xff2200, 0.35);
-    g.fillEllipse(8, 18, 14, 34);
-    g.fillStyle(0xff6600, 0.9);
-    g.fillRoundedRect(4, 2, 8, 24, 3);
-    g.fillStyle(0xffee66);
-    g.fillTriangle(2, 22, 14, 22, 8, 38);
-    g.fillStyle(0xffffff);
-    g.fillCircle(8, 8, 2.5);
   }
 }

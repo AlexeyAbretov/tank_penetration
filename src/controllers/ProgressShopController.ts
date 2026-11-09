@@ -22,7 +22,6 @@ import {
   type ProgressShopView,
   type ProgressTabView,
 } from '../ui/shops/ProgressShopPanel';
-import { GameHud } from '../ui/huds/GameHud';
 import { ProgressSave, type SavedProgress } from '../saves/ProgressSave';
 
 const SCORE_MAX = 100_000_000;
@@ -66,7 +65,7 @@ type Stat =
 export class ProgressShopController {
   // Панель и интерфейс живут только пока жива сцена. restart() их уничтожает, bind() собирает заново.
   private panel!: ProgressShopPanel;
-  private hud?: GameHud;
+  private scene?: Phaser.Scene & { paintAutoFire: () => void };
   private readonly progress: SavedProgress;
   // Пауза сцены. Покупки очков ждут продолжения. «В бой» паузу не спрашивает.
   private paused = false;
@@ -78,12 +77,11 @@ export class ProgressShopController {
   }
 
   // До create() нет scene.add. Сюда сцена приходит уже запущенной и отдаёт свежий интерфейс.
-  bind(scene: Phaser.Scene, onNewGame: () => void, hud: GameHud): void {
+  bind(scene: Phaser.Scene & { paintAutoFire: () => void }, onNewGame: () => void): void {
     this.onNewGame = onNewGame;
     this.paused = false;
+    this.scene = scene;
     this.panel = new ProgressShopPanel(scene, this, GAME);
-    this.hud = hud;
-    this.paintAutoFireMode();
   }
 
   layout(): void {
@@ -236,18 +234,12 @@ export class ProgressShopController {
     return this.progress.autoFire && this.progress.autoFireOn;
   }
 
-  // Строка над полем. Магазин волны эту надпись не собирает.
-  private paintAutoFireMode(): void {
-    this.hud?.setAutoFireMode(this.autoFireEnabled());
-  }
-
   toggleAutoFire(): void {
     if (this.paused || !this.progress.autoFire) {
       return;
     }
     this.progress.autoFireOn = !this.progress.autoFireOn;
     this.progressSave.save(this.progress);
-    this.paintAutoFireMode();
   }
 
   autoAimOwned(): boolean {
@@ -565,7 +557,7 @@ export class ProgressShopController {
     this.progress.autoFire = true;
     this.progress.autoFireOn = true;
     this.progressSave.save(this.progress);
-    this.paintAutoFireMode();
+    this.scene?.paintAutoFire();
     this.panel.refresh(this.view());
   }
 
