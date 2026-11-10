@@ -5,7 +5,8 @@ import Phaser from 'phaser';
 import { AbilityIcon, AutoApplyBadge, HudAbility, HudFrame } from './GameHud.types';
 
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
-import { ArtilleryStrikeAbilityIcon, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
+import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
+import { preloadTextures } from '../../gfx/textures';
 
 const AUTO_POWER_HIT = 16;
 
@@ -18,7 +19,10 @@ export class GameHud {
     AutoAimAbilityIcon.preload(scene);
     AutoFireAbilityIcon.preload(scene);
     AutoShopAbilityIcon.preload(scene);
-    ArtilleryStrikeAbilityIcon.preload(scene);
+
+    AbilityList.forEach((ability) => {
+      preloadTextures(scene, ability.texture, ability.path);
+    });
     
     if (scene.textures.exists(GameHud.bannerKey)) {
       return;
@@ -117,7 +121,7 @@ export class GameHud {
     strokeThickness: 4,
   };
 
-  constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number, abilities: readonly HudAbility[]) {
+  constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number) {
     this.frame = frame;
     this.maxHp = maxHp;
 
@@ -225,7 +229,7 @@ export class GameHud {
     });
 
     // Один ряд над баннером, слева направо в том порядке, в каком пришёл список.
-    this.abilities = abilities.map((spec, index) => this.makeAbility(scene, index, spec));
+    this.abilities = AbilityList.map((spec, index) => this.makeAbility(scene, index, spec));
     this.autoApplies = ['artillery', 'mines', 'ion', 'wall', 'bomber'].map((id) => this.makeAutoApply(scene, id));
 
     // Справа на ленте. Прямоугольник только ловит клик: рисунок — отдельная пластина.

@@ -31,5 +31,5 @@ export const cooldownFor = (
         Math.max(0, Math.round(shopLevel)) * config.cooldownStepMs,
     );
 
-    return Math.max(config.minCooldownMs, config.shopCooldownMs - progressCut - shopCut);
+    return Math.max(config.minCooldownMs, config.cooldownMs - progressCut - shopCut);
 }

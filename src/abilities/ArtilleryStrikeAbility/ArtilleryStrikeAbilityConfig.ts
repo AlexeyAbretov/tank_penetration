@@ -19,7 +19,7 @@ export const ArtilleryStrikeAbilityConfig: AbilityConfig & {
     cooldownStepMs: 1_000,
     shopCutMsMax: 20_000,
     progressCutMsMax: 20_000,
-    shopCooldownMs: 60_000,
+    cooldownMs: 60_000,
 
     // Залп из магазина после проигрыша. Без покупок три снаряда, каждая покупка добавляет ещё один.
     shellMax: 6,

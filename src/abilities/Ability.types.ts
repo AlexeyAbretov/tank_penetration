@@ -3,5 +3,14 @@ export type AbilityConfig = {
     cooldownStepMs: number;
     shopCutMsMax: number;
     progressCutMsMax: number;
-    shopCooldownMs: number;
+    cooldownMs: number;
+}
+
+export type Ability = {
+    id: string;
+    texture: string;
+    hint: string;
+    cooldownMs: number;
+    iconRadius: number;
+    path: string;
 }

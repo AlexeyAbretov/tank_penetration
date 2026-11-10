@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 import { GameHud } from './GameHud';
-import { HudAbility, HudFrame } from './GameHud.types';
+import { HudFrame } from './GameHud.types';
 
 import { EnemyDamageDebugAbilityIcon, EnemyDamageDebugAbility } from '../../abilities';
 
@@ -30,8 +30,8 @@ export class DebugGameHud extends GameHud {
     ];
   }
 
-  constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number, abilities: readonly HudAbility[]) {
-    super(scene, frame, maxHp, abilities);
+  constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number) {
+    super(scene, frame, maxHp);
 
     this.debugLabel = scene.add
       .text(frame.width / 2, this.statusY, 'DEBUG', {

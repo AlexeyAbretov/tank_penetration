@@ -4,14 +4,16 @@ import { EnergyWall } from "../entities/EnergyWall";
 import { IonCannon } from "../entities/IonCannon";
 import { Mines } from "../entities/Mines";
 import { NuclearStrike } from "../entities/NuclearStrike";
+import { Ability } from "./Ability.types";
 
-export const AbilityList = [
+export const AbilityList: Ability[] = [
     {
         id: 'artillery',
         texture: ArtilleryStrikeAbilityIcon.iconKey,
         hint: '1 — удар',
-        cooldownMs: ArtilleryStrikeAbilityConfig.shopCooldownMs,
+        cooldownMs: ArtilleryStrikeAbilityConfig.cooldownMs,
         iconRadius: ArtilleryStrikeAbilityIcon.iconRadius,
+        path: ArtilleryStrikeAbilityIcon.iconPath,
     },
     {
         id: 'mines',
@@ -19,6 +21,7 @@ export const AbilityList = [
         hint: '2 — мины',
         cooldownMs: Mines.shop.cooldownMs,
         iconRadius: Mines.iconRadius,
+        path: Mines.iconPath,
     },
     {
         id: 'nuclear',
@@ -26,6 +29,7 @@ export const AbilityList = [
         hint: '3 — атом',
         cooldownMs: NuclearStrike.shop.cooldownMs,
         iconRadius: NuclearStrike.iconRadius,
+        path: NuclearStrike.iconPath,
     },
     {
         id: 'ion',
@@ -33,6 +37,7 @@ export const AbilityList = [
         hint: '4 — луч',
         cooldownMs: IonCannon.shop.cooldownMs,
         iconRadius: IonCannon.iconRadius,
+        path: IonCannon.iconPath,
     },
     {
         id: 'wall',
@@ -40,6 +45,7 @@ export const AbilityList = [
         hint: '5 — стена',
         cooldownMs: EnergyWall.shop.cooldownMs,
         iconRadius: EnergyWall.iconRadius,
+        path: EnergyWall.iconPath,
     },
     {
         id: 'bomber',
@@ -47,5 +53,6 @@ export const AbilityList = [
         hint: '6 — бомбы',
         cooldownMs: BomberStrike.shop.cooldownMs,
         iconRadius: BomberStrike.iconRadius,
+        path: BomberStrike.iconPath,
     },
 ];

@@ -188,7 +188,7 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
 
   const haste = requiredInt(value.haste, 1, ENEMY_HASTE.max) ?? 1;
   const artilleryCooldownMs =
-    requiredInt(value.artilleryCooldownMs, 0, ArtilleryStrikeAbilityConfig.shopCooldownMs) ?? 0;
+    requiredInt(value.artilleryCooldownMs, 0, ArtilleryStrikeAbilityConfig.cooldownMs) ?? 0;
   const minesCooldownMs = requiredInt(value.minesCooldownMs, 0, Mines.shop.cooldownMs) ?? 0;
   const nuclearCooldownMs =
     requiredInt(value.nuclearCooldownMs, 0, NuclearStrike.shop.cooldownMs) ?? 0;

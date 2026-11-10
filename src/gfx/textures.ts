@@ -31,7 +31,7 @@ export function createTextures(scene: Phaser.Scene): void {
   if (!scene.textures.exists('spark')) {
     createParticles(scene);
   }
-  
+
   if (!scene.textures.exists('hp-frame')) {
     createHpFrame(scene);
   }
@@ -63,4 +63,12 @@ function createHpFrame(scene: Phaser.Scene): void {
     g.fillStyle(0x3a4630, 1);
     g.fillCircle(12, 14, 4);
   });
+}
+
+export const preloadTextures = (scene: Phaser.Scene, key: string, path: string): void => {
+  if (scene.textures.exists(key)) {
+    return;
+  }
+
+  scene.load.image(key, path);
 }

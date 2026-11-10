@@ -37,11 +37,13 @@ export const preloadImages = (scene: Phaser.Scene) => {
   LaserDefense.preload(scene);
   FlameTank.preload(scene);
   RocketSalvo.preload(scene);
+
   NuclearStrike.preload(scene);
   Mines.preload(scene);
   BomberStrike.preload(scene);
   IonCannon.preload(scene);
   EnergyWall.preload(scene);
+  
   AssaultInfantry.preload(scene);
   GunnerInfantry.preload(scene);
   PickupTruck.preload(scene);
