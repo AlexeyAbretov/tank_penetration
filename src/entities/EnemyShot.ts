@@ -17,23 +17,28 @@ export class EnemyShot extends Physics.Arcade.Image {
   // Узкий хитбокс по форме пули. Попадание в танк сцена проверяет отдельно, по координате.
   static readonly bodySize = { w: 14, h: 8 };
 
+  protected static readonly imageKey = 'enemy-bullet';
+
   // Короткая жёлтая пуля, 18×8. Светлый носик справа, в игре картинку ещё поворачивают по углу полёта.
-  static ensureTextures(scene: Scene): void {
-    if (scene.textures.exists('enemy-bullet')) {
+  protected static ensureTextures(scene: Scene): void {
+    if (scene.textures.exists(EnemyShot.imageKey)) {
       return;
     }
-    bake(scene, 'enemy-bullet', BULLET_FRAME.w, BULLET_FRAME.h, (g) => this.render(g));
+    bake(scene, EnemyShot.imageKey, BULLET_FRAME.w, BULLET_FRAME.h, (g) => this.render(g));
   }
 
-  static render(g: GameObjects.Graphics, paint: BulletPaint = BULLET_PAINT): void {
+  protected static render(g: GameObjects.Graphics, paint: BulletPaint = BULLET_PAINT): void {
     g.fillStyle(paint.body);
     g.fillRoundedRect(0, 1, 18, 6, 2);
     g.fillStyle(paint.tip);
     g.fillRect(12, 2, 5, 4);
   }
 
-  constructor(scene: Scene, x: number, y: number, damage: number, texture = 'enemy-bullet') {
+  constructor(scene: Scene, x: number, y: number, damage: number, texture = EnemyShot.imageKey) {
+    EnemyShot.ensureTextures(scene);
+
     super(scene, x, y, texture);
+    
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.damage = damage;

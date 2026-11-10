@@ -1,7 +1,7 @@
 // Улучшения между проигрышами. Партия стирается со смертью базы,
 // а эти уровни и непотраченный score остаются в localStorage.
 
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { ArtilleryStrikeAbilityConfig } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -311,9 +311,7 @@ export class ProgressSave {
     Tank.setAbsorbLevel(0);
     this.forgetHp();
     RocketSalvo.setProgressRocketLevel(0);
-    ArtilleryStrike.setProgressShellLevel(0);
     Mines.setProgressMineLevel(0);
-    ArtilleryStrike.setProgressCooldownLevel(0);
     IonCannon.setProgressCooldownLevel(0);
     IonCannon.setProgressSweepLevel(0);
     IonCannon.setProgressWidthLevel(0);
@@ -471,7 +469,7 @@ function parseProgress(value: unknown): SavedProgress | null {
     laserCooldown: requiredInt(value.laserCooldown, 0, LaserDefense.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали число ракет, снарядов и мин: залп оставался базовым.
     salvoRockets: requiredInt(value.salvoRockets, 0, RocketSalvo.maxRocketLevel) ?? 0,
-    artilleryShells: requiredInt(value.artilleryShells, 0, ArtilleryStrike.maxShellLevel) ?? 0,
+    artilleryShells: requiredInt(value.artilleryShells, 0, ArtilleryStrikeAbilityConfig.maxShellLevel()) ?? 0,
     minesCount: requiredInt(value.minesCount, 0, Mines.maxMineLevel) ?? 0,
     // Старые сохранения не писали урон ракет, снарядов и мин: бил базовый урон.
     salvoDamage: requiredInt(value.salvoDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
@@ -482,7 +480,7 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали урон проволоки: рана оставалась базовой.
     wireDamage: requiredInt(value.wireDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
-    artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxProgressCooldownLevel) ?? 0,
+    artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrikeAbilityConfig.maxProgressCooldownLevel()) ?? 0,
     // Старые сохранения не писали откат ионной пушки: луч ждал базовую минуту.
     ionCooldown: requiredInt(value.ionCooldown, 0, IonCannon.maxProgressCooldownLevel) ?? 0,
     // Старые сохранения не писали ход ионной пушки: пятно шло базовые 5 с.

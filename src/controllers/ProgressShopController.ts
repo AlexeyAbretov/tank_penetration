@@ -1,7 +1,7 @@
 // Покупки после проигрыша. Score копится между партиями, уровни не сбрасываются.
 
 import Phaser from 'phaser';
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { AbilityConfig, ArtilleryStrikeAbilityConfig, cooldownFor, cooldownLabel } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -666,6 +666,16 @@ export class ProgressShopController {
     this.panel.refresh(this.view());
   }
 
+  progressCooldownShortens(progressLevel: number, shopCooldownLevel: number, config: AbilityConfig): boolean {
+    return cooldownFor(
+      shopCooldownLevel,
+      progressLevel + 1,
+      config) < cooldownFor(
+        shopCooldownLevel,
+        progressLevel,
+        config);
+  }
+
   private buy(stat: Stat): void {
     if (this.isPaused()) {
       return;
@@ -710,13 +720,13 @@ export class ProgressShopController {
     if (stat === 'salvoRockets' && level >= RocketSalvo.maxRocketLevel) {
       return;
     }
-    if (stat === 'artilleryShells' && level >= ArtilleryStrike.maxShellLevel) {
+    if (stat === 'artilleryShells' && level >= ArtilleryStrikeAbilityConfig.maxShellLevel()) {
       return;
     }
     if (stat === 'minesCount' && level >= Mines.maxMineLevel) {
       return;
     }
-    if (stat === 'artilleryCooldown' && !ArtilleryStrike.progressCooldownShortens(level)) {
+    if (stat === 'artilleryCooldown' && !this.progressCooldownShortens(level, 0, ArtilleryStrikeAbilityConfig)) {
       return;
     }
     if (stat === 'ionCooldown' && !IonCannon.progressCooldownShortens(level)) {
@@ -779,14 +789,8 @@ export class ProgressShopController {
     if (stat === 'salvoRockets') {
       RocketSalvo.setProgressRocketLevel(this.progress.salvoRockets);
     }
-    if (stat === 'artilleryShells') {
-      ArtilleryStrike.setProgressShellLevel(this.progress.artilleryShells);
-    }
     if (stat === 'minesCount') {
       Mines.setProgressMineLevel(this.progress.minesCount);
-    }
-    if (stat === 'artilleryCooldown') {
-      ArtilleryStrike.setProgressCooldownLevel(this.progress.artilleryCooldown);
     }
     if (stat === 'ionCooldown') {
       IonCannon.setProgressCooldownLevel(this.progress.ionCooldown);
@@ -1234,8 +1238,8 @@ export class ProgressShopController {
       title: '−1 с перезарядки',
       buy: () => this.buyLaserCooldown(),
       info: maxed
-        ? `ур. ${level} · ${LaserDefense.cooldownLabel(now)}`
-        : `ур. ${level} · ${LaserDefense.cooldownLabel(now)}→${LaserDefense.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1286,8 +1290,8 @@ export class ProgressShopController {
       title: '−0,1 мин перезарядки',
       buy: () => this.buyBomberCooldown(),
       info: maxed
-        ? `ур. ${level} · ${BomberStrike.cooldownLabel(now)}`
-        : `ур. ${level} · ${BomberStrike.cooldownLabel(now)}→${BomberStrike.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1297,7 +1301,7 @@ export class ProgressShopController {
   private artilleryDamageCard(score: number): ProgressCardView {
     return this.damageCardFor(
       this.progress.artilleryDamage,
-      ArtilleryStrike.shop.damage,
+      ArtilleryStrikeAbilityConfig.shop.damage,
       score,
       () => this.buyArtilleryDamage(),
     );
@@ -1334,12 +1338,21 @@ export class ProgressShopController {
     };
   }
 
+  shellCount(level?: number): number {
+    const extra = Math.max(0, Math.round(level || this.progress.artilleryShells));
+
+    return Math.min(
+      ArtilleryStrikeAbilityConfig.shellMax, 
+      ArtilleryStrikeAbilityConfig.shop.shells + extra
+    );
+  }
+
   private artilleryShellsCard(score: number): ProgressCardView {
     const level = this.progress.artilleryShells;
     const price = this.countPrice(level);
-    const now = ArtilleryStrike.shellCount(level);
-    const next = ArtilleryStrike.shellCount(level + 1);
-    const maxed = level >= ArtilleryStrike.maxShellLevel;
+    const now = this.shellCount(level);
+    const next = this.shellCount(level + 1);
+    const maxed = level >= ArtilleryStrikeAbilityConfig.maxShellLevel();
     return {
       title: '+1 снаряд',
       buy: () => this.buyArtilleryShells(),
@@ -1369,15 +1382,21 @@ export class ProgressShopController {
   private artilleryCooldownCard(score: number): ProgressCardView {
     const level = this.progress.artilleryCooldown;
     const price = this.artilleryCooldownPrice(level);
-    const now = ArtilleryStrike.cooldownFor(ArtilleryStrike.shopCooldownLevel, level);
-    const next = ArtilleryStrike.cooldownFor(ArtilleryStrike.shopCooldownLevel, level + 1);
-    const maxed = !ArtilleryStrike.progressCooldownShortens(level);
+    const now = cooldownFor(
+      0,
+      level,
+      ArtilleryStrikeAbilityConfig);
+    const next = cooldownFor(
+      0,
+      level + 1,
+      ArtilleryStrikeAbilityConfig);
+    const maxed = !this.progressCooldownShortens(level, 0, ArtilleryStrikeAbilityConfig);
     return {
       title: '−1 с перезарядки',
       buy: () => this.buyArtilleryCooldown(),
       info: maxed
-        ? `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}`
-        : `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}→${ArtilleryStrike.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1394,8 +1413,8 @@ export class ProgressShopController {
       title: '−1 с перезарядки',
       buy: () => this.buyIonCooldown(),
       info: maxed
-        ? `ур. ${level} · ${IonCannon.cooldownLabel(now)}`
-        : `ур. ${level} · ${IonCannon.cooldownLabel(now)}→${IonCannon.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1446,8 +1465,8 @@ export class ProgressShopController {
       title: '−1 с перезарядки',
       buy: () => this.buyMinesCooldown(),
       info: maxed
-        ? `ур. ${level} · ${Mines.cooldownLabel(now)}`
-        : `ур. ${level} · ${Mines.cooldownLabel(now)}→${Mines.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1464,8 +1483,8 @@ export class ProgressShopController {
       title: '−1 с перезарядки',
       buy: () => this.buyNuclearCooldown(),
       info: maxed
-        ? `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}`
-        : `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}→${NuclearStrike.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
@@ -1500,8 +1519,8 @@ export class ProgressShopController {
       title: '−0.10 с перезарядки',
       buy: () => this.buyWallCooldown(),
       info: maxed
-        ? `ур. ${level} · ${EnergyWall.cooldownLabel(now)}`
-        : `ур. ${level} · ${EnergyWall.cooldownLabel(now)}→${EnergyWall.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'макс.' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,

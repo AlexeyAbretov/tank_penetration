@@ -100,19 +100,6 @@ export class NuclearStrike {
     );
   }
 
-  // Дольше минуты — как на иконке: 3:00, следующий шаг 2:59. Пол — 2:00.
-  static cooldownLabel(ms: number): string {
-    const totalSec = ms / 1000;
-    if (totalSec < 60) {
-      const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
-      return `${text} с`;
-    }
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec - min * 60;
-    const secText = Number.isInteger(sec) ? String(sec).padStart(2, '0') : sec.toFixed(1).padStart(4, '0');
-    return `${min}:${secText}`;
-  }
-
   // Кадр листа 400×256. 1.28 — шапка последней фазы почти у верхнего края и накрывает середину поля.
   static readonly mushroomScale = 1.28;
 

@@ -3,7 +3,7 @@
 // Порядок чтения: поля — кто участвует в партии, create() их собирает, update() крутит кадр.
 
 import Phaser from 'phaser';
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { ArtilleryStrikeAbilityConfig } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { IonCannon } from '../entities/IonCannon';
 import { EnergyWall } from '../entities/EnergyWall';
@@ -36,7 +36,7 @@ import { SettingsPanel } from '../ui/settings/SettingsPanel';
 import { preloadImages } from '../images/imagePreloader';
 import { preloadSounds } from '../sounds/soundPreloader';
 import { HudAbility, HudFrame } from '../ui/huds/GameHud.types';
-import { AbilityList } from '../abilities';
+import { AbilityList, cooldownFor } from '../abilities';
 
 export class GameScene extends Phaser.Scene {
   // Группа пуль врагов. Group — список спрайтов с физикой, по которому системы ходят циклом.
@@ -117,6 +117,7 @@ export class GameScene extends Phaser.Scene {
       tank: Tank,
       infantry: Phaser.Physics.Arcade.Group,
       shop: ShopController,
+      progressShop: ProgressShopController,
       enemyShots: Phaser.Physics.Arcade.Group,
       callbacks: CombatCallbacks,
       progressDamage: number,
@@ -187,16 +188,14 @@ export class GameScene extends Phaser.Scene {
     this.progressShop.syncTankHp();
     Tank.setProgressSpeedLevel(this.progressShop.speedLevel());
     Tank.setProgressFlightLevel(this.progressShop.flightLevel());
-    MachineGun.setProgressSpeedLevel(this.progressShop.mgSpeedLevel());
-    MachineGun.setProgressFlightLevel(this.progressShop.mgFlightLevel());
     Tank.setProgressBlastLevel(this.progressShop.blastBonus());
     Tank.setProgressKnockbackLevel(this.progressShop.knockbackBonus());
     Tank.setProgressPierceLevel(this.progressShop.pierceBonus());
     Tank.setAbsorbLevel(this.progressShop.absorbBonus());
+    MachineGun.setProgressSpeedLevel(this.progressShop.mgSpeedLevel());
+    MachineGun.setProgressFlightLevel(this.progressShop.mgFlightLevel());
     RocketSalvo.setProgressRocketLevel(this.progressShop.salvoRocketLevel());
-    ArtilleryStrike.setProgressShellLevel(this.progressShop.artilleryShellLevel());
     Mines.setProgressMineLevel(this.progressShop.minesCountLevel());
-    ArtilleryStrike.setProgressCooldownLevel(this.progressShop.artilleryCooldownLevel());
     Mines.setProgressCooldownLevel(this.progressShop.minesCooldownLevel());
     NuclearStrike.setProgressCooldownLevel(this.progressShop.nuclearCooldownLevel());
     IonCannon.setProgressCooldownLevel(this.progressShop.ionCooldownLevel());
@@ -395,6 +394,8 @@ export class GameScene extends Phaser.Scene {
         mg: this.progressShop.mgDamageBonus(),
         salvo: this.progressShop.salvoDamageBonus(),
         artillery: this.progressShop.artilleryDamageBonus(),
+        artilleryShells: this.progressShop.shellCount(),
+        artilleryCooldownLevel: this.progressShop.artilleryCooldownLevel(),
         mines: this.progressShop.minesDamageBonus(),
         wire: this.progressShop.wireDamageBonus(),
         ion: this.progressShop.ionDamageBonus(),
@@ -413,6 +414,7 @@ export class GameScene extends Phaser.Scene {
       this.player.tank,
       this.infantry,
       this.shop,
+      this.progressShop,
       this.enemyShots,
       {
         onKill: (reward) => this.onEnemyKill(reward),
@@ -607,7 +609,9 @@ export class GameScene extends Phaser.Scene {
       'artillery',
       this.shop.artilleryOwned,
       this.combat.artilleryCooldown,
-      ArtilleryStrike.cooldownFor(this.shop.artilleryCooldownLevel),
+      cooldownFor(this.shop.artilleryCooldownLevel,
+        this.progressShop.artilleryCooldownLevel(),
+        ArtilleryStrikeAbilityConfig),
     );
     this.hud.setAbility(
       'mines',

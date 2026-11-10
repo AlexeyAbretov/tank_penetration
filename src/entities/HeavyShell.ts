@@ -28,11 +28,11 @@ export class HeavyShell extends EnemyShot {
     });
   }
 
-  static ensureTextures(scene: Scene): void {
-    if (scene.textures.exists(this.textureKey)) {
-      scene.textures.get(this.textureKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
+  protected ensureTextures(scene: Scene): void {
+    if (scene.textures.exists(HeavyShell.textureKey)) {
+      scene.textures.get(HeavyShell.textureKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
     }
-    this.ensureBurst(scene);
+    HeavyShell.ensureBurst(scene);
   }
 
   // Вспышка, огонь и серый дым на броне. Фон листа прозрачный, поэтому режим ADD не нужен.
@@ -67,6 +67,9 @@ export class HeavyShell extends EnemyShot {
 
   constructor(scene: Scene, x: number, y: number, damage: number) {
     super(scene, x, y, damage, HeavyShell.textureKey);
+
+    this.ensureTextures(scene);
+
     this.setScale(HeavyShell.scale);
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(HeavyShell.bodySize.w, HeavyShell.bodySize.h);

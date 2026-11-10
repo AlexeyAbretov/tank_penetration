@@ -3,19 +3,14 @@
 
 import Phaser, { GameObjects } from 'phaser';
 import {
-  MUZZLE_FRAME,
-  MUZZLE_PAINT,
   paintQuiet,
   SHELL_FRAME,
   SHELL_PAINT,
   TANK_GUN_FRAME,
   TANK_HULL_FRAME,
-  TANK_PAINT,
   TANK_TURRET_FRAME,
   TANK_WRECK_FRAME,
-  type MuzzlePaint,
   type ShellPaint,
-  type TankPaint,
 } from '../../gfx/looks';
 import { ejectCasing } from '../../gfx/casing';
 import { exhaustAt, idleShift } from '../../gfx/engine';
@@ -342,7 +337,7 @@ export class Tank extends GameObjects.Container {
     'tank-wreck': 'assets/tank-wreck.png',
   } as const;
 
-  // GameScene и студия зовут до create. ensureTextures потом дорисует запасные кадры.
+  // GameScene и студия зовут до create.
   static preload(scene: Phaser.Scene): void {
     for (const [key, path] of Object.entries(this.images)) {
       scene.load.image(key, path);
@@ -371,9 +366,11 @@ export class Tank extends GameObjects.Container {
   private fireRateLevel = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
+    Tank.ensureTextures(scene);
+
     // Контейнер сам стоит в (x, y). Дети внутри задаются уже относительно этой точки.
     super(scene, x, y);
-
+    
     const layout = Tank.layout;
     // Корпус чуть правее и ниже центра контейнера.
     this.hull = scene.add.image(layout.hullX, layout.hullY, 'tank-hull');
@@ -582,11 +579,10 @@ export class Tank extends GameObjects.Container {
       node.setVisible(false);
     }
     const layout = Tank.layout;
-    if (!this.scene.textures.exists(Tank.wreckKey)) {
-      Tank.createWreck(this.scene);
-    }
+
     const wreck = this.scene.add.image(layout.hullX, layout.hullY, Tank.wreckKey);
     this.add(wreck);
+
     // Взрыв чуть выше середины корпуса: оттуда растут кадры спрайта.
     tankBoomAt(this.scene, this.x + layout.hullX, this.y + layout.hullY - 12);
     // Сначала огонь, поверх него — дым от тех же очагов.
@@ -618,158 +614,11 @@ export class Tank extends GameObjects.Container {
   }
 
   // Корпус, башня, ствол, снаряд и вспышка. Сцена берёт их по именам
-  // 'tank-hull', 'tank-turret', 'tank-gun', 'shell', 'muzzle'.
-  static ensureTextures(scene: Phaser.Scene): void {
-    if (!scene.textures.exists('tank-hull')) {
-      this.createHull(scene);
-    }
-    if (!scene.textures.exists('tank-turret')) {
-      this.createTurret(scene);
-    }
-    if (!scene.textures.exists('tank-gun')) {
-      this.createGun(scene);
-    }
-    for (const key of ['tank-hull', 'tank-turret', 'tank-gun', Tank.wreckKey]) {
-      if (scene.textures.exists(key)) {
-        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
-      }
-    }
+  // 'shell'
+  protected static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists('shell')) {
       this.createShell(scene);
     }
-    if (!scene.textures.exists('muzzle')) {
-      this.createMuzzle(scene);
-    }
-    // Обломки — готовая картинка из assets/, как корпус и башня.
-    // Запекание остаётся запасным вариантом, если файл не загрузили.
-    if (!scene.textures.exists(Tank.wreckKey)) {
-      this.createWreck(scene);
-      scene.textures.get(Tank.wreckKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    }
-  }
-
-  // Корпус танка, вид сбоку, нос смотрит вправо. Холст 176×110.
-  private static createHull(scene: Phaser.Scene): void {
-    bake(scene, 'tank-hull', TANK_HULL_FRAME.w, TANK_HULL_FRAME.h, (g) => this.renderHull(g));
-  }
-
-  static renderHull(g: Phaser.GameObjects.Graphics, paint: TankPaint = TANK_PAINT): void {
-    // Тень под гусеницей.
-    g.fillStyle(0x000000, 0.35);
-    g.fillEllipse(90, 96, 150, 22);
-
-    // Тёмная гусеница: скруглённый прямоугольник.
-    // fillRoundedRect(x, y, ширина, высота, радиус углов).
-    g.fillStyle(paint.track);
-    g.fillRoundedRect(18, 58, 148, 38, 8);
-
-    // Шесть катков внутри гусеницы. Шаг 22 пикселя.
-    for (let i = 0; i < 6; i += 1) {
-      const x = 36 + i * 22;
-      g.fillStyle(paint.wheelOuter); // внешнее кольцо катка
-      g.fillCircle(x, 78, 11);
-      g.fillStyle(paint.wheelDisk); // диск светлее
-      g.fillCircle(x, 78, 7);
-      g.fillStyle(paint.wheelHub); // ось в центре
-      g.fillCircle(x, 78, 3);
-    }
-
-    // Бронекорпус над гусеницей, три горизонтальные полосы: верх светлый, низ тёмный.
-    g.fillStyle(paint.armor);
-    g.fillRoundedRect(22, 28, 140, 44, 8);
-    g.fillStyle(paint.armorLight);
-    g.fillRoundedRect(28, 32, 128, 18, 6);
-    g.fillStyle(paint.armorDark);
-    g.fillRoundedRect(30, 50, 124, 16, 4);
-
-    // Скошенный нос справа. Треугольник по трём точкам: (x1,y1), (x2,y2), (x3,y3).
-    g.fillStyle(paint.nose);
-    g.fillTriangle(150, 32, 168, 50, 150, 68);
-    // Светлая вставка на носу.
-    g.fillStyle(paint.noseLight);
-    g.fillRect(148, 40, 16, 14);
-
-    // Люк или ящик на левой части крыши и тёмная щель под ним.
-    g.fillStyle(paint.hatch);
-    g.fillRect(28, 36, 22, 10);
-    g.fillRect(28, 48, 22, 4);
-    // Четыре тонкие горизонтальные риски — решётка.
-    g.lineStyle(1, paint.grill, 1);
-    for (let i = 0; i < 4; i += 1) {
-      // lineBetween(x1, y1, x2, y2) рисует один отрезок.
-      g.lineBetween(30, 38 + i * 2, 48, 38 + i * 2);
-    }
-
-    // Две заклёпки на борту.
-    g.fillStyle(paint.rivet);
-    g.fillCircle(78, 46, 4);
-    g.fillCircle(108, 46, 4);
-
-    // Небольшие выступы по краям гусеницы: левый грязевой щиток и правый.
-    g.fillStyle(paint.fender);
-    g.fillRect(20, 62, 8, 18);
-    g.fillRect(156, 64, 10, 14);
-  }
-
-  // Башня без ствола, вид сбоку с полоской крыши. В бою крутится вместе со стволом.
-  private static createTurret(scene: Phaser.Scene): void {
-    bake(scene, 'tank-turret', TANK_TURRET_FRAME.w, TANK_TURRET_FRAME.h, (g) => this.renderTurret(g));
-  }
-
-  static renderTurret(g: Phaser.GameObjects.Graphics, paint: TankPaint = TANK_PAINT): void {
-    // Тот же ракурс, что у корпуса: борт сбоку и светлая полоса крыши сверху.
-    // Круг с люком в центре читался как план сверху, корпус при этом был боком.
-    g.fillStyle(paint.turretRoof);
-    g.fillRoundedRect(8, 14, 62, 26, 7);
-    // Светлая крыша — верхняя грань, как светлая полоса брони корпуса.
-    g.fillStyle(paint.turretLight);
-    g.fillRoundedRect(12, 16, 50, 10, 5);
-    // Нижняя грань борта темнее.
-    g.fillStyle(paint.turret);
-    g.fillRoundedRect(12, 28, 50, 10, 4);
-
-    // Скошенный лоб справа. Кончик прячется под маску, маска нарисована уже на стволе.
-    g.fillStyle(paint.nose);
-    g.fillTriangle(62, 16, 78, 27, 62, 40);
-    g.fillStyle(paint.noseLight);
-    g.fillRect(66, 22, 10, 8);
-
-    // Люк на крыше: низкая коробка сбоку, не круг в центре башни.
-    g.fillStyle(paint.hatch);
-    g.fillRoundedRect(20, 4, 22, 12, 3);
-    g.fillStyle(paint.hatchShine);
-    g.fillRect(22, 6, 18, 3);
-
-    // Смотровая щель и заклёпки на борту.
-    g.fillStyle(paint.hatch);
-    g.fillRect(42, 30, 14, 3);
-    g.fillStyle(paint.rivet);
-    g.fillCircle(28, 33, 3);
-    g.fillCircle(52, 33, 3);
-  }
-
-  // Ствол и маска одной картинкой. Крутится не сама, а вместе с башней.
-  private static createGun(scene: Phaser.Scene): void {
-    bake(scene, 'tank-gun', TANK_GUN_FRAME.w, TANK_GUN_FRAME.h, (g) => this.renderGun(g));
-  }
-
-  static renderGun(g: Phaser.GameObjects.Graphics, paint: TankPaint = TANK_PAINT): void {
-    // Маска выше ствола. Центр (9, 11) — цапфа, её же ставит origin картинки.
-    g.fillStyle(paint.mask);
-    g.fillRoundedRect(0, 2, 18, 18, 4);
-    // Ствол выходит из середины маски, а не из её края.
-    g.fillStyle(paint.barrel);
-    g.fillRoundedRect(12, 5, 74, 12, 3);
-    g.fillStyle(paint.barrelLight);
-    g.fillRoundedRect(14, 7, 70, 4, 2);
-    // Утолщение у дула.
-    g.fillStyle(paint.muzzleRing);
-    g.fillRect(82, 3, 10, 16);
-    g.fillStyle(paint.barrel);
-    g.fillRect(86, 5, 6, 12);
-    // Светлый срез канала ствола.
-    g.fillStyle(paint.bore);
-    g.fillRect(90, 8, 4, 6);
   }
 
   // Снаряд танка — вытянутое свечение, не металлическая болванка. 54×22.
@@ -788,86 +637,7 @@ export class Tank extends GameObjects.Container {
     g.fillEllipse(40, 11, 12, 4);
   }
 
-  // Круглая вспышка выстрела и взрыва. В игре её ещё красят режимом ADD, поэтому она светится.
-  private static createMuzzle(scene: Phaser.Scene): void {
-    bake(scene, 'muzzle', MUZZLE_FRAME.w, MUZZLE_FRAME.h, (g) => this.renderMuzzle(g));
-  }
-
-  static renderMuzzle(g: Phaser.GameObjects.Graphics, paint: MuzzlePaint = MUZZLE_PAINT): void {
-    g.fillStyle(paint.outer, 0.5); // широкое оранжевое пятно
-    g.fillCircle(24, 24, 22);
-    g.fillStyle(paint.mid, 0.9); // жёлтый центр
-    g.fillCircle(24, 24, 12);
-    g.fillStyle(paint.core); // белая точка
-    g.fillCircle(24, 24, 5);
-  }
-
-  // Куча обломков вместо целого танка. Кадр шире корпуса: башня и ствол лежат рядом.
-  private static createWreck(scene: Phaser.Scene): void {
-    bake(scene, Tank.wreckKey, TANK_WRECK_FRAME.w, TANK_WRECK_FRAME.h, (g) => this.renderWreck(g));
-  }
-
-  static renderWreck(g: Phaser.GameObjects.Graphics, paint: TankPaint = TANK_PAINT): void {
-    // Центр кадра совпадает с центром живого корпуса. Земля — на линии низа гусеницы.
-    const ground = TANK_WRECK_FRAME.h / 2 + 24;
-
-    g.fillStyle(0x120806, 0.9);
-    g.fillEllipse(118, ground + 2, 210, 30);
-    g.fillStyle(0x4a160c, 0.65);
-    g.fillEllipse(124, ground, 108, 16);
-
-    // Гусеница разорвана на два куска, один каток выпал и лежит плашмя.
-    g.fillStyle(paint.track);
-    g.fillRoundedRect(36, ground - 18, 72, 20, 4);
-    g.fillRoundedRect(138, ground - 12, 48, 14, 3);
-    g.fillStyle(paint.wheelOuter);
-    g.fillEllipse(28, ground - 2, 26, 14);
-    g.fillStyle(paint.wheelDisk);
-    g.fillEllipse(28, ground - 2, 14, 7);
-    g.fillStyle(paint.wheelOuter);
-    g.fillCircle(58, ground - 10, 9);
-    g.fillStyle(paint.wheelDisk);
-    g.fillCircle(58, ground - 10, 5);
-    g.fillStyle(paint.wheelHub);
-    g.fillCircle(58, ground - 10, 2);
-    g.fillStyle(paint.wheelOuter);
-    g.fillCircle(84, ground - 8, 8);
-    g.fillStyle(paint.wheelDisk);
-    g.fillCircle(84, ground - 8, 4);
-    g.fillStyle(paint.wheelOuter);
-    g.fillEllipse(168, ground - 4, 22, 16);
-    g.fillStyle(paint.wheelDisk);
-    g.fillEllipse(168, ground - 4, 10, 7);
-
-    // Корпус просел и выгорел. В борту дыра, из неё ещё торчит пламя.
-    g.fillStyle(0x140e0a);
-    g.fillRoundedRect(44, ground - 42, 108, 32, 4);
-    g.fillStyle(paint.armorDark);
-    g.fillRoundedRect(50, ground - 36, 64, 16, 3);
-    g.fillStyle(paint.armor);
-    g.fillRect(52, ground - 34, 40, 6);
-    g.fillStyle(0x0c0806);
-    g.fillEllipse(108, ground - 26, 36, 18);
-    // Пламя не рисуем: над обломками его крутят частицы firesAt.
-
-    // Сорванный лист крыши и погнутый нос лежат отдельно от корпуса.
-    this.fillTurned(g, paint.armorLight, 70, ground - 36, 40, 10, -0.7);
-    this.fillTurned(g, paint.nose, 154, ground - 6, 28, 12, 0.9);
-    g.fillStyle(paint.rivet);
-    g.fillCircle(64, ground - 22, 3);
-
-    // Башня на боку справа, ствол отломлен и валяется перед ней.
-    this.fillTurned(g, paint.turret, 198, ground - 10, 52, 22, 0.65);
-    this.fillTurned(g, paint.turretLight, 196, ground - 16, 36, 8, 0.65);
-    g.fillStyle(paint.hatch);
-    g.fillCircle(206, ground - 6, 5);
-    this.fillTurned(g, paint.barrel, 132, ground - 4, 62, 8, -0.2);
-    this.fillTurned(g, paint.muzzleRing, 104, ground - 8, 12, 12, -0.2);
-
-    // Копоть у пролома. Сам столб дыма — частицы, их в текстуру не запечь.
-    g.fillStyle(0x2a221c, 0.75);
-    g.fillCircle(108, ground - 48, 8);
-  }
+  
 
   // Решётка моторного отсека на корме крыши, в координатах контейнера танка.
   static exhaustAnchor(): { x: number; y: number } {
@@ -1090,38 +860,5 @@ export class Tank extends GameObjects.Container {
     embers.setDepth(29);
     made.push(embers);
     return made;
-  }
-
-  // Прямоугольник, повёрнутый вокруг своего центра. angle в радианах, по часовой: ось Y вниз.
-  private static fillTurned(
-    g: Phaser.GameObjects.Graphics,
-    color: number,
-    cx: number,
-    cy: number,
-    width: number,
-    height: number,
-    angle: number,
-  ): void {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const corners: ReadonlyArray<readonly [number, number]> = [
-      [-width / 2, -height / 2],
-      [width / 2, -height / 2],
-      [width / 2, height / 2],
-      [-width / 2, height / 2],
-    ];
-    g.fillStyle(color);
-    g.beginPath();
-    corners.forEach(([px, py], index) => {
-      const x = cx + px * cos - py * sin;
-      const y = cy + px * sin + py * cos;
-      if (index === 0) {
-        g.moveTo(x, y);
-      } else {
-        g.lineTo(x, y);
-      }
-    });
-    g.closePath();
-    g.fillPath();
   }
 }

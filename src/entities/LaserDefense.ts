@@ -62,12 +62,6 @@ export class LaserDefense extends GameObjects.Container {
     return Math.max(LaserDefense.minCooldownMs, LaserDefense.shop.fireIntervalMs - cut);
   }
 
-  static cooldownLabel(ms: number): string {
-    const totalSec = ms / 1000;
-    const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
-    return `${text} с`;
-  }
-
   // Ось — ноль контейнера, это пятка линзы на крыше. belowBelly опускает пятку ниже днища танка.
   static readonly mount = { belowBelly: 100 };
 

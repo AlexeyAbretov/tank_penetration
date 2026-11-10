@@ -5,7 +5,7 @@ import Phaser from 'phaser';
 import { AbilityIcon, AutoApplyBadge, HudAbility, HudFrame } from './GameHud.types';
 
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
-import { AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon } from '../../abilities';
+import { ArtilleryStrikeAbilityIcon, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
 
 const AUTO_POWER_HIT = 16;
 
@@ -18,7 +18,8 @@ export class GameHud {
     AutoAimAbilityIcon.preload(scene);
     AutoFireAbilityIcon.preload(scene);
     AutoShopAbilityIcon.preload(scene);
-
+    ArtilleryStrikeAbilityIcon.preload(scene);
+    
     if (scene.textures.exists(GameHud.bannerKey)) {
       return;
     }
@@ -1064,16 +1065,6 @@ export class GameHud {
     g.fillRect(-stroke / 2, stemTop, stroke, stemBottom - stemTop);
   }
 
-  private cooldownLabel(ms: number): string {
-    const sec = Math.ceil(ms / 1000);
-    if (sec < 60) {
-      return `${sec}`;
-    }
-    const min = Math.floor(sec / 60);
-    const rest = sec % 60;
-    return `${min}:${rest.toString().padStart(2, '0')}`;
-  }
-
   private paintAbility(icon: AbilityIcon, owned: boolean, cooldownMs: number): void {
     if (icon.owned !== owned) {
       icon.owned = owned;
@@ -1103,7 +1094,7 @@ export class GameHud {
       icon.glow.setVisible(lit);
     }
     // Дольше минуты три цифры секунд не влезают в кружок, поэтому 3:00.
-    const label = cooling ? this.cooldownLabel(cooldownMs) : '';
+    const label = cooling ? cooldownLabel(cooldownMs, false) : '';
     if (icon.time.text !== label) {
       icon.time.setText(label);
     }

@@ -93,19 +93,6 @@ export class BomberStrike {
     return Math.max(BomberStrike.minCooldownMs, BomberStrike.shop.cooldownMs - progressCut - shopCut);
   }
 
-  // Дольше минуты — как на иконке: 3:00, следующий шаг 2:54. Пол — 1:00.
-  static cooldownLabel(ms: number): string {
-    const totalSec = ms / 1000;
-    if (totalSec < 60) {
-      const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
-      return `${text} с`;
-    }
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec - min * 60;
-    const secText = Number.isInteger(sec) ? String(sec).padStart(2, '0') : sec.toFixed(1).padStart(4, '0');
-    return `${min}:${secText}`;
-  }
-
   // Полоса высот, где ходят враги. Края линии по горизонтали считает impacts.
   static readonly field = {
     minY: 168,

@@ -188,19 +188,6 @@ export class Mines {
     return Math.max(Mines.minCooldownMs, Mines.shop.cooldownMs - progressCut - shopCut);
   }
 
-  // Дольше минуты — как на иконке: 1:00, следующий шаг 59 с. Пол — 20 с.
-  static cooldownLabel(ms: number): string {
-    const totalSec = ms / 1000;
-    if (totalSec < 60) {
-      const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
-      return `${text} с`;
-    }
-    const min = Math.floor(totalSec / 60);
-    const sec = totalSec - min * 60;
-    const secText = Number.isInteger(sec) ? String(sec).padStart(2, '0') : sec.toFixed(1).padStart(4, '0');
-    return `${min}:${secText}`;
-  }
-
   // Прямоугольник поля. Чужие препятствия приходят списком keepOut.
   static readonly field = {
     minX: 200,

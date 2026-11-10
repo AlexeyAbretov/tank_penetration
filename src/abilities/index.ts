@@ -1,5 +1,11 @@
 export { AutoAimAbilityIcon } from './AutoAimAbilityIcon';
 export { AutoFireAbilityIcon } from './AutoFireAbilityIcon';
 export { AutoShopAbilityIcon } from './AutoShopAbilityIcon';
-export { EnemyDamageDebugAbility, EnemyDamageDebugAbilityIcon } from './EnemyDamageDebugAbility';
+export { EnemyDamageDebugAbility, EnemyDamageDebugAbilityIcon, } from './EnemyDamageDebugAbility';
 export { AbilityList } from './AbilityList';
+export { ArtilleryStrikeAbility } from './ArtilleryStrikeAbility';
+export { type ArtilleryFlight, type ArtilleryMark } from './ArtilleryStrikeAbility/ArtilleryStrikeAbility.types';
+export { ArtilleryStrikeAbilityIcon } from './ArtilleryStrikeAbility/ArtilleryStrikeAbilityIcon';
+export type { AbilityConfig } from './Ability.types';
+export { cooldownLabel, cooldownFor } from './Ability.utils';
+export { ArtilleryStrikeAbilityConfig } from './ArtilleryStrikeAbility';

@@ -4,7 +4,7 @@
 // Стену огня пишем вместе с остатком срока: горение потом станет длиннее вкладки.
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { ArtilleryStrikeAbilityConfig } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -188,7 +188,7 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
 
   const haste = requiredInt(value.haste, 1, ENEMY_HASTE.max) ?? 1;
   const artilleryCooldownMs =
-    requiredInt(value.artilleryCooldownMs, 0, ArtilleryStrike.shop.cooldownMs) ?? 0;
+    requiredInt(value.artilleryCooldownMs, 0, ArtilleryStrikeAbilityConfig.shopCooldownMs) ?? 0;
   const minesCooldownMs = requiredInt(value.minesCooldownMs, 0, Mines.shop.cooldownMs) ?? 0;
   const nuclearCooldownMs =
     requiredInt(value.nuclearCooldownMs, 0, NuclearStrike.shop.cooldownMs) ?? 0;
@@ -262,7 +262,7 @@ function parseShop(value: unknown): ShopSave | null {
   const salvo = flag(value.salvo) ?? false;
   const nuclear = flag(value.nuclear) ?? false;
   // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
-  const artilleryCooldown = requiredInt(value.artilleryCooldown, 0, ArtilleryStrike.maxShopCooldownLevel) ?? 0;
+  const artilleryCooldown = requiredInt(value.artilleryCooldown, 0, ArtilleryStrikeAbilityConfig.maxShopCooldownLevel()) ?? 0;
   // Старые сохранения не писали ионную пушку: этой покупки ещё не было.
   const ion = flag(value.ion) ?? false;
   const ionCooldown = requiredInt(value.ionCooldown, 0, IonCannon.maxShopCooldownLevel) ?? 0;

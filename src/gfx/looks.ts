@@ -121,56 +121,6 @@ export const ROCKET_LOOK = {
   emblem: 0xd08030,
 } satisfies SoldierLook;
 
-export type TankPaint = {
-  armor: number;
-  armorLight: number;
-  armorDark: number;
-  nose: number;
-  noseLight: number;
-  hatch: number;
-  rivet: number;
-  grill: number;
-  track: number;
-  wheelOuter: number;
-  wheelDisk: number;
-  wheelHub: number;
-  fender: number;
-  turret: number;
-  turretLight: number;
-  turretRoof: number;
-  hatchShine: number;
-  mask: number;
-  barrel: number;
-  barrelLight: number;
-  muzzleRing: number;
-  bore: number;
-};
-
-export const TANK_PAINT = {
-  armor: 0x3d4a28,
-  armorLight: 0x556338,
-  armorDark: 0x2a341c,
-  nose: 0x2f3a22,
-  noseLight: 0x4a5830,
-  hatch: 0x1e2416,
-  rivet: 0x6a4a22,
-  grill: 0x0e120a,
-  track: 0x1a1c16,
-  wheelOuter: 0x2a2c24,
-  wheelDisk: 0x4a4c42,
-  wheelHub: 0x1a1c16,
-  fender: 0x2a2e22,
-  turret: 0x2c341c,
-  turretLight: 0x556338,
-  turretRoof: 0x3d4a28,
-  hatchShine: 0x6a7a48,
-  mask: 0x2a2e22,
-  barrel: 0x1a1c16,
-  barrelLight: 0x3a3e32,
-  muzzleRing: 0x2a2e22,
-  bore: 0x8a8e80,
-} satisfies TankPaint;
-
 export type ShellPaint = {
   outer: number;
   mid: number;

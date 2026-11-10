@@ -9,7 +9,7 @@ export class AbilityIconBase {
     protected static iconPath = '';
 
     // Радиус круга. Такой же, как у иконок способностей над лентой.
-    protected static iconRadius = 30;
+    static iconRadius = 30;
 
     static preload(scene: Phaser.Scene): void {
         if (scene.textures.exists(this.iconKey)) {

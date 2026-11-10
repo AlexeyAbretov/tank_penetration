@@ -1,7 +1,7 @@
 // Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, бомбардировщик, ионная пушка, мины, атомный взрыв, энергетическая стена, контакт с базой и урон отскочившего чужого выстрела.
 
 import Phaser from 'phaser';
-import { ArtilleryStrike, type ArtilleryFlight, type ArtilleryMark } from '../entities/ArtilleryStrike';
+import { ArtilleryStrikeAbility, ArtilleryStrikeAbilityConfig, cooldownFor, type ArtilleryFlight, type ArtilleryMark } from '../abilities';
 import { BomberStrike, type BomberFlight } from '../entities/BomberStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
@@ -33,6 +33,8 @@ import type { ShopController } from '../controllers/ShopController';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem as Combat } from '../types/CombatSystem';
 import type { WorldPoint } from '../types/WorldPoint';
+import { calculateImpacts } from '../utils';
+import { ProgressShopController } from '../controllers/ProgressShopController';
 
 type ArtillerySpot = { x: number; y: number; mark: ArtilleryMark };
 
@@ -177,6 +179,7 @@ export class CombatSystem implements Combat {
     protected readonly tank: Tank,
     protected readonly infantry: Phaser.Physics.Arcade.Group,
     protected readonly shop: ShopController,
+    protected readonly progressShop: ProgressShopController,
     private readonly enemyShots: Phaser.Physics.Arcade.Group,
     private readonly callbacks: CombatCallbacks,
     private readonly progressDamage: number,
@@ -327,7 +330,9 @@ export class CombatSystem implements Combat {
 
   // Купленный откат. Круг на иконке и следующий вызов берут одно число.
   private artillerySpan(): number {
-    return ArtilleryStrike.cooldownFor(this.shop.artilleryCooldownLevel);
+    return cooldownFor(this.shop.artilleryCooldownLevel,
+      this.progressShop.artilleryCooldownLevel(),
+      ArtilleryStrikeAbilityConfig);
   }
 
   private minesSpan(): number {
@@ -1285,7 +1290,7 @@ export class CombatSystem implements Combat {
     if (token !== this.artilleryToken) {
       return;
     }
-    const timer = this.scene.time.delayedCall(ArtilleryStrike.shop.afterShotMs, () => {
+    const timer = this.scene.time.delayedCall(ArtilleryStrikeAbilityConfig.afterShotMs, () => {
       this.salvoTimers = this.salvoTimers.filter((item) => item !== timer);
       if (token !== this.artilleryToken) {
         return;
@@ -1298,21 +1303,27 @@ export class CombatSystem implements Combat {
   // Огни этого залпа. Уже горящие от прошлого вызова не трогаем.
   private armSpots(): ArtillerySpot[] {
     const minX = Math.ceil(BarbedWire.bounds.face + craterReach());
-    const spots = ArtilleryStrike.impacts(minX).map((point) => ({
-      x: point.x,
-      y: point.y,
-      mark: ArtilleryStrike.mark(this.scene, point.x, point.y),
-    }));
+    const spots = calculateImpacts(
+      this.progressShop.shellCount(),
+      minX,
+      ArtilleryStrikeAbilityConfig.blastRadius * 2,
+      ArtilleryStrikeAbility.field).map((point) => ({
+        x: point.x,
+        y: point.y,
+        mark: ArtilleryStrikeAbility.effects.mark(this.scene, point.x, point.y),
+      }));
+
     this.spots.push(...spots);
+
     return spots;
   }
 
   private releaseShells(spots: ArtillerySpot[]): void {
-    const gap = ArtilleryStrike.shop.gapMs;
+    const gap = ArtilleryStrikeAbilityConfig.gapMs;
     spots.forEach((spot, index) => {
       const timer = this.scene.time.delayedCall(index * gap, () => {
         this.salvoTimers = this.salvoTimers.filter((item) => item !== timer);
-        const flight = ArtilleryStrike.drop(this.scene, spot.x, spot.y, () => {
+        const flight = ArtilleryStrikeAbility.effects.drop(this.scene, spot.x, spot.y, () => {
           this.flights = this.flights.filter((item) => item !== flight);
           this.retireSpot(spot);
           this.detonateArtillery(spot.x, spot.y);
@@ -1329,8 +1340,8 @@ export class CombatSystem implements Combat {
   }
 
   private detonateArtillery(x: number, y: number): void {
-    ArtilleryStrike.boom(this.scene, x, y);
-    const radius = ArtilleryStrike.shop.blastRadius;
+    ArtilleryStrikeAbility.effects.boom(this.scene, x, y);
+    const radius = ArtilleryStrikeAbilityConfig.blastRadius;
     (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
       if (!unit.active || unit.reachedWall) {
         return;
@@ -1857,7 +1868,7 @@ export class CombatSystem implements Combat {
 
   // Тот же разрыв, что у артиллерии: кадры, воронка, звук и тряска камеры.
   private detonateSalvo(x: number, y: number): void {
-    ArtilleryStrike.boom(this.scene, x, y);
+    ArtilleryStrikeAbility.effects.boom(this.scene, x, y);
     const radius = RocketSalvo.shop.blastRadius;
     (this.infantry.getChildren() as Infantry[]).forEach((unit) => {
       if (!unit.active || unit.reachedWall) {
@@ -2127,7 +2138,7 @@ export class CombatSystem implements Combat {
   }
 
   private artilleryDamage(): number {
-    return ArtilleryStrike.shop.damage + this.shop.artilleryDamageLevel + this.progressArtilleryDamage;
+    return ArtilleryStrikeAbilityConfig.shop.damage + this.shop.artilleryDamageLevel + this.progressArtilleryDamage;
   }
 
   private minesDamage(): number {

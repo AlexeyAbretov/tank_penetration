@@ -1,4 +1,4 @@
-import { ArtilleryStrike } from "../entities/ArtilleryStrike";
+import { ArtilleryStrikeAbilityConfig, ArtilleryStrikeAbilityIcon } from "./ArtilleryStrikeAbility";
 import { BomberStrike } from "../entities/BomberStrike";
 import { EnergyWall } from "../entities/EnergyWall";
 import { IonCannon } from "../entities/IonCannon";
@@ -8,10 +8,10 @@ import { NuclearStrike } from "../entities/NuclearStrike";
 export const AbilityList = [
     {
         id: 'artillery',
-        texture: ArtilleryStrike.iconKey,
+        texture: ArtilleryStrikeAbilityIcon.iconKey,
         hint: '1 — удар',
-        cooldownMs: ArtilleryStrike.shop.cooldownMs,
-        iconRadius: ArtilleryStrike.iconRadius,
+        cooldownMs: ArtilleryStrikeAbilityConfig.shopCooldownMs,
+        iconRadius: ArtilleryStrikeAbilityIcon.iconRadius,
     },
     {
         id: 'mines',

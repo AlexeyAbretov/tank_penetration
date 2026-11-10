@@ -204,7 +204,6 @@ export class HeavyTank extends RangedEnemy {
         repeat: -1,
       });
     }
-    HeavyShell.ensureTextures(scene);
   }
 
   // Нижняя гусеница дважды в одной текстуре, чтобы прокрутка не показывала шов.

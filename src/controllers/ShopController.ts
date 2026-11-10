@@ -3,7 +3,7 @@
 // Постоянные прибавки к урону, взрыву, пробиванию и монетам приходят снаружи и за партию не меняются.
 
 import Phaser from 'phaser';
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
+import { ArtilleryStrikeAbilityConfig, cooldownFor, cooldownLabel } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -40,6 +40,8 @@ type PermanentBonuses = {
   // Постоянный урон ракеты, снаряда и мины. К урону на карточке прибавляется, лестницу цены не двигает.
   salvo: number;
   artillery: number;
+  artilleryShells: number;
+  artilleryCooldownLevel: number;
   mines: number;
   ion: number;
   // Постоянный урон авиабомбы. К урону на карточке прибавляется, лестницу цены не двигает.
@@ -110,7 +112,6 @@ export class ShopController {
     private readonly onChanged: () => void,
   ) {
     this.panel = new ShopPanel(scene, this, GAME);
-    ArtilleryStrike.setShopCooldownLevel(0);
     IonCannon.setShopCooldownLevel(0);
     IonCannon.setShopSweepLevel(0);
     Mines.setShopCooldownLevel(0);
@@ -191,8 +192,7 @@ export class ShopController {
       this.salvo = this.installSalvo();
     }
     this.artilleryOwned = saved.artillery;
-    this.artilleryCooldownLevel = Math.min(saved.artilleryCooldown, ArtilleryStrike.maxShopCooldownLevel);
-    ArtilleryStrike.setShopCooldownLevel(this.artilleryCooldownLevel);
+    this.artilleryCooldownLevel = Math.min(saved.artilleryCooldown, ArtilleryStrikeAbilityConfig.maxShopCooldownLevel());
     this.ionOwned = saved.ion;
     this.ionCooldownLevel = Math.min(saved.ionCooldown, IonCannon.maxShopCooldownLevel);
     IonCannon.setShopCooldownLevel(this.ionCooldownLevel);
@@ -239,7 +239,6 @@ export class ShopController {
     this.salvoOwned = false;
     this.artilleryOwned = false;
     this.artilleryCooldownLevel = 0;
-    ArtilleryStrike.setShopCooldownLevel(0);
     this.ionOwned = false;
     this.ionCooldownLevel = 0;
     IonCannon.setShopCooldownLevel(0);
@@ -550,7 +549,7 @@ export class ShopController {
 
   // Открывает клавишу 1. Залп и перезарядку считает CombatSystem.
   buyArtillery(): void {
-    const cost = shopPrice(ArtilleryStrike.shop.cost);
+    const cost = shopPrice(ArtilleryStrikeAbilityConfig.shop.cost);
     if (this.isPaused() || this.artilleryOwned || this.economy.getCoins() < cost) {
       return;
     }
@@ -566,11 +565,15 @@ export class ShopController {
     if (this.isPaused() || !this.artilleryOwned) {
       return;
     }
-    if (this.artilleryCooldownLevel >= ArtilleryStrike.maxShopCooldownLevel) {
+    if (this.artilleryCooldownLevel >= ArtilleryStrikeAbilityConfig.maxShopCooldownLevel()) {
       return;
     }
-    const now = ArtilleryStrike.cooldownFor(this.artilleryCooldownLevel);
-    if (ArtilleryStrike.cooldownFor(this.artilleryCooldownLevel + 1) >= now) {
+    const now = cooldownFor(this.artilleryCooldownLevel,
+      this.bonuses.artilleryCooldownLevel,
+      ArtilleryStrikeAbilityConfig);
+    if (cooldownFor(this.artilleryCooldownLevel + 1,
+      this.bonuses.artilleryCooldownLevel,
+      ArtilleryStrikeAbilityConfig) >= now) {
       return;
     }
     const cost = ShopController.artilleryCooldownCost(this.artilleryCooldownLevel);
@@ -578,7 +581,6 @@ export class ShopController {
       return;
     }
     this.artilleryCooldownLevel += 1;
-    ArtilleryStrike.setShopCooldownLevel(this.artilleryCooldownLevel);
     this.refresh();
   }
 
@@ -1087,7 +1089,7 @@ export class ShopController {
           this.gearCard('artillery', coins),
           this.weaponDamageCard(
             this.artilleryDamageLevel,
-            ArtilleryStrike.shop.damage + this.artilleryDamageOfferLevel(),
+            ArtilleryStrikeAbilityConfig.shop.damage + this.artilleryDamageOfferLevel(),
             () => this.buyArtilleryDamage(),
             coins,
             this.artilleryOwned,
@@ -1253,7 +1255,7 @@ export class ShopController {
           coins,
           this.laserOwned,
           shopPrice(LaserDefense.shop.cost),
-          `ракета / ${LaserDefense.cooldownLabel(LaserDefense.fireIntervalFor())}`,
+          `ракета / ${cooldownLabel(LaserDefense.fireIntervalFor())}`,
           'сбивает РПГ',
         );
       case 'flame':
@@ -1451,14 +1453,16 @@ export class ShopController {
   }
 
   private artilleryCard(coins: number): ShopCardView {
-    const offer = ArtilleryStrike.shop;
+    const offer = ArtilleryStrikeAbilityConfig.shop;
     const price = shopPrice(offer.cost);
-    const reload = ArtilleryStrike.cooldownLabel(ArtilleryStrike.cooldownFor(this.artilleryCooldownLevel));
+    const reload = cooldownLabel(cooldownFor(this.artilleryCooldownLevel,
+      this.bonuses.artilleryCooldownLevel,
+      ArtilleryStrikeAbilityConfig));
     if (this.artilleryOwned) {
       return {
         title: 'Покупка',
         buy: () => this.buyArtillery(),
-        info: `откат ${reload}`,
+        info: `${this.bonuses.artilleryShells}×${offer.damage + this.bonuses.artillery} · откат ${reload}`,
         cost: '',
         open: false,
         canBuy: false,
@@ -1468,7 +1472,7 @@ export class ShopController {
     return {
       title: 'Покупка',
       buy: () => this.buyArtillery(),
-      info: `${ArtilleryStrike.shellCount()}×${offer.damage + this.bonuses.artillery} · откат ${reload}`,
+      info: `${this.bonuses.artilleryShells}×${offer.damage + this.bonuses.artillery} · откат ${reload}`,
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
@@ -1485,7 +1489,7 @@ export class ShopController {
   private bomberCard(coins: number): ShopCardView {
     const offer = BomberStrike.shop;
     const price = shopPrice(offer.cost);
-    const reload = BomberStrike.cooldownLabel(BomberStrike.cooldownFor(this.bomberCooldownLevel));
+    const reload = cooldownLabel(BomberStrike.cooldownFor(this.bomberCooldownLevel));
     if (this.bomberOwned) {
       return {
         title: 'Покупка',
@@ -1530,8 +1534,8 @@ export class ShopController {
       title: '−0,1 мин перезарядки',
       buy,
       info: maxed
-        ? `ур. ${level} · ${BomberStrike.cooldownLabel(now)}`
-        : `ур. ${level} · ${BomberStrike.cooldownLabel(now)}→${BomberStrike.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,
@@ -1554,15 +1558,19 @@ export class ShopController {
         owned: false,
       };
     }
-    const now = ArtilleryStrike.cooldownFor(level);
-    const next = ArtilleryStrike.cooldownFor(level + 1);
-    const maxed = level >= ArtilleryStrike.maxShopCooldownLevel || next >= now;
+    const now = cooldownFor(level,
+      this.bonuses.artilleryCooldownLevel,
+      ArtilleryStrikeAbilityConfig);
+    const next = cooldownFor(level + 1,
+      this.bonuses.artilleryCooldownLevel,
+      ArtilleryStrikeAbilityConfig);
+    const maxed = level >= ArtilleryStrikeAbilityConfig.maxShopCooldownLevel() || next >= now;
     return {
       title: '−1 с перезарядки',
       buy,
       info: maxed
-        ? `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}`
-        : `ур. ${level} · ${ArtilleryStrike.cooldownLabel(now)}→${ArtilleryStrike.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,
@@ -1573,7 +1581,7 @@ export class ShopController {
   private ionCard(coins: number): ShopCardView {
     const offer = IonCannon.shop;
     const price = shopPrice(offer.cost);
-    const reload = IonCannon.cooldownLabel(IonCannon.cooldownFor(this.ionCooldownLevel));
+    const reload = cooldownLabel(IonCannon.cooldownFor(this.ionCooldownLevel));
     if (this.ionOwned) {
       return {
         title: 'Покупка',
@@ -1618,8 +1626,8 @@ export class ShopController {
       title: '−1 с перезарядки',
       buy,
       info: maxed
-        ? `ур. ${level} · ${IonCannon.cooldownLabel(now)}`
-        : `ур. ${level} · ${IonCannon.cooldownLabel(now)}→${IonCannon.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,
@@ -1659,7 +1667,7 @@ export class ShopController {
   private minesCard(coins: number): ShopCardView {
     const offer = Mines.shop;
     const price = shopPrice(offer.cost);
-    const reload = Mines.cooldownLabel(Mines.cooldownFor(this.minesCooldownLevel));
+    const reload = cooldownLabel(Mines.cooldownFor(this.minesCooldownLevel));
     if (this.minesOwned) {
       return {
         title: 'Покупка',
@@ -1704,8 +1712,8 @@ export class ShopController {
       title: '−1 с перезарядки',
       buy,
       info: maxed
-        ? `ур. ${level} · ${Mines.cooldownLabel(now)}`
-        : `ур. ${level} · ${Mines.cooldownLabel(now)}→${Mines.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,
@@ -1716,7 +1724,7 @@ export class ShopController {
   private nuclearCard(coins: number): ShopCardView {
     const offer = NuclearStrike.shop;
     const price = shopPrice(offer.cost);
-    const reload = NuclearStrike.cooldownLabel(NuclearStrike.cooldownFor(this.nuclearCooldownLevel));
+    const reload = cooldownLabel(NuclearStrike.cooldownFor(this.nuclearCooldownLevel));
     if (this.nuclearOwned) {
       return {
         title: 'Покупка',
@@ -1761,8 +1769,8 @@ export class ShopController {
       title: '−1 с перезарядки',
       buy,
       info: maxed
-        ? `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}`
-        : `ур. ${level} · ${NuclearStrike.cooldownLabel(now)}→${NuclearStrike.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,
@@ -1772,7 +1780,7 @@ export class ShopController {
 
   private wallCard(coins: number): ShopCardView {
     const price = shopPrice(EnergyWall.shop.cost);
-    const reload = EnergyWall.cooldownLabel(EnergyWall.cooldownFor(this.wallCooldownLevel));
+    const reload = cooldownLabel(EnergyWall.cooldownFor(this.wallCooldownLevel));
     const hold = EnergyWall.durationLabel(EnergyWall.durationFor(this.wallDurationLevel));
     if (this.wallOwned) {
       return {
@@ -1849,8 +1857,8 @@ export class ShopController {
       title: '−0.10 с перезарядки',
       buy,
       info: maxed
-        ? `ур. ${level} · ${EnergyWall.cooldownLabel(now)}`
-        : `ур. ${level} · ${EnergyWall.cooldownLabel(now)}→${EnergyWall.cooldownLabel(next)}`,
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
       cost: maxed ? 'максимум' : this.coin(price),
       open: !maxed,
       canBuy: !maxed && coins >= price,

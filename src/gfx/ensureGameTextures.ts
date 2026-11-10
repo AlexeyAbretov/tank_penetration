@@ -2,7 +2,6 @@
 // сущности сами вызывают bake() из textures.ts, и общий импорт зациклил бы модули.
 
 import Phaser from 'phaser';
-import { ArtilleryStrike } from '../entities/ArtilleryStrike';
 import { BomberStrike } from '../entities/BomberStrike';
 import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
@@ -14,7 +13,6 @@ import { Mines } from '../entities/Mines';
 import { EnergyWall } from '../entities/EnergyWall';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
-import { EnemyShot } from '../entities/EnemyShot';
 import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { Rocket } from '../entities/Rocket';
@@ -23,20 +21,20 @@ import { Helicopter } from '../entities/Helicopter';
 import { RocketBuggy } from '../entities/RocketBuggy';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
-import { Tank } from '../entities/Tank/Tank';
 import { ensureCraters } from './craters';
 import { createTextures } from './textures';
+import { Muzzle } from './muzzle';
 
 export function ensureGameTextures(scene: Phaser.Scene): void {
   createTextures(scene);
   ensureCraters(scene);
-  Tank.ensureTextures(scene);
+
+  Muzzle.ensureTextures(scene);
   MachineGun.ensureTextures(scene);
   LaserDefense.ensureTextures(scene);
   FlameTank.ensureTextures(scene);
   RocketSalvo.ensureTextures(scene);
   BarbedWire.ensureTextures(scene);
-  ArtilleryStrike.ensureTextures(scene);
   BomberStrike.ensureTextures(scene);
   IonCannon.ensureTextures(scene);
   Mines.ensureTextures(scene);
@@ -51,5 +49,4 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   RocketBuggy.ensureTextures(scene);
   Helicopter.ensureTextures(scene);
   HeavyTank.ensureTextures(scene);
-  EnemyShot.ensureTextures(scene);
 }
