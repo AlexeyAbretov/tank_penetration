@@ -1,7 +1,8 @@
 import { AbilityConfig } from "./Ability.types";
 
-export const cooldownLabel = (ms: number, withSeconds = true, withMilliseconds = false): string => {
-    const totalSec = withMilliseconds ? ms / 1000 : Math.ceil(ms / 1000);
+// Карточка магазина держит десятую: шаг завесы 0,1 с. Кружок на поле считает целые секунды.
+export const cooldownLabel = (ms: number, withSeconds = true, withTenths = true): string => {
+    const totalSec = withTenths ? ms / 1000 : Math.ceil(ms / 1000);
 
     if (totalSec < 60) {
         const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);

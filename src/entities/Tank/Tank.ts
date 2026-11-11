@@ -613,11 +613,15 @@ export class Tank extends GameObjects.Container {
     };
   }
 
-  // Корпус, башня, ствол, снаряд и вспышка. Сцена берёт их по именам
-  // 'shell'
+  // Снаряд печётся здесь. Корпус, башня, ствол и обломки уже лежат файлами: ближайший пиксель, чтобы поворот не мылил.
   protected static ensureTextures(scene: Phaser.Scene): void {
     if (!scene.textures.exists('shell')) {
       this.createShell(scene);
+    }
+    for (const key of ['tank-hull', 'tank-turret', 'tank-gun', Tank.wreckKey]) {
+      if (scene.textures.exists(key)) {
+        scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
     }
   }
 

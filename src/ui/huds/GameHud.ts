@@ -31,13 +31,22 @@ export class GameHud {
     scene.load.image(GameHud.bannerKey, 'assets/banner.png');
   }
 
-  // Фильтр ближайшего пикселя, чтобы плитка не мылилась. Нет файла — красная лента из фигур.
+  // Ближайший пиксель, чтобы плитка и иконки не мылились.
   static ensureTextures(scene: Phaser.Scene): void {
-    if (scene.textures.exists(GameHud.bannerKey)) {
-      scene.textures.get(GameHud.bannerKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    GameHud.nearest(scene, GameHud.bannerKey);
+    for (const ability of AbilityList) {
+      GameHud.nearest(scene, ability.texture);
+    }
+    GameHud.nearest(scene, AutoAimAbilityIcon.iconKey);
+    GameHud.nearest(scene, AutoFireAbilityIcon.iconKey);
+    GameHud.nearest(scene, AutoShopAbilityIcon.iconKey);
+  }
 
+  protected static nearest(scene: Phaser.Scene, key: string): void {
+    if (!scene.textures.exists(key)) {
       return;
     }
+    scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
 
   private readonly scoreText: Phaser.GameObjects.Text;
@@ -1098,7 +1107,7 @@ export class GameHud {
       icon.glow.setVisible(lit);
     }
     // Дольше минуты три цифры секунд не влезают в кружок, поэтому 3:00.
-    const label = cooling ? cooldownLabel(cooldownMs, false) : '';
+    const label = cooling ? cooldownLabel(cooldownMs, false, false) : '';
     if (icon.time.text !== label) {
       icon.time.setText(label);
     }

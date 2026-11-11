@@ -57,6 +57,7 @@ export class DebugGameHud extends GameHud {
       scene.events.off('quiet-pause', onQuietPause);
     });
 
+    GameHud.nearest(scene, EnemyDamageDebugAbilityIcon.iconKey);
     const icon = this.bindRoundIcon(EnemyDamageDebugAbilityIcon.iconKey, this.rightSkillRoots().length, 53);
     
     this.enemyDamageRoot = icon.root;
