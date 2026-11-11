@@ -1,19 +1,16 @@
-// Голос ионной пушки.
-// public/audio/ion_appear.ogg — низкий сход столба. Не лазер: сверху почти нет, тон падает вниз.
+// Голос ионной пушки, кроме схода: тот лежит в Descent и общий со вспышкой ЭМИ.
 // public/audio/lowFrequency_explosion_000.ogg — подошва бьёт в землю (Kenney Sci-fi Sounds, CC0).
 // public/audio/thrusterFire_000.ogg — шипение хода (тот же набор). Играет, пока столб идёт, и обрывается вместе с ним.
-// Пауза и гибель базы глушат все три.
+// Пауза и гибель базы глушат оба.
 // Рестарт сцены звуки общего менеджера не удаляет, поэтому нужен destroy.
 
 import Phaser from 'phaser';
 import type { EffectsVolume } from './EffectsVolume';
 
-// Сход — ровный низкий гул, не короткий щелчок. 0.5 — громче луча лазера, ниже пушки (0.65).
 // Низкий взрыв длится две секунды и идёт один. 0.7 — рядом с пушкой: удар редкий, не очередь.
 // Шипение держится весь ход, 3–5 с. 0.38 — его слышно сквозь стрельбу, пушка остаётся громче.
-const APPEAR_GAIN = 0.5;
-const IMPACT_GAIN = 0.7;
-const SWEEP_GAIN = 0.38;
+const IMPACT_GAIN = 1.7;
+const SWEEP_GAIN = 1.0;
 
 type Clip = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
 
@@ -31,10 +28,6 @@ export class IonCannonSounds {
     private readonly effects: EffectsVolume,
   ) {
     effects.follow(() => this.applyGain());
-  }
-
-  playAppear(): void {
-    this.play('ion-appear', APPEAR_GAIN);
   }
 
   playImpact(): void {

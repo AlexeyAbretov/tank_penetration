@@ -115,6 +115,7 @@ const packedFiles = [
   ['audio/tank_mg_shot.mp3', 'audio/mpeg'],
   ['audio/laserSmall_000.ogg', 'audio/ogg'],
   ['audio/ion_appear.ogg', 'audio/ogg'],
+  ['audio/forceField_000.ogg', 'audio/ogg'],
   ['audio/lowFrequency_explosion_000.ogg', 'audio/ogg'],
   ['audio/thrusterFire_000.ogg', 'audio/ogg'],
   ['audio/gunner_shot.mp3', 'audio/mpeg'],

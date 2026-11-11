@@ -9,6 +9,8 @@ import { BoomSounds } from './BoomSounds';
 import { AssaultExplosion } from './AssaultExplosion';
 import { BulletHitTank } from './BulletHitTank';
 import { EffectsVolume } from './EffectsVolume';
+import { Descent } from './Descent';
+import { EmpSpread } from './EmpSpread';
 import { GunnerShot } from './GunnerShot';
 import { HeavyTankSounds } from './HeavyTankSounds';
 import { ImpactSounds } from './ImpactSounds';
@@ -34,6 +36,8 @@ export class BattleEffects {
   readonly tankShot: TankShot;
   readonly tankMgShot: TankMgShot;
   readonly laserShot: LaserShot;
+  readonly descent: Descent;
+  readonly empSpread: EmpSpread;
   readonly ionCannon: IonCannonSounds;
   readonly rocketBurst: RocketBurst;
   readonly gunnerShot: GunnerShot;
@@ -55,6 +59,8 @@ export class BattleEffects {
     this.tankShot = new TankShot(scene, this.gain);
     this.tankMgShot = new TankMgShot(scene, this.gain);
     this.laserShot = new LaserShot(scene, this.gain);
+    this.descent = new Descent(scene, this.gain);
+    this.empSpread = new EmpSpread(scene, this.gain);
     this.ionCannon = new IonCannonSounds(scene, this.gain);
     this.rocketBurst = new RocketBurst(scene, this.gain);
     this.gunnerShot = new GunnerShot(scene, this.gain);
@@ -73,6 +79,8 @@ export class BattleEffects {
       this.tankShot,
       this.tankMgShot,
       this.laserShot,
+      this.descent,
+      this.empSpread,
       this.ionCannon,
       this.rocketBurst,
       this.gunnerShot,

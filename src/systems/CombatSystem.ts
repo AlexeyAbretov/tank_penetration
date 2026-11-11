@@ -918,10 +918,14 @@ export class CombatSystem implements Combat {
       return;
     }
     this.empCooldownMs = this.empSpan();
-    this.empFlash = new EmpFlash(this.scene, () => this.pulseEmp());
+    this.empFlash = new EmpFlash(
+      this.scene,
+      () => this.pulseEmp(),
+      () => this.effects.empSpread.play(),
+    );
     this.empFlash.start();
-    // Тот же щелчок, что у луча и завесы: короткое включение энергии.
-    this.effects.laserShot.play();
+    // Тот же низкий сход, что у ионного столба: луч падает сверху.
+    this.effects.descent.play();
   }
 
   private empPressed(): boolean {
@@ -1043,7 +1047,7 @@ export class CombatSystem implements Combat {
     });
     this.cutIon(this.ionRun, from);
     this.scene.cameras.main.shake(180, 0.0025);
-    this.effects.ionCannon.playAppear();
+    this.effects.descent.play();
     this.effects.ionCannon.startSweep();
   }
 
