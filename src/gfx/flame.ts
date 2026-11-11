@@ -1,6 +1,7 @@
 // Струя — лист из восьми кадров: выбросы с просветами, кладётся от среза и повторяется по лучу.
 // Костёр на конце струи — свой лист. Под дугой костров фотографическая выжженная полоса.
-// Огонь на юните — уменьшенные костры по контуру. Урона не наносят.
+// Огонь на юните — уменьшенные костры по контуру.
+// Полную секунду горения gfx отдаёт бою, урон считает бой.
 // У пехоты они идут по задней части, у машины — по капоту. Над ними поднимается дым.
 
 import Phaser from 'phaser';
@@ -50,6 +51,8 @@ export const flameStreamSheetPath = 'assets/flame-stream.png';
 
 type Burn = {
   left: number;
+  // Мс текущей секунды. Полная секунда уходит в список тиков.
+  pending: number;
   unit: Body;
   tongues: Phaser.GameObjects.Sprite[];
   smoke: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -75,18 +78,37 @@ export function clearBurns(): void {
   burns.length = 0;
 }
 
-export function tickBurns(scene: Phaser.Scene, delta: number): void {
+export function isBurning(unit: Body): boolean {
+  return burns.some((burn) => burn.unit === unit);
+}
+
+// Юниты, у которых в этом кадре кончилась секунда горения. Бой снимает с них урон.
+export function tickBurns(scene: Phaser.Scene, delta: number, tickMs: number): Body[] {
   bindScene(scene);
+  const step = Math.max(1, tickMs);
+  const due: Body[] = [];
   for (let i = burns.length - 1; i >= 0; i -= 1) {
     const burn = burns[i];
-    burn.left -= delta;
-    if (burn.left <= 0 || !burn.unit.active) {
+    if (!burn.unit.active) {
+      dropBurn(burn);
+      burns.splice(i, 1);
+      continue;
+    }
+    const lived = Math.min(delta, burn.left);
+    burn.left -= lived;
+    burn.pending += lived;
+    while (burn.pending >= step) {
+      burn.pending -= step;
+      due.push(burn.unit);
+    }
+    if (burn.left <= 0) {
       dropBurn(burn);
       burns.splice(i, 1);
       continue;
     }
     followBurn(burn);
   }
+  return due;
 }
 
 // Повторное попадание продлевает уже горящие языки.
@@ -100,6 +122,7 @@ export function ignite(scene: Phaser.Scene, unit: Body, lifeMs: number): void {
   const hood = unit.flameSeat === 'hood';
   const burn: Burn = {
     left: lifeMs,
+    pending: 0,
     unit,
     tongues: tonguesAt(scene, hood ? 3 : 4),
     smoke: burnSmokeAt(scene, unit.x, unit.y, hood),

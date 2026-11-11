@@ -25,7 +25,7 @@ import { GAME } from '../gameConfig';
 import { airBurstAt } from '../gfx/airBurst';
 import { bombBoom } from '../gfx/bombBoom';
 import { craterHalfHeight, craterReach, fadeCrater, placeCrater } from '../gfx/craters';
-import { clearBurns, ignite, inPatch, inStream, layScorchedPath, placeCampfires, revealScorchedPath, syncFlameStream, syncScorchedEarth, tickBurns } from '../gfx/flame';
+import { clearBurns, ignite, inPatch, inStream, isBurning, layScorchedPath, placeCampfires, revealScorchedPath, syncFlameStream, syncScorchedEarth, tickBurns } from '../gfx/flame';
 import { createShellBlast } from '../gfx/particles';
 import { playArtilleryShot } from '../sounds/BoomSounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
@@ -1622,9 +1622,10 @@ export class CombatSystem implements Combat {
   }
 
   // Раз в 10 секунд башня ведёт струю сверху вниз на четверть длины поля.
-  // Струя бьёт один раз и поджигает картинку. Костры дуги гаснут вместе через две секунды, сжимаясь к основанию.
+  // Струя бьёт один раз и поджигает. Костёр поджигает того, кто ещё не горит.
+  // Секунда горения снимает долю базового урона. Костры гаснут вместе, сжимаясь к основанию.
   private tickFlame(delta: number): void {
-    tickBurns(this.scene, delta);
+    this.hurtBurns(tickBurns(this.scene, delta, FlameTank.shop.burnTickMs));
     const flame = this.shop.flame;
     if (!flame) {
       this.stopFlame();
@@ -1836,6 +1837,39 @@ export class CombatSystem implements Combat {
       }
       patch.hit.add(unit);
       this.hurtInfantry(unit, FlameTank.shop.patchDamage + this.shop.flameDamageLevel);
+    }
+    this.lightFromPatch(patch);
+  }
+
+  // Уже горящего костёр не продлевает: новое пламя только у того, кто погас.
+  private lightFromPatch(patch: FlamePatch): void {
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (!this.flameTarget(unit) || !unit.takes('other') || isBurning(unit)) {
+        continue;
+      }
+      const center = unit.hitCenter();
+      if (!inPatch(center.x, center.y, patch.points)) {
+        continue;
+      }
+      ignite(this.scene, unit, FlameTank.shop.burnMs);
+    }
+  }
+
+  // Доля базы струи, вверх до целого. У пятна то же число, уровень партии сюда не входит.
+  private burnDamage(): number {
+    return Math.ceil(FlameTank.shop.streamDamage * FlameTank.shop.burnShare);
+  }
+
+  private hurtBurns(units: readonly Phaser.GameObjects.Sprite[]): void {
+    const damage = this.burnDamage();
+    for (const sprite of units) {
+      if (!(sprite instanceof Infantry)) {
+        continue;
+      }
+      if (!this.flameTarget(sprite) || !sprite.takes('other')) {
+        continue;
+      }
+      this.hurtInfantry(sprite, damage);
     }
   }
 

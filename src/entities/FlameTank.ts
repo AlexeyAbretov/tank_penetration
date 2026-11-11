@@ -25,8 +25,10 @@ export class FlameTank extends GameObjects.Container {
     patchFadeMs: 400,
     // Выжженная полоса гаснет после костров.
     earthFadeMs: 500,
-    // Языки на юните. Урона у них нет.
+    // Языки на юните. Секунда горения снимает долю базового урона, уровень партии в неё не входит.
     burnMs: 2_000,
+    burnTickMs: 1_000,
+    burnShare: 0.2,
     // Доля ширины поля, на которую достаёт струя.
     reach: 0.25,
     streamDamage: 8,
