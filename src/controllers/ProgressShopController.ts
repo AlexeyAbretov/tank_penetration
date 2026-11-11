@@ -6,6 +6,7 @@ import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
 import { BarbedWire } from '../entities/BarbedWire';
+import { FlameTank } from '../entities/FlameTank';
 import { Infantry } from '../entities/Infantry';
 import { LaserDefense } from '../entities/LaserDefense';
 import { MachineGun } from '../entities/MachineGun';
@@ -51,6 +52,7 @@ type Stat =
   | 'ionDamage'
   | 'minesDamage'
   | 'wireDamage'
+  | 'flameDamage'
   | 'artilleryCooldown'
   | 'ionCooldown'
   | 'ionSweep'
@@ -183,6 +185,10 @@ export class ProgressShopController {
 
   wireDamageBonus(): number {
     return this.progress.wireDamage;
+  }
+
+  flameDamageBonus(): number {
+    return this.progress.flameDamage;
   }
 
   bomberDamageBonus(): number {
@@ -511,6 +517,10 @@ export class ProgressShopController {
 
   private buyWireDamage(): void {
     this.buy('wireDamage');
+  }
+
+  private buyFlameDamage(): void {
+    this.buy('flameDamage');
   }
 
   private buyArtilleryCooldown(): void {
@@ -847,6 +857,7 @@ export class ProgressShopController {
           this.mgFlightCard(score),
         ]),
         this.tab('wire', 'Колючая проволока', [this.wireDamageCard(score)]),
+        this.tab('flame', 'Огнемёт', [this.flameDamageCard(score)]),
         this.tab('laser', 'Лазерная установка', [this.laserCard(score), this.laserCooldownCard(score)]),
         this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score), this.salvoDamageCard(score)]),
         this.tab('artillery', 'Артиллерия', [
@@ -1324,6 +1335,15 @@ export class ProgressShopController {
     return this.damageCardFor(this.progress.wireDamage, BarbedWire.shop.damage, score, () => this.buyWireDamage());
   }
 
+  private flameDamageCard(score: number): ProgressCardView {
+    return this.damageCardFor(
+      this.progress.flameDamage,
+      FlameTank.shop.streamDamage,
+      score,
+      () => this.buyFlameDamage(),
+    );
+  }
+
   // Потолка нет. Лестница та же, что у урона пули: 300, 600, 900…
   private damageCardFor(level: number, base: number, score: number, buy: () => void): ProgressCardView {
     const price = this.mgDamagePrice(level);
@@ -1623,6 +1643,7 @@ export class ProgressShopController {
       stat === 'ionDamage' ||
       stat === 'minesDamage' ||
       stat === 'wireDamage' ||
+      stat === 'flameDamage' ||
       stat === 'bomberDamage'
     ) {
       return this.mgDamagePrice(level);

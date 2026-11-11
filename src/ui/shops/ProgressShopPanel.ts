@@ -48,10 +48,10 @@ const PANEL_H = 704;
 
 const SIDE = 22;
 const TAB_W = 250;
-// Одиннадцать вкладок остаются над нижним краем плашки и не доезжают до кнопок.
+// Счёт уехал в правый верхний угол: колонка закладок занимает его прежний ряд.
 const TAB_H = 42;
 const TAB_GAP = 4;
-const CONTENT_TOP = -228;
+const CONTENT_TOP = -260;
 const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
 
 const CARD_GAP_X = 16;
@@ -61,8 +61,8 @@ const CARD_H = 92;
 const CARD_GAP = 10;
 
 const TITLE_Y = -310;
-const SCORE_Y = -266;
-const RULE_Y = -246;
+const SCORE_X = PANEL_W / 2 - SIDE;
+const RULE_Y = -278;
 const BUTTON_Y = 314;
 const BUTTON_W = 260;
 const BUTTON_GAP = 30;
@@ -134,11 +134,11 @@ export class ProgressShopPanel {
       .setOrigin(0.5);
 
     this.scoreText = scene.add
-      .text(0, SCORE_Y, 'SCORE  0', {
+      .text(SCORE_X, TITLE_Y, 'SCORE  0', {
         fontSize: '22px',
         color: fieldPaper,
       })
-      .setOrigin(0.5);
+      .setOrigin(1, 0.5);
 
     this.container = scene.add.container(screen.width / 2, screen.height / 2, [
       this.dim,

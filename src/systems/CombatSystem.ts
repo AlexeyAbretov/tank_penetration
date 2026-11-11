@@ -192,6 +192,7 @@ export class CombatSystem implements Combat {
     private readonly progressArtilleryDamage: number,
     private readonly progressMinesDamage: number,
     private readonly progressWireDamage: number,
+    private readonly progressFlameDamage: number,
     private readonly progressIonDamage: number,
     private readonly progressBomberDamage: number,
     private readonly laserShots: number,
@@ -1819,7 +1820,7 @@ export class CombatSystem implements Combat {
         continue;
       }
       hit.add(unit);
-      this.hurtInfantry(unit, FlameTank.shop.streamDamage + this.shop.flameDamageLevel);
+      this.hurtInfantry(unit, this.flameHit(FlameTank.shop.streamDamage));
       if (unit.active) {
         ignite(this.scene, unit, FlameTank.shop.burnMs);
       }
@@ -1836,7 +1837,7 @@ export class CombatSystem implements Combat {
         continue;
       }
       patch.hit.add(unit);
-      this.hurtInfantry(unit, FlameTank.shop.patchDamage + this.shop.flameDamageLevel);
+      this.hurtInfantry(unit, this.flameHit(FlameTank.shop.patchDamage));
     }
     this.lightFromPatch(patch);
   }
@@ -1855,7 +1856,12 @@ export class CombatSystem implements Combat {
     }
   }
 
-  // Доля базы струи, вверх до целого. У пятна то же число, уровень партии сюда не входит.
+  // Струя и пятно. База у них одна, сверху уровень партии и магазин очков.
+  private flameHit(base: number): number {
+    return base + this.shop.flameDamageLevel + this.progressFlameDamage;
+  }
+
+  // Доля базы струи, вверх до целого. Покупки урона струи и пятна сюда не входят.
   private burnDamage(): number {
     return Math.ceil(FlameTank.shop.streamDamage * FlameTank.shop.burnShare);
   }

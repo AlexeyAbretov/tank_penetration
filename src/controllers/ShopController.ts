@@ -37,6 +37,8 @@ type PermanentBonuses = {
   mg: number;
   // Постоянный урон проволоки из магазина после гибели. К урону на карточке прибавляется, лестницу цены не двигает.
   wire: number;
+  // Постоянный урон огнемёта. К струе и пятну на карточке прибавляется, лестницу цены не двигает.
+  flame: number;
   // Постоянный урон ракеты, снаряда и мины. К урону на карточке прибавляется, лестницу цены не двигает.
   salvo: number;
   artillery: number;
@@ -1014,6 +1016,10 @@ export class ShopController {
     return this.wireDamageLevel + this.bonuses.wire;
   }
 
+  private flameDamageOfferLevel(): number {
+    return this.flameDamageLevel + this.bonuses.flame;
+  }
+
   private salvoDamageOfferLevel(): number {
     return this.salvoDamageLevel + this.bonuses.salvo;
   }
@@ -1157,7 +1163,7 @@ export class ShopController {
 
   // Струя и пятно на земле стартуют с одного числа и растут вместе.
   private flameDamageCard(coins: number): ShopCardView {
-    const now = FlameTank.shop.streamDamage + this.flameDamageLevel;
+    const now = FlameTank.shop.streamDamage + this.flameDamageOfferLevel();
     const card = this.weaponDamageCard(
       this.flameDamageLevel,
       now,

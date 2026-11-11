@@ -67,6 +67,8 @@ export type SavedProgress = {
   minesDamage: number;
   // Сколько раз докуплен урон колючей проволоки. 0 — базовый урон. Потолка нет. Цена как у урона пули.
   wireDamage: number;
+  // Сколько раз докуплен урон огнемёта. 0 — базовый урон струи и пятна. Потолка нет. Цена как у урона пули.
+  flameDamage: number;
   // Сколько раз укорочен откат артиллерии. 0 — базовая минута. Прогресс сам останавливается на 40 с.
   artilleryCooldown: number;
   // Сколько раз укорочен откат ионной пушки. 0 — базовая минута. Прогресс сам останавливается на 40 с.
@@ -274,6 +276,7 @@ export class ProgressSave {
     progress.ionDamage = 0;
     progress.minesDamage = 0;
     progress.wireDamage = 0;
+    progress.flameDamage = 0;
     progress.artilleryCooldown = 0;
     progress.ionCooldown = 0;
     progress.ionSweep = 0;
@@ -380,6 +383,7 @@ export class ProgressSave {
       ionDamage: 0,
       minesDamage: 0,
       wireDamage: 0,
+      flameDamage: 0,
       artilleryCooldown: 0,
       ionCooldown: 0,
       ionSweep: 0,
@@ -479,6 +483,8 @@ function parseProgress(value: unknown): SavedProgress | null {
     minesDamage: requiredInt(value.minesDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     // Старые сохранения не писали урон проволоки: рана оставалась базовой.
     wireDamage: requiredInt(value.wireDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
+    // Старые сохранения не писали урон огнемёта: струя и пятно били без этой прибавки.
+    flameDamage: requiredInt(value.flameDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     // Старые сохранения не писали откат артиллерии и мин: залп и постановка ждали базовую минуту.
     artilleryCooldown: requiredInt(value.artilleryCooldown, 0, ArtilleryStrikeAbilityConfig.maxProgressCooldownLevel()) ?? 0,
     // Старые сохранения не писали откат ионной пушки: луч ждал базовую минуту.
