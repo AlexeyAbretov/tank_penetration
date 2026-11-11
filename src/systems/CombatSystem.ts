@@ -1,7 +1,7 @@
-// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, бомбардировщик, ионная пушка, мины, атомный взрыв, энергетическая стена, контакт с базой и урон отскочившего чужого выстрела.
+// Снаряды танка: выстрел, попадания, взрывы, проволока, лазер, огнемёт, РСЗО, арт удар, бомбардировщик, ионная пушка, мины, атомный взрыв, энергетическая стена, ЭМИ, контакт с базой и урон отскочившего чужого выстрела.
 
 import Phaser from 'phaser';
-import { ArtilleryStrikeAbility, ArtilleryStrikeAbilityConfig, cooldownFor, type ArtilleryFlight, type ArtilleryMark } from '../abilities';
+import { ArtilleryStrikeAbility, ArtilleryStrikeAbilityConfig, EmpFlash, EmpFlashAbilityConfig, cooldownFor, type ArtilleryFlight, type ArtilleryMark } from '../abilities';
 import { BomberStrike, type BomberFlight } from '../entities/BomberStrike';
 import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
@@ -173,6 +173,10 @@ export class CombatSystem implements Combat {
   private minesReadyMs = 0;
   private bomberReadyMs = 0;
   private wallReadyMs = 0;
+  private empCooldownMs = 0;
+  private readonly empKeys: Phaser.Input.Keyboard.Key[] = [];
+  private empFromIcon = false;
+  private empFlash?: EmpFlash;
 
   constructor(
     protected readonly scene: Phaser.Scene,
@@ -226,6 +230,10 @@ export class CombatSystem implements Combat {
       this.bomberKeys.push(
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX),
         keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SIX),
+      );
+      this.empKeys.push(
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SEVEN),
+        keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_SEVEN),
       );
     }
     this.wall = new EnergyWall(scene);
@@ -289,6 +297,14 @@ export class CombatSystem implements Combat {
 
   setBomberCooldown(ms: number): void {
     this.bomberCooldownMs = Math.min(this.bomberSpan(), Math.max(0, ms));
+  }
+
+  get empCooldown(): number {
+    return this.empCooldownMs;
+  }
+
+  setEmpCooldown(ms: number): void {
+    this.empCooldownMs = Math.min(this.empSpan(), Math.max(0, ms));
   }
 
   // Правый край завесы. Пока её нет, чужой выстрел летит до танка.
@@ -356,6 +372,14 @@ export class CombatSystem implements Combat {
     return BomberStrike.cooldownFor(this.shop.bomberCooldownLevel);
   }
 
+  private empSpan(): number {
+    return cooldownFor(
+      this.shop.empCooldownLevel,
+      this.progressShop.empCooldownLevel(),
+      EmpFlashAbilityConfig,
+    );
+  }
+
   // Сколько миллисекунд гриб ещё будет на поле. Магазин волны ждёт это, чтобы не закрыть взрыв.
   nuclearCloudLeft(): number {
     return Math.max(0, this.nuclearCloudUntil - this.scene.time.now);
@@ -396,6 +420,11 @@ export class CombatSystem implements Combat {
     this.bomberFromIcon = true;
   }
 
+  // Иконка на HUD просит вспышку. Сработает в tickEmp, если бой идёт и перезарядка кончилась.
+  requestEmp(): void {
+    this.empFromIcon = true;
+  }
+
   clearProjectiles(): void {
     this.strikeFromIcon = false;
     this.mineFromIcon = false;
@@ -403,7 +432,12 @@ export class CombatSystem implements Combat {
     this.ionFromIcon = false;
     this.wallFromIcon = false;
     this.bomberFromIcon = false;
+    this.empFromIcon = false;
     this.wall.drop();
+    this.dropEmp();
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      unit.dropHold();
+    }
     this.artilleryReadyMs = 0;
     this.minesReadyMs = 0;
     this.ionReadyMs = 0;
@@ -861,6 +895,79 @@ export class CombatSystem implements Combat {
     const fromIcon = this.bomberFromIcon;
     this.bomberFromIcon = false;
     return fromIcon || this.bomberKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  // Перезарядка идёт и в магазине. Вспышка — в бою, по клавише 7 или по иконке.
+  // Уже пущенный луч и купол в магазине не замирают: тик вспышки идёт и при открытой витрине.
+  tickEmp(delta: number, canFire: boolean): void {
+    if (!this.shop.empOwned) {
+      this.empFromIcon = false;
+      this.dropEmp();
+      return;
+    }
+    this.empFlash?.tick(delta);
+    const span = this.empSpan();
+    this.empCooldownMs = Math.min(span, Math.max(0, this.empCooldownMs - delta));
+    if (this.empPressed()) {
+      this.useEmp(canFire);
+    }
+  }
+
+  protected useEmp(canFire: boolean): void {
+    if (!canFire || this.empCooldownMs > 0 || this.empFlash?.active) {
+      return;
+    }
+    this.empCooldownMs = this.empSpan();
+    this.empFlash = new EmpFlash(this.scene, () => this.pulseEmp());
+    this.empFlash.start();
+    // Тот же щелчок, что у луча и завесы: короткое включение энергии.
+    this.effects.laserShot.play();
+  }
+
+  private empPressed(): boolean {
+    const fromIcon = this.empFromIcon;
+    this.empFromIcon = false;
+    return fromIcon || this.empKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
+  }
+
+  // Купол уже погас. Пехота и техника стоят, летящие ракеты рвутся без урона.
+  private pulseEmp(): void {
+    const ms = EmpFlashAbilityConfig.stunFor(this.shop.empStunLevel, this.progressShop.empStunLevel());
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      if (!unit.active || unit.reachedWall) {
+        continue;
+      }
+      unit.hold(ms);
+    }
+    if (this.burstRockets()) {
+      this.effects.rocketBurst.play();
+    }
+  }
+
+  // Ракеты защиты и нападения. Пули и снаряд тяжёлого танка не ракеты: они летят дальше.
+  private burstRockets(): boolean {
+    let burst = false;
+    const salvo = this.shop.salvo?.burstInFlight() ?? [];
+    for (const point of salvo) {
+      burst = true;
+      airBurstAt(this.scene, point.x, point.y);
+    }
+    for (const obj of [...this.enemyShots.getChildren()]) {
+      if (!(obj instanceof Rocket) || !obj.active) {
+        continue;
+      }
+      const x = obj.x;
+      const y = obj.y;
+      obj.destroy();
+      airBurstAt(this.scene, x, y);
+      burst = true;
+    }
+    return burst;
+  }
+
+  private dropEmp(): void {
+    this.empFlash?.cancel();
+    this.empFlash = undefined;
   }
 
   // Высота — случайный живой. Пустое поле берёт случайную высоту в той же полосе.

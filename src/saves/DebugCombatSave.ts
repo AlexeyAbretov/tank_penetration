@@ -45,6 +45,7 @@ export class DebugCombatSave extends CombatSave {
       ionCooldownMs: 0,
       wallCooldownMs: 0,
       bomberCooldownMs: 0,
+      empCooldownMs: 0,
       flameCooldownMs: 0,
       flameWall: null,
       plantedMines: [],
@@ -88,6 +89,9 @@ export class DebugCombatSave extends CombatSave {
         bomber: true,
         bomberCooldown: 0,
         bomberDamage: 0,
+        emp: true,
+        empCooldown: 0,
+        empStun: 0,
       },
     };
   }

@@ -4,7 +4,7 @@
 // Стену огня пишем вместе с остатком срока: горение потом станет длиннее вкладки.
 // Дебаг-партия — отдельный наследник: другой ключ и другая пустая запись.
 
-import { ArtilleryStrikeAbilityConfig } from '../abilities';
+import { ArtilleryStrikeAbilityConfig, EmpFlashAbilityConfig } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -76,6 +76,11 @@ export type ShopSave = {
   bomberCooldown: number;
   // Уровни урона авиабомбы за эту партию. Старые сохранения читают 0.
   bomberDamage: number;
+  emp: boolean;
+  // Уровни отката ЭМИ за эту партию. Старые сохранения читают 0.
+  empCooldown: number;
+  // Уровни оглушения ЭМИ за эту партию. Старые сохранения читают 0: глушение 2 с.
+  empStun: number;
 };
 
 export type PlantedMineSave = {
@@ -101,6 +106,7 @@ export type SavedRun = {
   ionCooldownMs: number;
   wallCooldownMs: number;
   bomberCooldownMs: number;
+  empCooldownMs: number;
   flameCooldownMs: number;
   flameWall: FlameWallSave | null;
   wave: number;
@@ -198,6 +204,8 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
   const wallCooldownMs = requiredInt(value.wallCooldownMs, 0, EnergyWall.shop.cooldownMs) ?? 0;
   // Старые сохранения не писали перезарядку бомбардировщика: пролёта ещё не было.
   const bomberCooldownMs = requiredInt(value.bomberCooldownMs, 0, BomberStrike.shop.cooldownMs) ?? 0;
+  // Старые сохранения не писали перезарядку ЭМИ: вспышки ещё не было.
+  const empCooldownMs = requiredInt(value.empCooldownMs, 0, EmpFlashAbilityConfig.cooldownMs) ?? 0;
   // Старые сохранения не писали перезарядку огнемёта: струя просто ждёт новый заход.
   const flameCooldownMs = requiredInt(value.flameCooldownMs, 0, 60 * 60 * 1000) ?? 0;
   // Старые сохранения не писали стену огня: на поле её не было.
@@ -226,6 +234,7 @@ function parseRun(value: unknown, hpMax: number): SavedRun | null {
     ionCooldownMs,
     wallCooldownMs,
     bomberCooldownMs,
+    empCooldownMs,
     flameCooldownMs,
     flameWall,
     wave,
@@ -289,6 +298,10 @@ function parseShop(value: unknown): ShopSave | null {
   const bomber = flag(value.bomber) ?? false;
   const bomberCooldown = requiredInt(value.bomberCooldown, 0, BomberStrike.maxShopCooldownLevel) ?? 0;
   const bomberDamage = requiredInt(value.bomberDamage, 0, 500) ?? 0;
+  // Старые сохранения не писали ЭМИ: этой покупки ещё не было.
+  const emp = flag(value.emp) ?? false;
+  const empCooldown = requiredInt(value.empCooldown, 0, EmpFlashAbilityConfig.maxShopCooldownLevel()) ?? 0;
+  const empStun = requiredInt(value.empStun, 0, EmpFlashAbilityConfig.maxShopStunLevel()) ?? 0;
   if (
     blast === null ||
     damage === null ||
@@ -335,6 +348,9 @@ function parseShop(value: unknown): ShopSave | null {
     bomber,
     bomberCooldown,
     bomberDamage,
+    emp,
+    empCooldown,
+    empStun,
   };
 }
 

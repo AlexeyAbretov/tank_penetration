@@ -40,6 +40,7 @@ const packedFiles = [
   ['assets/ion-icon.png', 'image/png'],
   ['assets/ion-beam.png', 'image/png'],
   ['assets/energy-wall-icon.png', 'image/png'],
+  ['assets/emp-flash-icon.png', 'image/png'],
   ['assets/auto-aim-icon.png', 'image/png'],
   ['assets/auto-fire-icon.png', 'image/png'],
   ['assets/auto-shop-icon.png', 'image/png'],

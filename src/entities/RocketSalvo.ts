@@ -9,6 +9,7 @@ import { playRocketLaunch } from '../sounds/RocketSounds';
 
 export type SalvoFlight = {
   cancel(): void;
+  where(): Point;
 };
 
 type Point = { x: number; y: number };
@@ -210,6 +211,15 @@ export class RocketSalvo extends GameObjects.Container {
     this.flights.length = 0;
   }
 
+  // Уже вышедшие ракеты. Ждущие в шахте ещё не летят: вспышка их не берёт.
+  burstInFlight(): Point[] {
+    const points = this.flights.map((flight) => flight.where());
+    for (const flight of [...this.flights]) {
+      flight.cancel();
+    }
+    return points;
+  }
+
   // Правый край картинки сидит в шахте. Язык нарисован влево, поворот кладёт его вдоль трубы назад.
   private flash(hole: Point, nose: Point): void {
     const aim = RocketSalvo.aimOf(hole, nose);
@@ -248,6 +258,7 @@ export class RocketSalvo extends GameObjects.Container {
     const duration = straightMs + RocketSalvo.shop.flightMs;
     const split = straightMs / duration;
     const state = { t: 0 };
+    const spot = { x: from.x, y: from.y };
     let prev = { x: from.x, y: from.y };
     let puffMs = 0;
     let settled = false;
@@ -255,6 +266,9 @@ export class RocketSalvo extends GameObjects.Container {
     const handle: SalvoFlight = {
       cancel() {
         release(false);
+      },
+      where() {
+        return { x: spot.x, y: spot.y };
       },
     };
 
@@ -294,6 +308,8 @@ export class RocketSalvo extends GameObjects.Container {
                 y: from.y + aim.y * run * (t / split),
               }
             : RocketSalvo.arc((t - split) / (1 - split), bend, to, apex);
+        spot.x = at.x;
+        spot.y = at.y;
         const dx = at.x - prev.x;
         const dy = at.y - prev.y;
         if (dx !== 0 || dy !== 0) {

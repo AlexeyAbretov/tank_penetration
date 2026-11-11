@@ -9,3 +9,4 @@ export { ArtilleryStrikeAbilityIcon } from './ArtilleryStrikeAbility/ArtillerySt
 export type { AbilityConfig } from './Ability.types';
 export { cooldownLabel, cooldownFor } from './Ability.utils';
 export { ArtilleryStrikeAbilityConfig } from './ArtilleryStrikeAbility';
+export { EmpFlash, EmpFlashAbilityConfig, EmpFlashAbilityIcon } from './EmpFlashAbility';

@@ -1,7 +1,7 @@
 // Покупки после проигрыша. Score копится между партиями, уровни не сбрасываются.
 
 import Phaser from 'phaser';
-import { AbilityConfig, ArtilleryStrikeAbilityConfig, cooldownFor, cooldownLabel } from '../abilities';
+import { AbilityConfig, ArtilleryStrikeAbilityConfig, EmpFlashAbilityConfig, cooldownFor, cooldownLabel } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -62,7 +62,9 @@ type Stat =
   | 'wallDuration'
   | 'wallCooldown'
   | 'bomberDamage'
-  | 'bomberCooldown';
+  | 'bomberCooldown'
+  | 'empCooldown'
+  | 'empStun';
 
 export class ProgressShopController {
   // Панель и интерфейс живут только пока жива сцена. restart() их уничтожает, bind() собирает заново.
@@ -201,6 +203,14 @@ export class ProgressShopController {
 
   artilleryCooldownLevel(): number {
     return this.progress.artilleryCooldown;
+  }
+
+  empCooldownLevel(): number {
+    return this.progress.empCooldown;
+  }
+
+  empStunLevel(): number {
+    return this.progress.empStun;
   }
 
   ionCooldownLevel(): number {
@@ -527,6 +537,14 @@ export class ProgressShopController {
     this.buy('artilleryCooldown');
   }
 
+  private buyEmpCooldown(): void {
+    this.buy('empCooldown');
+  }
+
+  private buyEmpStun(): void {
+    this.buy('empStun');
+  }
+
   private buyIonCooldown(): void {
     this.buy('ionCooldown');
   }
@@ -763,6 +781,12 @@ export class ProgressShopController {
     if (stat === 'bomberCooldown' && !BomberStrike.progressCooldownShortens(level)) {
       return;
     }
+    if (stat === 'empCooldown' && !this.progressCooldownShortens(level, 0, EmpFlashAbilityConfig)) {
+      return;
+    }
+    if (stat === 'empStun' && !EmpFlashAbilityConfig.progressStunGrows(level)) {
+      return;
+    }
     const cost = this.costFor(stat, level);
     if (this.progress.score < cost) {
       return;
@@ -890,6 +914,7 @@ export class ProgressShopController {
           this.bomberCooldownCard(score),
           this.autoBomberCard(score),
         ]),
+        this.tab('emp', 'ЭМИ', [this.empCooldownCard(score), this.empStunCard(score)]),
         this.tab('resources', 'Ресурсы', [
           this.coinsCard(score),
           this.pointsCard(score),
@@ -1400,6 +1425,42 @@ export class ProgressShopController {
   }
 
   // Ноль вместо отката магазина волны: партия к этому экрану уже стёрта, следующая начнёт его заново.
+  private empCooldownCard(score: number): ProgressCardView {
+    const level = this.progress.empCooldown;
+    const price = this.empCooldownPrice(level);
+    const now = cooldownFor(0, level, EmpFlashAbilityConfig);
+    const next = cooldownFor(0, level + 1, EmpFlashAbilityConfig);
+    const maxed = !this.progressCooldownShortens(level, 0, EmpFlashAbilityConfig);
+    return {
+      title: '−1 с перезарядки',
+      buy: () => this.buyEmpCooldown(),
+      info: maxed
+        ? `ур. ${level} · ${cooldownLabel(now)}`
+        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
+  private empStunCard(score: number): ProgressCardView {
+    const level = this.progress.empStun;
+    const price = this.empStunPrice(level);
+    const now = EmpFlashAbilityConfig.stunFor(0, level);
+    const next = EmpFlashAbilityConfig.stunFor(0, level + 1);
+    const maxed = !EmpFlashAbilityConfig.progressStunGrows(level);
+    return {
+      title: '+0.10 с оглушения',
+      buy: () => this.buyEmpStun(),
+      info: maxed
+        ? `ур. ${level} · ${EmpFlashAbilityConfig.stunLabel(now)}`
+        : `ур. ${level} · ${EmpFlashAbilityConfig.stunLabel(now)}→${EmpFlashAbilityConfig.stunLabel(next)}`,
+      cost: maxed ? 'макс.' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && score >= price,
+    };
+  }
+
   private artilleryCooldownCard(score: number): ProgressCardView {
     const level = this.progress.artilleryCooldown;
     const price = this.artilleryCooldownPrice(level);
@@ -1599,6 +1660,14 @@ export class ProgressShopController {
     return shopPrice(ProgressSave.cost(level));
   }
 
+  private empCooldownPrice(level: number): number {
+    return shopPrice(ProgressSave.cost(level));
+  }
+
+  private empStunPrice(level: number): number {
+    return shopPrice(ProgressSave.empStunCost(level));
+  }
+
   // Та же лестница, что у отката артиллерии: 500, 1000, 1500…
   private bomberCooldownPrice(level: number): number {
     return shopPrice(ProgressSave.cost(level));
@@ -1665,6 +1734,12 @@ export class ProgressShopController {
     }
     if (stat === 'artilleryCooldown') {
       return this.artilleryCooldownPrice(level);
+    }
+    if (stat === 'empCooldown') {
+      return this.empCooldownPrice(level);
+    }
+    if (stat === 'empStun') {
+      return this.empStunPrice(level);
     }
     if (stat === 'bomberCooldown') {
       return this.bomberCooldownPrice(level);

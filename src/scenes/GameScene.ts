@@ -3,7 +3,7 @@
 // Порядок чтения: поля — кто участвует в партии, create() их собирает, update() крутит кадр.
 
 import Phaser from 'phaser';
-import { ArtilleryStrikeAbilityConfig } from '../abilities';
+import { ArtilleryStrikeAbilityConfig, EmpFlashAbilityConfig } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { IonCannon } from '../entities/IonCannon';
 import { EnergyWall } from '../entities/EnergyWall';
@@ -295,6 +295,12 @@ export class GameScene extends Phaser.Scene {
       }
       this.combat.requestWall();
     });
+    this.hud.onAbility('emp', () => {
+      if (this.blocksPlay()) {
+        return;
+      }
+      this.combat.requestEmp();
+    });
     this.hud.onAbility('bomber', () => {
       if (this.blocksPlay()) {
         return;
@@ -397,6 +403,8 @@ export class GameScene extends Phaser.Scene {
         artillery: this.progressShop.artilleryDamageBonus(),
         artilleryShells: this.progressShop.shellCount(),
         artilleryCooldownLevel: this.progressShop.artilleryCooldownLevel(),
+        empCooldownLevel: this.progressShop.empCooldownLevel(),
+        empStunLevel: this.progressShop.empStunLevel(),
         mines: this.progressShop.minesDamageBonus(),
         wire: this.progressShop.wireDamageBonus(),
         flame: this.progressShop.flameDamageBonus(),
@@ -601,8 +609,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     const fighting = !this.shop.shopOpen;
-    // Перезарядка артиллерии, ионной пушки, мин, атомного взрыва, стены и бомбардировщика идёт и в магазине. Вызов — только когда fighting.
-    // Секунда автоприменения тикает там же. Сам удар, постановка, луч, завеса и пролёт ждут закрытого магазина. Уже пущенный луч, стоящая стена и летящий самолёт не замирают.
+    // Перезарядка артиллерии, ионной пушки, мин, атомного взрыва, стены, бомбардировщика и ЭМИ идёт и в магазине. Вызов — только когда fighting.
+    // Секунда автоприменения тикает там же. Сам удар, постановка, луч, завеса и пролёт ждут закрытого магазина. Уже пущенный луч, стоящая стена, летящий самолёт и вспышка ЭМИ не замирают.
     this.applyAutoStrikes();
     this.combat.tickArtillery(delta, fighting);
     this.combat.tickMines(delta, fighting);
@@ -610,6 +618,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.tickIon(delta, fighting);
     this.combat.tickWall(delta, fighting);
     this.combat.tickBomber(delta, fighting);
+    this.combat.tickEmp(delta, fighting);
     this.hud.setAbility(
       'artillery',
       this.shop.artilleryOwned,
@@ -647,6 +656,12 @@ export class GameScene extends Phaser.Scene {
       this.shop.bomberOwned,
       this.combat.bomberCooldown,
       BomberStrike.cooldownFor(this.shop.bomberCooldownLevel),
+    );
+    this.hud.setAbility(
+      'emp',
+      this.shop.empOwned,
+      this.combat.empCooldown,
+      cooldownFor(this.shop.empCooldownLevel, this.progressShop.empCooldownLevel(), EmpFlashAbilityConfig),
     );
     this.paintAutoStrikes();
     this.hud.setAutoAimToggle(this.progressShop.autoAimOwned(), this.progressShop.autoAimEnabled());
@@ -992,6 +1007,7 @@ export class GameScene extends Phaser.Scene {
     this.combat.setIonCooldown(saved.ionCooldownMs);
     this.combat.setWallCooldown(saved.wallCooldownMs);
     this.combat.setBomberCooldown(saved.bomberCooldownMs);
+    this.combat.setEmpCooldown(saved.empCooldownMs);
     this.combat.setFlameCooldown(saved.flameCooldownMs);
     this.combat.restoreMines(saved.plantedMines);
     this.combat.restoreFlameWall(saved.flameWall);
@@ -1037,6 +1053,7 @@ export class GameScene extends Phaser.Scene {
       ionCooldownMs: Math.round(this.combat.ionCooldown),
       wallCooldownMs: Math.round(this.combat.wallCooldown),
       bomberCooldownMs: Math.round(this.combat.bomberCooldown),
+      empCooldownMs: Math.round(this.combat.empCooldown),
       flameCooldownMs: Math.round(this.combat.flameCooldown),
       flameWall: this.combat.captureFlameWall(),
       plantedMines: this.combat.captureMines(),

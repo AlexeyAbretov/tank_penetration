@@ -267,6 +267,10 @@ export class Helicopter extends Infantry {
     return dead;
   }
 
+  override mechanical(): boolean {
+    return true;
+  }
+
   protected override act(delta: number): void {
     this.aimGun();
     const step = delta * enemyHasteOf(this.scene.registry);

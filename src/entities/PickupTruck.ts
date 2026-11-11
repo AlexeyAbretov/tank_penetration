@@ -199,6 +199,10 @@ export class PickupTruck extends RangedEnemy {
     this.syncGun();
   }
 
+  override mechanical(): boolean {
+    return true;
+  }
+
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     this.syncGun();

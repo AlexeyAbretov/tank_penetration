@@ -46,10 +46,11 @@ const PANEL_H = 680;
 
 const SIDE = 22;
 const TAB_W = 250;
-// Одиннадцать вкладок помещаются в левую колонку над нижним краем плашки.
-const TAB_H = 42;
-const TAB_GAP = 4;
-const CONTENT_TOP = -220;
+// Монеты в правом верхнем углу, колонка занимает их прежний ряд.
+// Тринадцать вкладок кончаются над уголком плашки.
+const TAB_H = 40;
+const TAB_GAP = 2;
+const CONTENT_TOP = -264;
 const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
 
 const CARD_GAP_X = 16;
@@ -59,8 +60,8 @@ const CARD_H = 92;
 const CARD_GAP = 10;
 
 const TITLE_Y = -302;
-const COINS_Y = -258;
-const RULE_Y = -238;
+const COINS_X = PANEL_W / 2 - SIDE;
+const RULE_Y = -276;
 const BUTTON_Y = 292;
 
 const BRASS = 0xc4a15a;
@@ -128,11 +129,11 @@ export class ShopPanel {
       .setOrigin(0.5);
 
     this.coinsText = scene.add
-      .text(0, COINS_Y, 'Монеты  0', {
+      .text(COINS_X, TITLE_Y, 'Монеты  0', {
         fontSize: '22px',
         color: fieldPaper,
       })
-      .setOrigin(0.5);
+      .setOrigin(1, 0.5);
 
     const nextFace = scene.add.graphics().setPosition(0, BUTTON_Y);
     this.waveButton = nextFace;

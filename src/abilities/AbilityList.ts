@@ -1,4 +1,5 @@
 import { ArtilleryStrikeAbilityConfig, ArtilleryStrikeAbilityIcon } from "./ArtilleryStrikeAbility";
+import { EmpFlashAbilityConfig, EmpFlashAbilityIcon } from "./EmpFlashAbility";
 import { BomberStrike } from "../entities/BomberStrike";
 import { EnergyWall } from "../entities/EnergyWall";
 import { IonCannon } from "../entities/IonCannon";
@@ -54,5 +55,13 @@ export const AbilityList: Ability[] = [
         cooldownMs: BomberStrike.shop.cooldownMs,
         iconRadius: BomberStrike.iconRadius,
         path: BomberStrike.iconPath,
+    },
+    {
+        id: 'emp',
+        texture: EmpFlashAbilityIcon.iconKey,
+        hint: '7 — ЭМИ',
+        cooldownMs: EmpFlashAbilityConfig.cooldownMs,
+        iconRadius: EmpFlashAbilityIcon.iconRadius,
+        path: EmpFlashAbilityIcon.iconPath,
     },
 ];

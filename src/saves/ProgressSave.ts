@@ -1,7 +1,7 @@
 // Улучшения между проигрышами. Партия стирается со смертью базы,
 // а эти уровни и непотраченный score остаются в localStorage.
 
-import { ArtilleryStrikeAbilityConfig } from '../abilities';
+import { ArtilleryStrikeAbilityConfig, EmpFlashAbilityConfig } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -89,6 +89,10 @@ export type SavedProgress = {
   bomberDamage: number;
   // Сколько раз укорочен откат бомбардировщика. 0 — базовые 3 минуты. Прогресс сам снимает 1 минуту.
   bomberCooldown: number;
+  // Сколько раз укорочен откат ЭМИ. 0 — базовые 3 минуты. Прогресс сам снимает 1 минуту.
+  empCooldown: number;
+  // Сколько раз удлинено глушение ЭМИ. 0 — базовые 2 с. Прогресс сам прибавляет 0,5 с.
+  empStun: number;
   // Куплена ли автострельба. Танк стреляет сам, пока включена иконка справа.
   autoFire: boolean;
   // Выключатель уже купленной автострельбы. Пока false, танк ждёт левую кнопку.
@@ -221,6 +225,12 @@ export class ProgressSave {
     return 3000 + Math.max(0, level) * 3000;
   }
 
+  // Первая десятая секунды глушения стоит 500. Каждая следующая — на 500 × уже купленный уровень дороже:
+  // 500, 1000, 1500, …
+  static empStunCost(level: number): number {
+    return 500 + Math.max(0, level) * 500;
+  }
+
   // Первые 10% ширины луча стоят 3000. Каждая следующая покупка — на 3000 × уже купленный уровень дороже:
   // 3000, 6000, 9000, …
   static ionWidthCost(level: number): number {
@@ -287,6 +297,8 @@ export class ProgressSave {
     progress.wallCooldown = 0;
     progress.bomberDamage = 0;
     progress.bomberCooldown = 0;
+    progress.empCooldown = 0;
+    progress.empStun = 0;
     progress.autoFire = false;
     progress.autoFireOn = false;
     progress.autoAim = false;
@@ -394,6 +406,8 @@ export class ProgressSave {
       wallCooldown: 0,
       bomberDamage: 0,
       bomberCooldown: 0,
+      empCooldown: 0,
+      empStun: 0,
       autoFire: false,
       autoFireOn: false,
       autoAim: false,
@@ -502,6 +516,9 @@ function parseProgress(value: unknown): SavedProgress | null {
     // Старые сохранения не писали бомбардировщик: бомба била бы базовым уроном и ждала 3 минуты.
     bomberDamage: requiredInt(value.bomberDamage, 0, MG_DAMAGE_LEVEL_MAX) ?? 0,
     bomberCooldown: requiredInt(value.bomberCooldown, 0, BomberStrike.maxProgressCooldownLevel) ?? 0,
+    // Старые сохранения не писали ЭМИ: вспышка ждала 3 минуты и глушила 2 с.
+    empCooldown: requiredInt(value.empCooldown, 0, EmpFlashAbilityConfig.maxProgressCooldownLevel()) ?? 0,
+    empStun: requiredInt(value.empStun, 0, EmpFlashAbilityConfig.maxProgressStunLevel()) ?? 0,
     // Старые сохранения не писали автострельбу: она жила в партии и умирала с базой.
     autoFire: value.autoFire === true,
     autoFireOn: value.autoFire === true && value.autoFireOn !== false,

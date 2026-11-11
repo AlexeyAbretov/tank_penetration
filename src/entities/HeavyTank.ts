@@ -21,6 +21,10 @@ type Axle = { key: string; cx: number; cy: number; radius: number };
 type Roller = { image: Phaser.GameObjects.Image; cx: number; cy: number; radius: number };
 
 export class HeavyTank extends RangedEnemy {
+  override mechanical(): boolean {
+    return true;
+  }
+
   static readonly textureKey = 'heavy-tank';
   static readonly gunKey = 'heavy-tank-gun';
   static readonly flashKey = 'heavy-tank-shot';
@@ -411,6 +415,14 @@ export class HeavyTank extends RangedEnemy {
     this.rumble.y = 0;
     super.preUpdate(time, delta);
     if (!this.active) {
+      return;
+    }
+    if (this.held()) {
+      this.nextRumble.x = 0;
+      this.nextRumble.y = 0;
+      this.poseGun();
+      this.poseTrack(0);
+      this.poseRollers(0);
       return;
     }
     this.poseGun();

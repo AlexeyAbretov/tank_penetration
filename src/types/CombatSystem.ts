@@ -10,6 +10,7 @@ export type CombatSystem = {
   readonly ionCooldown: number;
   readonly wallCooldown: number;
   readonly bomberCooldown: number;
+  readonly empCooldown: number;
   readonly flameCooldown: number;
   setArtilleryCooldown(ms: number): void;
   setMinesCooldown(ms: number): void;
@@ -17,6 +18,7 @@ export type CombatSystem = {
   setIonCooldown(ms: number): void;
   setWallCooldown(ms: number): void;
   setBomberCooldown(ms: number): void;
+  setEmpCooldown(ms: number): void;
   setFlameCooldown(ms: number): void;
   nuclearCloudLeft(): number;
   bomberBlastLeft(): number;
@@ -26,6 +28,7 @@ export type CombatSystem = {
   requestIon(): void;
   requestWall(): void;
   requestBomber(): void;
+  requestEmp(): void;
   // Правый край завесы, если она стоит. null — выстрел летит до танка.
   shieldFace(): number | null;
   shieldGlint(y: number): void;
@@ -43,6 +46,7 @@ export type CombatSystem = {
   tickIon(delta: number, canFire: boolean): void;
   tickWall(delta: number, canFire: boolean): void;
   tickBomber(delta: number, canFire: boolean): void;
+  tickEmp(delta: number, canFire: boolean): void;
   tick(delta: number, allowFire?: boolean): void;
   // Сцена приносит флаг прогресса: бой магазин очков не читает.
   setAutoFire(on: boolean): void;

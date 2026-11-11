@@ -3,7 +3,7 @@
 // Постоянные прибавки к урону, взрыву, пробиванию и монетам приходят снаружи и за партию не меняются.
 
 import Phaser from 'phaser';
-import { ArtilleryStrikeAbilityConfig, cooldownFor, cooldownLabel } from '../abilities';
+import { ArtilleryStrikeAbilityConfig, EmpFlashAbilityConfig, cooldownFor, cooldownLabel } from '../abilities';
 import { BomberStrike } from '../entities/BomberStrike';
 import { EnergyWall } from '../entities/EnergyWall';
 import { IonCannon } from '../entities/IonCannon';
@@ -22,7 +22,7 @@ import { ShopPanel, type ShopCardView, type ShopTabView, type ShopView } from '.
 import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
-type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'ion' | 'mines' | 'nuclear' | 'wall' | 'bomber';
+type GearId = 'wire' | 'machineGun' | 'laser' | 'flame' | 'salvo' | 'artillery' | 'ion' | 'mines' | 'nuclear' | 'wall' | 'bomber' | 'emp';
 
 type PermanentBonuses = {
   damage: number;
@@ -44,6 +44,8 @@ type PermanentBonuses = {
   artillery: number;
   artilleryShells: number;
   artilleryCooldownLevel: number;
+  empCooldownLevel: number;
+  empStunLevel: number;
   mines: number;
   ion: number;
   // Постоянный урон авиабомбы. К урону на карточке прибавляется, лестницу цены не двигает.
@@ -98,6 +100,9 @@ export class ShopController {
   bomberOwned = false;
   bomberCooldownLevel = 0;
   bomberDamageLevel = 0;
+  empOwned = false;
+  empCooldownLevel = 0;
+  empStunLevel = 0;
   shopOpen = false;
   // Пауза сцены. Покупки и «следующая волна» ждут продолжения.
   private paused = false;
@@ -161,6 +166,9 @@ export class ShopController {
       bomber: this.bomberOwned,
       bomberCooldown: this.bomberCooldownLevel,
       bomberDamage: this.bomberDamageLevel,
+      emp: this.empOwned,
+      empCooldown: this.empCooldownLevel,
+      empStun: this.empStunLevel,
     };
   }
 
@@ -224,6 +232,9 @@ export class ShopController {
     this.bomberCooldownLevel = Math.min(saved.bomberCooldown, BomberStrike.maxShopCooldownLevel);
     BomberStrike.setShopCooldownLevel(this.bomberCooldownLevel);
     this.bomberDamageLevel = saved.bomberDamage;
+    this.empOwned = saved.emp;
+    this.empCooldownLevel = Math.min(saved.empCooldown, EmpFlashAbilityConfig.maxShopCooldownLevel());
+    this.empStunLevel = Math.min(saved.empStun, EmpFlashAbilityConfig.maxShopStunLevel());
   }
 
   // Чистая партия: уровни и постройки обнуляются. Предметы на поле убирает перезапуск сцены.
@@ -270,6 +281,9 @@ export class ShopController {
     this.bomberCooldownLevel = 0;
     BomberStrike.setShopCooldownLevel(0);
     this.bomberDamageLevel = 0;
+    this.empOwned = false;
+    this.empCooldownLevel = 0;
+    this.empStunLevel = 0;
     this.wire = undefined;
     this.machineGun = undefined;
     this.laser = undefined;
@@ -583,6 +597,59 @@ export class ShopController {
       return;
     }
     this.artilleryCooldownLevel += 1;
+    this.refresh();
+  }
+
+  // Открывает клавишу 7. Вспышку и глушение считает CombatSystem.
+  buyEmp(): void {
+    const cost = shopPrice(EmpFlashAbilityConfig.shop.cost);
+    if (this.isPaused() || this.empOwned || this.economy.getCoins() < cost) {
+      return;
+    }
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.empOwned = true;
+    this.refresh();
+  }
+
+  // −1 с к откату ЭМИ. Партия снимает свою минуту и останавливается на 2:00 без очков.
+  buyEmpCooldown(): void {
+    if (this.isPaused() || !this.empOwned) {
+      return;
+    }
+    if (this.empCooldownLevel >= EmpFlashAbilityConfig.maxShopCooldownLevel()) {
+      return;
+    }
+    const now = cooldownFor(this.empCooldownLevel, this.bonuses.empCooldownLevel, EmpFlashAbilityConfig);
+    if (cooldownFor(this.empCooldownLevel + 1, this.bonuses.empCooldownLevel, EmpFlashAbilityConfig) >= now) {
+      return;
+    }
+    const cost = ShopController.empCooldownCost(this.empCooldownLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.empCooldownLevel += 1;
+    this.refresh();
+  }
+
+  // +0,1 с к глушению. Партия прибавляет свои 0,5 с и останавливается на 2,5 с без очков.
+  buyEmpStun(): void {
+    if (this.isPaused() || !this.empOwned) {
+      return;
+    }
+    if (this.empStunLevel >= EmpFlashAbilityConfig.maxShopStunLevel()) {
+      return;
+    }
+    const now = EmpFlashAbilityConfig.stunFor(this.empStunLevel, this.bonuses.empStunLevel);
+    if (EmpFlashAbilityConfig.stunFor(this.empStunLevel + 1, this.bonuses.empStunLevel) <= now) {
+      return;
+    }
+    const cost = ShopController.empStunCost(this.empStunLevel);
+    if (!this.economy.spendCoins(cost)) {
+      return;
+    }
+    this.empStunLevel += 1;
     this.refresh();
   }
 
@@ -998,6 +1065,18 @@ export class ShopController {
     return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
   }
 
+  // Первая секунда отката ЭМИ стоит 1000. Дальше та же ступень 15%:
+  // 1000, 1150, 1323, 1521, …
+  private static empCooldownCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
+  // Первый шаг оглушения стоит 1000. Дальше та же ступень 15%:
+  // 1000, 1150, 1323, 1521, …
+  private static empStunCost(level: number): number {
+    return shopPrice(Math.round(1000 * 1.15 ** Math.max(0, level)));
+  }
+
   // Сумма партии и прогресса: число на карточке и потолок взрыва.
   // Номер кнопки и цена считают только покупки партии.
   private blastOfferLevel(): number {
@@ -1149,6 +1228,11 @@ export class ShopController {
           ),
           this.bomberCooldownCard(coins),
         ]),
+        this.tab('emp', 'ЭМИ', [
+          this.gearCard('emp', coins),
+          this.empCooldownCard(coins),
+          this.empStunCard(coins),
+        ]),
       ],
     };
   }
@@ -1296,6 +1380,8 @@ export class ShopController {
         return this.nuclearCard(coins);
       case 'wall':
         return this.wallCard(coins);
+      case 'emp':
+        return this.empCard(coins);
     }
   }
 
@@ -1514,6 +1600,96 @@ export class ShopController {
       cost: this.coin(price),
       open: true,
       canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private empCard(coins: number): ShopCardView {
+    const price = shopPrice(EmpFlashAbilityConfig.shop.cost);
+    const stun = EmpFlashAbilityConfig.stunLabel(
+      EmpFlashAbilityConfig.stunFor(this.empStunLevel, this.bonuses.empStunLevel),
+    );
+    const reload = cooldownLabel(
+      cooldownFor(this.empCooldownLevel, this.bonuses.empCooldownLevel, EmpFlashAbilityConfig),
+    );
+    if (this.empOwned) {
+      return {
+        title: 'Покупка',
+        buy: () => this.buyEmp(),
+        info: `оглушение ${stun}`,
+        cost: '',
+        open: false,
+        canBuy: false,
+        owned: true,
+      };
+    }
+    return {
+      title: 'Покупка',
+      buy: () => this.buyEmp(),
+      info: `оглушение ${stun} · откат ${reload}`,
+      cost: this.coin(price),
+      open: true,
+      canBuy: coins >= price,
+      owned: false,
+    };
+  }
+
+  private empCooldownCard(coins: number): ShopCardView {
+    const buy = () => this.buyEmpCooldown();
+    const level = this.empCooldownLevel;
+    const price = ShopController.empCooldownCost(level);
+    if (!this.empOwned) {
+      return {
+        title: '−1 с перезарядки',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = cooldownFor(level, this.bonuses.empCooldownLevel, EmpFlashAbilityConfig);
+    const next = cooldownFor(level + 1, this.bonuses.empCooldownLevel, EmpFlashAbilityConfig);
+    const maxed = level >= EmpFlashAbilityConfig.maxShopCooldownLevel() || next >= now;
+    return {
+      title: '−1 с перезарядки',
+      buy,
+      info: maxed ? `ур. ${level} · ${cooldownLabel(now)}` : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
+      owned: false,
+    };
+  }
+
+  private empStunCard(coins: number): ShopCardView {
+    const buy = () => this.buyEmpStun();
+    const level = this.empStunLevel;
+    const price = ShopController.empStunCost(level);
+    if (!this.empOwned) {
+      return {
+        title: '+0.10 с оглушения',
+        buy,
+        info: 'после покупки',
+        cost: this.coin(price),
+        open: false,
+        canBuy: false,
+        owned: false,
+      };
+    }
+    const now = EmpFlashAbilityConfig.stunFor(level, this.bonuses.empStunLevel);
+    const next = EmpFlashAbilityConfig.stunFor(level + 1, this.bonuses.empStunLevel);
+    const maxed = level >= EmpFlashAbilityConfig.maxShopStunLevel() || next <= now;
+    return {
+      title: '+0.10 с оглушения',
+      buy,
+      info: maxed
+        ? `ур. ${level} · ${EmpFlashAbilityConfig.stunLabel(now)}`
+        : `ур. ${level} · ${EmpFlashAbilityConfig.stunLabel(now)}→${EmpFlashAbilityConfig.stunLabel(next)}`,
+      cost: maxed ? 'максимум' : this.coin(price),
+      open: !maxed,
+      canBuy: !maxed && coins >= price,
       owned: false,
     };
   }

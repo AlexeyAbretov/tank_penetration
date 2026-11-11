@@ -1,5 +1,6 @@
 // Магазин после гибели базы. Оплата накопленным score.
-// Слева закладки, справа карточки выбранной. Скролла нет.
+// Слева закладки, справа карточки выбранной. Скролла нет:
+// лишняя закладка ужимает колонку, низ остаётся внутри плашки.
 // Высота карточки не сжимается. Больше четырёх встают в два узких столбца.
 // Покупки и тексты карточек приходят из контроллера: окно их список не знает.
 
@@ -49,9 +50,13 @@ const PANEL_H = 704;
 const SIDE = 22;
 const TAB_W = 250;
 // Счёт уехал в правый верхний угол: колонка закладок занимает его прежний ряд.
-const TAB_H = 42;
+// 42 px — пока колонка доходит до внутреннего края. Дальше высота падает, но не тоньше подписи.
+const TAB_MAX_H = 42;
+const TAB_MIN_H = 28;
 const TAB_GAP = 4;
 const CONTENT_TOP = -260;
+// Край плашки 352, оливковая рамка 10 и ещё воздух, чтобы последняя закладка не вылезала.
+const TAB_LIMIT = PANEL_H / 2 - 18;
 const TAB_X = -PANEL_W / 2 + SIDE + TAB_W / 2;
 
 const CARD_GAP_X = 16;
@@ -101,6 +106,7 @@ export class ProgressShopPanel {
   private paused = false;
   private selected = '';
   private tabKey = '';
+  private tabH = TAB_MAX_H;
   private lastView: ProgressShopView | null = null;
   private lastCards: ProgressCardView[] = [];
 
@@ -190,6 +196,7 @@ export class ProgressShopPanel {
     if (key !== this.tabKey) {
       this.destroyTabs();
       this.tabKey = key;
+      this.tabH = this.tabHeight(tabs.length);
       tabs.forEach((tab, index) => {
         this.tabs.push(this.makeTab(tab.id, tab.label, index));
       });
@@ -209,11 +216,18 @@ export class ProgressShopPanel {
     this.applyOffers();
   }
 
+  // Колонка не скроллится: лишняя закладка короче, пол оставляет место подписи.
+  private tabHeight(count: number): number {
+    const slots = Math.max(count, 1);
+    const room = TAB_LIMIT - CONTENT_TOP - (slots - 1) * TAB_GAP;
+    return Math.min(TAB_MAX_H, Math.max(TAB_MIN_H, Math.floor(room / slots)));
+  }
+
   private makeTab(id: string, label: string, index: number): Tab {
     const scene = this.container.scene;
-    const y = CONTENT_TOP + TAB_H / 2 + index * (TAB_H + TAB_GAP);
+    const y = CONTENT_TOP + this.tabH / 2 + index * (this.tabH + TAB_GAP);
     const face = scene.add.graphics().setPosition(TAB_X, y);
-    const hit = scene.add.rectangle(TAB_X, y, TAB_W, TAB_H, 0x000000, 0);
+    const hit = scene.add.rectangle(TAB_X, y, TAB_W, this.tabH, 0x000000, 0);
     hit.setInteractive({ useHandCursor: true });
     hit.on('pointerup', () => {
       if (this.blocked() || this.selected === id || !this.lastView) {
@@ -236,14 +250,14 @@ export class ProgressShopPanel {
     const g = tab.face;
     g.clear();
     const left = -TAB_W / 2;
-    const top = -TAB_H / 2;
+    const top = -this.tabH / 2;
     g.fillStyle(selected ? 0x6e6240 : 0x3e4634, 1);
-    g.fillRect(left, top, TAB_W, TAB_H);
+    g.fillRect(left, top, TAB_W, this.tabH);
     g.fillStyle(selected ? 0x3a4630 : 0x1e2618, 1);
-    g.fillRect(left + 3, top + 3, TAB_W - 6, TAB_H - 6);
+    g.fillRect(left + 3, top + 3, TAB_W - 6, this.tabH - 6);
     if (selected) {
       g.fillStyle(BRASS, 1);
-      g.fillRect(left + 3, top + 3, 5, TAB_H - 6);
+      g.fillRect(left + 3, top + 3, 5, this.tabH - 6);
     }
     tab.label.setColor(selected ? fieldInk : fieldPaper);
   }

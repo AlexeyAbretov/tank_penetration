@@ -210,6 +210,10 @@ export class RocketBuggy extends RangedEnemy {
     this.poseWheels(0);
   }
 
+  override mechanical(): boolean {
+    return true;
+  }
+
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     this.poseWheels(delta);

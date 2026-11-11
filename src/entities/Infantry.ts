@@ -9,6 +9,7 @@ import { enemyHasteOf, GAME, isDebugRun } from '../gameConfig';
 import { bisectImage } from '../gfx/bisect';
 import { floatDamage } from '../gfx/damageFloat';
 import { scatterGibs, type GibBit } from '../gfx/gibs';
+import { hullLightning, stunMark, type HoldMark } from '../gfx/hold';
 import type { SoldierLook } from '../gfx/looks';
 import type { WorldPoint } from '../types/WorldPoint';
 
@@ -119,6 +120,11 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   private readonly walkKey: string;
   // true после первого шага. Пока юнит стоит (стрельба или проволока), темп скорость не возвращает.
   private paceLatched = false;
+  // Остаток глушения. 0 — юнит снова ходит и стреляет.
+  private holdLeft = 0;
+  // Шёл в момент вспышки. После срока шаг возвращается, стоявший стрелок остаётся на рубеже.
+  private holdWasMoving = false;
+  private holdMark?: HoldMark;
 
   // Тёмный фон полоски здоровья над головой.
   private readonly barBg: Phaser.GameObjects.Rectangle;
@@ -192,6 +198,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
       this.barBg.destroy();
       this.barFill.destroy();
       this.hpLabel?.destroy();
+      this.holdMark?.destroy();
     });
     // Первый раз ставим полоску над головой сразу, не дожидаясь кадра.
     this.syncBar();
@@ -202,13 +209,16 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   preUpdate(time: number, delta: number): void {
     // Родитель двигает анимацию и применяет скорость тела к координатам.
     super.preUpdate(time, delta);
-    if (this.anims.isPlaying) {
+    if (this.anims.isPlaying && this.holdLeft <= 0) {
       this.anims.timeScale = enemyHasteOf(this.scene.registry);
     }
     // Пока юнит жив и едет, полоска едет вместе с ним.
     // Глубина и на паузе: босс меняет дорожку, и дальний не должен остаться поверх ближнего.
     this.placeDepth();
     this.syncBar();
+    if (this.tickHold(delta)) {
+      return;
+    }
     // Мёртвый юнит, магазин (combat === false) или стоящие часы — поведение замирает.
     // preUpdate Phaser зовёт до update сцены, поэтому выход из кадра паузы сам стрельбу не гасит.
     // Иначе стрелок достреливает при замерших твинах, и вспышка остаётся на дуле.
@@ -217,6 +227,77 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     }
     // Наследник здесь решает: просто идти или ещё и стрелять.
     this.act(delta);
+  }
+
+  // Машина рисует молнии, человек — звёзды. Бой вид не угадывает.
+  mechanical(): boolean {
+    return false;
+  }
+
+  held(): boolean {
+    return this.holdLeft > 0;
+  }
+
+  // Вспышка уже кончилась. Повторная не укорачивает остаток, если он ещё длиннее.
+  hold(ms: number): void {
+    if (!this.active || this.reachedWall || ms <= 0) {
+      return;
+    }
+    const fresh = this.holdLeft <= 0;
+    this.holdLeft = Math.max(this.holdLeft, ms);
+    if (!fresh) {
+      return;
+    }
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    this.holdWasMoving = !!body?.enable && (body.velocity.x < -1 || Math.abs(body.velocity.y) > 1);
+    body?.stop();
+    if (this.anims.isPlaying) {
+      this.anims.pause();
+    }
+    this.holdMark = this.mechanical() ? hullLightning(this.scene) : stunMark(this.scene);
+    this.holdMark.follow(this, 0);
+  }
+
+  // Поражение снимает знак сразу. Шаг не возвращает: поле всё равно гаснет.
+  dropHold(): void {
+    this.holdLeft = 0;
+    this.holdWasMoving = false;
+    this.holdMark?.destroy();
+    this.holdMark = undefined;
+  }
+
+  // Магазин срок не ест: солдаты и так стоят, глушение начнётся в бою.
+  private tickHold(delta: number): boolean {
+    if (this.holdLeft <= 0) {
+      return false;
+    }
+    const live = !this.reachedWall && !this.scene.time.paused && this.scene.registry.get('combat') !== false;
+    if (live) {
+      this.holdLeft -= delta;
+    }
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    body?.stop();
+    this.holdMark?.follow(this, delta);
+    if (this.holdLeft > 0 && !this.reachedWall) {
+      return true;
+    }
+    this.endHold();
+    return this.reachedWall;
+  }
+
+  private endHold(): void {
+    this.holdLeft = 0;
+    this.holdMark?.destroy();
+    this.holdMark = undefined;
+    const moving = this.holdWasMoving;
+    this.holdWasMoving = false;
+    if (moving) {
+      this.resumeMarch();
+      return;
+    }
+    if (this.anims.isPaused) {
+      this.anims.resume();
+    }
   }
 
   // Пустая реализация для штурмовика: ему достаточно скорости, заданной в march.
@@ -301,7 +382,8 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
       return;
     }
     body.x += pixels;
-    if (this.reachesBase) {
+    // Глушение само вернёт шаг. Иначе стойка запомнит ход и после вспышки останется на месте.
+    if (this.reachesBase && this.holdLeft <= 0) {
       this.resumeMarch();
     }
   }
