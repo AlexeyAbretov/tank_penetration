@@ -3,6 +3,7 @@
 // Расстановку и подрыв считает CombatSystem. Заряд лежит, пока на него не наступит пехота.
 
 import Phaser from 'phaser';
+import { GAME } from '../gameConfig';
 import { boomAt } from '../gfx/boom';
 import { placeCrater } from '../gfx/craters';
 import { bake } from '../gfx/textures';
@@ -17,7 +18,7 @@ export type MineKeepOut = {
 };
 
 export class PlantedMine {
-  readonly x: number;
+  private spotX: number;
   readonly y: number;
 
   private armed = false;
@@ -27,7 +28,7 @@ export class PlantedMine {
   private dirt?: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor(scene: Phaser.Scene, x: number, y: number, settled = false) {
-    this.x = x;
+    this.spotX = x;
     this.y = y;
 
     const frame = scene.textures.get(Mines.bodyKey).get();
@@ -69,8 +70,22 @@ export class PlantedMine {
     scene.time.delayedCall(560, () => this.releaseDirt());
   }
 
+  get x(): number {
+    return this.spotX;
+  }
+
   get isArmed(): boolean {
     return this.armed && !this.gone;
+  }
+
+  // Корпус и комья едут вместе. Высота остаётся: сужение холста двигает только правый край.
+  moveTo(x: number): void {
+    if (this.gone || x === this.spotX) {
+      return;
+    }
+    this.spotX = x;
+    this.root.setX(x);
+    this.dirt?.setPosition(x, this.y + 2);
   }
 
   destroy(): void {
@@ -188,10 +203,13 @@ export class Mines {
     return Math.max(Mines.minCooldownMs, Mines.shop.cooldownMs - progressCut - shopCut);
   }
 
-  // Прямоугольник поля. Чужие препятствия приходят списком keepOut.
+  // Полоса постановки. Правый край — текущая ширина холста: на широком окне мины доходят до него.
+  // Чужие препятствия приходят списком keepOut.
   static readonly field = {
     minX: 200,
-    maxX: 1160,
+    get maxX(): number {
+      return GAME.width - 120;
+    },
     minY: 160,
     maxY: 540,
   };
@@ -259,6 +277,22 @@ export class Mines {
     boomAt(scene, x, y);
     placeCrater(scene, x, y, Mines.shop.craterMs);
     scene.cameras.main.shake(90, 0.0035);
+  }
+
+  // Та же высота и не правее текущего края. Влево, пока центр не выйдет из запрета и не отойдёт от чужих зарядов.
+  // null — на этой высоте свободной точки нет.
+  static pullInside(
+    keepOut: MineKeepOut[],
+    occupied: { x: number; y: number }[],
+    y: number,
+  ): number | null {
+    const field = Mines.field;
+    for (let x = field.maxX; x >= field.minX; x -= 1) {
+      if (!Mines.blocked(keepOut, occupied, x, y)) {
+        return x;
+      }
+    }
+    return null;
   }
 
   private static findSpot(

@@ -31,6 +31,8 @@ export type CombatSystem = {
   shieldGlint(y: number): void;
   clearProjectiles(): void;
   captureMines(): { x: number; y: number }[];
+  // Лежащая мина правее нового края сдвигается влево и не ложится на соседнюю.
+  pullMines(): void;
   restoreMines(spots: { x: number; y: number }[]): void;
   captureFlameWall(): { points: { x: number; y: number }[]; left: number } | null;
   restoreFlameWall(saved: { points: { x: number; y: number }[]; left: number } | null): void;

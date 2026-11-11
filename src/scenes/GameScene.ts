@@ -516,6 +516,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Ширина поля изменилась вместе с окном. Фон и окна, которые стоят по центру, едут за ней.
+  // Лежащие мины правее нового края бой подтягивает на поле.
   private layoutFrame(): void {
     this.field.setPosition(GAME.width / 2, GAME.height / 2);
     this.field.setDisplaySize(GAME.width, GAME.height);
@@ -523,6 +524,7 @@ export class GameScene extends Phaser.Scene {
     this.settings.layout();
     this.shop.panel.place();
     this.progressShop.layout();
+    this.combat.pullMines();
   }
 
   // Конец волны. Панель выходит, когда последний разрыв доиграл.

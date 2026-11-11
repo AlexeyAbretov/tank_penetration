@@ -97,8 +97,11 @@ export class RocketInfantry extends RangedEnemy {
 
   static readonly coinReward = 3;
   readonly coinReward = RocketInfantry.coinReward;
-  // Три четверти ширины поля. Стрелок встаёт на середине, этот дальше от танка.
-  protected readonly holdX = (GAME.width * 3) / 4;
+  // Три четверти текущей ширины. Стрелок встаёт на середине, этот дальше от танка.
+  // Число не запоминается при выходе: иначе после сужения окна рубеж остаётся за правым краем.
+  protected get holdX(): number {
+    return (GAME.width * 3) / 4;
+  }
   protected readonly fireDelay = RocketInfantry.shotInterval;
   protected readonly bulletSpeed = RocketInfantry.shotSpeed;
   // База ракеты. Прибавку волны добавляет предок.

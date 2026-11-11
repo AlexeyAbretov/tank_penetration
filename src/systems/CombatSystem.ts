@@ -1262,6 +1262,25 @@ export class CombatSystem implements Combat {
     return this.mines.map((mine) => ({ x: Math.round(mine.x), y: Math.round(mine.y) }));
   }
 
+  // Холст стал уже. Заряд правее нового края едет влево по своей высоте.
+  // Правый из таких берёт место первым, следующий не садится на него и на тех, кто уже был в кадре.
+  pullMines(): void {
+    const maxX = Mines.field.maxX;
+    const loose = this.mines.filter((mine) => mine.x > maxX).sort((a, b) => b.x - a.x);
+    if (loose.length === 0) {
+      return;
+    }
+    const stayed = this.mines
+      .filter((mine) => mine.x <= maxX)
+      .map((mine) => ({ x: mine.x, y: mine.y }));
+    const keepOut = this.mineKeepOut();
+    for (const mine of loose) {
+      const x = Mines.pullInside(keepOut, stayed, mine.y) ?? maxX;
+      mine.moveTo(x);
+      stayed.push({ x: mine.x, y: mine.y });
+    }
+  }
+
   restoreMines(spots: { x: number; y: number }[]): void {
     this.clearMines();
     for (const spot of spots) {

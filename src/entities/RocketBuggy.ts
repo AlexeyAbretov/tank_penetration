@@ -114,9 +114,11 @@ export class RocketBuggy extends RangedEnemy {
     return this.shellRadius();
   }
 
-  // Корма на несколько пикселей внутри правого края. Нос смотрит влево, к танку.
-  protected readonly holdX =
-    GAME.width - RocketBuggy.frame.w * (1 - RocketBuggy.placed.originX) * RocketBuggy.placed.scale - 6;
+  // Корма на несколько пикселей внутри текущего правого края. Нос смотрит влево, к танку.
+  // Край читается каждый кадр: сузившееся окно не оставляет машину за кадром.
+  protected get holdX(): number {
+    return GAME.width - RocketBuggy.frame.w * (1 - RocketBuggy.placed.originX) * RocketBuggy.placed.scale - 6;
+  }
   protected readonly fireDelay = RocketBuggy.shotInterval;
   protected override readonly burstGap = RocketBuggy.burstGap;
   protected readonly bulletSpeed = RocketBuggy.shotSpeed;
