@@ -1,7 +1,7 @@
 // Собирает сцену до старта Phaser. В список сцен кладётся готовый объект:
 // иначе движок вызовет конструктор без аргументов, и restart() поднимет пустую сцену.
-// Дебаг-ветка стоит отдельно. В сборке для игроков isDebugRun() становится false,
-// и дебаг-классы из бандла выпадают.
+// Дебаг-ветка стоит отдельно. В сборке для игроков и в подарочной isDebugRun() становится false,
+// и дебаг-классы из бандла выпадают. Сборка build:html:debug оставляет эту ветку.
 
 import { DebugPlayerController } from '../controllers/DebugPlayerController';
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';

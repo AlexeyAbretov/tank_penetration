@@ -1,6 +1,6 @@
-# Публикация релиза собирает два HTML и прикрепляет их к этому же релизу.
+# Публикация релиза собирает три HTML и прикрепляет их к этому же релизу.
 # Черновик сборку не запускает: событие published приходит, когда релиз уже открыт для скачивания.
-# Сначала обычный файл: его сборка очищает release/. Подарочная дописывает второй файл рядом.
+# Сначала обычный файл: его сборка очищает release/. Подарочная и дебаг дописывают файлы рядом.
 
 name: Release HTML
 
@@ -28,7 +28,9 @@ jobs:
 
       - run: npm run build:html:gift
 
+      - run: npm run build:html:debug
+
       - name: Attach HTML files
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" release/tank-penetration.html release/tank-penetration-gift.html --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" release/tank-penetration.html release/tank-penetration-gift.html release/tank-penetration-debug.html --clobber

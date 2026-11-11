@@ -2,7 +2,9 @@
 // Готовый файл лежит в release/tank-penetration.html и открывается двойным кликом:
 // браузер не ходит за скриптом, картинками, звуками и шрифтом, потому что они уже внутри страницы.
 // npm run build:html:gift — тот же файл, но Vite ставит mode gift, и покупки в обоих магазинах стоят 1.
-// Он называется tank-penetration-gift.html. Релиз на GitHub прикрепляет оба файла.
+// Он называется tank-penetration-gift.html.
+// npm run build:html:debug — дебаг-партия без адреса ?debug, файл tank-penetration-debug.html.
+// Релиз на GitHub прикрепляет все три файла.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -208,7 +210,7 @@ function keepLiveServerOutOfScript(html: string): string {
 
 // Vite называет страницу index.html по имени входного файла.
 // На релизе нужно другое имя, чтобы скачанный файл было видно среди ассетов.
-function nameReleaseHtml(fileName: string): Plugin {
+function nameReleaseHtml(fileName: string, debug: boolean): Plugin {
   return {
     name: 'name-release-html',
     apply: 'build',
@@ -220,7 +222,7 @@ function nameReleaseHtml(fileName: string): Plugin {
       }
 
       const to = path.join(directory, fileName);
-      // Повторная подарочная сборка не чистит release/, и старый файл на Windows не даёт переименовать.
+      // Повторная сборка не чистит release/, и старый файл на Windows не даёт переименовать.
       if (fs.existsSync(to)) {
         fs.unlinkSync(to);
       }
@@ -277,6 +279,18 @@ function nameReleaseHtml(fileName: string): Plugin {
         );
       }
 
+      // Ключ дебаг-партии остаётся строкой после минификации.
+      // В файле для игроков и в подарочном его быть не должно: иначе дебаг-классы не выпали из бандла.
+      const debugMarker = 'tank-penetration-combat:debug';
+      const hasDebug = page.includes(debugMarker);
+      if (debug !== hasDebug) {
+        throw new Error(
+          debug
+            ? `release/${fileName} собран без дебаг-партии`
+            : `release/${fileName} содержит дебаг-партию`,
+        );
+      }
+
       fs.writeFileSync(to, page);
     },
   };
@@ -284,7 +298,12 @@ function nameReleaseHtml(fileName: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const gift = mode === 'gift';
-  const fileName = gift ? 'tank-penetration-gift.html' : 'tank-penetration.html';
+  const debug = mode === 'debug';
+  const fileName = debug
+    ? 'tank-penetration-debug.html'
+    : gift
+      ? 'tank-penetration-gift.html'
+      : 'tank-penetration.html';
 
   return {
     // Картинки и музыку читает плагин выше. Копировать public/ рядом с HTML не нужно:
@@ -293,8 +312,8 @@ export default defineConfig(({ mode }) => {
     base: './',
     build: {
       outDir: 'release',
-      // Обычная сборка чистит release/. Подарочная оставляет tank-penetration.html на месте.
-      emptyOutDir: !gift,
+      // Обычная сборка чистит release/. Подарочная и дебаг оставляют соседние файлы на месте.
+      emptyOutDir: !gift && !debug,
       target: 'es2022',
     },
     plugins: [
@@ -302,7 +321,7 @@ export default defineConfig(({ mode }) => {
       // Скрипт страницы вшивается в сам HTML. Загрузчик модулей Vite после этого не нужен:
       // ему нечего догружать, а с диска лишний запрос всё равно бы не прошёл.
       viteSingleFile({ removeViteModuleLoader: true }),
-      nameReleaseHtml(fileName),
+      nameReleaseHtml(fileName, debug),
     ],
   };
 });

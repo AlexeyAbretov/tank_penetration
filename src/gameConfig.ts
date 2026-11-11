@@ -29,10 +29,14 @@ export const ENEMY_HASTE = {
   max: 3,
 } as const;
 
-// Дебаг-партия включается адресом с ?debug только на сервере разработки.
-// Команда: npm run debug. В сборке для игроков Vite подставляет false, и адрес уже ничего не включает.
+// Дебаг-партия: на сервере разработки адрес с ?debug, команда npm run debug.
+// Сборка build:html:debug включает её без адреса: Vite ставит mode debug.
+// В сборке для игроков и в подарочной Vite подставляет false, и адрес уже ничего не включает.
 export function isDebugRun(): boolean {
-  return import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug');
+  return (
+    import.meta.env.MODE === 'debug' ||
+    (import.meta.env.DEV && new URLSearchParams(window.location.search).has('debug'))
+  );
 }
 
 // Текущий темп врагов. Registry — общая полка сцены: туда GameScene кладёт число по ключу.
