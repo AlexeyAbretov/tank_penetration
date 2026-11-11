@@ -1,7 +1,8 @@
 // Тяжёлый танк: босс чётных десятков и сосед суперсолдата, когда боссов уже несколько.
 // Едет по линии танка игрока к середине поля, встаёт и бьёт прямой наводкой. До проволоки не доходит.
 // Гусеница прокручивается на ходу, каждый каток крутится целиком, и остаются две колеи на всю длину ленты, каждую толщиной с неё. После загрузки след дорисовывается от правого края поля: путь туда известен. При гибели колеи гаснут. Ствол отдельный: отдача сдвигает его в башню.
-// Корпус дрожит от мотора. С кормы идёт чёрный дым на юго-восток.
+// Корпус дрожит от мотора и гудит, пока жив. С кормы идёт чёрный дым на юго-восток.
+// Лязг гусениц только на ходу: рубеж и ЭМИ корпус останавливают, и лязг смолкает.
 // При гибели живой корпус сменяется сгоревшим остовом. Дым идёт из пролома башни.
 
 import Phaser, { Scene } from 'phaser';
@@ -12,6 +13,7 @@ import { bake } from '../gfx/textures';
 import { vehicleDeathBlast } from '../gfx/vehicleBlast';
 import { wreckSmokeAt } from '../gfx/wreckSmoke';
 import { playArtilleryShot } from '../sounds/BoomSounds';
+import { syncHeavyTankDrive } from '../sounds/HeavyTankSounds';
 import { HeavyShell } from './HeavyShell';
 import { RangedEnemy } from './RangedEnemy';
 import type { WorldPoint } from '../types/WorldPoint';
@@ -325,6 +327,7 @@ export class HeavyTank extends RangedEnemy {
     scene.events.on(Phaser.Scenes.Events.POST_UPDATE, rumble);
     this.once('destroy', () => {
       scene.events.off(Phaser.Scenes.Events.POST_UPDATE, rumble);
+      syncHeavyTankDrive(scene, false, false);
       this.gun.destroy();
       this.track.destroy();
       this.releaseRuts();
@@ -372,6 +375,12 @@ export class HeavyTank extends RangedEnemy {
     this.marchAt(speed);
   }
 
+  // ЭМИ глушит шаг в кадре боя, до следующего preUpdate. Лязг обрывается сразу, не кадром позже.
+  override hold(ms: number): void {
+    super.hold(ms);
+    this.voice();
+  }
+
   // Прибавка каждых десяти волн этому снаряду не нужна: номер выхода уже в shellDamage.
   protected override shotHit(): number {
     return this.shellDamage;
@@ -415,6 +424,7 @@ export class HeavyTank extends RangedEnemy {
     this.rumble.y = 0;
     super.preUpdate(time, delta);
     if (!this.active) {
+      this.voice();
       return;
     }
     if (this.held()) {
@@ -423,6 +433,7 @@ export class HeavyTank extends RangedEnemy {
       this.poseGun();
       this.poseTrack(0);
       this.poseRollers(0);
+      this.voice();
       return;
     }
     this.poseGun();
@@ -440,6 +451,7 @@ export class HeavyTank extends RangedEnemy {
       this.stopEngine();
       return;
     }
+    this.voice();
     this.engineMs += delta;
     const shift = idleShift(this.engineMs);
     this.nextRumble.x = shift.x;
@@ -686,6 +698,20 @@ export class HeavyTank extends RangedEnemy {
     this.nextRumble.y = 0;
     this.engine?.destroy();
     this.engine = undefined;
+    this.voice();
+  }
+
+  // Мотор гудит, пока корпус жив. Гусеницы — только когда лента едет.
+  // Рубеж гасит скорость, ЭМИ держит корпус, магазин и пауза не двигают поле: лязга нет.
+  private voice(): void {
+    const alive = this.active && !this.reachedWall;
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    const clock =
+      !this.scene.time.paused &&
+      !this.scene.physics.world.isPaused &&
+      this.scene.registry.get('combat') !== false;
+    const rolling = alive && clock && !this.held() && !!body?.enable && body.velocity.x < -1;
+    syncHeavyTankDrive(this.scene, alive, rolling);
   }
 
   private poseTrack(step: number): void {

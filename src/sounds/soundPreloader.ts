@@ -13,6 +13,8 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     // nuclear_explosion — взрыв атомной бомбы. Тишина в начале и пустой хвост срезаны.
     // ion_appear — низкий сход ионного столба. lowFrequency_explosion_000 — удар подошвы.
     // thrusterFire_000 — шипение, пока столб идёт.
+    // heavy-tank-boss-engine — гул мотора тяжёлого танка, пока корпус жив.
+    // heavy-tank-boss-tracks — лязг гусениц, только пока танк едет.
     scene.load.audio('music-wave', 'audio/TRACK_01.mp3');
     scene.load.audio('music-boss', 'audio/boss.mp3');
     scene.load.audio('tank-shot', 'audio/tank_shot.mp3');
@@ -37,4 +39,6 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     scene.load.audio('ion-appear', 'audio/ion_appear.ogg');
     scene.load.audio('ion-impact', 'audio/lowFrequency_explosion_000.ogg');
     scene.load.audio('ion-sweep', 'audio/thrusterFire_000.ogg');
+    scene.load.audio('heavy-tank-engine', 'audio/heavy-tank-boss-engine.mp3');
+    scene.load.audio('heavy-tank-tracks', 'audio/heavy-tank-boss-tracks.mp3');
 };

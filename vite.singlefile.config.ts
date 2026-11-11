@@ -133,6 +133,8 @@ const packedFiles = [
   ['audio/artillery_shot.mp3', 'audio/mpeg'],
   ['audio/artillery_explosion.mp3', 'audio/mpeg'],
   ['audio/nuclear_explosion.mp3', 'audio/mpeg'],
+  ['audio/heavy-tank-boss-engine.mp3', 'audio/mpeg'],
+  ['audio/heavy-tank-boss-tracks.mp3', 'audio/mpeg'],
   ['fonts/russo-one-cyrillic.woff2', 'font/woff2'],
   ['fonts/russo-one-latin-ext.woff2', 'font/woff2'],
   ['fonts/russo-one-latin.woff2', 'font/woff2'],
