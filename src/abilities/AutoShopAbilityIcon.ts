@@ -1,5 +1,5 @@
 // Иконка автопокупки. Покупка и выключатель живут в прогрессе, монеты тратит магазин волны.
-// Картинка — assets/auto-shop-icon.png. Если файл не загрузился, кнопка рисуется кругом.
+// Картинка — assets/auto-shop-icon.png.
 
 import { AbilityIconBase } from "./AbilityIconBase";
 

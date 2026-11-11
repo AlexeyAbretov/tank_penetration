@@ -1,5 +1,5 @@
 // Иконка автонаведения. Покупка и выключатель живут в прогрессе, точку башне отдаёт бой.
-// Картинка — assets/auto-aim-icon.png. Если файл не загрузился, кнопка рисуется кругом.
+// Картинка — assets/auto-aim-icon.png.
 
 import { AbilityIconBase } from './AbilityIconBase';
 

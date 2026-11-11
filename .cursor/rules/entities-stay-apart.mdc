@@ -21,13 +21,13 @@ import { BarbedWire } from './BarbedWire';
 minX: BarbedWire.bounds.face + reach
 
 // Хорошо: бой передаёт левый край
-ArtilleryStrike.impacts(minX)
+calculateImpacts(count, minX, gap, field)
 ```
 
 ```ts
-// Плохо: мины знают про артиллерию
-import { ArtilleryStrike } from './ArtilleryStrike';
-ArtilleryStrike.placeCrater(scene, x, y, lifeMs)
+// Плохо: мины знают про бомбардировщик
+import { BomberStrike } from './BomberStrike';
+BomberStrike.placeCrater(scene, x, y, lifeMs)
 
 // Хорошо: общая чаша в графике
 import { placeCrater } from '../gfx/craters';

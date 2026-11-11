@@ -5,7 +5,7 @@ export type HudFrame = {
     bannerY: number;
 };
 
-// Иконка способности. Картинка и перезарядка приходят от сущности, подпись — от сцены.
+// Строка списка способностей. Картинка, подпись и откат лежат в AbilityList.
 export type HudAbility = {
     id: string;
     texture: string;

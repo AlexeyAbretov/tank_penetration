@@ -693,7 +693,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Иконка справа и выстрел без ЛКМ читают одну и ту же покупку прогресса.
-  // Слово в строке над полем пишет сам магазин очков.
+  // Слово «авто» или «ЛКМ» сцена пишет отдельно, в create().
   public paintAutoFire(): void {
     const enabled = this.progressShop.autoFireEnabled();
     this.hud.setAutoFireToggle(this.progressShop.autoFireOwned(), enabled);

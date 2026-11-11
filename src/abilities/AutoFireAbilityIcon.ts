@@ -1,5 +1,5 @@
 // Иконка автострельбы. Покупка и выключатель живут в прогрессе, стреляет бой.
-// Картинка — assets/auto-fire-icon.png. Если файл не загрузился, кнопка рисуется кругом.
+// Картинка — assets/auto-fire-icon.png.
 
 import { AbilityIconBase } from "./AbilityIconBase";
 

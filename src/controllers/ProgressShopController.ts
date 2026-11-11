@@ -1379,6 +1379,7 @@ export class ProgressShopController {
     };
   }
 
+  // Ноль вместо отката магазина волны: партия к этому экрану уже стёрта, следующая начнёт его заново.
   private artilleryCooldownCard(score: number): ProgressCardView {
     const level = this.progress.artilleryCooldown;
     const price = this.artilleryCooldownPrice(level);

@@ -144,7 +144,7 @@ export class ArtilleryStrikeAbilityEffects {
         g.fillCircle(8, 8, 2.5);
     }
 
-    // Четыре кадра разрыва и воронка. Воронка гаснет сама через craterMs.
+    // Четыре кадра разрыва и воронка. Воронка гаснет сама через 5 с.
     // Свой звук на каждый снаряд.
     boom(scene: Phaser.Scene, x: number, y: number): void {
         playBoom(scene);
