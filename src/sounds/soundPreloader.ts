@@ -9,7 +9,8 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     // pickup_exposion — гибель пикапа, багги и вертолёта.
     // rocket_shot — пуск ракеты. rocket_hit_tank — её взрыв о броню.
     // rocket_burst — разрыв в воздухе, когда лазер её сбивает. Из середины записи, тишина срезана.
-    // artillery_shot — хлопок батареи. artillery_explosion — разрыв снаряда и мины.
+    // artillery_shot — хлопок батареи.
+    // artillery_explosion — разрыв снаряда, мины, бомбы и попадания снаряда тяжёлого танка.
     // nuclear_explosion — взрыв атомной бомбы. Тишина в начале и пустой хвост срезаны.
     // ion_appear — низкий сход ионного столба. lowFrequency_explosion_000 — удар подошвы.
     // thrusterFire_000 — шипение, пока столб идёт.

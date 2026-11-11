@@ -64,7 +64,8 @@ export class ProjectileSystem {
 
       if (shot instanceof HeavyShell) {
         HeavyShell.burstAt(this.scene, x, y);
-        this.effects.bulletHit.play();
+        // Тот же файл, что у артиллерии, но громче: снаряд один, не залп.
+        this.effects.boomSounds.playTankHit();
       } else if (isRocket) {
         Rocket.burstAt(this.scene, x, y);
         this.effects.rocketSounds.playHit();

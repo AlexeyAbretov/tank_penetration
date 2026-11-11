@@ -1,6 +1,7 @@
 // Хлопок батареи и разрыв у земли — два файла, не один.
 // public/audio/artillery_shot.mp3 — хлопок в момент залпа. Его играет только артиллерия.
-// public/audio/artillery_explosion.mp3 — разрыв в точке. Снаряд и мина берут один и тот же звук.
+// public/audio/artillery_explosion.mp3 — разрыв в точке.
+// Его берут снаряд артиллерии, мина, бомба и попадание снаряда тяжёлого танка.
 // Пауза и гибель базы глушат оба вместе с выстрелом пушки.
 // Рестарт сцены звуки общего менеджера не удаляет, поэтому нужен destroy.
 
@@ -10,11 +11,13 @@ import type { EffectsVolume } from './EffectsVolume';
 // Ключ на полке сцены. Залп и разрыв берут плеер отсюда, не держа ссылку в каждом вызове.
 const REGISTRY_KEY = 'boomSounds';
 
-// Оба файла записаны почти на полную громкость, и три штуки звучат почти вместе.
+// Оба файла записаны почти на полную громкость.
 // 0.55 — тише пушки (0.65): залп слышен, три длинных хвоста не забивают бой.
-// 0.4 — тише пушки и взрыва пикапа (0.72). Три разрыва садятся друг на друга и иначе забивают бой.
+// 0.2 — три разрыва артиллерии садятся друг на друга и иначе забивают бой.
+// 0.65 — попадание снаряда тяжёлого танка одно, на уровне пушки игрока и поверх мотора.
 const SHOT_GAIN = 0.55;
 const BOOM_GAIN = 0.2;
+const TANK_HIT_GAIN = 0.65;
 
 type Clip = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
 
@@ -42,6 +45,11 @@ export class BoomSounds {
 
   playBoom(): void {
     this.play('boom', BOOM_GAIN);
+  }
+
+  // Тот же файл, что у артиллерии, но один разрыв о броню — громче общего.
+  playTankHit(): void {
+    this.play('boom', TANK_HIT_GAIN);
   }
 
   setPaused(paused: boolean): void {
@@ -120,7 +128,7 @@ export function playArtilleryShot(scene: Phaser.Scene, onEnded?: () => void): bo
   return false;
 }
 
-// Разрыв в точке. Свой звук на каждый снаряд и на каждую мину.
+// Разрыв в точке. Свой звук на каждый снаряд, мину, бомбу и попадание снаряда тяжёлого танка.
 export function playBoom(scene: Phaser.Scene): void {
   const fx = scene.registry.get(REGISTRY_KEY);
   if (fx instanceof BoomSounds) {
