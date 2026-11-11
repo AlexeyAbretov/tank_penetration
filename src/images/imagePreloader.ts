@@ -17,6 +17,7 @@ import { MachineGun } from '../entities/MachineGun';
 import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { Tank } from '../entities/Tank/Tank';
+import { EmpFlash } from '../abilities/EmpFlashAbility/EmpFlash';
 import { preloadAirBurst } from '../gfx/airBurst';
 import { preloadCampfire, preloadFlameStream, preloadScorchedEarth } from '../gfx/flame';
 import { preloadBombBoom } from '../gfx/bombBoom';
@@ -43,6 +44,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   BomberStrike.preload(scene);
   IonCannon.preload(scene);
   EnergyWall.preload(scene);
+  EmpFlash.preload(scene);
   
   AssaultInfantry.preload(scene);
   GunnerInfantry.preload(scene);
