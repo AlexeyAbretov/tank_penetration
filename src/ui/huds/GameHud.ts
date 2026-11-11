@@ -5,7 +5,7 @@ import Phaser from 'phaser';
 import { AbilityIcon, AutoApplyBadge, HudAbility, HudFrame } from './GameHud.types';
 
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
-import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, EmpFlashAbilityIcon, cooldownLabel } from '../../abilities';
+import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
 import { preloadTextures } from '../../gfx/textures';
 
 const AUTO_POWER_HIT = 16;
@@ -33,7 +33,6 @@ export class GameHud {
 
   // Ближайший пиксель, чтобы плитка и иконки не мылились.
   static ensureTextures(scene: Phaser.Scene): void {
-    EmpFlashAbilityIcon.ensureTextures(scene);
     GameHud.nearest(scene, GameHud.bannerKey);
     for (const ability of AbilityList) {
       GameHud.nearest(scene, ability.texture);

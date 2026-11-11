@@ -3,7 +3,6 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
-import { bake } from '../gfx/textures';
 import type { WorldPoint } from '../types/WorldPoint';
 
 type Edge = 'left' | 'right' | 'top' | 'bottom';
@@ -200,8 +199,6 @@ export class IonCannon {
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(IonCannon.iconKey)) {
       scene.textures.get(IonCannon.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    } else {
-      bake(scene, IonCannon.iconKey, 64, 64, (g) => IonCannon.renderIcon(g));
     }
     if (!scene.textures.exists(IonCannon.beamKey)) {
       return;
@@ -557,24 +554,5 @@ export class IonCannon {
       case 'bottom':
         return { x: Phaser.Math.Between(minX, width), y: floorY };
     }
-  }
-
-  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x061018);
-    g.fillCircle(32, 32, IonCannon.iconRadius);
-    g.fillStyle(0x0c2436);
-    g.fillCircle(32, 32, 26);
-    g.lineStyle(3, 0xf0d56a, 1);
-    g.strokeCircle(32, 32, 28);
-    g.lineStyle(10, 0x1a6cff, 0.9);
-    g.lineBetween(32, 8, 32, 46);
-    g.lineStyle(4, 0x8adfff, 1);
-    g.lineBetween(32, 8, 32, 46);
-    g.lineStyle(1.5, 0xffffff, 1);
-    g.lineBetween(32, 10, 32, 44);
-    g.fillStyle(0xb7f4ff, 0.95);
-    g.fillEllipse(32, 48, 22, 8);
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(32, 46, 2.5);
   }
 }

@@ -226,8 +226,6 @@ export class Mines {
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(Mines.iconKey)) {
       scene.textures.get(Mines.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    } else {
-      bake(scene, Mines.iconKey, 64, 64, (g) => Mines.renderIcon(g));
     }
     if (scene.textures.exists(Mines.bodyKey)) {
       scene.textures.get(Mines.bodyKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -327,26 +325,6 @@ export class Mines {
       x: Phaser.Math.Between(field.minX, field.maxX),
       y: Phaser.Math.Between(field.minY, field.maxY),
     };
-  }
-
-  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x2a0c0c);
-    g.fillCircle(32, 32, Mines.iconRadius);
-    g.fillStyle(0x5a1210);
-    g.fillCircle(32, 32, 26);
-    g.lineStyle(3, 0xf0d56a, 1);
-    g.strokeCircle(32, 32, 28);
-
-    g.fillStyle(0x1a1008);
-    g.fillEllipse(32, 46, 28, 10);
-    g.fillStyle(0x5c6a3e);
-    g.fillRoundedRect(21, 30, 22, 14, 3);
-    g.fillStyle(0x1e2416);
-    g.fillEllipse(32, 32, 18, 8);
-    g.fillStyle(0xff2a18);
-    g.fillCircle(32, 24, 4);
-    g.fillStyle(0xfff0c0);
-    g.fillCircle(32, 24, 1.8);
   }
 
   // Низ картинки — линия земли. Origin спрайта стоит на ней, масштаб растёт вверх.

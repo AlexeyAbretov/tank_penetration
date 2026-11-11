@@ -6,7 +6,6 @@ import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
 import { nuclearCraterKeys, placeCrater } from '../gfx/craters';
 import { nuke, nukeAt } from '../gfx/nuke';
-import { bake } from '../gfx/textures';
 import { playNuclearBoom } from '../sounds/NuclearExplosion';
 
 export type NuclearFlight = {
@@ -117,7 +116,7 @@ export class NuclearStrike {
     return { x: GAME.width / 2, y: 356 };
   }
 
-  // GameScene и студия зовут до create. Нет файла — иконка рисуется в ensureTextures.
+  // GameScene и студия зовут до create.
   static preload(scene: Phaser.Scene): void {
     scene.load.image(NuclearStrike.bombKey, NuclearStrike.imagePath);
     if (!scene.textures.exists(NuclearStrike.iconKey)) {
@@ -128,8 +127,6 @@ export class NuclearStrike {
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(NuclearStrike.iconKey)) {
       scene.textures.get(NuclearStrike.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    } else {
-      bake(scene, NuclearStrike.iconKey, 64, 64, (g) => NuclearStrike.renderIcon(g));
     }
     if (scene.textures.exists(NuclearStrike.bombKey)) {
       scene.textures.get(NuclearStrike.bombKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
@@ -185,23 +182,5 @@ export class NuclearStrike {
     // Пыль кадра стоит на воронке: origin гриба — нижняя линия листа.
     nukeAt(scene, x, y, scale);
     scene.cameras.main.shake(480, 0.009);
-  }
-
-  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x2a0c0c);
-    g.fillCircle(32, 32, NuclearStrike.iconRadius);
-    g.fillStyle(0x5a1210);
-    g.fillCircle(32, 32, 26);
-    g.lineStyle(3, 0xf0d56a, 1);
-    g.strokeCircle(32, 32, 28);
-
-    g.fillStyle(0x6a5646);
-    g.fillTriangle(27, 52, 37, 52, 32, 28);
-    g.fillStyle(0xd8c8b4);
-    g.fillEllipse(32, 26, 40, 16);
-    g.fillStyle(0xffb040);
-    g.fillEllipse(32, 28, 24, 8);
-    g.fillStyle(0xfff6d0);
-    g.fillCircle(32, 24, 4);
   }
 }

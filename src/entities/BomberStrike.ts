@@ -6,7 +6,6 @@ import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
 import { bombBoomAt } from '../gfx/bombBoom';
 import { craterReach, placeCrater } from '../gfx/craters';
-import { bake } from '../gfx/textures';
 import { playBoom } from '../sounds/BoomSounds';
 
 export type BomberFlight = {
@@ -112,9 +111,6 @@ export class BomberStrike {
       if (scene.textures.exists(key)) {
         scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
-    }
-    if (!scene.textures.exists(BomberStrike.iconKey)) {
-      bake(scene, BomberStrike.iconKey, 64, 64, (g) => BomberStrike.renderIcon(g));
     }
   }
 
@@ -246,18 +242,5 @@ export class BomberStrike {
         bomb.destroy();
       },
     };
-  }
-
-  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x2a0c0c);
-    g.fillCircle(32, 32, BomberStrike.iconRadius);
-    g.lineStyle(3, 0xf0d56a, 1);
-    g.strokeCircle(32, 32, 28);
-    g.fillStyle(0x1a1c1e);
-    g.fillTriangle(14, 30, 50, 30, 32, 22);
-    g.fillStyle(0x6a7a32);
-    g.fillTriangle(28, 36, 32, 44, 36, 36);
-    g.fillTriangle(22, 40, 26, 48, 30, 40);
-    g.fillTriangle(34, 40, 38, 48, 42, 40);
   }
 }

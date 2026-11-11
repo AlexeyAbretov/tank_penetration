@@ -4,7 +4,6 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
-import { bake } from '../gfx/textures';
 
 type Glint = {
   y: number;
@@ -150,9 +149,7 @@ export class EnergyWall {
   static ensureTextures(scene: Phaser.Scene): void {
     if (scene.textures.exists(EnergyWall.iconKey)) {
       scene.textures.get(EnergyWall.iconKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-      return;
     }
-    bake(scene, EnergyWall.iconKey, 64, 64, (g) => EnergyWall.renderIcon(g));
   }
 
   up(): boolean {
@@ -262,20 +259,5 @@ export class EnergyWall {
       g.fillStyle(0x9be7ff, 0.45 * alpha);
       g.fillEllipse(x, hit.y, 48, 28);
     }
-  }
-
-  private static renderIcon(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x061018);
-    g.fillCircle(32, 32, EnergyWall.iconRadius);
-    g.fillStyle(0x0c2436);
-    g.fillCircle(32, 32, 26);
-    g.lineStyle(3, 0x7fd4ff, 1);
-    g.strokeCircle(32, 32, 28);
-    g.fillStyle(0x1a6cff, 0.45);
-    g.fillRect(24, 10, 16, 44);
-    g.fillStyle(0x8adfff, 0.95);
-    g.fillRect(29, 8, 6, 48);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(31, 8, 2, 48);
   }
 }
