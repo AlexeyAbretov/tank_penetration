@@ -48,19 +48,51 @@ function createParticles(scene: Phaser.Scene): void {
   });
 }
 
+// Сердце слева и заливка полоски. Один красный, чтобы знак и шкала читались вместе.
+export const hpMarkColor = 0xe44538;
+
 // Рамка полоски HP базы. Сама заливка здоровья рисуется в сцене отдельным прямоугольником.
 function createHpFrame(scene: Phaser.Scene): void {
   bake(scene, 'hp-frame', 280, 28, (g) => {
-    // Латунный кожух и тёмный жёлоб. Полоска ложится внутрь, кружок слева остаётся снаружи.
-    g.fillStyle(0x6e6240, 1);
+    // Красный кожух и тёмный жёлоб. Полоска ложится внутрь, сердце слева остаётся снаружи.
+    g.fillStyle(0x7a3830, 1);
     g.fillRect(22, 2, 252, 24);
     g.fillStyle(0x1a2214, 1);
     g.fillRect(26, 6, 244, 16);
-    g.fillStyle(0xc4a15a, 1);
-    g.fillCircle(12, 14, 8);
-    g.fillStyle(0x3a4630, 1);
-    g.fillCircle(12, 14, 4);
+    // Ободок темнее заливки: на траве сердце не сливается с полоской.
+    fillHeart(g, 12, 14, 0.6, 0x8e241c);
+    fillHeart(g, 12, 14, 0.48, hpMarkColor);
   });
+}
+
+// Кардиоида шире, чем высока: низ формулы −17, верх около 12.
+// Сдвиг по вертикали сажает остриё вниз, на место прежнего кружка.
+const HEART_Y_MID = (-17 + 11.92) / 2;
+
+function fillHeart(
+  g: Phaser.GameObjects.Graphics,
+  cx: number,
+  cy: number,
+  scale: number,
+  color: number,
+): void {
+  const steps = 40;
+  g.fillStyle(color, 1);
+  g.beginPath();
+  for (let i = 0; i <= steps; i += 1) {
+    const t = (i / steps) * Math.PI * 2;
+    const x = 16 * Math.sin(t) ** 3;
+    const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+    const px = cx + x * scale;
+    const py = cy - (y - HEART_Y_MID) * scale;
+    if (i === 0) {
+      g.moveTo(px, py);
+    } else {
+      g.lineTo(px, py);
+    }
+  }
+  g.closePath();
+  g.fillPath();
 }
 
 export const preloadTextures = (scene: Phaser.Scene, key: string, path: string): void => {

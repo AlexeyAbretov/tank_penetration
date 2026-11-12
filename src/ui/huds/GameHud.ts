@@ -8,7 +8,7 @@ import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, 
 import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
 import { coinMarkKey } from '../../gfx/coinMark';
 import { scoreMarkKey } from '../../gfx/scoreMark';
-import { preloadTextures } from '../../gfx/textures';
+import { hpMarkColor, preloadTextures } from '../../gfx/textures';
 import { gameVersion } from '../../gameVersion';
 
 const AUTO_POWER_HIT = 16;
@@ -342,7 +342,7 @@ export class GameHud {
 
     this.hpFrame = scene.add.image(1128, 28, 'hp-frame').setDepth(51);
     this.hpTrack = scene.add.rectangle(1018, 28, 236, 10, 0x1a2214).setOrigin(0, 0.5).setDepth(51);
-    this.hpFill = scene.add.rectangle(1018, 28, 236, 10, 0xc4a15a).setOrigin(0, 0.5).setDepth(52);
+    this.hpFill = scene.add.rectangle(1018, 28, 236, 10, hpMarkColor).setOrigin(0, 0.5).setDepth(52);
 
     this.pauseOverlay = scene.add.container(frame.width / 2, frame.height / 2).setDepth(90).setVisible(false);
     this.pauseDim = scene.add.rectangle(0, 0, frame.width, frame.height, 0x000000, 0.45).setInteractive();
