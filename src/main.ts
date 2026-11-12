@@ -6,6 +6,7 @@ import Phaser from 'phaser';
 // Размер холста — в gameConfig.ts. Сцену собирает GameSceneFactory.
 import { GAME, fitGameTo } from './gameConfig';
 import { GameSceneFactory } from './scenes/GameSceneFactory';
+import { watchBootProgress } from './bootScreen';
 import { installClipVolumes } from './sounds/clipVolume';
 import { installGameFont, loadGameFont } from './ui/gameFont';
 
@@ -55,6 +56,12 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   // Список сцен. Сейчас одна: она стартует сразу.
   scene: [GameSceneFactory.create()],
+  callbacks: {
+    // Холст уже есть, сцена стоит в очереди файлов. Полоса живёт поверх, пока поле не собрано.
+    postBoot: (game) => {
+      watchBootProgress(game);
+    },
+  },
 };
 
 void startGame();

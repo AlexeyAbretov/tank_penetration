@@ -82,6 +82,7 @@ export class DebugGameHud extends GameHud {
         return;
       }
       this.debugLabel.setText(on ? 'DEBUG  ПАУЗА' : 'DEBUG');
+      this.placeDebugLabel();
     };
 
     scene.events.on('quiet-pause', onQuietPause);
@@ -125,14 +126,15 @@ export class DebugGameHud extends GameHud {
     this.loseMark = this.addMark(scene, 'F');
 
     this.placeDebugRow();
+    this.placeDebugLabel();
   }
 
   override layout(): void {
     super.layout();
 
     this.placeDebugRow();
+    this.placeDebugLabel();
     this.enemyDamageRoot.setPosition(this.edgeIconX(this.rightSkillRoots().length), this.skillY());
-    this.debugLabel.setX(this.frame.width / 2);
   }
 
   override coversEnemyDamage(pointer: Phaser.Input.Pointer): boolean {
@@ -146,6 +148,16 @@ export class DebugGameHud extends GameHud {
     return [this.quietPlate, this.restartPlate, this.skipPlate, this.losePlate].some((plate) =>
       plate.getBounds().contains(pointer.worldX, pointer.worldY),
     );
+  }
+
+  // По центру, пока слово помещается. «DEBUG  ПАУЗА» длиннее зазора до шестерёнки
+  // и иначе заходит под ряд кнопок: тогда правый край остаётся слева от неё.
+  private placeDebugLabel(): void {
+    const gearLeft =
+      this.plateXLeftOfPause(1 + this.platesBetweenSettingsAndPause()) - this.plateSize / 2;
+    const roomRight = gearLeft - this.plateGap;
+    const half = this.debugLabel.width / 2;
+    this.debugLabel.setX(Math.min(this.frame.width / 2, roomRight - half));
   }
 
   // Слева направо от шестерёнки: тихая пауза, перезапуск, пропуск, проигрыш, затем обычная пауза.
