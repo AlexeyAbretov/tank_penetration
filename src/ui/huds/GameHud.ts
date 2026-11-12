@@ -9,6 +9,7 @@ import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIc
 import { coinMarkKey } from '../../gfx/coinMark';
 import { scoreMarkKey } from '../../gfx/scoreMark';
 import { preloadTextures } from '../../gfx/textures';
+import { gameVersion } from '../../gameVersion';
 
 const AUTO_POWER_HIT = 16;
 
@@ -73,6 +74,10 @@ export class GameHud {
   private autoFireMode = false;
   private readonly banner: Phaser.GameObjects.TileSprite;
   private readonly title: Phaser.GameObjects.Text;
+  private readonly versionText: Phaser.GameObjects.Text;
+  // Тёмное окно в плитке ленты, в пикселях assets/banner.png.
+  // Слева камуфляж под название, справа эта плашка.
+  private readonly versionPlate = { left: 133, right: 235, top: 8, bottom: 27 };
   private readonly hpFrame: Phaser.GameObjects.Image;
   private readonly hpTrack: Phaser.GameObjects.Rectangle;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
@@ -171,6 +176,15 @@ export class GameHud {
         color: '#f3d56a',
         stroke: '#4a1208',
         strokeThickness: 5,
+      })
+      .setOrigin(0.5)
+      .setDepth(51);
+    this.versionText = scene.add
+      .text(0, 677, `v${gameVersion}`, {
+        fontSize: '20px',
+        color: '#f3d56a',
+        stroke: '#4a1208',
+        strokeThickness: 4,
       })
       .setOrigin(0.5)
       .setDepth(51);
@@ -400,6 +414,7 @@ export class GameHud {
     // setSize удлиняет ленту. setDisplaySize растянул бы саму плитку.
     this.banner.setPosition(width / 2, 677).setSize(width, 86);
     this.title.setX(width / 2);
+    this.placeVersion(width);
     this.waveBanner.setX(width / 2);
 
     this.hastePlate.setPosition(hasteX, y);
@@ -429,6 +444,33 @@ export class GameHud {
     this.keysOverlay.setPosition(width / 2, height / 2);
     this.pauseDim.setSize(width, height);
     this.pauseOverlay.setPosition(width / 2, height / 2);
+  }
+
+  // Плашка той плитки, что справа от названия и левее кнопки «?».
+  // На широком окне плитки повторяются, и номер не залезает ни на название, ни на кнопку.
+  private placeVersion(width: number): void {
+    const frame = this.banner.frame;
+    const scale = 86 / frame.height;
+    const tileW = frame.width * scale;
+    const plate = this.versionPlate;
+    const plateLeft = plate.left * scale;
+    const plateRight = plate.right * scale;
+    const titleRight = this.title.x + this.title.width / 2;
+    const keysLeft = width - 56 - 20;
+    let chosen = -1;
+    for (let tile = 0; tile < 16; tile += 1) {
+      const left = tile * tileW + plateLeft;
+      const right = tile * tileW + plateRight;
+      if (left >= titleRight + 12 && right <= keysLeft - 8) {
+        chosen = tile;
+      }
+    }
+    if (chosen < 0) {
+      chosen = Math.max(0, Math.floor(this.title.x / tileW));
+    }
+    const x = chosen * tileW + (plateLeft + plateRight) / 2;
+    const y = 677 - 43 + ((plate.top + plate.bottom) / 2) * scale;
+    this.versionText.setPosition(Math.round(x), Math.round(y));
   }
 
   setScore(score: number): void {

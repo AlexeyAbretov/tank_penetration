@@ -1,7 +1,7 @@
 {
   "name": "tank-penetration",
   "private": true,
-  "version": "1.16.0",
+  "version": "1.17.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,6 +19,7 @@
     "@types/node": "^26.6.6",
     "typescript": "^5.8.3",
     "vite": "^7.1.5",
+    "vite-plugin-pwa": "^2.0.0",
     "vite-plugin-singlefile": "^2.3.3"
   }
 }
