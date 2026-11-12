@@ -39,8 +39,11 @@ export function isDebugRun(): boolean {
   );
 }
 
-// Кнопка «+» в заголовке дебаг-витрины. GameScene слушает её только в дебаг-партии и делает то же, что клавиша M.
-export const DEBUG_FUNDS_EVENT = 'debug-funds';
+// «+» у знака монет в дебаг-витрине волны. Слушает DebugShopController.
+export const DEBUG_COIN_EVENT = 'debug-coins';
+
+// «+» у знака очков в дебаг-витрине после гибели. Слушает DebugProgressShopController.
+export const DEBUG_SCORE_EVENT = 'debug-score';
 
 // Текущий темп врагов. Registry — общая полка сцены: туда GameScene кладёт число по ключу.
 // Если ключа ещё нет или там не число, темп равен 1. Выше max и ниже 1 значение не уходит.

@@ -9,12 +9,13 @@ import { EnemyFactory } from '../entities/EnemyFactory';
 import { GAME, isDebugRun } from '../gameConfig';
 import { BattleMusic } from '../sounds/BattleMusic';
 import { DebugCombatSave } from '../saves/DebugCombatSave';
-import { DebugProgressSave } from '../saves/DebugProgressSave';
 import { CombatSave } from '../saves/CombatSave';
 import { ProgressSave } from '../saves/ProgressSave';
 import { DebugQuietPause } from '../controllers/DebugQuietPause';
 import { PauseStack } from '../controllers/PauseStack';
 import { ScreenPause } from '../controllers/ScreenPause';
+import { DebugProgressShopController } from '../controllers/DebugProgressShopController';
+import { DebugShopController } from '../controllers/DebugShopController';
 import { ProgressShopController } from '../controllers/ProgressShopController';
 import { DebugWaveManager } from '../systems/DebugWaveManager';
 import { WaveManager } from '../systems/WaveManager';
@@ -24,7 +25,6 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { DebugGameHud } from '../ui/huds/DebugGameHud';
 import { GameHud } from '../ui/huds/GameHud';
 import { DebugSettingsPanel } from '../ui/settings/DebugSettingsPanel';
-import { DebugProgressShopPanel } from '../ui/shops/DebugProgressShopPanel';
 import { DebugShopPanel } from '../ui/shops/DebugShopPanel';
 
 export class GameSceneFactory {
@@ -34,7 +34,7 @@ export class GameSceneFactory {
       
       return new GameScene(
         new DebugCombatSave(),
-        new ProgressShopController(new DebugProgressSave(), DebugProgressShopPanel),
+        new DebugProgressShopController(),
         new DebugWaveManager(enemies, GAME),
         new BattleMusic(enemies),
         DebugGameHud,
@@ -43,6 +43,7 @@ export class GameSceneFactory {
         DebugSettingsPanel,
         DebugPlayerController,
         DebugShopPanel,
+        DebugShopController,
       );
     }
 

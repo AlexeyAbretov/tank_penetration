@@ -15,7 +15,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
-import { DEBUG_FUNDS_EVENT, ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
+import { ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
 import { boom } from '../gfx/boom';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
@@ -80,8 +80,6 @@ export class GameScene extends Phaser.Scene {
   private hasteKey?: Phaser.Input.Keyboard.Key;
   private hasteNumpad?: Phaser.Input.Keyboard.Key;
   private pauseKey?: Phaser.Input.Keyboard.Key;
-  // Дебаг: M и «+» в заголовке витрины досыпают очки и монеты. В обычной партии клавиши нет.
-  private fundsKey?: Phaser.Input.Keyboard.Key;
   // Дебаг: F сразу проигрывает партию и открывает магазин очков.
   private forfeitKey?: Phaser.Input.Keyboard.Key;
   // false до конца create() и в момент гибели, чтобы оборванная партия не записалась поверх стирания.
@@ -155,6 +153,8 @@ export class GameScene extends Phaser.Scene {
       shop: ShopDelegate,
       screen: { width: number; height: number },
     ) => ShopPanel = ShopPanel,
+    // Магазин волны. Дебаг подставляет наследника, который слушает M. Обычная партия — сам контроллер.
+    private readonly Shop: typeof ShopController = ShopController,
   ) {
     // Ключ сцены. restart() ищет её по этой строке и поднимает тот же объект,
     // поэтому хранилище, магазин очков, волны и музыка, переданные при старте, не подменяются.
@@ -362,13 +362,8 @@ export class GameScene extends Phaser.Scene {
       this.hasteNumpad = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.NUMPAD_ADD);
       this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
       if (isDebugRun()) {
-        this.fundsKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
         this.forfeitKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
       }
-    }
-    // «+» дебаг-витрины. restart() поднимает ту же сцену, поэтому слушатель снимается в onShutdown.
-    if (isDebugRun()) {
-      this.events.on(DEBUG_FUNDS_EVENT, this.grantDebugFunds, this);
     }
     this.events.once('shutdown', this.onShutdown, this);
 
@@ -387,7 +382,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.player.reset();
 
-    this.shop = new ShopController(
+    this.shop = new this.Shop(
       this,
       this.hud,
       this.player.tank,
@@ -400,6 +395,13 @@ export class GameScene extends Phaser.Scene {
           }
           this.coins -= amount;
           return true;
+        },
+        // Кошелёк партии. Магазин просит прибавить, сцена пишет число, счёт и сохранение.
+        addCoins: (amount) => {
+          const gained = Math.max(0, Math.round(amount));
+          this.coins += gained;
+          this.hud.setCoins(this.coins);
+          this.writeSave();
         },
       },
       {
@@ -589,10 +591,7 @@ export class GameScene extends Phaser.Scene {
 
   // Кадр боя. delta — миллисекунды с прошлого кадра, его забирают системы.
   update(_time: number, delta: number): void {
-    // Раньше магазинов и паузы: иначе M и F молчат, пока витрина открыта.
-    if (this.fundsPressed()) {
-      this.grantDebugFunds();
-    }
+    // Раньше магазинов и паузы: иначе F молчит, пока витрина открыта.
     if (this.forfeitPressed()) {
       this.forfeitRun();
     }
@@ -840,7 +839,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onShutdown(): void {
-    this.events.off(DEBUG_FUNDS_EVENT, this.grantDebugFunds, this);
     this.scale.off(Phaser.Scale.Events.RESIZE, this.layoutFrame, this);
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.removeEventListener('pagehide', this.onPageHide);
@@ -883,10 +881,6 @@ export class GameScene extends Phaser.Scene {
     return this.pauseKey !== undefined && Phaser.Input.Keyboard.JustDown(this.pauseKey);
   }
 
-  private fundsPressed(): boolean {
-    return this.fundsKey !== undefined && Phaser.Input.Keyboard.JustDown(this.fundsKey);
-  }
-
   private forfeitPressed(): boolean {
     return this.forfeitKey !== undefined && Phaser.Input.Keyboard.JustDown(this.forfeitKey);
   }
@@ -902,20 +896,6 @@ export class GameScene extends Phaser.Scene {
     this.progressShop.bank(this.score);
     this.combatSave.clear();
     this.player.forfeit();
-  }
-
-  // Вне экрана гибели — 10000 очков партии и 10000 монет. На экране гибели — 10000 очков прогресса.
-  private grantDebugFunds(): void {
-    if (this.defeatShop) {
-      this.progressShop.addScore(10000);
-      return;
-    }
-    this.score += 10000;
-    this.coins += 10000;
-    this.hud.setScore(this.score);
-    this.hud.setCoins(this.coins);
-    this.shop.refreshCoins();
-    this.writeSave();
   }
 
   private cycleEnemyHaste(): void {

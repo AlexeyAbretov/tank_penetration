@@ -2,7 +2,7 @@
 // Обычная партия этот класс не импортирует.
 
 import Phaser from 'phaser';
-import { DEBUG_FUNDS_EVENT } from '../../gameConfig';
+import { DEBUG_COIN_EVENT } from '../../gameConfig';
 import { mountPlusChip, plusChipSize } from '../militaryDialog';
 import { ShopPanel, type ShopDelegate, type ShopView } from './ShopPanel';
 
@@ -21,7 +21,7 @@ export class DebugShopPanel extends ShopPanel {
       if (!this.container.visible) {
         return;
       }
-      scene.events.emit(DEBUG_FUNDS_EVENT);
+      scene.events.emit(DEBUG_COIN_EVENT);
     });
     // Не в конец: карточки встают перед «Следующая волна», плюс остаётся у знака.
     this.container.addAt(this.plus, this.container.getIndex(this.coinMark));

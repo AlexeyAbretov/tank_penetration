@@ -62,6 +62,7 @@ type PermanentBonuses = {
 type Economy = {
   getCoins: () => number;
   spendCoins: (amount: number) => boolean;
+  addCoins: (amount: number) => void;
 };
 
 export class ShopController {
@@ -117,10 +118,10 @@ export class ShopController {
   private batch = false;
 
   constructor(
-    private readonly scene: Phaser.Scene,
+    protected readonly scene: Phaser.Scene,
     private readonly hud: GameHud,
     private readonly tank: Tank,
-    private readonly economy: Economy,
+    protected readonly economy: Economy,
     private readonly bonuses: PermanentBonuses,
     private readonly onContinue: () => void,
     private readonly onChanged: () => void,

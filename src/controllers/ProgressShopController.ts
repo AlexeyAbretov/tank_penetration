@@ -77,8 +77,8 @@ export class ProgressShopController {
   private paused = false;
   private onNewGame: () => void = () => {};
 
-  // Сохранение приходит из фабрики: у дебага свой ключ, и restart() его не подменяет.
-  // Витрина тоже: дебаг передаёт наследника с кнопкой «+».
+  // Сохранение и витрина приходят снаружи. restart() контроллер не создаёт заново и ключ не подменяет.
+  // Дебаг-наследник сам отдаёт сюда свой ключ и окно с «+».
   constructor(
     private readonly progressSave: ProgressSave,
     private readonly Panel: new (
@@ -405,12 +405,17 @@ export class ProgressShopController {
     this.progressSave.save(this.progress);
   }
 
-  // Дебаг досыпает очки, пока витрина открыта. Иначе кнопки остаются по старому числу.
-  addScore(amount: number): void {
+  // Витрина читает число заново: иначе кнопки остаются по старому числу.
+  protected addScore(amount: number): void {
     const gained = Math.max(0, Math.round(amount));
     this.progress.score = Math.min(SCORE_MAX, this.progress.score + gained);
     this.progressSave.save(this.progress);
     this.panel.refresh(this.view());
+  }
+
+  // До bind() панели ещё нет: досыпка тогда не к чему привязана.
+  protected isShown(): boolean {
+    return this.panel?.container.visible ?? false;
   }
 
   open(): void {

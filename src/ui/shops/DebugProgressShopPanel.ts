@@ -2,7 +2,7 @@
 // Обычная партия этот класс не импортирует.
 
 import Phaser from 'phaser';
-import { DEBUG_FUNDS_EVENT } from '../../gameConfig';
+import { DEBUG_SCORE_EVENT } from '../../gameConfig';
 import { mountPlusChip, plusChipSize } from '../militaryDialog';
 import { ProgressShopPanel, type ProgressShopDelegate, type ProgressShopView } from './ProgressShopPanel';
 
@@ -21,7 +21,7 @@ export class DebugProgressShopPanel extends ProgressShopPanel {
       if (!this.container.visible) {
         return;
       }
-      scene.events.emit(DEBUG_FUNDS_EVENT);
+      scene.events.emit(DEBUG_SCORE_EVENT);
     });
     // Не в конец: карточки встают перед «Новая игра» и «В бой», плюс остаётся у знака.
     this.container.addAt(this.plus, this.container.getIndex(this.scoreMark));
