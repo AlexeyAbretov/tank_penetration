@@ -419,11 +419,16 @@ function parseEnemies(value: unknown): EnemySave[] {
     }
     // Место в очереди. Старые записи его не писали: тогда волна подставит порядок в списке.
     const slot = entry.slot === undefined ? undefined : requiredInt(entry.slot, 0, 10_000);
-    if (slot === undefined || slot === null) {
-      enemies.push({ kind, x, y, hp, pace });
-      continue;
+    // Сколько солдат уже вышло из БТР. Чужое или битое число не выбрасывает врага: дверь считается закрытой.
+    const dropped = entry.dropped === undefined ? undefined : requiredInt(entry.dropped, 0, 11);
+    const saved: EnemySave = { kind, x, y, hp, pace };
+    if (slot !== undefined && slot !== null) {
+      saved.slot = slot;
     }
-    enemies.push({ kind, x, y, hp, pace, slot });
+    if (dropped !== undefined && dropped !== null && dropped > 0) {
+      saved.dropped = dropped;
+    }
+    enemies.push(saved);
   }
   return enemies;
 }

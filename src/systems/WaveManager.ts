@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import type { EnemySave, WavePhase } from '../types/EnemySave';
 import type { EnemyWaves } from '../types/EnemyWaves';
+import type { TroopKind } from '../types/SpawnContext';
 import type { WaveUnit } from '../types/WaveUnit';
 import type { WorldPoint } from '../types/WorldPoint';
 
@@ -108,6 +109,8 @@ export class WaveManager {
         hp: unit.hp,
         pace: unit.paceRank,
         slot: unit.slot,
+        // Ноль у всех, кроме БТР, который уже открыл дверь. Старая запись поля не ждёт.
+        ...( (unit.routeMark ?? 0) > 0 ? { dropped: unit.routeMark } : {}),
       });
     }
     return {
@@ -233,21 +236,37 @@ export class WaveManager {
     }
   }
 
+  // Солдат из двери встаёт в тот же отряд, что и вышедшие по списку волны.
+  private deployTroop(kind: TroopKind, x: number, y: number): void {
+    if (this.isGameOver()) {
+      return;
+    }
+    const unit = this.enemies.deploy(kind, this.spawnContext(x, y));
+    this.infantry.add(unit);
+    unit.march();
+  }
+
+  private spawnContext(x: number, y: number) {
+    return {
+      scene: this.scene,
+      x,
+      y,
+      wave: this.wave,
+      shots: this.enemyShots,
+      fireTarget: this.fireTarget,
+      deploy: (kind: TroopKind, dx: number, dy: number) => this.deployTroop(kind, dx, dy),
+    };
+  }
+
   private restoreEnemy(enemy: EnemySave, index: number): void {
     const unit = this.enemies.restore(
       enemy.kind,
-      {
-        scene: this.scene,
-        x: enemy.x,
-        y: enemy.y,
-        wave: this.wave,
-        shots: this.enemyShots,
-        fireTarget: this.fireTarget,
-      },
+      this.spawnContext(enemy.x, enemy.y),
       enemy.hp,
       enemy.pace,
       // Старая запись без места берёт порядок в списке. Новая хранит место очереди.
       enemy.slot ?? index,
+      enemy.dropped ?? 0,
     );
     this.infantry.add(unit);
     // march включает скорость. Без него спрайт стоит в точке появления.
@@ -264,14 +283,7 @@ export class WaveManager {
     const { x, y } = this.entryPoint();
     // index — место в списке волны. Фабрика по нему выбирает вид и здоровье.
     // fireTarget — точка, в которую целятся стрелки; её задала сцена в bind().
-    const unit = this.enemies.create(index, {
-      scene: this.scene,
-      x,
-      y,
-      wave: this.wave,
-      shots: this.enemyShots,
-      fireTarget: this.fireTarget,
-    });
+    const unit = this.enemies.create(index, this.spawnContext(x, y));
     this.infantry.add(unit);
     unit.march();
   }

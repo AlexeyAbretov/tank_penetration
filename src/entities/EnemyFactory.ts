@@ -4,6 +4,7 @@
 // Так дебют стрелка на 3-й волне сам появляется и в составе 15-й.
 
 import { AssaultInfantry } from './AssaultInfantry';
+import { Btr } from './Btr';
 import { DroneCarrier } from './DroneCarrier';
 import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
@@ -13,7 +14,7 @@ import { PickupTruck } from './PickupTruck';
 import { RocketBuggy } from './RocketBuggy';
 import { RocketInfantry } from './RocketInfantry';
 import { SuperSoldier } from './SuperSoldier';
-import type { SpawnContext } from '../types/SpawnContext';
+import type { SpawnContext, TroopKind } from '../types/SpawnContext';
 import type { EnemySaveKind } from '../types/EnemySave';
 import type { WaveUnit } from '../types/WaveUnit';
 
@@ -24,6 +25,7 @@ export { ENEMY_KINDS } from '../types/EnemySave';
 
 type EnemyKind =
   | typeof AssaultInfantry
+  | typeof Btr
   | typeof DroneCarrier
   | typeof GunnerInfantry
   | typeof HeavyTank
@@ -78,6 +80,7 @@ export class EnemyFactory {
   // 10, 20, 30… На экран выходят боссы: нечётный выход — суперсолдат, чётный — тяжёлый танк.
   // Со второго тела на поле оба: чётные места очереди держит ведущий, нечётные — другой.
   // Со волны дрономатки к ним добавляется она, не больше двух на поле.
+  // С 60-й к той же волне выходит один БТР. Его число не растёт.
   // Сколько — считает bossCount. Внутри roster более поздняя волна этот номер
   // всё равно проигрывает, чтобы дебют пикапа на 10-й и ракетчика на 20-й не потерялся.
   static isBossWave(wave: number): boolean {
@@ -105,6 +108,14 @@ export class EnemyFactory {
     return Math.min(DroneCarrier.maxOnField, 1 + step);
   }
 
+  // На обычной волне и до 60-й ноль. Дальше ровно один, на каждой босс-волне.
+  static btrCount(wave: number): number {
+    if (!this.isBossWave(wave) || wave < Btr.debutWave) {
+      return 0;
+    }
+    return 1;
+  }
+
   // Длина списка. WaveManager сравнивает её с тем, сколько врагов уже вышло.
   static count(wave: number): number {
     return this.roster(wave).length;
@@ -115,6 +126,13 @@ export class EnemyFactory {
   static create(index: number, ctx: SpawnContext): Infantry {
     const kind = this.roster(ctx.wave)[index] ?? AssaultInfantry;
     return this.spawnUnit(kind, ctx, index);
+  }
+
+  // Солдат из двери БТР. Ранг и урон — как у пехоты этой волны, не как у босса.
+  static deploy(kind: TroopKind, ctx: SpawnContext): Infantry {
+    const troop =
+      kind === 'gunner' ? GunnerInfantry : kind === 'rocket' ? RocketInfantry : AssaultInfantry;
+    return this.spawnUnit(troop, ctx, 0);
   }
 
   // Обратное превращение: живой спрайт → строка для сохранения. null — это не наш враг.
@@ -143,6 +161,9 @@ export class EnemyFactory {
     if (unit instanceof DroneCarrier) {
       return 'carrier';
     }
+    if (unit instanceof Btr) {
+      return 'btr';
+    }
     if (unit instanceof AssaultInfantry) {
       return 'assault';
     }
@@ -152,15 +173,28 @@ export class EnemyFactory {
   // Собирает уже вышедшего врага на сохранённом месте. Запас здоровья берётся из ранга,
   // как при обычном спавне, а полоска ставится на оставшиеся hp.
   // У суперсолдата ранг скорости всегда 1, запас считает номер появления на текущей волне.
-  static restore(kind: EnemySaveKind, ctx: SpawnContext, hp: number, pace: number, slot = 0): Infantry {
+  static restore(
+    kind: EnemySaveKind,
+    ctx: SpawnContext,
+    hp: number,
+    pace: number,
+    slot = 0,
+    dropped = 0,
+  ): Infantry {
     const rankHp = Infantry.waveHp(pace);
-    const unit = this.spawnSaved(kind, ctx, rankHp, slot);
+    const unit = this.spawnSaved(kind, ctx, rankHp, slot, dropped);
     unit.setPaceWave(pace);
     unit.setHealth(hp);
     return unit;
   }
 
-  private static spawnSaved(kind: EnemySaveKind, ctx: SpawnContext, rankHp: number, slot: number): Infantry {
+  private static spawnSaved(
+    kind: EnemySaveKind,
+    ctx: SpawnContext,
+    rankHp: number,
+    slot: number,
+    dropped: number,
+  ): Infantry {
     const { scene, x, y, shots, fireTarget } = ctx;
     if (kind === 'super') {
       const appearance = this.bossAppearance(ctx.wave);
@@ -181,6 +215,16 @@ export class EnemyFactory {
       const count = this.bodyCount(ctx.wave);
       const hp = DroneCarrier.hpForAppearance(showing);
       const unit = new DroneCarrier(scene, x, y, hp, shots, fireTarget, purse, slot, count);
+      unit.setDamageWave(ctx.wave);
+      return unit;
+    }
+    if (kind === 'btr') {
+      const showing = this.btrShowing(ctx.wave);
+      const purse = this.bossAppearance(ctx.wave);
+      const count = this.bodyCount(ctx.wave);
+      const hp = Btr.hpForAppearance(showing);
+      const unit = new Btr(scene, x, y, hp, shots, fireTarget, ctx.deploy, dropped, purse, slot, count);
+      unit.setPaceWave(1);
       unit.setDamageWave(ctx.wave);
       return unit;
     }
@@ -228,7 +272,7 @@ export class EnemyFactory {
   // Монеты — одна касса волны на все тела. Скорость обоих боссов остаётся на ранге 1.
   // Остальные прибавляют 1 урона каждые 10 волн: на 10-й уже +1, на 20-й +2.
   // Дебаг-наследник считает ранг по номеру своей волны, без дебюта обычной партии.
-  protected static spawnUnit(kind: EnemyKind, ctx: SpawnContext, slot = 0): Infantry {
+  protected static spawnUnit(kind: EnemyKind, ctx: SpawnContext, slot = 0, dropped = 0): Infantry {
     const { scene, x, y, wave, shots, fireTarget } = ctx;
 
     if (kind === SuperSoldier) {
@@ -255,6 +299,16 @@ export class EnemyFactory {
       const count = this.bodyCount(wave);
       const hp = DroneCarrier.hpForAppearance(this.carrierShowing(wave));
       const unit = new DroneCarrier(scene, x, y, hp, shots, fireTarget, purse, slot, count);
+      unit.setPaceWave(1);
+      unit.setDamageWave(wave);
+      return unit;
+    }
+
+    if (kind === Btr) {
+      const purse = this.bossAppearance(wave);
+      const count = this.bodyCount(wave);
+      const hp = Btr.hpForAppearance(this.btrShowing(wave));
+      const unit = new Btr(scene, x, y, hp, shots, fireTarget, ctx.deploy, dropped, purse, slot, count);
       unit.setPaceWave(1);
       unit.setDamageWave(wave);
       return unit;
@@ -320,9 +374,14 @@ export class EnemyFactory {
     return DroneCarrier.appearanceOn(wave);
   }
 
-  // Все тела босс-волны, включая дрономатку. Касса делится на это число.
+  // Какой по счёту выход именно БТР. Дебаг подменяет номером круга.
+  protected static btrShowing(wave: number): number {
+    return Btr.appearanceOn(wave);
+  }
+
+  // Все тела босс-волны, включая дрономатку и БТР. Касса делится на это число.
   private static bodyCount(wave: number): number {
-    return this.bossCount(wave) + this.carrierCount(wave);
+    return this.bossCount(wave) + this.carrierCount(wave) + this.btrCount(wave);
   }
 
   // Ведущий чередуется. Пока тело одно, на поле только он.
@@ -368,16 +427,17 @@ export class EnemyFactory {
     if (this.carrierCount(wave) > 0) {
       names.push('ДРОНОМАТКА');
     }
+    if (this.btrCount(wave) > 0) {
+      names.push('БТР');
+    }
     if (names.length === 0) {
       return null;
     }
     if (names.length === 1) {
       return names[0];
     }
-    if (names.length === 2) {
-      return `${names[0]} И ${names[1]}`;
-    }
-    return `${names[0]}, ${names[1]} И ${names[2]}`;
+    const last = names[names.length - 1];
+    return `${names.slice(0, -1).join(', ')} И ${last}`;
   }
 
   protected static growthRank(wave: number, debutWave: number): number {
@@ -403,6 +463,10 @@ export class EnemyFactory {
       const carriers = this.carrierCount(wave);
       for (let i = 0; i < carriers; i += 1) {
         bosses.push(DroneCarrier);
+      }
+      const btrs = this.btrCount(wave);
+      for (let i = 0; i < btrs; i += 1) {
+        bosses.push(Btr);
       }
       return bosses;
     }

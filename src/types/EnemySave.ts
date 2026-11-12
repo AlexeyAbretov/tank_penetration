@@ -3,7 +3,7 @@
 
 // Короткое имя вида для сохранения партии. Имя класса после сборки Vite может измениться,
 // поэтому в localStorage пишется эта строка, а не AssaultInfantry.
-export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket', 'buggy', 'heli', 'super', 'tank', 'carrier'] as const;
+export const ENEMY_KINDS = ['assault', 'gunner', 'truck', 'rocket', 'buggy', 'heli', 'super', 'tank', 'carrier', 'btr'] as const;
 export type EnemySaveKind = (typeof ENEMY_KINDS)[number];
 
 export type EnemySave = {
@@ -14,6 +14,8 @@ export type EnemySave = {
   pace: number;
   // Место в очереди волны. Доля кассы босса от него. Старые записи поля не имеют.
   slot?: number;
+  // Сколько солдат БТР уже выпустил. Старые записи и прочие виды поля не имеют.
+  dropped?: number;
 };
 
 export type WavePhase = 'combat' | 'shop';

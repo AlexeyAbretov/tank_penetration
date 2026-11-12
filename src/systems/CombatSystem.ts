@@ -8,6 +8,7 @@ import { BarbedWire } from '../entities/BarbedWire';
 import { EnergyWall } from '../entities/EnergyWall';
 import { EnemyShot } from '../entities/EnemyShot';
 import { DroneCarrier } from '../entities/DroneCarrier';
+import { Btr } from '../entities/Btr';
 import { FlameTank } from '../entities/FlameTank';
 import { HeavyTank } from '../entities/HeavyTank';
 import { Helicopter } from '../entities/Helicopter';
@@ -2301,14 +2302,15 @@ export class CombatSystem implements Combat {
     };
   }
 
-  // Пикап, багги и вертолёт делят один клип гибели. Пехота кричит отдельно.
+  // Пикап, багги, вертолёт, тяжёлый танк, дрономатка и БТР делят один клип гибели. Пехота кричит отдельно.
   private isVehicle(unit: Infantry): boolean {
     return (
       unit instanceof PickupTruck ||
       unit instanceof RocketBuggy ||
       unit instanceof Helicopter ||
       unit instanceof HeavyTank ||
-      unit instanceof DroneCarrier
+      unit instanceof DroneCarrier ||
+      unit instanceof Btr
     );
   }
 
