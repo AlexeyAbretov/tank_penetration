@@ -1,11 +1,13 @@
 // Летающая дрономатка. Босс дальней четверти поля: зависает и выпускает залп ударных дронов.
 // Здоровье снимают снаряд танка, пулемёт и атомный взрыв. ЭМИ только держит её на месте.
+// Пока корпус жив и винты крутятся, они шумят. Под ЭМИ и после гибели шум молчит.
 
 import Phaser from 'phaser';
 import { enemyHasteOf, GAME } from '../gameConfig';
 import { bake } from '../gfx/textures';
 import { vehicleDeathBlast } from '../gfx/vehicleBlast';
 import { wreckSmokeAt } from '../gfx/wreckSmoke';
+import { syncDroneRotors } from '../sounds/DroneCarrierSounds';
 import type { WorldPoint } from '../types/WorldPoint';
 import { Infantry } from './Infantry';
 import { StrikeDrone } from './StrikeDrone';
@@ -54,6 +56,7 @@ export class DroneCarrier extends Infantry {
   ] as const;
   static readonly fallMs = 620;
   static readonly wreckMs = 5000;
+  private static nextRotor = 1;
 
   readonly reachesBase = false;
   readonly contactDamage = 0;
@@ -70,6 +73,7 @@ export class DroneCarrier extends Infantry {
   private shotsLeft = 0;
   private departAt = -1;
   private droneCount = DroneCarrier.droneMin;
+  private readonly rotorId = DroneCarrier.nextRotor++;
   private readonly shots: Phaser.Physics.Arcade.Group;
   private readonly fireTarget: WorldPoint;
 
@@ -193,7 +197,19 @@ export class DroneCarrier extends Infantry {
     this.once('destroy', () => {
       this.shadow?.destroy();
       this.smoke?.destroy();
+      syncDroneRotors(scene, this.rotorId, false);
     });
+  }
+
+  override preUpdate(time: number, delta: number): void {
+    super.preUpdate(time, delta);
+    this.voice();
+  }
+
+  // ЭМИ глушит винты в кадре боя, до следующего preUpdate. Шум обрывается сразу.
+  override hold(ms: number): void {
+    super.hold(ms);
+    this.voice();
   }
 
   override march(): void {
@@ -230,6 +246,7 @@ export class DroneCarrier extends Infantry {
   }
 
   protected override onDie(slain: boolean): void {
+    this.voice();
     this.shadow?.destroy();
     this.shadow = undefined;
     if (!slain) {
@@ -393,6 +410,12 @@ export class DroneCarrier extends Infantry {
     const left = Math.round((GAME.width * 3) / 4);
     const right = Math.max(left + 40, GAME.width - 100);
     return { left, right, top: 140, bottom: 540 };
+  }
+
+  // Шум, пока этот корпус жив и не под ЭМИ. Остов и падение уже молчат.
+  private voice(): void {
+    const spinning = this.active && !this.reachedWall && !this.held();
+    syncDroneRotors(this.scene, this.rotorId, spinning);
   }
 
   private framePoint(px: number, py: number): { x: number; y: number } {

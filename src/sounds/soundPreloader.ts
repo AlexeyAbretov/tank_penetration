@@ -18,6 +18,7 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     // thrusterFire_000 — шипение, пока столб идёт.
     // heavy-tank-boss-engine — гул мотора тяжёлого танка, пока корпус жив.
     // heavy-tank-boss-tracks — лязг гусениц, только пока танк едет.
+    // drone-carrier-boss — шум винтов дрономатки. Плотный луп, без тишины по краям.
     scene.load.audio('music-wave', 'audio/TRACK_01.mp3');
     scene.load.audio('music-boss', 'audio/boss.mp3');
     scene.load.audio('tank-shot', 'audio/tank_shot.mp3');
@@ -45,4 +46,5 @@ export const preloadSounds = (scene: Phaser.Scene) => {
     scene.load.audio('ion-sweep', 'audio/thrusterFire_000.ogg');
     scene.load.audio('heavy-tank-engine', 'audio/heavy-tank-boss-engine.mp3');
     scene.load.audio('heavy-tank-tracks', 'audio/heavy-tank-boss-tracks.mp3');
+    scene.load.audio('drone-carrier-rotor', 'audio/drone-carrier-boss.wav');
 };
