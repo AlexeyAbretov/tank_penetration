@@ -22,6 +22,7 @@ import { RocketBuggy } from '../entities/RocketBuggy';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
 import { ensureCoinMark } from './coinMark';
+import { ensureScoreMark } from './scoreMark';
 import { ensureCraters } from './craters';
 import { createTextures } from './textures';
 import { Muzzle } from './muzzle';
@@ -30,6 +31,7 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   createTextures(scene);
   ensureCraters(scene);
   ensureCoinMark(scene);
+  ensureScoreMark(scene);
 
   Muzzle.ensureTextures(scene);
   MachineGun.ensureTextures(scene);

@@ -7,6 +7,7 @@ import { AbilityIcon, AutoApplyBadge, HudAbility, HudFrame } from './GameHud.typ
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
 import { coinMarkKey } from '../../gfx/coinMark';
+import { scoreMarkKey } from '../../gfx/scoreMark';
 import { preloadTextures } from '../../gfx/textures';
 
 const AUTO_POWER_HIT = 16;
@@ -51,6 +52,8 @@ export class GameHud {
   }
 
   private readonly scoreText: Phaser.GameObjects.Text;
+  private readonly scoreMark: Phaser.GameObjects.Image;
+  private readonly scoreAspect: number;
   private readonly waveText: Phaser.GameObjects.Text;
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly coinMark: Phaser.GameObjects.Image;
@@ -157,8 +160,14 @@ export class GameHud {
       .setOrigin(0.5)
       .setDepth(51);
 
+    const scoreFrame = scene.textures.get(scoreMarkKey).get();
+    this.scoreAspect = scoreFrame.width / scoreFrame.height;
+    this.scoreMark = scene.add
+      .image(28, this.statusY, scoreMarkKey)
+      .setOrigin(0, 0.5)
+      .setDepth(51);
     this.scoreText = scene.add
-      .text(28, this.statusY, 'SCORE  0', { ...this.statusStyle, color: '#f3d56a' })
+      .text(28, this.statusY, '0', { ...this.statusStyle, color: '#f3d56a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
     this.waveText = scene.add
@@ -409,7 +418,7 @@ export class GameHud {
   }
 
   setScore(score: number): void {
-    this.scoreText.setText(`SCORE  ${score}`);
+    this.scoreText.setText(String(score));
 
     this.layoutStatus();
   }
@@ -426,16 +435,20 @@ export class GameHud {
     this.layoutStatus();
   }
 
-  // Белый знак вместо слова COINS. Высота как у числа, зазор как в магазине волны.
+  // Белый знак вместо слов SCORE и COINS. Высота как у числа, зазор как в магазине.
   private layoutStatus(): void {
     const gap = 32;
-    const coinGap = 6;
-    const height = this.coinsText.height;
+    const markGap = 6;
+    const scoreHeight = this.scoreText.height;
+    const coinHeight = this.coinsText.height;
 
+    this.scoreMark.setDisplaySize(scoreHeight * this.scoreAspect, scoreHeight);
+    this.scoreMark.setPosition(28, this.statusY);
+    this.scoreText.setPosition(28 + this.scoreMark.displayWidth + markGap, this.statusY);
     this.waveText.setX(this.scoreText.x + this.scoreText.width + gap);
-    this.coinMark.setDisplaySize(height * this.coinAspect, height);
+    this.coinMark.setDisplaySize(coinHeight * this.coinAspect, coinHeight);
     this.coinMark.setPosition(this.waveText.x + this.waveText.width + gap, this.statusY);
-    this.coinsText.setPosition(this.coinMark.x + this.coinMark.displayWidth + coinGap, this.statusY);
+    this.coinsText.setPosition(this.coinMark.x + this.coinMark.displayWidth + markGap, this.statusY);
   }
 
   setTankStats(

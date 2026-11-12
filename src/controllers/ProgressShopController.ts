@@ -19,6 +19,7 @@ import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
 import {
   ProgressShopPanel,
+  scoreCostPrefix,
   type ProgressCardView,
   type ProgressShopView,
   type ProgressTabView,
@@ -1772,7 +1773,7 @@ export class ProgressShopController {
   }
 
   private coin(price: number): string {
-    return `¤ ${price}`;
+    return `${scoreCostPrefix}${price}`;
   }
 
   private formatSeconds(ms: number): string {

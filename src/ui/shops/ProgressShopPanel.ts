@@ -14,6 +14,7 @@ import {
   paintFieldRule,
   paintOrderBar,
 } from '../militaryDialog';
+import { scoreMarkKey } from '../../gfx/scoreMark';
 
 export type ProgressCardView = {
   title: string;
@@ -37,6 +38,9 @@ export type ProgressShopView = {
   score: number;
   tabs: ProgressTabView[];
 };
+
+// Цена в очках начинается с этой метки. На карточке вместо неё белый знак.
+export const scoreCostPrefix = '¤ ';
 
 // «Новая игра» и «в бой». Сами покупки приходят в карточке.
 export type ProgressShopDelegate = {
@@ -77,12 +81,15 @@ const FRESH_X = CARD_X - BUTTON_PAIR / 2 + BUTTON_W / 2;
 const NEXT_X = CARD_X + BUTTON_PAIR / 2 - BUTTON_W / 2;
 
 const BRASS = 0xc4a15a;
+// Серое число, когда очков не хватает. Совпадает с fieldMuted: знак гаснет вместе с ценой.
+const PRICE_MUTED = 0x7d7868;
 
 type Offer = {
   card: Phaser.GameObjects.Rectangle;
   title: Phaser.GameObjects.Text;
   info: Phaser.GameObjects.Text;
   cost: Phaser.GameObjects.Text;
+  score: Phaser.GameObjects.Image;
   mark: Phaser.GameObjects.Graphics;
   buy: () => void;
   open: boolean;
@@ -99,6 +106,8 @@ export class ProgressShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly scoreText: Phaser.GameObjects.Text;
+  private readonly scoreMark: Phaser.GameObjects.Image;
+  private readonly scoreAspect: number;
   private readonly dim: Phaser.GameObjects.Rectangle;
   private readonly offers: Offer[] = [];
   private readonly tabs: Tab[] = [];
@@ -139,12 +148,16 @@ export class ProgressShopPanel {
       })
       .setOrigin(0.5);
 
+    const frame = scene.textures.get(scoreMarkKey).get();
+    this.scoreAspect = frame.width / frame.height;
+    this.scoreMark = scene.add.image(SCORE_X, TITLE_Y, scoreMarkKey).setOrigin(1, 0.5);
     this.scoreText = scene.add
-      .text(SCORE_X, TITLE_Y, 'SCORE  0', {
+      .text(SCORE_X, TITLE_Y, '0', {
         fontSize: '22px',
         color: fieldPaper,
       })
       .setOrigin(1, 0.5);
+    this.placeScoreBalance();
 
     this.container = scene.add.container(screen.width / 2, screen.height / 2, [
       this.dim,
@@ -152,6 +165,7 @@ export class ProgressShopPanel {
       well,
       rule,
       title,
+      this.scoreMark,
       this.scoreText,
     ]);
 
@@ -187,7 +201,8 @@ export class ProgressShopPanel {
 
   refresh(view: ProgressShopView): void {
     this.lastView = view;
-    this.scoreText.setText(`SCORE  ${view.score}`);
+    this.scoreText.setText(String(view.score));
+    this.placeScoreBalance();
     this.syncTabs(view.tabs);
   }
 
@@ -292,7 +307,7 @@ export class ProgressShopPanel {
       this.offers.push(offer);
       // Кнопки «Новая игра» и «В бой» остаются поверх карточек.
       const at = Math.max(0, this.container.length - 2);
-      const nodes = [offer.card, offer.title, offer.info, offer.cost, offer.mark];
+      const nodes = [offer.card, offer.title, offer.info, offer.score, offer.cost, offer.mark];
       nodes.forEach((node, index) => this.container.addAt(node, at + index));
     }
   }
@@ -324,6 +339,7 @@ export class ProgressShopPanel {
     offer.title.setVisible(shown);
     offer.info.setVisible(shown);
     offer.cost.setVisible(shown);
+    offer.score.setVisible(false);
     if (!shown) {
       offer.mark.setVisible(false);
       offer.card.disableInteractive();
@@ -356,9 +372,10 @@ export class ProgressShopPanel {
         align: 'center',
       })
       .setOrigin(0.5, 1);
+    const score = scene.add.image(CARD_X, y, scoreMarkKey).setVisible(false);
     const mark = scene.add.graphics().setPosition(CARD_X - CARD_W / 2 + 28, y + CARD_H / 2 - 26);
     paintOwnedMark(mark);
-    const offer: Offer = { card, title, info, cost, mark, buy: () => undefined, open: false };
+    const offer: Offer = { card, title, info, cost, score, mark, buy: () => undefined, open: false };
     card.on('pointerup', () => {
       if (this.blocked() || !offer.open) {
         return;
@@ -378,9 +395,8 @@ export class ProgressShopPanel {
     offer.open = card.open;
     offer.title.setText(card.title);
     offer.info.setText(card.info);
-    offer.cost.setText(card.cost);
-    offer.cost.setVisible(!card.owned);
     offer.mark.setVisible(card.owned === true);
+    this.layoutPrice(offer, card);
     if (offer.card.input) {
       offer.card.input.cursor = card.open ? 'pointer' : 'default';
     }
@@ -390,6 +406,46 @@ export class ProgressShopPanel {
       return;
     }
     this.tintCard(offer.card, offer.cost, card.canBuy);
+  }
+
+  // Знак той же высоты, что строка, и стоит вплотную слева от числа.
+  private placeScoreBalance(): void {
+    const height = this.scoreText.height;
+    this.scoreMark.setDisplaySize(height * this.scoreAspect, height);
+    this.scoreMark.setPosition(SCORE_X - this.scoreText.width - 6, TITLE_Y);
+  }
+
+  // «¤ » в строке цены — метка очков. На карточке её место занимает белый знак.
+  // «макс.» и пустая цена знака не получают. Серая цена гасит и знак.
+  private layoutPrice(offer: Offer, card: ProgressCardView): void {
+    const priced = card.cost.startsWith(scoreCostPrefix);
+    const label = priced ? card.cost.slice(scoreCostPrefix.length) : card.cost;
+    offer.cost.setText(label);
+    const showScore = priced && card.owned !== true;
+    offer.score.setVisible(showScore);
+    offer.cost.setVisible(card.owned !== true);
+    const bottom = offer.card.y + offer.card.height / 2 - 10;
+    const mid = offer.card.x;
+    if (!showScore) {
+      offer.cost.setOrigin(0.5, 1);
+      offer.cost.setPosition(mid, bottom);
+      return;
+    }
+    const height = offer.cost.height;
+    offer.score.setDisplaySize(height * this.scoreAspect, height);
+    offer.score.setOrigin(0, 0.5);
+    offer.cost.setOrigin(0, 0.5);
+    const gap = 4;
+    const total = offer.score.displayWidth + gap + offer.cost.width;
+    const left = mid - total / 2;
+    const y = bottom - height / 2;
+    offer.score.setPosition(left, y);
+    offer.cost.setPosition(left + offer.score.displayWidth + gap, y);
+    if (card.open && !card.canBuy) {
+      offer.score.setTint(PRICE_MUTED);
+      return;
+    }
+    offer.score.clearTint();
   }
 
   private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {

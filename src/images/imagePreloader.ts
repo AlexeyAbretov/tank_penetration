@@ -25,6 +25,7 @@ import { preloadBoom } from '../gfx/boom';
 import { preloadCraters } from '../gfx/craters';
 import { preloadNuke } from '../gfx/nuke';
 import { preloadCoinMark } from '../gfx/coinMark';
+import { preloadScoreMark } from '../gfx/scoreMark';
 import { preloadTankBoom } from '../gfx/tankBoom';
 
 // Картинки живут у сущностей. Здесь только собираем их в один вызов для GameScene.
@@ -64,4 +65,5 @@ export const preloadImages = (scene: Phaser.Scene) => {
   preloadScorchedEarth(scene);
   preloadAirBurst(scene);
   preloadCoinMark(scene);
+  preloadScoreMark(scene);
 };
