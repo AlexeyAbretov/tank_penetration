@@ -55,7 +55,7 @@ const gravity = 1700;
 const flights = new WeakMap<Phaser.Scene, Flight[]>();
 
 // Нарезает кадр и ставит каждый прямоугольник туда, где он был на живом спрайте.
-// null — картинка другого размера: запасной рисунок 64×80, прямоугольники с него снимут не то.
+// null — картинка другого размера: прямоугольники с неё снимут не те куски.
 export function frameBits(scene: Phaser.Scene, pose: GibPose): GibBit[] | null {
   if (!scene.textures.exists(pose.key)) {
     return null;

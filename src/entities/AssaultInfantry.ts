@@ -6,8 +6,7 @@
 import Phaser from 'phaser';
 import { contactBlast } from '../gfx/contactBlast';
 import { frameBits, type GibCut } from '../gfx/gibs';
-import { ASSAULT_LOOK, CORPSE_FRAME, SOLDIER_FRAME } from '../gfx/looks';
-import { bake } from '../gfx/textures';
+import { ASSAULT_LOOK } from '../gfx/looks';
 import type { WorldPoint } from '../types/WorldPoint';
 import { Infantry } from './Infantry';
 
@@ -73,26 +72,8 @@ export class AssaultInfantry extends Infantry {
     }
   }
 
-  // Шесть кадров шага и анимация, которая их крутит. Повторный вызов ничего не рисует заново.
-  // В бою кадры — картинки из assets/. Фигурный рисунок остаётся, если файл не загрузили.
+  // Шесть кадров шага и анимация, которая их крутит. Повторный вызов собирает её заново.
   static ensureTextures(scene: Phaser.Scene): void {
-    const idle = this.frameKeys[0];
-    const step = this.frameKeys[1];
-    if (idle && !scene.textures.exists(idle)) {
-      bake(scene, idle, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 0, ASSAULT_LOOK),
-      );
-      if (step) {
-        bake(scene, step, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-          this.drawSoldier(g, 1, ASSAULT_LOOK),
-        );
-      }
-    }
-    if (!scene.textures.exists(this.corpseKey)) {
-      bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) =>
-        this.drawCorpse(g, ASSAULT_LOOK),
-      );
-    }
     const frames = this.frameKeys.filter((key) => scene.textures.exists(key));
     // Кадры шага — пиксели. Ближний фильтр не размывает их при увеличении.
     for (const key of frames) {

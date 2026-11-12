@@ -5,14 +5,7 @@
 import Phaser, { Scene } from 'phaser';
 import { ejectCasing } from '../gfx/casing';
 import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
-import {
-  CORPSE_FRAME,
-  GUNNER_FLASH_FRAME,
-  GUNNER_LOOK,
-  GUNNER_RIFLE_FRAME,
-  SOLDIER_FRAME,
-  type SoldierLook,
-} from '../gfx/looks';
+import { GUNNER_FLASH_FRAME, GUNNER_RIFLE_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { Infantry } from './Infantry';
 import type { WorldPoint } from '../types/WorldPoint';
@@ -143,29 +136,8 @@ export class GunnerInfantry extends RangedEnemy {
     }
   }
 
-  // Картинки из assets/. Фигурный рисунок остаётся, если файл не загрузили.
+  // Кадры и винтовка — файлы. Вспышка у среза файла не имеет.
   static ensureTextures(scene: Scene): void {
-    if (!scene.textures.exists('gunner-0')) {
-      bake(scene, 'gunner-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 0, GUNNER_LOOK, false),
-      );
-      bake(scene, 'gunner-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 1, GUNNER_LOOK, false),
-      );
-    }
-    if (!scene.textures.exists(this.aimKey)) {
-      bake(scene, this.aimKey, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 0, GUNNER_LOOK, false),
-      );
-    }
-    if (!scene.textures.exists(this.corpseKey)) {
-      bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) =>
-        this.drawCorpse(g, GUNNER_LOOK),
-      );
-    }
-    if (!scene.textures.exists(this.rifleKey)) {
-      bake(scene, this.rifleKey, GUNNER_RIFLE_FRAME.w, GUNNER_RIFLE_FRAME.h, (g) => this.renderRifle(g));
-    }
     if (!scene.textures.exists('gunner-flash')) {
       bake(scene, 'gunner-flash', GUNNER_FLASH_FRAME.w, GUNNER_FLASH_FRAME.h, (g) => this.renderFlash(g));
     }
@@ -502,10 +474,6 @@ export class GunnerInfantry extends RangedEnemy {
       scale,
     );
     return { x: muzzle.x - tip.x, y: muzzle.y - tip.y, rotation };
-  }
-
-  static renderRifle(g: Phaser.GameObjects.Graphics, look: SoldierLook = GUNNER_LOOK): void {
-    this.drawRifle(g, look, 4, 41);
   }
 
   // Точка ядра вспышки: впереди дула по направлению выстрела.

@@ -1,25 +1,15 @@
 // Цвета и размеры картинок сущностей.
-// Игра рисует ими спрайты.
 
-export const SOLDIER_FRAME = { w: 64, h: 80 };
-// Лежащее тело шире кадра шага: голова, туловище и ноги в одну линию.
-// Высота та же, чтобы origin солдата опустил лужу на линию земли, а не оставил её в воздухе.
-export const CORPSE_FRAME = { w: 96, h: 80 };
 // Руки вместе с винтовкой. Правый край — плечо, вокруг него картинка крутится.
 export const GUNNER_RIFLE_FRAME = { w: 88, h: 88 };
 // Короткая вспышка у среза. Уже и ниже веера пикапа.
 export const GUNNER_FLASH_FRAME = { w: 26, h: 18 };
-// Пулемёт суперсолдата. Нос слева, приклад справа: в покое смотрит к танку.
-export const SUPER_MG_FRAME = { w: 58, h: 18 };
 // Руки вместе с гранатомётом. Нос слева, раструб справа, правый край рукава — плечо.
 export const LAUNCHER_FRAME = { w: 50, h: 25 };
 // Выхлоп за казёнником. Левый край — срез раструба, струя растёт вправо.
 export const ROCKET_FLASH_FRAME = { w: 48, h: 40 };
 // Ракета: носик справа, как у пули, чтобы поворот картинки совпал с углом полёта.
 export const ROCKET_FRAME = { w: 26, h: 10 };
-export const PICKUP_FRAME = { w: 160, h: 80 };
-// Ствол вырезан из кадра машины, чтобы в бою он мог отъезжать отдельно от кузова.
-export const PICKUP_GUN_FRAME = { w: 104, h: 12 };
 // Хлопок у дула. Выше и шире пули, но короче кузова.
 export const PICKUP_FLASH_FRAME = { w: 56, h: 64 };
 export const TANK_HULL_FRAME = { w: 170, h: 50 };
@@ -33,93 +23,15 @@ export const SHELL_FRAME = { w: 54, h: 22 };
 export const MUZZLE_FRAME = { w: 48, h: 48 };
 export const BULLET_FRAME = { w: 18, h: 8 };
 
-// Набор цветов одного солдата. Числа — 0xRRGGBB.
-export type SoldierLook = {
-  pants: number;
-  tunic: number;
-  vest: number;
-  helmet: number;
-  helmetLight: number;
-  longRifle: boolean;
-  skin: number;
-  outline: number;
-  boots: number;
-  belt: number;
-  rifle: number;
-  rifleWood: number;
-  rifleWoodLight: number;
-  rifleMetal: number;
-  visor: number;
-  emblem: number;
-};
-
-const soldierBase = {
-  skin: 0xe8c49a,
-  outline: 0x1a120c,
-  boots: 0x2a1c12,
-  belt: 0x5a3a18,
-  rifle: 0x1a120c,
-  rifleWood: 0x3a3228,
-  rifleWoodLight: 0x6a6248,
-  rifleMetal: 0x1a1c16,
-  visor: 0x1a1e18,
-  emblem: 0x8a9a58,
-};
-
-// Пустынный штурмовик: песочная форма, короткая винтовка.
+// Ошмётки штурмовика при взрыве о броню.
 export const ASSAULT_LOOK = {
-  ...soldierBase,
   pants: 0x6a5238,
   tunic: 0xc4a36a,
   vest: 0x8a5a28,
   helmet: 0x4a5a30,
-  helmetLight: 0xdde8a8,
-  longRifle: false,
-} satisfies SoldierLook;
-
-// Стрелок темнее и в сине-сером, винтовка длиннее.
-export const GUNNER_LOOK = {
-  ...soldierBase,
-  pants: 0x2a3a32,
-  tunic: 0x4a5a52,
-  vest: 0x1a2a22,
-  helmet: 0x2a3a28,
-  helmetLight: 0x8ab0c8,
-  longRifle: true,
-} satisfies SoldierLook;
-
-// Суперсолдат: тёмная броня, красное забрало и жёлтый знак. Крупнее обычной пехоты.
-export const SUPER_LOOK = {
-  ...soldierBase,
-  pants: 0x241c22,
-  tunic: 0x3a3036,
-  vest: 0x4a1820,
-  helmet: 0x221c24,
-  helmetLight: 0xff5a58,
-  longRifle: true,
-  visor: 0xff2430,
-  emblem: 0xffd060,
-  rifle: 0x12110e,
-  rifleWood: 0x2c2824,
-  rifleWoodLight: 0x5a564c,
-  rifleMetal: 0x8a9084,
-} satisfies SoldierLook;
-
-// Ракетчик: оливковая форма и медный блик каски, чтобы не слиться со стрелком.
-export const ROCKET_LOOK = {
-  ...soldierBase,
-  pants: 0x3a4030,
-  tunic: 0x6a7048,
-  vest: 0x6a3420,
-  helmet: 0x3a4428,
-  helmetLight: 0xe8a050,
-  longRifle: true,
-  rifle: 0x2a3224,
-  rifleWood: 0x4a3820,
-  rifleWoodLight: 0x8a6840,
-  rifleMetal: 0x3a3e34,
-  emblem: 0xd08030,
-} satisfies SoldierLook;
+  boots: 0x2a1c12,
+  rifle: 0x1a120c,
+};
 
 export type ShellPaint = {
   outer: number;
@@ -146,52 +58,6 @@ export const MUZZLE_PAINT = {
   mid: 0xffee88,
   core: 0xffffff,
 } satisfies MuzzlePaint;
-
-export type PickupPaint = {
-  body: number;
-  bodyDark: number;
-  bodyLight: number;
-  metal: number;
-  cabin: number;
-  bumper: number;
-  headlight: number;
-  glass: number;
-  glassLight: number;
-  glassShine: number;
-  driver: number;
-  driverShirt: number;
-  skin: number;
-  mount: number;
-  barrel: number;
-  muzzleFace: number;
-  muzzleTip: number;
-  wheel: number;
-  wheelDisk: number;
-  spoke: number;
-};
-
-export const PICKUP_PAINT = {
-  body: 0x5a6a38,
-  bodyDark: 0x3a4a24,
-  bodyLight: 0x4a5a30,
-  metal: 0x2a2e22,
-  cabin: 0x2a341c,
-  bumper: 0x1a1c16,
-  headlight: 0xd8d080,
-  glass: 0x1a3040,
-  glassLight: 0x88c8e0,
-  glassShine: 0xffffff,
-  driver: 0x2a2218,
-  driverShirt: 0x6a5438,
-  skin: 0xe8c49a,
-  mount: 0x2a2a26,
-  barrel: 0x1a1a16,
-  muzzleFace: 0x4a4a42,
-  muzzleTip: 0x6a6a60,
-  wheel: 0x1a1a16,
-  wheelDisk: 0x3a3a32,
-  spoke: 0x8a8a80,
-} satisfies PickupPaint;
 
 export type BulletPaint = {
   body: number;

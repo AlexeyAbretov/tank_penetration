@@ -31,12 +31,9 @@ export class PlantedMine {
     this.spotX = x;
     this.y = y;
 
-    const frame = scene.textures.get(Mines.bodyKey).get();
-    // У файла низ корпуса на строке 45. Запасной рисунок 36 px сидит своим низом.
-    const originY = frame.height === 48 ? Mines.bodyOriginY : 1;
     this.body = scene.add
       .image(0, settled ? 0 : 4, Mines.bodyKey)
-      .setOrigin(0.5, originY)
+      .setOrigin(0.5, Mines.bodyOriginY)
       .setScale(settled ? Mines.bodyScale : Mines.bodyScale * 0.72, settled ? Mines.bodyScale : 0.02);
 
     this.root = scene.add.container(x, y, [this.body]).setDepth(4);
@@ -229,8 +226,6 @@ export class Mines {
     }
     if (scene.textures.exists(Mines.bodyKey)) {
       scene.textures.get(Mines.bodyKey).setFilter(Phaser.Textures.FilterMode.NEAREST);
-    } else {
-      bake(scene, Mines.bodyKey, 48, 36, (g) => Mines.renderBody(g));
     }
     if (!scene.textures.exists(Mines.clodKey)) {
       bake(scene, Mines.clodKey, 8, 8, (g) => {
@@ -325,21 +320,5 @@ export class Mines {
       x: Phaser.Math.Between(field.minX, field.maxX),
       y: Phaser.Math.Between(field.minY, field.maxY),
     };
-  }
-
-  // Низ картинки — линия земли. Origin спрайта стоит на ней, масштаб растёт вверх.
-  private static renderBody(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0x3a2a18);
-    g.fillEllipse(24, 32, 36, 10);
-    g.fillStyle(0x2a2418);
-    g.fillRoundedRect(14, 8, 20, 24, 4);
-    g.fillStyle(0x5c6a3e);
-    g.fillRoundedRect(16, 10, 16, 18, 3);
-    g.fillStyle(0x9aaa68);
-    g.fillRect(18, 13, 6, 3);
-    g.fillStyle(0x1e2416);
-    g.fillEllipse(24, 12, 22, 10);
-    g.fillStyle(0x6d7d48);
-    g.fillEllipse(24, 11, 12, 5);
   }
 }

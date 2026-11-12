@@ -3,13 +3,7 @@
 // Урон пули меньше, чем у стрелка, но здоровье выше и награда больше.
 
 import Phaser from 'phaser';
-import {
-  PICKUP_FLASH_FRAME,
-  PICKUP_FRAME,
-  PICKUP_GUN_FRAME,
-  PICKUP_PAINT,
-  type PickupPaint,
-} from '../gfx/looks';
+import { PICKUP_FLASH_FRAME } from '../gfx/looks';
 import { ejectCasing } from '../gfx/casing';
 import { bake } from '../gfx/textures';
 import { vehicleDeathBlast } from '../gfx/vehicleBlast';
@@ -68,8 +62,6 @@ export class PickupTruck extends RangedEnemy {
   // Хлопок у дула. Доли меньше единицы: картинка вспышки сама по себе шире пули.
   // Короткий: очередь частая, долгая вспышка висит на стволе как наклейка.
   static readonly flashPop = { x: 0.4, y: 0.45, ms: 90 };
-  // Запасной фигурный ствол вырезан из старого кадра 160×80.
-  static readonly gunCut = { x: 7, y: 14 };
   // Ось на кистях, не на коробке. Иначе при наклоне руки уезжают на голову или ниже плеч.
   // Ствол при этом крутится вокруг хвата. Канал чуть выше центра кистей.
   static readonly breech = { x: 115, y: 15 };
@@ -517,27 +509,8 @@ export class PickupTruck extends RangedEnemy {
     }
   }
 
-  // Кадры колёс. Анимация pickup-drive проигрывает их по порядку и замыкает круг.
+  // Кадры колёс, стойка, остов и ствол — файлы. Хлопок у дула файла не имеет.
   static ensureTextures(scene: Phaser.Scene): void {
-    if (!scene.textures.exists('pickup-0')) {
-      for (let phase = 0; phase < PickupTruck.wheelFrames; phase += 1) {
-        // Без ствола: в бою его рисует отдельный спрайт и двигает при отдаче.
-        bake(scene, `pickup-${phase}`, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) =>
-          this.render(g, phase, PICKUP_PAINT),
-        );
-      }
-    }
-    if (!scene.textures.exists(this.aimKey)) {
-      bake(scene, this.aimKey, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) =>
-        this.render(g, 0, PICKUP_PAINT),
-      );
-    }
-    if (!scene.textures.exists(this.corpseKey)) {
-      bake(scene, this.corpseKey, PICKUP_FRAME.w, PICKUP_FRAME.h, (g) => this.renderWreck(g));
-    }
-    if (!scene.textures.exists('pickup-gun')) {
-      bake(scene, 'pickup-gun', PICKUP_GUN_FRAME.w, PICKUP_GUN_FRAME.h, (g) => this.renderGun(g));
-    }
     if (!scene.textures.exists('pickup-flash')) {
       bake(scene, 'pickup-flash', PICKUP_FLASH_FRAME.w, PICKUP_FLASH_FRAME.h, (g) => this.renderFlash(g));
     }
@@ -566,182 +539,6 @@ export class PickupTruck extends RangedEnemy {
     }
   }
 
-  // Пикап боком, нос влево (к танку). wheelPhase — номер кадра, от него зависит угол спиц.
-  static render(
-    g: Phaser.GameObjects.Graphics,
-    wheelPhase: number,
-    paint: PickupPaint = PICKUP_PAINT,
-  ): void {
-    // Тень под машиной. Холст 160×80, низ около y = 74.
-    g.fillStyle(0x000000, 0.35);
-    g.fillEllipse(84, 74, 128, 12);
-
-    // Рама по всей длине, на ней потом стоят кабины и колёса.
-    g.fillStyle(paint.metal);
-    g.fillRoundedRect(14, 50, 136, 10, 3);
-
-    // Капот слева: машина едет влево, мотор впереди.
-    g.fillStyle(paint.body);
-    g.fillRoundedRect(16, 40, 38, 20, 4);
-    g.fillStyle(paint.bodyDark);
-    g.fillRect(18, 48, 34, 5);
-    // Бампер.
-    g.fillStyle(paint.bumper);
-    g.fillRect(12, 46, 8, 14);
-    // Фара.
-    g.fillStyle(paint.headlight);
-    g.fillCircle(15, 50, 3);
-
-    // Грузовой борт справа, позади кабины.
-    g.fillStyle(paint.bodyDark);
-    g.fillRoundedRect(90, 34, 56, 26, 3);
-    g.fillStyle(paint.bodyLight); // светлый верхний край борта
-    g.fillRect(92, 38, 52, 8);
-    g.fillStyle(paint.cabin); // щель между досками
-    g.fillRect(92, 44, 52, 4);
-    // Металлическая обвязка кузова.
-    g.fillStyle(paint.metal);
-    g.fillRect(90, 32, 56, 4);
-    g.fillRect(90, 32, 4, 22);
-    g.fillRect(142, 32, 4, 22);
-    // Задний борт ещё правее.
-    g.fillStyle(paint.bodyDark);
-    g.fillRect(144, 34, 6, 26);
-
-    // Кабина. Крыша на y = 26, чтобы ствол на уровне рук всё равно шёл выше неё.
-    g.fillStyle(paint.cabin);
-    g.fillRoundedRect(50, 26, 42, 34, 5);
-    g.fillStyle(paint.body);
-    g.fillRoundedRect(52, 28, 38, 30, 4);
-    g.fillStyle(paint.bodyDark);
-    g.fillRect(54, 46, 34, 8);
-
-    // Лобовое стекло и блик. Второй аргумент цвета у fillStyle — прозрачность блика.
-    g.fillStyle(paint.glass);
-    g.fillRoundedRect(54, 32, 22, 12, 3);
-    g.fillStyle(paint.glassLight, 0.9);
-    g.fillRoundedRect(56, 34, 18, 8, 2);
-    g.fillStyle(paint.glassShine, 0.35);
-    g.fillRect(58, 36, 6, 3);
-    // Боковое окошко.
-    g.fillStyle(paint.glassLight, 0.7);
-    g.fillRoundedRect(78, 34, 10, 8, 2);
-
-    // Стрелок в кузове. Плечи на y = 18 — туда же ляжет ствол. Пояс за бортом (борт с y = 32).
-    g.fillStyle(paint.driverShirt);
-    g.fillRoundedRect(112, 18, 16, 18, 3);
-    g.fillRoundedRect(96, 18, 18, 5, 2);
-
-    // Упор в кузов. Ствол на высоте рук, выше крыши, носом влево.
-    g.fillStyle(paint.mount);
-    g.fillRect(100, 20, 6, 14);
-
-    // Голова выше ствола. Ствол и кисти — отдельная картинка, их двигает отдача.
-    g.fillStyle(paint.skin);
-    g.fillCircle(120, 13, 5);
-    g.fillStyle(paint.driver);
-    g.fillRoundedRect(112, 2, 16, 9, 3);
-    g.fillRect(110, 9, 20, 3);
-
-    // Линия через центр выглядит так же после поворота на 180° (π радиан).
-    // Кадры делят эту половину оборота поровну, следующий после последнего совпадает с первым.
-    // Минус: на экране Y растёт вниз, и положительный угол крутит колесо по часовой.
-    // Машина едет влево, верх покрышки должен уходить влево — это против часовой.
-    const spokeAngle = -(wheelPhase * Math.PI) / PickupTruck.wheelFrames;
-    // Колесо в точке cx. Два вызова рисуют переднее и заднее.
-    const drawWheel = (cx: number) => {
-      g.fillStyle(paint.wheel); // покрышка
-      g.fillCircle(cx, 62, 14);
-      g.fillStyle(paint.wheelDisk); // диск
-      g.fillCircle(cx, 62, 9);
-      g.fillStyle(paint.wheel); // ступица
-      g.fillCircle(cx, 62, 3);
-      // Две спицы крест-накрест. Угол spokeAngle задаёт поворот.
-      g.lineStyle(2, paint.spoke, 1);
-      g.beginPath();
-      // cos и sin от угла дают точку на окружности радиуса 8 вокруг центра колеса.
-      g.moveTo(cx + Math.cos(spokeAngle) * 8, 62 + Math.sin(spokeAngle) * 8);
-      g.lineTo(cx - Math.cos(spokeAngle) * 8, 62 - Math.sin(spokeAngle) * 8);
-      // Вторая спица повёрнута ещё на 1.2 радиана, чтобы крест не был ровно под 90°.
-      g.moveTo(cx + Math.cos(spokeAngle + 1.2) * 8, 62 + Math.sin(spokeAngle + 1.2) * 8);
-      g.lineTo(cx - Math.cos(spokeAngle + 1.2) * 8, 62 - Math.sin(spokeAngle + 1.2) * 8);
-      g.strokePath();
-    };
-    drawWheel(40); // переднее, под капотом
-    drawWheel(126); // заднее, под кузовом
-  }
-
-  // Разбитый пикап в том же кадре 160×80, чтобы колёса остались на линии земли живой машины.
-  static renderWreck(g: Phaser.GameObjects.Graphics, paint: PickupPaint = PICKUP_PAINT): void {
-    g.fillStyle(0x140806, 0.6);
-    g.fillEllipse(82, 73, 140, 18);
-    g.fillStyle(0x6a140c, 0.5);
-    g.fillEllipse(70, 71, 78, 10);
-
-    // Переднее колесо сорвано и лежит плашмя слева от рамы.
-    g.fillStyle(paint.wheel);
-    g.fillEllipse(20, 67, 28, 12);
-    g.fillStyle(paint.wheelDisk);
-    g.fillEllipse(20, 67, 14, 6);
-
-    // Ствол отломан и валяется перед кабиной.
-    g.fillStyle(paint.barrel);
-    g.fillRoundedRect(34, 66, 42, 5, 1);
-    g.fillStyle(paint.muzzleTip);
-    g.fillCircle(34, 68, 3);
-
-    g.fillStyle(paint.metal);
-    g.fillRoundedRect(32, 56, 100, 8, 2);
-
-    // Капот смят и выгорел, из щели торчит пламя.
-    g.fillStyle(paint.bodyDark);
-    g.fillRoundedRect(34, 46, 30, 14, 3);
-    g.fillStyle(0x1a0c08);
-    g.fillRect(38, 48, 16, 8);
-    g.fillStyle(0xff4a10);
-    g.fillTriangle(40, 46, 48, 32, 56, 46);
-    g.fillStyle(0xffe080);
-    g.fillTriangle(44, 46, 48, 36, 52, 46);
-
-    // Заднее колесо ещё на оси, но покрышка спущена.
-    g.fillStyle(paint.wheel);
-    g.fillEllipse(114, 64, 26, 18);
-    g.fillStyle(paint.wheelDisk);
-    g.fillEllipse(114, 64, 12, 8);
-    g.fillStyle(paint.wheel);
-    g.fillCircle(114, 64, 3);
-
-    // Кузов короче: борт вырван, в досках дыра.
-    g.fillStyle(paint.bodyDark);
-    g.fillRoundedRect(100, 42, 34, 18, 2);
-    g.fillStyle(paint.bodyLight);
-    g.fillRect(102, 44, 22, 6);
-    g.fillStyle(0x1a120c);
-    g.fillRect(110, 46, 12, 8);
-    g.fillStyle(paint.metal);
-    g.fillRect(132, 44, 4, 18);
-    g.fillStyle(paint.body);
-    g.fillRect(138, 58, 16, 6);
-
-    // Крыша кабины просела, стекло — чёрная дыра с трещиной.
-    g.fillStyle(paint.cabin);
-    g.fillRoundedRect(60, 38, 36, 22, 3);
-    g.fillStyle(paint.body);
-    g.fillRoundedRect(62, 40, 32, 18, 2);
-    g.fillStyle(0x0c0e12);
-    g.fillRect(66, 42, 16, 9);
-    g.lineStyle(1, 0xd8e4ea, 0.8);
-    g.beginPath();
-    g.moveTo(68, 43);
-    g.lineTo(78, 50);
-    g.lineTo(72, 50);
-    g.strokePath();
-
-    // Копоть у щели капота. Сам столб дыма — частицы, их в текстуру не запечь.
-    g.fillStyle(0x2a2622, 0.7);
-    g.fillCircle(48, 34, 6);
-  }
-
   // Точка над щелью капота в координатах спрайта. От неё поднимается дым.
   static smokeAnchor(scale: number): { x: number; y: number } {
     const flame = PickupTruck.flame;
@@ -765,39 +562,6 @@ export class PickupTruck extends RangedEnemy {
     const nose = at(40, 34);
     const cab = at(78, 36);
     vehicleDeathBlast(scene, nose, cab);
-  }
-
-  // Ствол в своих координатах. ox и oy сдвигают рисунок: для текстуры ствола это вырез из кадра машины.
-  private static drawBarrel(
-    g: Phaser.GameObjects.Graphics,
-    paint: PickupPaint,
-    ox: number,
-    oy: number,
-  ): void {
-    g.fillStyle(paint.barrel);
-    g.fillRoundedRect(86 + ox, 16 + oy, 22, 8, 2);
-    g.fillRoundedRect(10 + ox, 18 + oy, 80, 4, 1);
-    g.fillStyle(paint.muzzleFace);
-    g.fillRect(10 + ox, 18 + oy, 8, 4);
-    g.fillStyle(paint.muzzleTip);
-    g.fillCircle(12 + ox, 20 + oy, 3);
-  }
-
-  private static drawHands(
-    g: Phaser.GameObjects.Graphics,
-    paint: PickupPaint,
-    ox: number,
-    oy: number,
-  ): void {
-    g.fillStyle(paint.skin);
-    g.fillRect(92 + ox, 18 + oy, 8, 4);
-  }
-
-  static renderGun(g: Phaser.GameObjects.Graphics, paint: PickupPaint = PICKUP_PAINT): void {
-    const ox = -PickupTruck.gunCut.x;
-    const oy = -PickupTruck.gunCut.y;
-    this.drawBarrel(g, paint, ox, oy);
-    this.drawHands(g, paint, ox, oy);
   }
 
   // Хлопок у среза. Левый край — дуло, огонь вправо.
@@ -1013,7 +777,7 @@ export class PickupTruck extends RangedEnemy {
   }
 
   // Режет сгоревший кадр: нос, корма, две спущенные шины и пулемёт под днищем.
-  // Чужой размер кадра — запасной рисунок. Тогда null, и на поле остаётся целый остов.
+  // Чужой размер кадра не режется: на поле остаётся целый остов.
   private static cutApart(scene: Phaser.Scene): ApartCut | null {
     const key = PickupTruck.corpseKey;
     if (!scene.textures.exists(key)) {

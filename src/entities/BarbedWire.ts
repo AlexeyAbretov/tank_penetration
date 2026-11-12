@@ -3,7 +3,6 @@
 // Пехоту, которая идёт к базе, она не пускает и каждые несколько секунд ранит.
 
 import Phaser, { GameObjects, Physics, Scene } from 'phaser';
-import { bake } from '../gfx/textures';
 
 type WireBlockTarget = {
   reachesBase: boolean;
@@ -61,18 +60,17 @@ export class BarbedWire extends GameObjects.Image {
     scene.load.image(this.sourceKey, this.imagePath);
   }
 
-  // В бою полоса — картинка из assets/, наложенная дважды. Фигурный рисунок остаётся, если файл не загрузили.
+  // В бою полоса — картинка из assets/, наложенная дважды.
   static ensureTextures(scene: Scene): void {
     if (scene.textures.exists(this.textureKey)) {
       scene.textures.get(this.textureKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
       return;
     }
-    const width = BarbedWire.bounds.face - BarbedWire.bounds.x;
-    const height = BarbedWire.bounds.bottom - BarbedWire.bounds.top;
     if (!scene.textures.exists(this.sourceKey)) {
-      bake(scene, this.textureKey, width, height, (g) => this.draw(g, width, height));
       return;
     }
+    const width = BarbedWire.bounds.face - BarbedWire.bounds.x;
+    const height = BarbedWire.bounds.bottom - BarbedWire.bounds.top;
     const source = scene.textures.get(this.sourceKey).getSourceImage() as CanvasImageSource;
     const frame = scene.textures.get(this.sourceKey).get();
     const canvas = scene.textures.createCanvas(this.textureKey, width, height);
@@ -87,42 +85,6 @@ export class BarbedWire extends GameObjects.Image {
     canvas.context.drawImage(source, 0, shift - period, width, height);
     canvas.refresh();
     scene.textures.get(this.textureKey).setFilter(Phaser.Textures.FilterMode.LINEAR);
-  }
-
-  // Два столба и косые нити с колючками. Высота уже посчитана сценой, рисуем её целиком без швов.
-  private static draw(g: GameObjects.Graphics, width: number, height: number): void {
-    g.fillStyle(0x140604, 0.4);
-    g.fillRect(width - 8, 0, 8, height);
-
-    const post = (x: number) => {
-      g.fillStyle(0x1c120c);
-      g.fillRect(x, 0, 8, height);
-      g.fillStyle(0xa06a3c);
-      g.fillRect(x + 1, 0, 5, height);
-      g.fillStyle(0xf0c080);
-      g.fillRect(x + 2, 0, 2, height);
-    };
-    post(0);
-    post(width - 8);
-
-    for (let y = 10; y < height - 6; y += 16) {
-      g.lineStyle(4, 0x2a241c, 1);
-      g.beginPath();
-      g.moveTo(6, y);
-      g.lineTo(width - 6, y + 5);
-      g.strokePath();
-      g.lineStyle(2, 0xe7dcc8, 1);
-      g.beginPath();
-      g.moveTo(6, y + 5);
-      g.lineTo(width - 6, y);
-      g.strokePath();
-
-      g.fillStyle(0xfff6e8);
-      for (const x of [13, 18, 23]) {
-        g.fillTriangle(x, y - 5, x + 3, y + 2, x - 3, y + 2);
-        g.fillTriangle(x, y + 10, x + 3, y + 3, x - 3, y + 3);
-      }
-    }
   }
 
   // true, если этот юнит идёт к базе и его передний край уже на линии проволоки.

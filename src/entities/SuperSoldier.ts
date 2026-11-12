@@ -8,14 +8,7 @@ import Phaser, { Scene } from 'phaser';
 import { enemyHasteOf } from '../gameConfig';
 import { ejectCasing } from '../gfx/casing';
 import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
-import {
-  CORPSE_FRAME,
-  GUNNER_FLASH_FRAME,
-  SOLDIER_FRAME,
-  SUPER_LOOK,
-  SUPER_MG_FRAME,
-  type SoldierLook,
-} from '../gfx/looks';
+import { GUNNER_FLASH_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { EnemyShot } from './EnemyShot';
 import { Infantry } from './Infantry';
@@ -217,21 +210,8 @@ export class SuperSoldier extends Infantry {
     }
   }
 
-  // Картинки из assets/. Фигурный рисунок остаётся, если файл не загрузили.
+  // Кадры и пулемёт — файлы. Вспышка у среза файла не имеет.
   static ensureTextures(scene: Scene): void {
-    if (!scene.textures.exists('super-0')) {
-      bake(scene, 'super-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => this.drawMarch(g, 0, SUPER_LOOK));
-      bake(scene, 'super-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => this.drawMarch(g, 1, SUPER_LOOK));
-    }
-    if (!scene.textures.exists(this.aimKey)) {
-      bake(scene, this.aimKey, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) => this.drawMarch(g, 0, SUPER_LOOK));
-    }
-    if (!scene.textures.exists(this.corpseKey)) {
-      bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) => this.drawCorpse(g, SUPER_LOOK));
-    }
-    if (!scene.textures.exists(this.gunKey)) {
-      bake(scene, this.gunKey, SUPER_MG_FRAME.w, SUPER_MG_FRAME.h, (g) => this.renderGun(g));
-    }
     if (!scene.textures.exists('super-flash')) {
       bake(scene, 'super-flash', GUNNER_FLASH_FRAME.w, GUNNER_FLASH_FRAME.h, (g) => this.renderFlash(g));
     }
@@ -723,22 +703,6 @@ export class SuperSoldier extends Infantry {
     }
   }
 
-  // Кадр марша для текстуры. Пулемёт — отдельная картинка, чтобы отдача двигала ствол.
-  static drawMarch(g: Phaser.GameObjects.Graphics, legPhase: 0 | 1, look: SoldierLook): void {
-    Infantry.drawSoldier(g, legPhase, look, false);
-    g.fillStyle(look.vest);
-    g.fillRoundedRect(12, 26, 14, 8, 2);
-    g.fillRoundedRect(40, 26, 14, 8, 2);
-  }
-
-  static drawCorpse(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
-    Infantry.drawCorpse(g, look, (pen, colors) => this.drawDroppedGun(pen, colors));
-  }
-
-  static renderGun(g: Phaser.GameObjects.Graphics, look: SoldierLook = SUPER_LOOK): void {
-    this.drawGun(g, look, 0, 0);
-  }
-
   static renderFlash(g: Phaser.GameObjects.Graphics): void {
     const y = GUNNER_FLASH_FRAME.h / 2;
     g.fillStyle(0xff4a10, 1);
@@ -748,31 +712,5 @@ export class SuperSoldier extends Infantry {
     g.fillTriangle(0, y, 24, 4, 24, GUNNER_FLASH_FRAME.h - 4);
     g.fillStyle(0xffffff, 1);
     g.fillCircle(4, y, 3);
-  }
-
-  private static drawGun(g: Phaser.GameObjects.Graphics, look: SoldierLook, ox: number, oy: number): void {
-    g.fillStyle(look.rifle);
-    g.fillRoundedRect(ox, oy + 5, 50, 8, 2);
-    g.fillStyle(look.rifleMetal);
-    g.fillRect(ox, oy + 6, 8, 6);
-    g.fillStyle(look.rifleWood);
-    g.fillRect(ox + 12, oy + 7, 18, 4);
-    g.fillStyle(look.outline);
-    g.fillRoundedRect(ox + 34, oy + 2, 16, 14, 2);
-    g.fillStyle(look.rifleWoodLight);
-    g.fillRect(ox + 36, oy + 4, 12, 3);
-    g.fillStyle(look.vest);
-    g.fillRect(ox + 30, oy + 13, 8, 5);
-    g.fillStyle(look.rifleWood);
-    g.fillRoundedRect(ox + 48, oy + 4, 10, 10, 2);
-  }
-
-  private static drawDroppedGun(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
-    g.fillStyle(look.rifle);
-    g.fillRoundedRect(6, 64, 36, 6, 2);
-    g.fillStyle(look.rifleMetal);
-    g.fillRect(4, 63, 8, 8);
-    g.fillStyle(look.vest);
-    g.fillRect(22, 69, 7, 5);
   }
 }

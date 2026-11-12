@@ -5,14 +5,7 @@
 import Phaser, { Scene } from 'phaser';
 import { GAME } from '../gameConfig';
 import { frameBits, imageBit, type GibCut } from '../gfx/gibs';
-import {
-  CORPSE_FRAME,
-  LAUNCHER_FRAME,
-  ROCKET_FLASH_FRAME,
-  ROCKET_LOOK,
-  SOLDIER_FRAME,
-  type SoldierLook,
-} from '../gfx/looks';
+import { LAUNCHER_FRAME, ROCKET_FLASH_FRAME } from '../gfx/looks';
 import { bake } from '../gfx/textures';
 import { Infantry } from './Infantry';
 import { RangedEnemy } from './RangedEnemy';
@@ -139,29 +132,8 @@ export class RocketInfantry extends RangedEnemy {
     }
   }
 
-  // Картинки из assets/. Фигурный рисунок остаётся, если файл не загрузили.
+  // Кадры и труба — файлы. Выхлоп за казёнником файла не имеет.
   static ensureTextures(scene: Scene): void {
-    if (!scene.textures.exists('rocketman-0')) {
-      bake(scene, 'rocketman-0', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 0, ROCKET_LOOK, false),
-      );
-      bake(scene, 'rocketman-1', SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 1, ROCKET_LOOK, false),
-      );
-    }
-    if (!scene.textures.exists(this.aimKey)) {
-      bake(scene, this.aimKey, SOLDIER_FRAME.w, SOLDIER_FRAME.h, (g) =>
-        this.drawSoldier(g, 0, ROCKET_LOOK, false),
-      );
-    }
-    if (!scene.textures.exists(this.corpseKey)) {
-      bake(scene, this.corpseKey, CORPSE_FRAME.w, CORPSE_FRAME.h, (g) =>
-        this.drawCorpse(g, ROCKET_LOOK),
-      );
-    }
-    if (!scene.textures.exists(this.launcherKey)) {
-      bake(scene, this.launcherKey, LAUNCHER_FRAME.w, LAUNCHER_FRAME.h, (g) => this.renderLauncher(g));
-    }
     if (!scene.textures.exists('rocketman-flash')) {
       bake(scene, 'rocketman-flash', ROCKET_FLASH_FRAME.w, ROCKET_FLASH_FRAME.h, (g) =>
         this.renderFlash(g),
@@ -524,37 +496,6 @@ export class RocketInfantry extends RangedEnemy {
       ease: 'Cubic.Out',
       onComplete: () => flash.destroy(),
     });
-  }
-
-  // Запасное тело, если картинку не загрузили. Рядом лежит труба, а не винтовка.
-  static drawCorpse(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
-    super.drawCorpse(g, look, this.drawDroppedTube);
-  }
-
-  private static drawDroppedTube(g: Phaser.GameObjects.Graphics, look: SoldierLook): void {
-    g.fillStyle(look.rifle);
-    g.fillRoundedRect(10, 64, 34, 8, 3);
-    g.fillStyle(look.rifleWood);
-    g.fillRoundedRect(18, 66, 16, 4, 1);
-    g.fillStyle(look.rifleMetal);
-    g.fillTriangle(2, 68, 12, 63, 12, 73);
-    g.fillStyle(look.emblem);
-    g.fillRect(12, 65, 4, 6);
-  }
-
-  // Запасной рисунок, если png нет. Ось на y = 3: нос в (0, 3), раструб вокруг x = 50.
-  static renderLauncher(g: Phaser.GameObjects.Graphics, look: SoldierLook = ROCKET_LOOK): void {
-    g.fillStyle(look.emblem);
-    g.fillTriangle(0, 3, 18, 1, 18, 5);
-    g.fillStyle(look.rifle);
-    g.fillRect(16, 1, 38, 5);
-    g.fillStyle(look.outline);
-    g.fillRect(30, 0, 4, 2);
-    g.fillStyle(look.rifleWood);
-    g.fillRect(22, 6, 6, 5);
-    g.fillRect(32, 6, 4, 4);
-    g.fillStyle(look.rifleMetal);
-    g.fillRect(54, 0, 6, 7);
   }
 
   // Левый край — срез раструба, струя вправо. Круги, не трапеции: ядро, языки, редкие искры.
