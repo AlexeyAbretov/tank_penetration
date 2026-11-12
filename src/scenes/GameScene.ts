@@ -15,7 +15,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
-import { ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
+import { DEBUG_FORFEIT_EVENT, ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
 import { boom } from '../gfx/boom';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
@@ -356,6 +356,9 @@ export class GameScene extends Phaser.Scene {
     });
     // Стирает и партию, и постоянные улучшения. Кнопка живёт на плашке паузы.
     this.hud.onNewGame(() => this.restartRun());
+    if (isDebugRun()) {
+      this.events.on(DEBUG_FORFEIT_EVENT, this.onDebugForfeit, this);
+    }
     const keyboard = this.input.keyboard;
     if (keyboard) {
       this.hasteKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.PLUS);
@@ -688,12 +691,13 @@ export class GameScene extends Phaser.Scene {
     const locked = this.progressShop.autoAimEnabled() ? this.combat.aimPoint() : null;
     this.player.tick(delta, locked?.x ?? pointer.worldX, locked?.y ?? pointer.worldY);
 
-    // Клик по кнопкам темпа, паузы, автострельбы, автонаведения, автопокупки, урона врагов, клавиш, иконкам покупок и настройкам не считается выстрелом: они лежат поверх поля.
+    // Клик по кнопкам темпа, паузы, автострельбы, автонаведения, автопокупки, урона врагов, клавиш, иконкам покупок, настройкам и дебаг-плашкам не считается выстрелом: они лежат поверх поля.
     this.combat.tick(
       delta,
       !this.hud.coversHaste(pointer) &&
         !this.hud.coversPause(pointer) &&
         !this.hud.coversSettings(pointer) &&
+        !this.hud.coversDebugPlates(pointer) &&
         !this.hud.coversAutoFire(pointer) &&
         !this.hud.coversAutoAim(pointer) &&
         !this.hud.coversAutoShop(pointer) &&
@@ -849,6 +853,7 @@ export class GameScene extends Phaser.Scene {
     this.anims.resumeAll();
     this.music.destroy();
     this.fx?.destroy();
+    this.events.off(DEBUG_FORFEIT_EVENT, this.onDebugForfeit, this);
   }
 
   private freezeEmitters(): void {
@@ -883,6 +888,11 @@ export class GameScene extends Phaser.Scene {
 
   private forfeitPressed(): boolean {
     return this.forfeitKey !== undefined && Phaser.Input.Keyboard.JustDown(this.forfeitKey);
+  }
+
+  // Кнопка на дебаг-счёте. Та же гибель, что у F, в том числе пока открыта витрина.
+  private onDebugForfeit(): void {
+    this.forfeitRun();
   }
 
   // Обычная гибель без паузы на взрыв: хп 0, очки в копилку, партия стёрта, магазин очков.

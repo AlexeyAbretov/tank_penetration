@@ -45,6 +45,15 @@ export const DEBUG_COIN_EVENT = 'debug-coins';
 // «+» у знака очков в дебаг-витрине после гибели. Слушает DebugProgressShopController.
 export const DEBUG_SCORE_EVENT = 'debug-score';
 
+// Кнопка тихой паузы на дебаг-счёте. Слушает DebugQuietPause, как пробел.
+export const DEBUG_QUIET_PAUSE_EVENT = 'debug-quiet-pause';
+
+// Кнопка пропуска волны на дебаг-счёте. Слушает DebugWaveManager, как N.
+export const DEBUG_SKIP_WAVE_EVENT = 'debug-skip-wave';
+
+// Кнопка проигрыша на дебаг-счёте. Слушает GameScene, как F.
+export const DEBUG_FORFEIT_EVENT = 'debug-forfeit';
+
 // Текущий темп врагов. Registry — общая полка сцены: туда GameScene кладёт число по ключу.
 // Если ключа ещё нет или там не число, темп равен 1. Выше max и ниже 1 значение не уходит.
 export function enemyHasteOf(registry: { get(key: string): unknown }): number {

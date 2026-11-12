@@ -1,4 +1,4 @@
-// Дебаг-волны. N убивает живых и сразу открывает следующую, без магазина.
+// Дебаг-волны. N и кнопка на счёте убивают живых и сразу открывают следующую, без магазина.
 // Очки и монеты приходят как за убийство: и тем, кто уже на поле, и тем, кто ещё не вышел.
 // A добавляет в текущую волну ещё одного юнита. У обычной волны это тот же вид.
 // У смешанной следующий по списку: штурмовик, стрелок, пикап, ракетчик, багги, вертолёт.
@@ -8,6 +8,7 @@
 // Другая клавиша или другой момент пропуска меняются здесь.
 
 import Phaser from 'phaser';
+import { DEBUG_SKIP_WAVE_EVENT } from '../gameConfig';
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';
 import type { EnemySave } from '../types/EnemySave';
 import type { EnemyWaves } from '../types/EnemyWaves';
@@ -17,6 +18,7 @@ import { WaveManager } from './WaveManager';
 export class DebugWaveManager extends WaveManager {
   private skipKey?: Phaser.Input.Keyboard.Key;
   private addKey?: Phaser.Input.Keyboard.Key;
+  private skipButtonArmed = false;
   // true от объявления волны до первого назначения выходов.
   // В этот промежуток поле настроек меняет фабрику, а счётчик выхода ещё помнит старое число.
   private announced = false;
@@ -37,6 +39,26 @@ export class DebugWaveManager extends WaveManager {
     const keyboard = scene.input.keyboard;
     this.skipKey = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.N);
     this.addKey = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.armSkipButton(scene);
+  }
+
+  // Кнопка зовёт тот же пропуск, что N. На паузе и в настройках часы стоят, и клавиша тоже молчит.
+  private armSkipButton(scene: Phaser.Scene): void {
+    if (this.skipButtonArmed) {
+      return;
+    }
+    this.skipButtonArmed = true;
+    const onSkip = (): void => {
+      if (scene.time.paused) {
+        return;
+      }
+      this.skipToNext();
+    };
+    scene.events.on(DEBUG_SKIP_WAVE_EVENT, onSkip);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      scene.events.off(DEBUG_SKIP_WAVE_EVENT, onSkip);
+      this.skipButtonArmed = false;
+    });
   }
 
   override tick(): void {

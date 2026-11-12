@@ -127,6 +127,21 @@ export class GameHud {
   protected readonly plateSize = 40;
   protected readonly plateGap = 6;
   protected readonly plateY = 28;
+
+  // Сколько своих плашек наследник ставит между шестерёнкой и паузой.
+  // Ноль — они стоят вплотную. Вызов идёт из конструктора базы, до полей наследника.
+  protected platesBetweenSettingsAndPause(): number {
+    return 0;
+  }
+
+  // slots — шаги влево от паузы. 0 — сама пауза, 1 — место сразу слева от неё.
+  protected plateXLeftOfPause(slots: number): number {
+    const icon = this.plateSize;
+    const hpLeft = this.frame.width - 152 - 140;
+    const hasteX = hpLeft - 8 - icon / 2;
+    const pauseX = hasteX - this.plateGap - icon;
+    return pauseX - slots * (this.plateGap + icon);
+  }
   // Шаг и отступ ряда способностей. Один и тот же слева и справа.
   private readonly skillStep = 88;
   private readonly skillInset = 56;
@@ -208,11 +223,11 @@ export class GameHud {
       .setAlpha(0);
 
     // Рамка HP стоит в 152 px от правого края. Иконки — сразу слева от неё.
+    // Лишние плашки есть только у наследника. Без них шестерёнка вплотную к паузе.
     const icon = this.plateSize;
-    const hpLeft = 1128 - 140;
-    const hasteX = hpLeft - 8 - icon / 2;
-    const pauseX = hasteX - this.plateGap - icon;
-    const settingsX = pauseX - this.plateGap - icon;
+    const pauseX = this.plateXLeftOfPause(0);
+    const settingsX = this.plateXLeftOfPause(1 + this.platesBetweenSettingsAndPause());
+    const hasteX = pauseX + this.plateGap + icon;
     const iconY = this.plateY;
 
     this.hastePlate = scene.add
@@ -377,10 +392,9 @@ export class GameHud {
     const icon = this.plateSize;
     const hpCenter = width - 152;
     const barLeft = hpCenter - 110;
-    const hpLeft = hpCenter - 140;
-    const hasteX = hpLeft - 8 - icon / 2;
-    const pauseX = hasteX - this.plateGap - icon;
-    const settingsX = pauseX - this.plateGap - icon;
+    const pauseX = this.plateXLeftOfPause(0);
+    const settingsX = this.plateXLeftOfPause(1 + this.platesBetweenSettingsAndPause());
+    const hasteX = pauseX + this.plateGap + icon;
     const y = this.plateY;
 
     // setSize удлиняет ленту. setDisplaySize растянул бы саму плитку.
@@ -799,6 +813,11 @@ export class GameHud {
   // Клик по шестерёнке не должен быть выстрелом танка.
   coversSettings(pointer: Phaser.Input.Pointer): boolean {
     return this.settingsPlate.getBounds().contains(pointer.worldX, pointer.worldY);
+  }
+
+  // В обычной партии между шестерёнкой и паузой пусто. Дебаг перекрывает своими кнопками.
+  coversDebugPlates(_pointer: Phaser.Input.Pointer): boolean {
+    return false;
   }
 
   // Скрытая иконка не занимает место: до покупки курсор над ней всё ещё стреляет.

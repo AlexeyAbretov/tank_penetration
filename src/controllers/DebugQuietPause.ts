@@ -1,7 +1,8 @@
-// Дебаг-пауза без плашки и затемнения. Пробел замирает поле.
+// Дебаг-пауза без плашки и затемнения. Пробел и кнопка на счёте замирают поле.
 // Esc эта пауза не читает: верхняя в стопке открывает обычный экран и перебивает эту.
 
 import Phaser from 'phaser';
+import { DEBUG_QUIET_PAUSE_EVENT } from '../gameConfig';
 import type { Pause, PauseEnv } from './PauseStack';
 
 export class DebugQuietPause implements Pause {
@@ -27,7 +28,26 @@ export class DebugQuietPause implements Pause {
       this.key = env.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
       env.keyboard.addCapture(Phaser.Input.Keyboard.KeyCodes.SPACE);
     }
+    env.scene.events.on(DEBUG_QUIET_PAUSE_EVENT, this.onButton, this);
+    // restart() поднимает ту же сцену. Без снятия старая пауза ответит ещё раз.
+    env.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      env.scene.events.off(DEBUG_QUIET_PAUSE_EVENT, this.onButton, this);
+    });
     this.mark(false);
+  }
+
+  // Кнопка — один щелчок. Кадр «вооружения» нужен только клавише, чтобы она не отпустила себя сама.
+  private onButton(): void {
+    if (!this.env) {
+      return;
+    }
+    if (this.active) {
+      this.exit();
+      return;
+    }
+    if (this.env.canPause() && !this.env.blockedAbove()) {
+      this.enter();
+    }
   }
 
   tick(_esc: boolean): void {
