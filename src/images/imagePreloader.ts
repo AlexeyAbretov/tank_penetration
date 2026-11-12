@@ -7,6 +7,7 @@ import { GunnerInfantry } from '../entities/GunnerInfantry';
 import { PickupTruck } from '../entities/PickupTruck';
 import { HeavyTank } from '../entities/HeavyTank';
 import { Helicopter } from '../entities/Helicopter';
+import { DroneCarrier } from '../entities/DroneCarrier';
 import { RocketBuggy } from '../entities/RocketBuggy';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
@@ -53,6 +54,7 @@ export const preloadImages = (scene: Phaser.Scene) => {
   PickupTruck.preload(scene);
   RocketBuggy.preload(scene);
   Helicopter.preload(scene);
+  DroneCarrier.preload(scene);
   RocketInfantry.preload(scene);
   SuperSoldier.preload(scene);
   HeavyTank.preload(scene);

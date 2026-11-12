@@ -412,6 +412,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
 
   // Какое оружие снимает здоровье. Обычный враг принимает всё.
   // Вертолёт оставляет снаряд танка, пулемёт, ионную пушку и атомный взрыв.
+  // Дрономатка оставляет снаряд танка, пулемёт и атомный взрыв. ЭМИ её только держит.
   takes(_strike: 'shell' | 'mg' | 'ion' | 'nuclear' | 'other'): boolean {
     return true;
   }

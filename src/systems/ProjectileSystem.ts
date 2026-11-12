@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 import { EnemyShot } from '../entities/EnemyShot';
 import { HeavyShell } from '../entities/HeavyShell';
 import { Rocket } from '../entities/Rocket';
+import { StrikeDrone } from '../entities/StrikeDrone';
 import { Tank, type PartBox } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { createArmorSparks, emitArmorSparks } from '../gfx/sparks';
@@ -39,7 +40,12 @@ export class ProjectileSystem {
       const face = this.shieldFace();
       if (face !== null && !shot.hasBounced() && shot.x <= face) {
         const y = shot.y;
+        const x = shot.x;
+        const drone = shot instanceof StrikeDrone;
         shot.destroy();
+        if (drone) {
+          StrikeDrone.burstAt(this.scene, x, y);
+        }
         this.onShield(y);
         return;
       }
@@ -56,7 +62,15 @@ export class ProjectileSystem {
       const y = shot.y;
       const travel = shot.rotation;
       const isRocket = shot instanceof Rocket;
-      if (this.absorbed()) {
+      const isDrone = shot instanceof StrikeDrone;
+      const turned = this.absorbed();
+      if (isDrone && !turned) {
+        shot.destroy();
+        StrikeDrone.burstAt(this.scene, x, y);
+        this.onTankDamage(damage);
+        return;
+      }
+      if (turned) {
         this.ricochet(shot, x, y, travel, isRocket);
         return;
       }
@@ -103,7 +117,7 @@ export class ProjectileSystem {
       body.prevFrame.y = body.position.y;
     }
     emitArmorSparks(this.armorSparks, x, y, travel);
-    if (!isRocket) {
+    if (!isRocket && !(shot instanceof StrikeDrone)) {
       this.effects.bulletHit.play();
     }
   }

@@ -85,8 +85,13 @@ export class EnemyShot extends Physics.Arcade.Image {
       return;
     }
     const haste = enemyHasteOf(this.scene.registry);
-    const angle = this.rotation;
+    const angle = this.flightAngle();
     // cos даёт долю скорости по X, sin — по Y. Угол 0 — строго вправо, Math.PI — строго влево.
     this.setVelocity(Math.cos(angle) * this.flightSpeed * haste, Math.sin(angle) * this.flightSpeed * haste);
+  }
+
+  // Куда летит картинка. У пули это её поворот. Дрон подменяет: нос смотрит по курсу, а корпус не переворачивается.
+  protected flightAngle(): number {
+    return this.rotation;
   }
 }

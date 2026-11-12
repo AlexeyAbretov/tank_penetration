@@ -7,6 +7,7 @@ import { AssaultInfantry } from '../entities/AssaultInfantry';
 import { BarbedWire } from '../entities/BarbedWire';
 import { EnergyWall } from '../entities/EnergyWall';
 import { EnemyShot } from '../entities/EnemyShot';
+import { DroneCarrier } from '../entities/DroneCarrier';
 import { FlameTank } from '../entities/FlameTank';
 import { HeavyTank } from '../entities/HeavyTank';
 import { Helicopter } from '../entities/Helicopter';
@@ -20,6 +21,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { RocketBuggy } from '../entities/RocketBuggy';
 import { Rocket } from '../entities/Rocket';
 import { RocketSalvo } from '../entities/RocketSalvo';
+import { StrikeDrone } from '../entities/StrikeDrone';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { airBurstAt } from '../gfx/airBurst';
@@ -27,7 +29,7 @@ import { bombBoom } from '../gfx/bombBoom';
 import { craterHalfHeight, craterReach, fadeCrater, placeCrater } from '../gfx/craters';
 import { clearBurns, ignite, inPatch, inStream, isBurning, layScorchedPath, placeCampfires, revealScorchedPath, syncFlameStream, syncScorchedEarth, tickBurns } from '../gfx/flame';
 import { createShellBlast } from '../gfx/particles';
-import { playArtilleryShot } from '../sounds/BoomSounds';
+import { playArtilleryShot, playBoom } from '../sounds/BoomSounds';
 import type { BattleEffects } from '../sounds/BattleEffects';
 import type { ShopController } from '../controllers/ShopController';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
@@ -934,7 +936,7 @@ export class CombatSystem implements Combat {
     return fromIcon || this.empKeys.some((key) => Phaser.Input.Keyboard.JustDown(key));
   }
 
-  // Купол уже погас. Пехота и техника стоят, летящие ракеты рвутся без урона.
+  // Купол уже погас. Пехота и техника стоят. Ракеты и ударные дроны рвутся без урона по танку.
   private pulseEmp(): void {
     const ms = EmpFlashAbilityConfig.stunFor(this.shop.empStunLevel, this.progressShop.empStunLevel());
     for (const unit of this.infantry.getChildren() as Infantry[]) {
@@ -946,6 +948,25 @@ export class CombatSystem implements Combat {
     if (this.burstRockets()) {
       this.effects.rocketBurst.play();
     }
+    if (this.burstDrones()) {
+      playBoom(this.scene);
+    }
+  }
+
+  // Ударные дроны. Картинка на каждом, разрыв артиллерии один на пачку.
+  private burstDrones(): boolean {
+    let burst = false;
+    for (const obj of [...this.enemyShots.getChildren()]) {
+      if (!(obj instanceof StrikeDrone) || !obj.active) {
+        continue;
+      }
+      const x = obj.x;
+      const y = obj.y;
+      obj.destroy();
+      StrikeDrone.burstAt(this.scene, x, y, false);
+      burst = true;
+    }
+    return burst;
   }
 
   // Ракеты защиты и нападения. Пули и снаряд тяжёлого танка не ракеты: они летят дальше.
@@ -1510,6 +1531,11 @@ export class CombatSystem implements Combat {
         unit.kill();
       }
     });
+    for (const obj of [...this.enemyShots.getChildren()]) {
+      if (obj instanceof StrikeDrone && obj.active) {
+        obj.destroy();
+      }
+    }
   }
 
   // Правее кадра враг ещё не вошёл: взрыв его не берёт. Труп уже не боец.
@@ -1709,26 +1735,30 @@ export class CombatSystem implements Combat {
     if (this.laserCooldown > 0 || !this.weaponLive('laser')) {
       return;
     }
-    const rocket = this.randomRocket();
+    const target = this.randomAirTarget();
     if (this.laserBurstLeft <= 0) {
-      if (!rocket) {
+      if (!target) {
         return;
       }
       this.laserBurstLeft = this.laserShots;
     }
-    if (rocket) {
-      this.shootLaser(laser, rocket);
+    if (target) {
+      this.shootLaser(laser, target);
     }
     this.laserBurstLeft -= 1;
     this.laserCooldown = this.laserBurstLeft > 0 ? LaserDefense.burstGap : LaserDefense.fireIntervalFor();
   }
 
-  private shootLaser(laser: LaserDefense, rocket: Rocket): void {
-    const x = rocket.x;
-    const y = rocket.y;
+  private shootLaser(laser: LaserDefense, target: Rocket | StrikeDrone): void {
+    const x = target.x;
+    const y = target.y;
     laser.fireAt(x, y);
     this.effects.laserShot.play();
-    rocket.destroy();
+    target.destroy();
+    if (target instanceof StrikeDrone) {
+      StrikeDrone.burstAt(this.scene, x, y);
+      return;
+    }
     airBurstAt(this.scene, x, y);
     this.effects.rocketBurst.play();
   }
@@ -2050,10 +2080,19 @@ export class CombatSystem implements Combat {
     });
   }
 
-  private randomRocket(): Rocket | null {
-    const flying: Rocket[] = [];
+  // Ракета или ударный дрон, которые уже летят minFlightMs.
+  private randomAirTarget(): Rocket | StrikeDrone | null {
+    const flying: (Rocket | StrikeDrone)[] = [];
+    const now = this.scene.time.now;
     for (const obj of this.enemyShots.getChildren()) {
-      if (obj instanceof Rocket && obj.active && obj.flownMs(this.scene.time.now) >= LaserDefense.shop.minFlightMs) {
+      if (!obj.active) {
+        continue;
+      }
+      if (obj instanceof StrikeDrone && obj.flownMs(now) >= LaserDefense.shop.minFlightMs) {
+        flying.push(obj);
+        continue;
+      }
+      if (obj instanceof Rocket && obj.flownMs(now) >= LaserDefense.shop.minFlightMs) {
         flying.push(obj);
       }
     }
@@ -2101,13 +2140,31 @@ export class CombatSystem implements Combat {
         along = at;
         struck = unit;
       }
-      if (!struck) {
+      let drone: StrikeDrone | null = null;
+      let droneAlong = Infinity;
+      for (const obj of this.enemyShots.getChildren()) {
+        if (!(obj instanceof StrikeDrone) || !obj.active) {
+          continue;
+        }
+        const at = this.reachAlong(step, obj.x, obj.y, StrikeDrone.reach);
+        if (at === null || at >= droneAlong) {
+          continue;
+        }
+        droneAlong = at;
+        drone = obj;
+      }
+      if (!struck && !drone) {
         continue;
       }
       bullet.destroy();
+      if (drone && (struck === null || droneAlong <= along)) {
+        StrikeDrone.burstAt(this.scene, drone.x, drone.y);
+        drone.destroy();
+        continue;
+      }
       // Пуля долетела до круга попадания.
       this.effects.impacts.play();
-      this.hurtInfantry(struck, this.mgDamage(), false, undefined, 'mg');
+      this.hurtInfantry(struck as Infantry, this.mgDamage(), false, undefined, 'mg');
     }
   }
 
@@ -2250,7 +2307,8 @@ export class CombatSystem implements Combat {
       unit instanceof PickupTruck ||
       unit instanceof RocketBuggy ||
       unit instanceof Helicopter ||
-      unit instanceof HeavyTank
+      unit instanceof HeavyTank ||
+      unit instanceof DroneCarrier
     );
   }
 

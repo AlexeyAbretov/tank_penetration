@@ -18,6 +18,7 @@ import { PickupTruck } from '../entities/PickupTruck';
 import { Rocket } from '../entities/Rocket';
 import { HeavyTank } from '../entities/HeavyTank';
 import { Helicopter } from '../entities/Helicopter';
+import { DroneCarrier } from '../entities/DroneCarrier';
 import { RocketBuggy } from '../entities/RocketBuggy';
 import { RocketInfantry } from '../entities/RocketInfantry';
 import { SuperSoldier } from '../entities/SuperSoldier';
@@ -52,5 +53,6 @@ export function ensureGameTextures(scene: Phaser.Scene): void {
   PickupTruck.ensureTextures(scene);
   RocketBuggy.ensureTextures(scene);
   Helicopter.ensureTextures(scene);
+  DroneCarrier.ensureTextures(scene);
   HeavyTank.ensureTextures(scene);
 }

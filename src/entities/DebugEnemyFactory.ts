@@ -1,16 +1,19 @@
 // Дебаг-круг волн. Наследует появление юнитов у обычной фабрики и подменяет состав.
-// Круг длиннее списка видов на три волны: сначала каждый вид своей волной,
-// потом смешанная, потом суперсолдат, потом тяжёлый танк.
-// С вертолётом это девять: 1–6 один вид, 7-я все по одному, 8-я суперсолдат, 9-я танк.
-// Дальше круг сначала: 16 и 17 — боссы второго круга, 25 и 26 — третьего.
+// Круг длиннее списка видов на четыре волны: сначала каждый вид своей волной,
+// потом смешанная, потом суперсолдат, потом тяжёлый танк, потом дрономатка.
+// С вертолётом это десять: 1–6 один вид, 7-я все по одному, 8-я суперсолдат, 9-я танк, 10-я дрономатка.
+// Дальше круг сначала: 18, 19 и 20 — боссы второго круга.
 // Обычных в волне по умолчанию трое. Поле в настройках пишет число в localStorage, потолок 50.
 // Смешанная волна и босс это число не читают. Здоровье и скорость растут с номером волны.
 // Ранг обычного юнита — сам номер: круг видов не держит его на дебюте обычной партии.
-// Босс толстеет и бьёт больнее с каждым своим выходом: 8-я и 9-я — первое появление, 17-я и 18-я — второе.
-// Число суперсолдат то же, что в партии: три выхода на одном составе, потолок пять. Волна танка всегда из одного. Появление здесь — волна / длину круга.
+// Босс толстеет и бьёт больнее с каждым своим выходом: 8-я, 9-я и 10-я — первое появление.
+// Число суперсолдат то же, что в партии: три выхода на одном составе, потолок пять. Волна танка всегда из одного.
+// Дрономатка на своей волне: три первых круга одна, с четвёртого две, больше двух не бывает.
+// Появление здесь — волна / длину круга.
 // Монеты считает та же касса, что в партии: номер выхода умножается на 25, тела делят сумму.
 
 import { AssaultInfantry } from './AssaultInfantry';
+import { DroneCarrier } from './DroneCarrier';
 import { HeavyTank } from './HeavyTank';
 import { Helicopter } from './Helicopter';
 import { EnemyFactory } from './EnemyFactory';
@@ -25,6 +28,7 @@ import type { SpawnContext } from '../types/SpawnContext';
 
 type EnemyKind =
   | typeof AssaultInfantry
+  | typeof DroneCarrier
   | typeof GunnerInfantry
   | typeof HeavyTank
   | typeof Helicopter
@@ -73,35 +77,54 @@ export class DebugEnemyFactory extends EnemyFactory {
     return this.timing.spawnGap;
   }
 
-  // Две босс-волны замыкают круг: предпоследняя — суперсолдат, последняя — танк.
-  // Танк на своей волне всегда один, даже когда у суперсолдата того же круга тел уже несколько.
+  // Две босс-волны замыкали круг. Третья — дрономатка, одна или две.
+  // Танк на своей волне всегда один. Волна дрономатки суперсолдата и танка не берёт.
   static override bossCount(wave: number): number {
+    if (this.isCarrierWave(wave)) {
+      return 0;
+    }
     if (this.isTankWave(wave)) {
       return 1;
     }
     return super.bossCount(wave);
   }
 
+  static override carrierCount(wave: number): number {
+    if (!this.isCarrierWave(wave)) {
+      return 0;
+    }
+    const step = Math.floor((this.bossAppearance(wave) - 1) / this.boss.hold);
+    return Math.min(DroneCarrier.maxOnField, 1 + step);
+  }
+
   static isBossWave(wave: number): boolean {
-    return this.isSuperWave(wave) || this.isTankWave(wave);
+    return this.isSuperWave(wave) || this.isTankWave(wave) || this.isCarrierWave(wave);
   }
 
   static isSuperWave(wave: number): boolean {
     const cycle = this.cycle();
-    return wave > 0 && wave % cycle === cycle - 1;
-  }
-
-  static isTankWave(wave: number): boolean {
-    return wave > 0 && wave % this.cycle() === 0;
-  }
-
-  // Волна перед суперсолдатом в том же круге. С шестью видами это 7, 16, 25…
-  static isMixedWave(wave: number): boolean {
-    const cycle = this.cycle();
     return wave > 0 && wave % cycle === cycle - 2;
   }
 
+  static isTankWave(wave: number): boolean {
+    const cycle = this.cycle();
+    return wave > 0 && wave % cycle === cycle - 1;
+  }
+
+  static isCarrierWave(wave: number): boolean {
+    return wave > 0 && wave % this.cycle() === 0;
+  }
+
+  // Волна перед суперсолдатом в том же круге. С шестью видами это 7, 17, 27…
+  static isMixedWave(wave: number): boolean {
+    const cycle = this.cycle();
+    return wave > 0 && wave % cycle === cycle - 3;
+  }
+
   static override bossTitle(wave: number): string | null {
+    if (this.isCarrierWave(wave)) {
+      return 'ДРОНОМАТКА';
+    }
     if (this.isTankWave(wave)) {
       return 'ТЯЖЁЛЫЙ ТАНК';
     }
@@ -116,7 +139,7 @@ export class DebugEnemyFactory extends EnemyFactory {
       return 0;
     }
     if (this.isBossWave(wave)) {
-      return this.bossCount(wave);
+      return this.bossCount(wave) + this.carrierCount(wave);
     }
     if (this.isMixedWave(wave)) {
       return REGULAR.length;
@@ -153,6 +176,9 @@ export class DebugEnemyFactory extends EnemyFactory {
     if (kind === Helicopter) {
       return Helicopter.coinReward;
     }
+    if (kind === DroneCarrier) {
+      return DroneCarrier.coinsForBody(this.bossAppearance(wave), index, this.carrierCount(wave));
+    }
     return AssaultInfantry.coinReward;
   }
 
@@ -180,14 +206,21 @@ export class DebugEnemyFactory extends EnemyFactory {
     return Math.max(1, Math.ceil(wave / this.cycle()));
   }
 
-  // В дебаге выход танка считает круги, а не чётные десятки партии.
+  // В дебаге выход танка и дрономатки считает круги, а не десятки партии.
   protected static override tankShowing(wave: number): number {
+    return this.bossAppearance(wave);
+  }
+
+  protected static override carrierShowing(wave: number): number {
     return this.bossAppearance(wave);
   }
 
   // Обычная волна — один слот круга, пока не дошли до смешанной.
   // Смешанная отдаёт вид по месту в очереди. Добавка с клавиши A идёт по тому же списку.
   private static kindAt(wave: number, index: number): EnemyKind {
+    if (this.isCarrierWave(wave)) {
+      return DroneCarrier;
+    }
     if (this.isTankWave(wave)) {
       return HeavyTank;
     }
@@ -201,9 +234,9 @@ export class DebugEnemyFactory extends EnemyFactory {
     return REGULAR[slot] ?? AssaultInfantry;
   }
 
-  // Виды по одному, затем смешанная, затем суперсолдат, затем танк.
+  // Виды по одному, затем смешанная, затем суперсолдат, танк и дрономатка.
   private static cycle(): number {
-    return REGULAR.length + 3;
+    return REGULAR.length + 4;
   }
 
   private static kindOfSave(kind: EnemySaveKind): EnemyKind {
@@ -227,6 +260,9 @@ export class DebugEnemyFactory extends EnemyFactory {
     }
     if (kind === 'tank') {
       return HeavyTank;
+    }
+    if (kind === 'carrier') {
+      return DroneCarrier;
     }
     return AssaultInfantry;
   }

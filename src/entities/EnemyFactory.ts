@@ -4,6 +4,7 @@
 // Так дебют стрелка на 3-й волне сам появляется и в составе 15-й.
 
 import { AssaultInfantry } from './AssaultInfantry';
+import { DroneCarrier } from './DroneCarrier';
 import { GunnerInfantry } from './GunnerInfantry';
 import { Infantry } from './Infantry';
 import { HeavyTank } from './HeavyTank';
@@ -23,6 +24,7 @@ export { ENEMY_KINDS } from '../types/EnemySave';
 
 type EnemyKind =
   | typeof AssaultInfantry
+  | typeof DroneCarrier
   | typeof GunnerInfantry
   | typeof HeavyTank
   | typeof Helicopter
@@ -75,6 +77,7 @@ export class EnemyFactory {
 
   // 10, 20, 30… На экран выходят боссы: нечётный выход — суперсолдат, чётный — тяжёлый танк.
   // Со второго тела на поле оба: чётные места очереди держит ведущий, нечётные — другой.
+  // Со волны дрономатки к ним добавляется она, не больше двух на поле.
   // Сколько — считает bossCount. Внутри roster более поздняя волна этот номер
   // всё равно проигрывает, чтобы дебют пикапа на 10-й и ракетчика на 20-й не потерялся.
   static isBossWave(wave: number): boolean {
@@ -90,6 +93,16 @@ export class EnemyFactory {
     }
     const step = Math.floor((this.bossAppearance(wave) - 1) / this.boss.hold);
     return Math.min(this.boss.maxCount, 1 + step);
+  }
+
+  // На обычной волне и до дебюта ноль. Дальше один, затем двое, и на этом потолок.
+  // Три своих выхода держат одно число, как у остальных боссов.
+  static carrierCount(wave: number): number {
+    if (!this.isBossWave(wave) || wave < DroneCarrier.debutWave) {
+      return 0;
+    }
+    const step = Math.floor((DroneCarrier.appearanceOn(wave) - 1) / this.boss.hold);
+    return Math.min(DroneCarrier.maxOnField, 1 + step);
   }
 
   // Длина списка. WaveManager сравнивает её с тем, сколько врагов уже вышло.
@@ -127,6 +140,9 @@ export class EnemyFactory {
     if (unit instanceof HeavyTank) {
       return 'tank';
     }
+    if (unit instanceof DroneCarrier) {
+      return 'carrier';
+    }
     if (unit instanceof AssaultInfantry) {
       return 'assault';
     }
@@ -148,16 +164,25 @@ export class EnemyFactory {
     const { scene, x, y, shots, fireTarget } = ctx;
     if (kind === 'super') {
       const appearance = this.bossAppearance(ctx.wave);
-      const count = this.bossCount(ctx.wave);
+      const count = this.bodyCount(ctx.wave);
       const hp = SuperSoldier.hpForAppearance(appearance);
       return new SuperSoldier(scene, x, y, hp, shots, fireTarget, appearance, slot, count);
     }
     if (kind === 'tank') {
       const showing = this.tankShowing(ctx.wave);
       const purse = this.bossAppearance(ctx.wave);
-      const count = this.bossCount(ctx.wave);
+      const count = this.bodyCount(ctx.wave);
       const hp = HeavyTank.hpForAppearance(showing);
       return new HeavyTank(scene, x, y, hp, shots, fireTarget, showing, purse, slot, count);
+    }
+    if (kind === 'carrier') {
+      const showing = this.carrierShowing(ctx.wave);
+      const purse = this.bossAppearance(ctx.wave);
+      const count = this.bodyCount(ctx.wave);
+      const hp = DroneCarrier.hpForAppearance(showing);
+      const unit = new DroneCarrier(scene, x, y, hp, shots, fireTarget, purse, slot, count);
+      unit.setDamageWave(ctx.wave);
+      return unit;
     }
     let unit: Infantry;
     if (kind === 'assault') {
@@ -208,7 +233,7 @@ export class EnemyFactory {
 
     if (kind === SuperSoldier) {
       const appearance = this.bossAppearance(wave);
-      const count = this.bossCount(wave);
+      const count = this.bodyCount(wave);
       const hp = SuperSoldier.hpForAppearance(appearance);
       const unit = new SuperSoldier(scene, x, y, hp, shots, fireTarget, appearance, slot, count);
       unit.setPaceWave(1);
@@ -218,10 +243,20 @@ export class EnemyFactory {
     if (kind === HeavyTank) {
       const showing = this.tankShowing(wave);
       const purse = this.bossAppearance(wave);
-      const count = this.bossCount(wave);
+      const count = this.bodyCount(wave);
       const hp = HeavyTank.hpForAppearance(showing);
       const unit = new HeavyTank(scene, x, y, hp, shots, fireTarget, showing, purse, slot, count);
       unit.setPaceWave(1);
+      return unit;
+    }
+
+    if (kind === DroneCarrier) {
+      const purse = this.bossAppearance(wave);
+      const count = this.bodyCount(wave);
+      const hp = DroneCarrier.hpForAppearance(this.carrierShowing(wave));
+      const unit = new DroneCarrier(scene, x, y, hp, shots, fireTarget, purse, slot, count);
+      unit.setPaceWave(1);
+      unit.setDamageWave(wave);
       return unit;
     }
 
@@ -280,6 +315,16 @@ export class EnemyFactory {
     return HeavyTank.appearanceOn(wave);
   }
 
+  // Какой по счёту выход именно дрономатки. Дебаг подменяет номером круга.
+  protected static carrierShowing(wave: number): number {
+    return DroneCarrier.appearanceOn(wave);
+  }
+
+  // Все тела босс-волны, включая дрономатку. Касса делится на это число.
+  private static bodyCount(wave: number): number {
+    return this.bossCount(wave) + this.carrierCount(wave);
+  }
+
   // Ведущий чередуется. Пока тело одно, на поле только он.
   // Дальше чётные места очереди — ведущий, нечётные — второй босс.
   // Тяжёлый танк на волне один: место, которое досталось бы второму танку, занимает суперсолдат.
@@ -313,13 +358,26 @@ export class EnemyFactory {
         soldier = true;
       }
     }
-    if (tank && soldier) {
-      return 'СУПЕРСОЛДАТ И ТЯЖЁЛЫЙ ТАНК';
+    const names: string[] = [];
+    if (soldier) {
+      names.push('СУПЕРСОЛДАТ');
     }
     if (tank) {
-      return 'ТЯЖЁЛЫЙ ТАНК';
+      names.push('ТЯЖЁЛЫЙ ТАНК');
     }
-    return 'СУПЕРСОЛДАТ';
+    if (this.carrierCount(wave) > 0) {
+      names.push('ДРОНОМАТКА');
+    }
+    if (names.length === 0) {
+      return null;
+    }
+    if (names.length === 1) {
+      return names[0];
+    }
+    if (names.length === 2) {
+      return `${names[0]} И ${names[1]}`;
+    }
+    return `${names[0]}, ${names[1]} И ${names[2]}`;
   }
 
   protected static growthRank(wave: number, debutWave: number): number {
@@ -341,6 +399,10 @@ export class EnemyFactory {
       const total = this.bossCount(wave);
       for (let i = 0; i < total; i += 1) {
         bosses.push(this.bossKindAt(wave, i));
+      }
+      const carriers = this.carrierCount(wave);
+      for (let i = 0; i < carriers; i += 1) {
+        bosses.push(DroneCarrier);
       }
       return bosses;
     }
