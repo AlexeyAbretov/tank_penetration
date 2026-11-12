@@ -36,6 +36,9 @@ export type ShopView = {
   tabs: ShopTabView[];
 };
 
+// Цена в монетах начинается с этой метки. На карточке вместо неё белый знак.
+export const coinCostPrefix = '¤ ';
+
 // «Следующая волна». Сами покупки приходят в карточке: окно их список не знает.
 export type ShopDelegate = {
   closeAndContinue(): void;
@@ -46,7 +49,7 @@ const PANEL_H = 680;
 
 const SIDE = 22;
 const TAB_W = 250;
-// Монеты в правом верхнем углу, колонка занимает их прежний ряд.
+// Монеты в правом верхнем углу: белый знак и число. Колонка занимает их прежний ряд.
 // Тринадцать вкладок кончаются над уголком плашки.
 const TAB_H = 40;
 const TAB_GAP = 2;
@@ -65,12 +68,15 @@ const RULE_Y = -276;
 const BUTTON_Y = 292;
 
 const BRASS = 0xc4a15a;
+// Серое число, когда монет не хватает. Совпадает с fieldMuted: знак гаснет вместе с ценой.
+const PRICE_MUTED = 0x7d7868;
 
 type Offer = {
   card: Phaser.GameObjects.Rectangle;
   title: Phaser.GameObjects.Text;
   info: Phaser.GameObjects.Text;
   cost: Phaser.GameObjects.Text;
+  coin: Phaser.GameObjects.Image;
   mark: Phaser.GameObjects.Graphics;
   buy: () => void;
   open: boolean;
@@ -86,7 +92,16 @@ type Tab = {
 export class ShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
+  static readonly coinKey = 'coin-mark';
+
+  // Белый знак с рисунка. Чёрное там пустое: в файле на его месте прозрачность.
+  static preload(scene: Phaser.Scene): void {
+    scene.load.image(ShopPanel.coinKey, 'assets/coin-mark.png');
+  }
+
   private readonly coinsText: Phaser.GameObjects.Text;
+  private readonly coinMark: Phaser.GameObjects.Image;
+  private readonly coinAspect: number;
   private readonly dim: Phaser.GameObjects.Rectangle;
   private readonly offers: Offer[] = [];
   private readonly waveButton: Phaser.GameObjects.Graphics;
@@ -128,12 +143,16 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
 
+    const frame = scene.textures.get(ShopPanel.coinKey).get();
+    this.coinAspect = frame.width / frame.height;
+    this.coinMark = scene.add.image(COINS_X, TITLE_Y, ShopPanel.coinKey).setOrigin(1, 0.5);
     this.coinsText = scene.add
-      .text(COINS_X, TITLE_Y, 'Монеты  0', {
+      .text(COINS_X, TITLE_Y, '0', {
         fontSize: '22px',
         color: fieldPaper,
       })
       .setOrigin(1, 0.5);
+    this.placeCoinBalance();
 
     const nextFace = scene.add.graphics().setPosition(0, BUTTON_Y);
     this.waveButton = nextFace;
@@ -158,6 +177,7 @@ export class ShopPanel {
       well,
       rule,
       title,
+      this.coinMark,
       this.coinsText,
       nextFace,
       next,
@@ -196,7 +216,8 @@ export class ShopPanel {
 
   refresh(view: ShopView): void {
     this.lastView = view;
-    this.coinsText.setText(`Монеты  ${view.coins}`);
+    this.coinsText.setText(String(view.coins));
+    this.placeCoinBalance();
     this.syncTabs(view.tabs);
   }
 
@@ -293,7 +314,7 @@ export class ShopPanel {
       this.offers.push(offer);
       // «Следующая волна» остаётся поверх карточек.
       const at = this.container.getIndex(this.waveButton);
-      const nodes = [offer.card, offer.title, offer.info, offer.cost, offer.mark];
+      const nodes = [offer.card, offer.title, offer.info, offer.coin, offer.cost, offer.mark];
       nodes.forEach((node, index) => this.container.addAt(node, at + index));
     }
   }
@@ -325,6 +346,7 @@ export class ShopPanel {
     offer.title.setVisible(shown);
     offer.info.setVisible(shown);
     offer.cost.setVisible(shown);
+    offer.coin.setVisible(false);
     offer.mark.setVisible(shown);
     if (!shown) {
       offer.card.disableInteractive();
@@ -357,9 +379,10 @@ export class ShopPanel {
         align: 'center',
       })
       .setOrigin(0.5, 1);
+    const coin = scene.add.image(CARD_X, y, ShopPanel.coinKey).setVisible(false);
     const mark = scene.add.graphics().setPosition(CARD_X - CARD_W / 2 + 28, y + CARD_H / 2 - 26);
     paintOwnedMark(mark);
-    const offer: Offer = { card, title, info, cost, mark, buy: () => undefined, open: false };
+    const offer: Offer = { card, title, info, cost, coin, mark, buy: () => undefined, open: false };
     card.on('pointerup', () => {
       if (this.blocked() || !offer.open) {
         return;
@@ -379,9 +402,8 @@ export class ShopPanel {
     offer.open = card.open;
     offer.title.setText(card.title);
     offer.info.setText(card.info);
-    offer.cost.setText(card.cost);
-    offer.cost.setVisible(!card.owned);
     offer.mark.setVisible(card.owned);
+    this.layoutPrice(offer, card);
     if (offer.card.input) {
       offer.card.input.cursor = card.open ? 'pointer' : 'default';
     }
@@ -391,6 +413,46 @@ export class ShopPanel {
       return;
     }
     this.tintCard(offer.card, offer.cost, card.canBuy);
+  }
+
+  // Знак той же высоты, что строка, и стоит вплотную слева от числа.
+  private placeCoinBalance(): void {
+    const height = this.coinsText.height;
+    this.coinMark.setDisplaySize(height * this.coinAspect, height);
+    this.coinMark.setPosition(COINS_X - this.coinsText.width - 6, TITLE_Y);
+  }
+
+  // «¤ » в строке цены — метка монеты. На карточке её место занимает белый знак.
+  // «максимум» и пустая цена знака не получают. Серая цена гасит и знак.
+  private layoutPrice(offer: Offer, card: ShopCardView): void {
+    const coin = card.cost.startsWith(coinCostPrefix);
+    const label = coin ? card.cost.slice(coinCostPrefix.length) : card.cost;
+    offer.cost.setText(label);
+    const showCoin = coin && !card.owned;
+    offer.coin.setVisible(showCoin);
+    offer.cost.setVisible(!card.owned);
+    const bottom = offer.card.y + offer.card.height / 2 - 10;
+    const mid = offer.card.x;
+    if (!showCoin) {
+      offer.cost.setOrigin(0.5, 1);
+      offer.cost.setPosition(mid, bottom);
+      return;
+    }
+    const height = offer.cost.height;
+    offer.coin.setDisplaySize(height * this.coinAspect, height);
+    offer.coin.setOrigin(0, 0.5);
+    offer.cost.setOrigin(0, 0.5);
+    const gap = 4;
+    const total = offer.coin.displayWidth + gap + offer.cost.width;
+    const left = mid - total / 2;
+    const y = bottom - height / 2;
+    offer.coin.setPosition(left, y);
+    offer.cost.setPosition(left + offer.coin.displayWidth + gap, y);
+    if (card.open && !card.canBuy) {
+      offer.coin.setTint(PRICE_MUTED);
+      return;
+    }
+    offer.coin.clearTint();
   }
 
   private tintCard(card: Phaser.GameObjects.Rectangle, cost: Phaser.GameObjects.Text, canBuy: boolean): void {

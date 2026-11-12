@@ -25,6 +25,7 @@ import { preloadBoom } from '../gfx/boom';
 import { preloadCraters } from '../gfx/craters';
 import { preloadNuke } from '../gfx/nuke';
 import { preloadTankBoom } from '../gfx/tankBoom';
+import { ShopPanel } from '../ui/shops/ShopPanel';
 
 // Картинки живут у сущностей. Здесь только собираем их в один вызов для GameScene.
 export const preloadImages = (scene: Phaser.Scene) => {
@@ -62,4 +63,6 @@ export const preloadImages = (scene: Phaser.Scene) => {
   preloadFlameStream(scene);
   preloadScorchedEarth(scene);
   preloadAirBurst(scene);
+  // Знак монеты обычного магазина. Путь к файлу — в ShopPanel.preload.
+  ShopPanel.preload(scene);
 };

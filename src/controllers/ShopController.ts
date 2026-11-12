@@ -18,7 +18,13 @@ import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { GAME } from '../gameConfig';
 import { shopPrice } from '../shopPrice';
-import { ShopPanel, type ShopCardView, type ShopTabView, type ShopView } from '../ui/shops/ShopPanel';
+import {
+  coinCostPrefix,
+  ShopPanel,
+  type ShopCardView,
+  type ShopTabView,
+  type ShopView,
+} from '../ui/shops/ShopPanel';
 import type { GameHud } from '../ui/huds/GameHud';
 import type { ShopSave } from '../saves/CombatSave';
 
@@ -2071,9 +2077,9 @@ export class ShopController {
     };
   }
 
-  // Знак валюты вместо слова «цена».
+  // Метка монеты. Окно рисует вместо неё белый знак.
   private coin(price: number): string {
-    return `¤ ${price}`;
+    return `${coinCostPrefix}${price}`;
   }
 
   private formatSeconds(ms: number): string {
