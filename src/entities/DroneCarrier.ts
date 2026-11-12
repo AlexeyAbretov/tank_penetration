@@ -41,8 +41,10 @@ export class DroneCarrier extends Infantry {
   static readonly animKey = 'carrier-hover';
   static readonly shadowKey = 'drone-carrier-shadow';
   static readonly shadow = { w: 150, h: 14, drop: 48 };
+  // Рисунок на кадре 71 px: винты с 34-й строки, низ на 105-й.
+  // Солдат на поле около 93 px. При масштабе 1 винты ниже каски. 1.6 поднимает их над ней.
   static readonly placed = {
-    scale: 1,
+    scale: 1.6,
     originX: 0.5,
     originY: 0.62,
     bodyW: 176,
@@ -60,7 +62,7 @@ export class DroneCarrier extends Infantry {
 
   readonly reachesBase = false;
   readonly contactDamage = 0;
-  override readonly hitRadius = 96;
+  override readonly hitRadius = 96 * DroneCarrier.placed.scale;
   coinReward: number;
 
   private shadow?: Phaser.GameObjects.Image;
@@ -188,10 +190,11 @@ export class DroneCarrier extends Infantry {
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(placed.bodyW, placed.bodyH);
     body.setOffset(placed.bodyX, placed.bodyY);
-    this.hpBarWidth = 64;
+    this.hpBarWidth = Math.round(64 * placed.scale);
     this.syncBar();
     if (scene.textures.exists(DroneCarrier.shadowKey)) {
       this.shadow = scene.add.image(x, y, DroneCarrier.shadowKey).setOrigin(0.5, 0.5);
+      this.shadow.setScale(placed.scale);
       this.placeShadow();
     }
     this.once('destroy', () => {
@@ -266,7 +269,7 @@ export class DroneCarrier extends Infantry {
       super.vanish();
       return;
     }
-    const ground = this.y + DroneCarrier.shadow.drop;
+    const ground = this.y + DroneCarrier.shadow.drop * this.scaleY;
     this.scene.tweens.add({
       targets: this,
       y: ground,
@@ -279,7 +282,7 @@ export class DroneCarrier extends Infantry {
         }
         this.setTexture(DroneCarrier.corpseKey);
         this.setRotation(0);
-        this.smoke = wreckSmokeAt(this.scene, this.x, this.y - 18, 0.8);
+        this.smoke = wreckSmokeAt(this.scene, this.x, this.y - 18 * this.scaleY, 0.8 * this.scaleX);
         this.smoke.setDepth(this.depth + 0.4);
       },
     });
@@ -301,7 +304,7 @@ export class DroneCarrier extends Infantry {
     if (!shade?.active) {
       return;
     }
-    shade.setPosition(this.x, this.y + DroneCarrier.shadow.drop);
+    shade.setPosition(this.x, this.y + DroneCarrier.shadow.drop * this.scaleY);
     shade.setAlpha(this.alpha);
     shade.setDepth(this.depth - 0.15);
   }
@@ -408,8 +411,19 @@ export class DroneCarrier extends Infantry {
 
   private roam(): { left: number; right: number; top: number; bottom: number } {
     const left = Math.round((GAME.width * 3) / 4);
-    const right = Math.max(left + 40, GAME.width - 100);
-    return { left, right, top: 140, bottom: 540 };
+    const fit = DroneCarrier.placed;
+    // Правый винт на x = 232. Отступ, чтобы корма не уходила за край поля.
+    const tail = (232 - fit.originX * DroneCarrier.frame.w) * fit.scale;
+    const right = Math.max(left + 40, Math.round(GAME.width - tail));
+    // Полоска здоровья сидит над кадром, тень — ниже корпуса. Оба остаются на поле.
+    const head = fit.originY * DroneCarrier.frame.h * fit.scale + 28;
+    const foot = DroneCarrier.shadow.drop * fit.scale + 16;
+    return {
+      left,
+      right,
+      top: Math.max(140, Math.round(head)),
+      bottom: Math.min(540, Math.round(GAME.bannerY - foot)),
+    };
   }
 
   // Шум, пока этот корпус жив и не под ЭМИ. Остов и падение уже молчат.

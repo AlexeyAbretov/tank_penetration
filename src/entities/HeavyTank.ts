@@ -40,9 +40,10 @@ export class HeavyTank extends RangedEnemy {
   static readonly frame = { w: 256, h: 128 };
   static readonly gunFrame = { w: 256, h: 128 };
   static readonly flashFrame = { w: 256, h: 128 };
-  // Подошва на строке 111, середина корпуса по непрозрачным пикселям.
+  // Опора на строке 112, крыша башни на 19: силуэт 93 px.
+  // Солдат на поле около 93 px. При масштабе 1 крыша вровень с каской. 1.4 поднимает её над каской.
   static readonly placed = {
-    scale: 1,
+    scale: 1.4,
     originX: 143 / 256,
     originY: 112 / 128,
     bodyW: 188,
@@ -115,7 +116,7 @@ export class HeavyTank extends RangedEnemy {
   readonly coinReward: number;
   readonly reachesBase = false;
   readonly contactDamage = 0;
-  override readonly hitRadius = 108;
+  override readonly hitRadius = 108 * HeavyTank.placed.scale;
   readonly flameSeat = 'hood' as const;
 
   protected readonly holdX = HeavyTank.holdX;
@@ -299,7 +300,7 @@ export class HeavyTank extends RangedEnemy {
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setSize(fit.bodyW, fit.bodyH);
     body.setOffset(fit.bodyX, fit.bodyY);
-    this.hpBarWidth = 78;
+    this.hpBarWidth = Math.round(78 * fit.scale);
     this.syncBar();
 
     this.gun = scene.add.image(x, y, HeavyTank.gunKey);
@@ -401,7 +402,7 @@ export class HeavyTank extends RangedEnemy {
     flash.setRotation(Phaser.Math.Angle.Wrap(angle - Math.PI));
     // Выше корпуса и выше летящего снаряда: глубина танка около 12, снаряд на 14.
     flash.setDepth(20);
-    const pop = HeavyTank.flashScale;
+    const pop = HeavyTank.flashScale * this.scaleX;
     flash.setScale(pop);
     // scale одним числом в твине обнуляет картинку. Гаснут оси по отдельности, как у пикапа.
     this.scene.tweens.add({
@@ -440,7 +441,8 @@ export class HeavyTank extends RangedEnemy {
     const body = this.body as Phaser.Physics.Arcade.Body | null;
     const rolling = !!body?.enable && body.velocity.x < -1 && !this.reachedWall;
     const haste = rolling ? enemyHasteOf(this.scene.registry) : 0;
-    const step = rolling ? (HeavyTank.trackRoll * delta * haste) / 1000 : 0;
+    // Лента и катки крутятся в пикселях кадра. Деление на масштаб оставляет ту же скорость на поле.
+    const step = rolling ? (HeavyTank.trackRoll * delta * haste) / 1000 / this.scaleX : 0;
     this.poseTrack(step);
     this.poseRollers(step);
     // Стоящий после загрузки тоже кладёт колею: он уже проехал путь от правого края.
@@ -523,9 +525,9 @@ export class HeavyTank extends RangedEnemy {
     if (!slain) {
       return;
     }
-    const nose = this.x - 50;
-    const rear = this.x + 36;
-    const chest = this.y - 36;
+    const nose = this.x - 50 * this.scaleX;
+    const rear = this.x + 36 * this.scaleX;
+    const chest = this.y - 36 * this.scaleY;
     vehicleDeathBlast(this.scene, { x: nose, y: chest }, { x: rear, y: chest - 8 });
     const at = this.wreckPoint();
     const smoke = wreckSmokeAt(this.scene, at.x, at.y, this.scaleX);
@@ -577,7 +579,7 @@ export class HeavyTank extends RangedEnemy {
       this.y + (port.y - fit.originY * HeavyTank.frame.h) * this.scaleY,
       angle,
       this.depth + 1,
-      brass.scale,
+      brass.scale * this.scaleX,
       brass.heft,
     );
   }
@@ -637,7 +639,8 @@ export class HeavyTank extends RangedEnemy {
     );
   }
 
-  // Ноги ниже среза ствола. Так пушка лежит на точке прицела, а гусеница — на той же земле, что у танка игрока.
+  // Гусеница на той же земле, что у танка игрока. Масштаб растит корпус вверх от этой земли,
+  // ствол оказывается выше точки прицела и доворачивается вниз в пределах aimLimit.
   private static laneY(aimY: number): number {
     const fit = HeavyTank.placed;
     return aimY - (HeavyTank.breech.y - fit.originY * HeavyTank.frame.h);
@@ -687,7 +690,7 @@ export class HeavyTank extends RangedEnemy {
     this.exhaustPoint.x = this.x + (port.x - fit.originX * HeavyTank.frame.w) * this.scaleX;
     this.exhaustPoint.y = this.y + (port.y - fit.originY * HeavyTank.frame.h) * this.scaleY;
     if (!this.engine) {
-      this.engine = exhaustAt(this.scene, this.exhaustPoint.x, this.exhaustPoint.y, 1.15, 'southeast', true);
+      this.engine = exhaustAt(this.scene, this.exhaustPoint.x, this.exhaustPoint.y, 1.15 * this.scaleX, 'southeast', true);
       return;
     }
     this.engine.setPosition(this.exhaustPoint.x, this.exhaustPoint.y);
@@ -827,6 +830,7 @@ export class HeavyTank extends RangedEnemy {
   private rutRibbonAt(x: number, y: number, width: number): Phaser.GameObjects.TileSprite {
     const ribbon = this.scene.add.tileSprite(x, y, width, HeavyTank.trackBand.h, HeavyTank.rutKey);
     ribbon.setOrigin(0, 0.5);
+    ribbon.setScale(1, this.scaleY);
     ribbon.setDepth(3);
     return ribbon;
   }
