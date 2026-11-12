@@ -1,4 +1,4 @@
-// Дебаг-счёт. Между шестерёнкой и обычной паузой — тихая пауза, пропуск волны и проигрыш.
+// Дебаг-счёт. Между шестерёнкой и обычной паузой — тихая пауза, перезапуск волны, пропуск и проигрыш.
 // Обычная партия этот класс не импортирует, и зазора под эти кнопки у неё нет.
 
 import Phaser from 'phaser';
@@ -7,7 +7,12 @@ import { GameHud } from './GameHud';
 import { HudFrame } from './GameHud.types';
 
 import { EnemyDamageDebugAbilityIcon, EnemyDamageDebugAbility } from '../../abilities';
-import { DEBUG_FORFEIT_EVENT, DEBUG_QUIET_PAUSE_EVENT, DEBUG_SKIP_WAVE_EVENT } from '../../gameConfig';
+import {
+  DEBUG_FORFEIT_EVENT,
+  DEBUG_QUIET_PAUSE_EVENT,
+  DEBUG_RESTART_WAVE_EVENT,
+  DEBUG_SKIP_WAVE_EVENT,
+} from '../../gameConfig';
 
 // Тот же красный, что у надписи DEBUG. Золотые знаки остаются у обычных кнопок.
 const debugMark = '#ff5a48';
@@ -28,6 +33,9 @@ export class DebugGameHud extends GameHud {
   private readonly quietFace: Phaser.GameObjects.Graphics;
   private readonly quietLeft: Phaser.GameObjects.Rectangle;
   private readonly quietRight: Phaser.GameObjects.Rectangle;
+  private readonly restartPlate: Phaser.GameObjects.Rectangle;
+  private readonly restartFace: Phaser.GameObjects.Graphics;
+  private readonly restartMark: Phaser.GameObjects.Text;
   private readonly skipPlate: Phaser.GameObjects.Rectangle;
   private readonly skipFace: Phaser.GameObjects.Graphics;
   private readonly skipMark: Phaser.GameObjects.Text;
@@ -42,15 +50,16 @@ export class DebugGameHud extends GameHud {
       'пробел — пауза без экрана',
       'двойное нажатие — сброс',
       'A — ещё юнит',
+      'R — перезапуск волны',
       'N — пропуск волны',
       'F — проигрыш',
       'иконка слева — урон врагов',
     ];
   }
 
-  // Три плашки. База сдвигает шестерёнку на это число и сама место не рисует.
+  // Четыре плашки. База сдвигает шестерёнку на это число и сама место не рисует.
   protected override platesBetweenSettingsAndPause(): number {
-    return 3;
+    return 4;
   }
 
   constructor(scene: Phaser.Scene, frame: HudFrame, maxHp: number) {
@@ -100,6 +109,11 @@ export class DebugGameHud extends GameHud {
     this.quietLeft = scene.add.rectangle(0, this.plateY, 4, 16, debugBar).setDepth(81);
     this.quietRight = scene.add.rectangle(0, this.plateY, 4, 16, debugBar).setDepth(81);
 
+    const restart = this.addPlate(scene, () => scene.events.emit(DEBUG_RESTART_WAVE_EVENT));
+    this.restartPlate = restart.plate;
+    this.restartFace = restart.face;
+    this.restartMark = this.addMark(scene, 'R');
+
     const skip = this.addPlate(scene, () => scene.events.emit(DEBUG_SKIP_WAVE_EVENT));
     this.skipPlate = skip.plate;
     this.skipFace = skip.face;
@@ -129,17 +143,19 @@ export class DebugGameHud extends GameHud {
   }
 
   override coversDebugPlates(pointer: Phaser.Input.Pointer): boolean {
-    return [this.quietPlate, this.skipPlate, this.losePlate].some((plate) =>
+    return [this.quietPlate, this.restartPlate, this.skipPlate, this.losePlate].some((plate) =>
       plate.getBounds().contains(pointer.worldX, pointer.worldY),
     );
   }
 
-  // Слева направо от шестерёнки: тихая пауза, пропуск, проигрыш, затем обычная пауза.
+  // Слева направо от шестерёнки: тихая пауза, перезапуск, пропуск, проигрыш, затем обычная пауза.
   private placeDebugRow(): void {
     const y = this.plateY;
-    this.placePlate(this.quietPlate, this.quietFace, this.plateXLeftOfPause(3), y);
+    this.placePlate(this.quietPlate, this.quietFace, this.plateXLeftOfPause(4), y);
     this.quietLeft.setPosition(this.quietPlate.x - 4, y);
     this.quietRight.setPosition(this.quietPlate.x + 4, y);
+    this.placePlate(this.restartPlate, this.restartFace, this.plateXLeftOfPause(3), y);
+    this.restartMark.setPosition(this.restartPlate.x, y);
     this.placePlate(this.skipPlate, this.skipFace, this.plateXLeftOfPause(2), y);
     this.skipMark.setPosition(this.skipPlate.x, y);
     this.placePlate(this.losePlate, this.loseFace, this.plateXLeftOfPause(1), y);

@@ -370,11 +370,27 @@ export class ShopController {
     if (!this.shopOpen || this.isPaused()) {
       return;
     }
+    this.revealField();
+    this.onContinue();
+  }
+
+  // Спрятать витрину и вернуть физику, не начиная следующую волну.
+  // Дебаг-перезапуск зовёт это: «дальше» само вызвало бы beginNextWave.
+  dismiss(): void {
+    if (!this.shopOpen) {
+      return;
+    }
+    this.revealField();
+  }
+
+  // Витрина уходит, ствол снова стреляет, солдаты больше не стоят на паузе физики.
+  private revealField(): void {
     this.panel.hide();
     this.shopOpen = false;
     this.scene.registry.set('combat', true);
-    this.scene.physics.world.resume();
-    this.onContinue();
+    if (this.scene.physics.world.isPaused) {
+      this.scene.physics.world.resume();
+    }
   }
 
   // +1 к радиусу взрыва. Вместе с прогрессом не выше Tank.maxBlastLevel.

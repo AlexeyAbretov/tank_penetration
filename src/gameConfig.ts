@@ -51,6 +51,10 @@ export const DEBUG_QUIET_PAUSE_EVENT = 'debug-quiet-pause';
 // Кнопка пропуска волны на дебаг-счёте. Слушает DebugWaveManager, как N.
 export const DEBUG_SKIP_WAVE_EVENT = 'debug-skip-wave';
 
+// Кнопка перезапуска волны на дебаг-счёте. Слушает DebugWaveManager, как R.
+// Сцена на том же событии закрывает магазин волны, не запуская следующую.
+export const DEBUG_RESTART_WAVE_EVENT = 'debug-restart-wave';
+
 // Кнопка проигрыша на дебаг-счёте. Слушает GameScene, как F.
 export const DEBUG_FORFEIT_EVENT = 'debug-forfeit';
 

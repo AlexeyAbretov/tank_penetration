@@ -1,4 +1,5 @@
 // Дебаг-волны. N и кнопка на счёте убивают живых и сразу открывают следующую, без магазина.
+// R и кнопка на счёте стирают поле и заново объявляют тот же номер, без монет и очков.
 // Очки и монеты приходят как за убийство: и тем, кто уже на поле, и тем, кто ещё не вышел.
 // A добавляет в текущую волну ещё одного юнита. У обычной волны это тот же вид.
 // У смешанной следующий по списку: штурмовик, стрелок, пикап, ракетчик, багги, вертолёт.
@@ -8,7 +9,7 @@
 // Другая клавиша или другой момент пропуска меняются здесь.
 
 import Phaser from 'phaser';
-import { DEBUG_SKIP_WAVE_EVENT } from '../gameConfig';
+import { DEBUG_RESTART_WAVE_EVENT, DEBUG_SKIP_WAVE_EVENT } from '../gameConfig';
 import { DebugEnemyFactory } from '../entities/DebugEnemyFactory';
 import type { EnemySave } from '../types/EnemySave';
 import type { EnemyWaves } from '../types/EnemyWaves';
@@ -17,8 +18,10 @@ import { WaveManager } from './WaveManager';
 
 export class DebugWaveManager extends WaveManager {
   private skipKey?: Phaser.Input.Keyboard.Key;
+  private restartKey?: Phaser.Input.Keyboard.Key;
   private addKey?: Phaser.Input.Keyboard.Key;
   private skipButtonArmed = false;
+  private restartArmed = false;
   // true от объявления волны до первого назначения выходов.
   // В этот промежуток поле настроек меняет фабрику, а счётчик выхода ещё помнит старое число.
   private announced = false;
@@ -38,8 +41,10 @@ export class DebugWaveManager extends WaveManager {
   protected override onBound(scene: Phaser.Scene): void {
     const keyboard = scene.input.keyboard;
     this.skipKey = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.N);
+    this.restartKey = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     this.addKey = keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.armSkipButton(scene);
+    this.armRestart(scene);
   }
 
   // Кнопка зовёт тот же пропуск, что N. На паузе и в настройках часы стоят, и клавиша тоже молчит.
@@ -58,6 +63,36 @@ export class DebugWaveManager extends WaveManager {
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.events.off(DEBUG_SKIP_WAVE_EVENT, onSkip);
       this.skipButtonArmed = false;
+    });
+  }
+
+  // R и кнопка зовут один перезапуск. На паузе и в настройках часы стоят, и оба молчат.
+  // Клавиша слушается здесь, а не в tick: магазин волны update обрывает раньше менеджера.
+  // emitOnRepeat у клавиши выключен, поэтому удержание R волну второй раз не начинает.
+  // Сцена на том же событии подписана раньше и успевает закрыть витрину.
+  private armRestart(scene: Phaser.Scene): void {
+    if (this.restartArmed) {
+      return;
+    }
+    this.restartArmed = true;
+    const onKey = (): void => {
+      if (scene.time.paused) {
+        return;
+      }
+      scene.events.emit(DEBUG_RESTART_WAVE_EVENT);
+    };
+    this.restartKey?.on('down', onKey);
+    const onRestart = (): void => {
+      if (scene.time.paused) {
+        return;
+      }
+      this.replayCurrent();
+    };
+    scene.events.on(DEBUG_RESTART_WAVE_EVENT, onRestart);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.restartKey?.off('down', onKey);
+      scene.events.off(DEBUG_RESTART_WAVE_EVENT, onRestart);
+      this.restartArmed = false;
     });
   }
 
@@ -92,6 +127,31 @@ export class DebugWaveManager extends WaveManager {
   private waveSize(): number {
     const queued = this.announced ? this.roster.count(this.wave) : this.locked;
     return queued + this.extra;
+  }
+
+  // Тот же номер с баннера. Уже убитые монеты не возвращаются, живые награды не дают.
+  // Волна 0 и поражение молчат. Магазин между волнами тоже перезапускает свой номер:
+  // сцена к этому моменту витрину уже закрыла.
+  private replayCurrent(): void {
+    if (this.isGameOver() || this.wave < 1) {
+      return;
+    }
+    // Старый таймер выхода молча сгорает: штамп волны уже другой.
+    this.spawnStamp += 1;
+    this.wipeField();
+    this.clearShots();
+    // beginNextWave сам прибавляет номер. Шаг назад оставляет ту же волну.
+    this.wave -= 1;
+    this.beginNextWave();
+  }
+
+  // Живые, трупы и ещё не доигравшие смерть. Награды нет: это не попадание.
+  // Твин смерти гасится до destroy, иначе он допишет координаты уже снятому спрайту.
+  private wipeField(): void {
+    for (const unit of [...this.infantry.getChildren()] as Phaser.GameObjects.GameObject[]) {
+      unit.scene?.tweens.killTweensOf(unit);
+      unit.destroy();
+    }
   }
 
   // Живые умирают, ещё не вышедшие не появляются. Магазин не открывается.

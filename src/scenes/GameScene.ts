@@ -15,7 +15,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
-import { DEBUG_FORFEIT_EVENT, ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
+import { DEBUG_FORFEIT_EVENT, DEBUG_RESTART_WAVE_EVENT, ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
 import { boom } from '../gfx/boom';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
@@ -88,6 +88,8 @@ export class GameScene extends Phaser.Scene {
   private autosaveMs = 0;
   // Секунда автопокупки после открытия магазина волны. Снятие выключателя её убирает.
   private shopAutoTimer?: Phaser.Time.TimerEvent;
+  // Ожидание, пока доиграет разрыв, и только потом витрина. Перезапуск волны его снимает.
+  private waveShopTimer?: Phaser.Time.TimerEvent;
   // Одна функция на pagehide и beforeunload, чтобы снять оба слушателя одним и тем же объектом.
   private readonly onPageHide = (): void => {
     this.writeSave();
@@ -358,6 +360,9 @@ export class GameScene extends Phaser.Scene {
     this.hud.onNewGame(() => this.restartRun());
     if (isDebugRun()) {
       this.events.on(DEBUG_FORFEIT_EVENT, this.onDebugForfeit, this);
+      // Раньше волн: на одном событии сцена закрывает витрину, и только потом менеджер
+      // заново объявляет номер. Иначе враги вышли бы под открытым магазином.
+      this.events.on(DEBUG_RESTART_WAVE_EVENT, this.onDebugRestartWave, this);
     }
     const keyboard = this.input.keyboard;
     if (keyboard) {
@@ -558,8 +563,10 @@ export class GameScene extends Phaser.Scene {
   // Конец волны. Панель выходит, когда последний разрыв доиграл.
   // Гриб и вспышка бомбы, если они ещё стоят дольше разрыва, держат её до своего конца.
   private openWaveShop(): void {
+    this.waveShopTimer?.remove(false);
     const wait = Math.max(boom.goneMs, this.combat.nuclearCloudLeft(), this.combat.bomberBlastLeft());
-    this.time.delayedCall(wait, () => {
+    this.waveShopTimer = this.time.delayedCall(wait, () => {
+      this.waveShopTimer = undefined;
       if (this.player.isGameOver || this.defeatShop || this.shop.shopOpen) {
         return;
       }
@@ -854,6 +861,7 @@ export class GameScene extends Phaser.Scene {
     this.music.destroy();
     this.fx?.destroy();
     this.events.off(DEBUG_FORFEIT_EVENT, this.onDebugForfeit, this);
+    this.events.off(DEBUG_RESTART_WAVE_EVENT, this.onDebugRestartWave, this);
   }
 
   private freezeEmitters(): void {
@@ -893,6 +901,18 @@ export class GameScene extends Phaser.Scene {
   // Кнопка на дебаг-счёте. Та же гибель, что у F, в том числе пока открыта витрина.
   private onDebugForfeit(): void {
     this.forfeitRun();
+  }
+
+  // R и кнопка на дебаг-счёте. Витрина и её отложенное открытие уходят, следующая волна не стартует.
+  // Номер заново объявляет DebugWaveManager на том же событии, сразу после этого метода.
+  private onDebugRestartWave(): void {
+    if (this.player.isGameOver || this.defeatShop || this.time.paused) {
+      return;
+    }
+    this.cancelShopAutoBuy();
+    this.waveShopTimer?.remove(false);
+    this.waveShopTimer = undefined;
+    this.shop.dismiss();
   }
 
   // Обычная гибель без паузы на взрыв: хп 0, очки в копилку, партия стёрта, магазин очков.
