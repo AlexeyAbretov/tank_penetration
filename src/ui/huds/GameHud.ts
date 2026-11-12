@@ -6,6 +6,7 @@ import { AbilityIcon, AutoApplyBadge, HudAbility, HudFrame } from './GameHud.typ
 
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
+import { coinMarkKey } from '../../gfx/coinMark';
 import { preloadTextures } from '../../gfx/textures';
 
 const AUTO_POWER_HIT = 16;
@@ -52,6 +53,8 @@ export class GameHud {
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly waveText: Phaser.GameObjects.Text;
   private readonly coinsText: Phaser.GameObjects.Text;
+  private readonly coinMark: Phaser.GameObjects.Image;
+  private readonly coinAspect: number;
   private readonly tankStatsText: Phaser.GameObjects.Text;
   // Числа строки над полем.
   private tankStats = {
@@ -162,8 +165,14 @@ export class GameHud {
       .text(0, this.statusY, 'WAVE  0', { ...this.statusStyle, color: '#e8c48a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
+    const coinFrame = scene.textures.get(coinMarkKey).get();
+    this.coinAspect = coinFrame.width / coinFrame.height;
+    this.coinMark = scene.add
+      .image(0, this.statusY, coinMarkKey)
+      .setOrigin(0, 0.5)
+      .setDepth(51);
     this.coinsText = scene.add
-      .text(0, this.statusY, 'COINS  0', { ...this.statusStyle, color: '#f3d56a' })
+      .text(0, this.statusY, '0', { ...this.statusStyle, color: '#f3d56a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
     this.layoutStatus();
@@ -412,16 +421,21 @@ export class GameHud {
   }
 
   setCoins(coins: number): void {
-    this.coinsText.setText(`COINS  ${coins}`);
+    this.coinsText.setText(String(coins));
 
     this.layoutStatus();
   }
 
+  // Белый знак вместо слова COINS. Высота как у числа, зазор как в магазине волны.
   private layoutStatus(): void {
     const gap = 32;
+    const coinGap = 6;
+    const height = this.coinsText.height;
 
     this.waveText.setX(this.scoreText.x + this.scoreText.width + gap);
-    this.coinsText.setX(this.waveText.x + this.waveText.width + gap);
+    this.coinMark.setDisplaySize(height * this.coinAspect, height);
+    this.coinMark.setPosition(this.waveText.x + this.waveText.width + gap, this.statusY);
+    this.coinsText.setPosition(this.coinMark.x + this.coinMark.displayWidth + coinGap, this.statusY);
   }
 
   setTankStats(

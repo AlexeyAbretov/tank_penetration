@@ -12,6 +12,7 @@ import {
   paintFieldRule,
   paintOrderBar,
 } from '../militaryDialog';
+import { coinMarkKey } from '../../gfx/coinMark';
 
 export type ShopCardView = {
   title: string;
@@ -92,13 +93,6 @@ type Tab = {
 export class ShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
-  static readonly coinKey = 'coin-mark';
-
-  // Белый знак с рисунка. Чёрное там пустое: в файле на его месте прозрачность.
-  static preload(scene: Phaser.Scene): void {
-    scene.load.image(ShopPanel.coinKey, 'assets/coin-mark.png');
-  }
-
   private readonly coinsText: Phaser.GameObjects.Text;
   private readonly coinMark: Phaser.GameObjects.Image;
   private readonly coinAspect: number;
@@ -143,9 +137,9 @@ export class ShopPanel {
       })
       .setOrigin(0.5);
 
-    const frame = scene.textures.get(ShopPanel.coinKey).get();
+    const frame = scene.textures.get(coinMarkKey).get();
     this.coinAspect = frame.width / frame.height;
-    this.coinMark = scene.add.image(COINS_X, TITLE_Y, ShopPanel.coinKey).setOrigin(1, 0.5);
+    this.coinMark = scene.add.image(COINS_X, TITLE_Y, coinMarkKey).setOrigin(1, 0.5);
     this.coinsText = scene.add
       .text(COINS_X, TITLE_Y, '0', {
         fontSize: '22px',
@@ -379,7 +373,7 @@ export class ShopPanel {
         align: 'center',
       })
       .setOrigin(0.5, 1);
-    const coin = scene.add.image(CARD_X, y, ShopPanel.coinKey).setVisible(false);
+    const coin = scene.add.image(CARD_X, y, coinMarkKey).setVisible(false);
     const mark = scene.add.graphics().setPosition(CARD_X - CARD_W / 2 + 28, y + CARD_H / 2 - 26);
     paintOwnedMark(mark);
     const offer: Offer = { card, title, info, cost, coin, mark, buy: () => undefined, open: false };

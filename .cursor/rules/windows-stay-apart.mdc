@@ -1,0 +1,24 @@
+---
+description: Окна не импортируют другие окна
+alwaysApply: true
+---
+
+# Окна не знают друг о друге
+
+Файл окна не импортирует другой файл окна.
+
+Окна — это `GameHud`, `ShopPanel`, `ProgressShopPanel`, `SettingsPanel` и их дебаг-наследники.
+
+Исключение одно: наследник импортирует свою базу (`DebugGameHud` — `GameHud`, `DebugSettingsPanel` — `SettingsPanel`).
+
+Чужой ключ текстуры, цену и вёрстку из чужого окна не берут. Общая картинка живёт в `src/gfx`. Общий рисунок рамки — `militaryDialog`. Окно его только вызывает.
+
+```ts
+// Плохо: счёт знает магазин, чтобы взять его знак
+import { ShopPanel } from '../shops/ShopPanel';
+scene.add.image(x, y, ShopPanel.coinKey);
+
+// Хорошо: знак общий
+import { coinMarkKey } from '../../gfx/coinMark';
+scene.add.image(x, y, coinMarkKey);
+```
