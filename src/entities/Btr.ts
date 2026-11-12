@@ -57,12 +57,12 @@ export class Btr extends RangedEnemy {
   static readonly wreckFit = { originX: 140 / 256, originY: 64 / 128 };
   // Пролом башни на остове. Дым стоит здесь, пока корпус лежит.
   static readonly wreckFlame = { x: 118, y: 38 };
-  // Левая грань башни. Плита ствола садится сюда, ствол торчит влево.
-  static readonly breech = { x: 100, y: 40 };
-  // Правый срез плиты на кадре пушки. Вокруг него крутится ствол.
-  static readonly gunPivot = { x: 102, y: 23 };
+  // Щека башни. Корень на три пикселя внутрь грани: отдача его не выдёргивает.
+  static readonly breech = { x: 103, y: 40 };
+  // Правый срез ствола. Вокруг него крутится пушка.
+  static readonly gunPivot = { x: 90, y: 23 };
   static readonly muzzleTip = { x: 9, y: 23 };
-  // Плита 25 px высотой садится в грань башни около 12 px.
+  // Корень на кадре 12 px. Половина сажает его в щеку и не поднимает выше крыши.
   static readonly gunScale = 0.5;
   // Солдат на поле около 93 px ростом. Корпус 65 px при масштабе 1 ниже его. 1.7 поднимает крышу над каской.
   static readonly scale = 1.7;
@@ -452,7 +452,9 @@ export class Btr extends RangedEnemy {
       }
     }
     if (this.gun?.active) {
-      this.gun.setDepth(layer);
+      // Та же глубина отдаёт корпус поверх ствола, когда список сцены ставит его позже.
+      // Шаг меньше полоски и дисков: солдат на нижней линии всё равно поверх.
+      this.gun.setDepth(layer + 0.01);
     }
   }
 
