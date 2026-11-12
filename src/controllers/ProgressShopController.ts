@@ -21,6 +21,7 @@ import {
   ProgressShopPanel,
   scoreCostPrefix,
   type ProgressCardView,
+  type ProgressShopDelegate,
   type ProgressShopView,
   type ProgressTabView,
 } from '../ui/shops/ProgressShopPanel';
@@ -77,7 +78,15 @@ export class ProgressShopController {
   private onNewGame: () => void = () => {};
 
   // Сохранение приходит из фабрики: у дебага свой ключ, и restart() его не подменяет.
-  constructor(private readonly progressSave: ProgressSave) {
+  // Витрина тоже: дебаг передаёт наследника с кнопкой «+».
+  constructor(
+    private readonly progressSave: ProgressSave,
+    private readonly Panel: new (
+      scene: Phaser.Scene,
+      shop: ProgressShopDelegate,
+      screen: { width: number; height: number },
+    ) => ProgressShopPanel = ProgressShopPanel,
+  ) {
     this.progress = this.progressSave.load();
   }
 
@@ -86,7 +95,7 @@ export class ProgressShopController {
     this.onNewGame = onNewGame;
     this.paused = false;
     this.scene = scene;
-    this.panel = new ProgressShopPanel(scene, this, GAME);
+    this.panel = new this.Panel(scene, this, GAME);
   }
 
   layout(): void {

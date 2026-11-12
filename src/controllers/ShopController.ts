@@ -22,6 +22,7 @@ import {
   coinCostPrefix,
   ShopPanel,
   type ShopCardView,
+  type ShopDelegate,
   type ShopTabView,
   type ShopView,
 } from '../ui/shops/ShopPanel';
@@ -123,8 +124,14 @@ export class ShopController {
     private readonly bonuses: PermanentBonuses,
     private readonly onContinue: () => void,
     private readonly onChanged: () => void,
+    // Витрина. Дебаг передаёт наследника с кнопкой «+». Обычная партия — само окно.
+    Panel: new (
+      scene: Phaser.Scene,
+      shop: ShopDelegate,
+      screen: { width: number; height: number },
+    ) => ShopPanel = ShopPanel,
   ) {
-    this.panel = new ShopPanel(scene, this, GAME);
+    this.panel = new Panel(scene, this, GAME);
     IonCannon.setShopCooldownLevel(0);
     IonCannon.setShopSweepLevel(0);
     Mines.setShopCooldownLevel(0);

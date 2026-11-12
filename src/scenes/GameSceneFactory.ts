@@ -24,6 +24,8 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { DebugGameHud } from '../ui/huds/DebugGameHud';
 import { GameHud } from '../ui/huds/GameHud';
 import { DebugSettingsPanel } from '../ui/settings/DebugSettingsPanel';
+import { DebugProgressShopPanel } from '../ui/shops/DebugProgressShopPanel';
+import { DebugShopPanel } from '../ui/shops/DebugShopPanel';
 
 export class GameSceneFactory {
   static create(): GameScene {
@@ -32,7 +34,7 @@ export class GameSceneFactory {
       
       return new GameScene(
         new DebugCombatSave(),
-        new ProgressShopController(new DebugProgressSave()),
+        new ProgressShopController(new DebugProgressSave(), DebugProgressShopPanel),
         new DebugWaveManager(enemies, GAME),
         new BattleMusic(enemies),
         DebugGameHud,
@@ -40,6 +42,7 @@ export class GameSceneFactory {
         new PauseStack([new ScreenPause(), new DebugQuietPause()]),
         DebugSettingsPanel,
         DebugPlayerController,
+        DebugShopPanel,
       );
     }
 

@@ -94,7 +94,8 @@ export class ShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly coinsText: Phaser.GameObjects.Text;
-  private readonly coinMark: Phaser.GameObjects.Image;
+  // Правый край знака прижат к числу. Дебаг-наследник ставит «+» слева от него.
+  protected readonly coinMark: Phaser.GameObjects.Image;
   private readonly coinAspect: number;
   private readonly dim: Phaser.GameObjects.Rectangle;
   private readonly offers: Offer[] = [];

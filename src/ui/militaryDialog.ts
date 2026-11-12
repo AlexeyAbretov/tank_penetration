@@ -55,6 +55,35 @@ export function paintOrderBar(g: Phaser.GameObjects.Graphics, w: number, h: numb
   g.fillRect(left + 3, top + 3, 5, h - 6);
 }
 
+export const plusChipSize = 32;
+
+// Квадрат «+» в заголовке дебаг-витрины. Латунной полосы нет: плюс остаётся в центре.
+export function mountPlusChip(scene: Phaser.Scene, fire: () => void): Phaser.GameObjects.Container {
+  const size = plusChipSize;
+  const chip = scene.add.container(0, 0);
+  const face = scene.add.graphics();
+  const left = -size / 2;
+  const top = -size / 2;
+  face.fillStyle(ORDER_EDGE, 1);
+  face.fillRect(left, top, size, size);
+  face.fillStyle(ORDER_WELL, 1);
+  face.fillRect(left + 3, top + 3, size - 6, size - 6);
+  const label = scene.add
+    .text(0, 0, '+', {
+      fontSize: '22px',
+      color: fieldInk,
+    })
+    .setOrigin(0.5);
+  chip.add([face, label]);
+  chip.setInteractive({
+    hitArea: new Phaser.Geom.Rectangle(left, top, size, size),
+    hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+    useHandCursor: true,
+  });
+  chip.on('pointerup', fire);
+  return chip;
+}
+
 export function paintFieldRule(g: Phaser.GameObjects.Graphics, y: number, half: number): void {
   g.lineStyle(2, 0x8a7848, 0.9);
   g.beginPath();

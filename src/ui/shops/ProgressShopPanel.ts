@@ -106,7 +106,8 @@ export class ProgressShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly scoreText: Phaser.GameObjects.Text;
-  private readonly scoreMark: Phaser.GameObjects.Image;
+  // Правый край знака прижат к числу. Дебаг-наследник ставит «+» слева от него.
+  protected readonly scoreMark: Phaser.GameObjects.Image;
   private readonly scoreAspect: number;
   private readonly dim: Phaser.GameObjects.Rectangle;
   private readonly offers: Offer[] = [];
