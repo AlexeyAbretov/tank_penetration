@@ -707,6 +707,7 @@ export class Helicopter extends Infantry {
     if (!body?.enable) {
       return;
     }
+    this.seatDest();
     const haste = enemyHasteOf(this.scene.registry);
     const angle = Phaser.Math.Angle.Between(this.x, this.y, this.destX, this.destY);
     const speed = this.cruise() * haste;
@@ -721,6 +722,22 @@ export class Helicopter extends Infantry {
 
   private cruise(): number {
     return Helicopter.moveSpeed + this.paceRank * 2;
+  }
+
+  // Точка перелёта за новым краем остаётся на той же доле ширины, что и корпус.
+  override followWidth(previous: number): void {
+    if (this.active && previous > GAME.width && this.destX > GAME.width) {
+      this.destX *= GAME.width / previous;
+    }
+    super.followWidth(previous);
+  }
+
+  // Старая точка дальней четверти после сужения окна остаётся за краем. Сажаем её в текущий прямоугольник.
+  private seatDest(): void {
+    const box = this.roam();
+    if (this.destX > box.right || this.destX < box.left) {
+      this.destX = Phaser.Math.Clamp(this.destX, box.left, box.right);
+    }
   }
 
   // Левее трёх четвертей ширины не садится: это его максимальная дальность.

@@ -99,6 +99,8 @@ export class GameScene extends Phaser.Scene {
   // restart() конструктор сцены не вызывает, а до create() нет scene.add и текстуры баннера.
   private hud!: GameHud;
   private field!: Phaser.GameObjects.Image;
+  // Ширина, под которую уже стоят юниты. Сужение сравнивает новый холст с ней.
+  private fieldWidth = GAME.width;
 
   constructor(
     private readonly combatSave: CombatSave,
@@ -550,7 +552,10 @@ export class GameScene extends Phaser.Scene {
 
   // Ширина поля изменилась вместе с окном. Фон и окна, которые стоят по центру, едут за ней.
   // Лежащие мины правее нового края бой подтягивает на поле.
+  // Юнит и снаряд правее нового края остаются на той же доле ширины.
   private layoutFrame(): void {
+    const previous = this.fieldWidth;
+    this.fieldWidth = GAME.width;
     this.field.setPosition(GAME.width / 2, GAME.height / 2);
     this.field.setDisplaySize(GAME.width, GAME.height);
     this.hud.layout();
@@ -558,6 +563,7 @@ export class GameScene extends Phaser.Scene {
     this.shop.panel.place();
     this.progressShop.layout();
     this.combat.pullMines();
+    this.combat.pullField(previous);
   }
 
   // Конец волны. Панель выходит, когда последний разрыв доиграл.

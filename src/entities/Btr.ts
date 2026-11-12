@@ -497,6 +497,14 @@ export class Btr extends RangedEnemy {
     });
   }
 
+  // Дверь не считает скачок сужения за проезд мимо точек высадки.
+  override followWidth(previous: number): void {
+    if (this.active && previous > GAME.width && this.x > GAME.width) {
+      this.prevX *= GAME.width / previous;
+    }
+    super.followWidth(previous);
+  }
+
   // Хлопок у среза. Левый край — дуло.
   private static renderFlash(g: Phaser.GameObjects.Graphics): void {
     const y = 14;

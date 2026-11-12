@@ -835,6 +835,14 @@ export class HeavyTank extends RangedEnemy {
     return ribbon;
   }
 
+  // Колея, ушедшая за новый край, сжимается вместе с полем. Иначе лента остаётся на старой ширине.
+  override followWidth(previous: number): void {
+    if (previous > GAME.width && Number.isFinite(this.rutRear) && this.rutRear > GAME.width) {
+      this.rutRear *= GAME.width / previous;
+    }
+    super.followWidth(previous);
+  }
+
   // Танк въезжает с правого края и едет только влево. После загрузки этот край — корма уже проеханного следа.
   private pathRear(): number {
     return GAME.width;

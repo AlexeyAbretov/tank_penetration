@@ -368,6 +368,28 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.syncPace();
   }
 
+  // Холст стал уже. Доля ширины та же: юнит, который шёл по правой части широкого поля,
+  // остаётся на экране, а не за новым краем. Высота и шаг не меняются.
+  followWidth(previous: number): void {
+    if (!this.active || previous <= GAME.width || this.x <= GAME.width) {
+      return;
+    }
+    this.placeX((this.x * GAME.width) / previous);
+  }
+
+  // Спрайт и тело на одну и ту же точку. Только тело следующий кадр затрёт картинку,
+  // только картинку — тело вернёт её назад в preUpdate.
+  private placeX(x: number): void {
+    const dx = this.x - x;
+    this.x = x;
+    const body = this.body as Phaser.Physics.Arcade.Body | null;
+    if (body) {
+      body.x -= dx;
+      body.updateCenter();
+    }
+    this.syncBar();
+  }
+
   // Сдвиг вправо от разрыва снаряда танка. Тело двигаем сами: postUpdate перенесёт спрайт.
   // Дошедшего до базы не трогаем — он уже выбыл.
   // Проволока гасит шаг, и syncPace стоящего не отпускает. Если сдвиг унёс штурмовика

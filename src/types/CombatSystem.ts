@@ -36,6 +36,8 @@ export type CombatSystem = {
   captureMines(): { x: number; y: number }[];
   // Лежащая мина правее нового края сдвигается влево и не ложится на соседнюю.
   pullMines(): void;
+  // Юнит и летящий снаряд правее нового края остаются на той же доле ширины.
+  pullField(previousWidth: number): void;
   restoreMines(spots: { x: number; y: number }[]): void;
   captureFlameWall(): { points: { x: number; y: number }[]; left: number } | null;
   restoreFlameWall(saved: { points: { x: number; y: number }[]; left: number } | null): void;

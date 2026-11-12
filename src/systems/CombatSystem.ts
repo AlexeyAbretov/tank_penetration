@@ -1396,6 +1396,40 @@ export class CombatSystem implements Combat {
     return this.mines.map((mine) => ({ x: Math.round(mine.x), y: Math.round(mine.y) }));
   }
 
+  // Холст стал уже. Кто шёл или летел правее нового края, остаётся на той же доле ширины.
+  // Иначе после закрытия широкого окна юнит продолжает шаг за экраном.
+  pullField(previousWidth: number): void {
+    if (previousWidth <= GAME.width) {
+      return;
+    }
+    const edge = GAME.width;
+    const scale = edge / previousWidth;
+    for (const unit of this.infantry.getChildren() as Infantry[]) {
+      unit.followWidth(previousWidth);
+    }
+    this.scalePastEdge(this.enemyShots, scale, edge);
+    this.scalePastEdge(this.shells, scale, edge);
+    this.scalePastEdge(this.mgShots, scale, edge);
+  }
+
+  // Снаряд за новым краем уборка стирает, хотя на широком поле он ещё был в кадре.
+  private scalePastEdge(group: Phaser.Physics.Arcade.Group, scale: number, edge: number): void {
+    for (const obj of group.getChildren()) {
+      const sprite = obj as Phaser.GameObjects.Sprite;
+      if (!sprite.active || sprite.x <= edge) {
+        continue;
+      }
+      const next = sprite.x * scale;
+      const dx = sprite.x - next;
+      sprite.x = next;
+      const body = sprite.body as Phaser.Physics.Arcade.Body | null;
+      if (body) {
+        body.x -= dx;
+        body.updateCenter();
+      }
+    }
+  }
+
   // Холст стал уже. Заряд правее нового края едет влево по своей высоте.
   // Правый из таких берёт место первым, следующий не садится на него и на тех, кто уже был в кадре.
   pullMines(): void {
