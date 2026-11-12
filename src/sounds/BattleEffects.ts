@@ -1,7 +1,7 @@
 // Звуки боя, кроме музыки. Пауза и рестарт сцены глушат их одним вызовом.
 // stop при гибели базы взрыв базы не трогает: он доигрывает.
 // Новый клип добавляется здесь: поле и строка в clips. Сцена список не знает.
-// gunnerShot, boomSounds, nuclearExplosion, голос тяжёлого танка, шум винтов дрономатки и пуск ракеты сами кладут себя в registry.
+// gunnerShot, boomSounds, nuclearExplosion, голос тяжёлого танка, шум винтов дрономатки, гул БТР и пуск ракеты сами кладут себя в registry.
 // Их всё равно создаём здесь, иначе пауза и destroy их не найдут.
 
 import Phaser from 'phaser';
@@ -10,6 +10,7 @@ import { AssaultExplosion } from './AssaultExplosion';
 import { BulletHitTank } from './BulletHitTank';
 import { EffectsVolume } from './EffectsVolume';
 import { Descent } from './Descent';
+import { BtrSounds } from './BtrSounds';
 import { DroneCarrierSounds } from './DroneCarrierSounds';
 import { EmpSpread } from './EmpSpread';
 import { GunnerShot } from './GunnerShot';
@@ -51,6 +52,7 @@ export class BattleEffects {
   readonly vehicleExplosion: VehicleExplosion;
   readonly heavyTank: HeavyTankSounds;
   readonly droneCarrier: DroneCarrierSounds;
+  readonly btr: BtrSounds;
   readonly infantryDeath: InfantryDeath;
   readonly tankDeath: TankDeath;
   private readonly gain: EffectsVolume;
@@ -75,6 +77,7 @@ export class BattleEffects {
     this.vehicleExplosion = new VehicleExplosion(scene, this.gain);
     this.heavyTank = new HeavyTankSounds(scene, this.gain);
     this.droneCarrier = new DroneCarrierSounds(scene, this.gain);
+    this.btr = new BtrSounds(scene, this.gain);
     this.infantryDeath = new InfantryDeath(scene, this.gain);
     this.tankDeath = new TankDeath(scene, this.gain);
     // Взрыв базы сюда не входит: пауза до него не доходит, stop при гибели его не обрывает.
@@ -96,6 +99,7 @@ export class BattleEffects {
       this.vehicleExplosion,
       this.heavyTank,
       this.droneCarrier,
+      this.btr,
       this.infantryDeath,
     ];
   }

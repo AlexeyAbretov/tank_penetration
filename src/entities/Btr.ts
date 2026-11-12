@@ -1,6 +1,7 @@
 // БТР: босс с 60-й волны. Две высадки по диагонали, нос влево, корпус к скорости не поворачивается.
 // Сначала высаживает ракетчиков и штурмовиков, потом стрелков, на рубеже пулемёта бьёт очередью как пикап.
 // Диски колёс крутятся на всём пути. На рубеже пулемёта крутится только ствол.
+// Пока корпус жив, мотор гудит. Рубеж пулемёта и ЭМИ колёса останавливают, гул оставляют.
 
 import Phaser from 'phaser';
 import { enemyHasteOf, GAME } from '../gameConfig';
@@ -8,6 +9,7 @@ import { ejectCasing } from '../gfx/casing';
 import { bake } from '../gfx/textures';
 import { vehicleDeathBlast } from '../gfx/vehicleBlast';
 import { wreckSmokeAt } from '../gfx/wreckSmoke';
+import { syncBtrEngine } from '../sounds/BtrSounds';
 import type { TroopKind } from '../types/SpawnContext';
 import type { WorldPoint } from '../types/WorldPoint';
 import { RangedEnemy } from './RangedEnemy';
@@ -332,6 +334,7 @@ export class Btr extends RangedEnemy {
     this.poseGun();
     this.poseWheels();
     this.once('destroy', () => {
+      syncBtrEngine(scene, false);
       this.scene.tweens.killTweensOf(this.recoil);
       if (this.gun.active) {
         this.gun.destroy();
@@ -356,6 +359,7 @@ export class Btr extends RangedEnemy {
   override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
     if (!this.active) {
+      this.voice();
       return;
     }
     if (!this.reachedWall) {
@@ -363,6 +367,7 @@ export class Btr extends RangedEnemy {
     }
     this.poseGun();
     this.poseWheels();
+    this.voice();
   }
 
   // Свой маршрут вместо шага влево до одного рубежа. Темп и возврат после сдвига идут сюда же.
@@ -594,6 +599,11 @@ export class Btr extends RangedEnemy {
       return;
     }
     body.setVelocity((dx / dist) * speed, (dy / dist) * speed);
+  }
+
+  // Мотор гудит, пока корпус жив. Остов молчит. Рубеж и ЭМИ гул не снимают.
+  private voice(): void {
+    syncBtrEngine(this.scene, this.active && !this.reachedWall);
   }
 
   // Путь этого кадра, включая диагональ высадки. Скорость уже выставлена шагом. Под ЭМИ тело стоит.

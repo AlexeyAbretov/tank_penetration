@@ -145,6 +145,7 @@ const packedFiles = [
   ['audio/heavy-tank-boss-engine.mp3', 'audio/mpeg'],
   ['audio/heavy-tank-boss-tracks.mp3', 'audio/mpeg'],
   ['audio/drone-carrier-boss.wav', 'audio/wav'],
+  ['audio/btr-engine.mp3', 'audio/mpeg'],
   ['fonts/russo-one-cyrillic.woff2', 'font/woff2'],
   ['fonts/russo-one-latin-ext.woff2', 'font/woff2'],
   ['fonts/russo-one-latin.woff2', 'font/woff2'],
