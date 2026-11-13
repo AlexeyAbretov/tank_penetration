@@ -1145,7 +1145,7 @@ export class CombatSystem implements Combat {
     if (!unit.hit(this.ionDamage())) {
       return;
     }
-    this.callbacks.onKill(unit.coinReward);
+    this.callbacks.onKill(unit.coinReward, unit.scoreReward);
     if (this.isVehicle(unit)) {
       this.effects.vehicleExplosion.play();
     } else {
@@ -1567,7 +1567,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (unit.hit(1_000_000)) {
-        this.callbacks.onKill(unit.coinReward);
+        this.callbacks.onKill(unit.coinReward, unit.scoreReward);
         unit.kill();
       }
     });
@@ -2427,7 +2427,7 @@ export class CombatSystem implements Combat {
       return;
     }
     if (unit.hit(damage, wire)) {
-      this.callbacks.onKill(unit.coinReward);
+      this.callbacks.onKill(unit.coinReward, unit.scoreReward);
       // Пикап — техника: свой взрыв, не крик пехоты.
       // Дошедший до базы сюда не попадает: его убивает hitBase.
       if (this.isVehicle(unit)) {

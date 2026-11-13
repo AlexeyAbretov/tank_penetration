@@ -178,13 +178,16 @@ export class DebugWaveManager extends WaveManager {
       if (!unit.active || unit.reachedWall) {
         continue;
       }
-      this.onKill(unit.coinReward);
+      this.onKill(unit.coinReward, unit.scoreReward);
     }
     // На баннере очередь ещё вся впереди и начинается с нуля.
     // После выхода платим хвост: первые места уже стоят на поле и получили монеты выше.
     const start = this.announced ? 0 : Math.max(0, this.locked - this.remainingToSpawn);
     for (let i = 0; i < this.remainingToSpawn; i += 1) {
-      this.onKill(DebugEnemyFactory.coinReward(this.wave, start + i));
+      this.onKill(
+        DebugEnemyFactory.coinReward(this.wave, start + i),
+        DebugEnemyFactory.scoreReward(this.wave, start + i),
+      );
     }
   }
 

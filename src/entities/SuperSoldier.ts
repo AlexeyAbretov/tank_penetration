@@ -24,7 +24,8 @@ export class SuperSoldier extends Infantry {
   // Прибавка за каждый выход после первого. 10-я волна — первое появление, 20-я — второе.
   static readonly hpPerAppearance = 500;
 
-  // 10-я волна даёт 1, 20-я — 2. На обычной волне босс не выходит, но номер всё равно не ниже 1.
+  // Номер босс-волны шкалы, которая начинается с 10. 10 даёт 1, 20 — 2.
+  // Партия с 50-й передаёт сюда номер на 40 меньше: 50-я считается как 10-я.
   static appearanceOn(wave: number): number {
     return Math.max(1, Math.floor(wave / 10));
   }
@@ -35,24 +36,10 @@ export class SuperSoldier extends Infantry {
     return this.baseHp + extra * this.hpPerAppearance;
   }
 
-  // Касса одного выхода: 25 монет за номер появления. 10-я волна — 25, 20-я — 50, 40-я — 100.
-  static readonly coinsPerAppearance = 25;
-
-  // Доля одного тела. Сумма по местам 0 .. count−1 равна кассе.
-  // Остаток от деления по одной монете забирают первые места очереди.
-  // Место за последним в составе берёт базовую долю без остатка.
-  static coinsForBody(appearance: number, index: number, count: number): number {
-    const n = Math.max(1, Math.floor(appearance));
-    const bodies = Math.max(1, Math.floor(count));
-    const purse = this.coinsPerAppearance * n;
-    const base = Math.floor(purse / bodies);
-    const extra = purse % bodies;
-    const slot = Math.max(0, Math.floor(index));
-    if (slot >= bodies) {
-      return base;
-    }
-    return base + (slot < extra ? 1 : 0);
-  }
+  // Свои монеты и очки. Тела одной волны это число не делят.
+  // Ознакомительная 10-я подставляет меньшую пару, её задаёт фабрика.
+  static readonly coinReward = 100;
+  static readonly scoreReward = 100;
 
   // Первая пуля снимает shotDamage. Каждый следующий выход прибавляет damagePerAppearance.
   // Второй босс бьёт на 2, третий — на 3.
@@ -142,7 +129,6 @@ export class SuperSoldier extends Infantry {
     return { x: point.x, y: point.y };
   }
 
-  // Доля кассы этого тела. Считается в конструкторе от номера выхода и места в очереди.
   readonly coinReward: number;
   // false: WaveManager и проволока не ждут, что он дойдёт до стены.
   readonly reachesBase = false;
@@ -247,12 +233,14 @@ export class SuperSoldier extends Infantry {
     fireTarget: WorldPoint,
     appearance = 1,
     slot = 0,
-    count = 1,
+    coins = SuperSoldier.coinReward,
+    score = SuperSoldier.scoreReward,
   ) {
     super(scene, x, y, hp, 'super-0', 'super-walk', 0xff3348);
-    // Место пишется в сохранение: после загрузки доля кассы остаётся у того же тела.
+    // Место пишется в сохранение: после загрузки босс остаётся на том же месте очереди.
     this.slot = Math.max(0, Math.floor(slot));
-    this.coinReward = SuperSoldier.coinsForBody(appearance, this.slot, count);
+    this.coinReward = coins;
+    this.scoreReward = score;
     this.bulletDamage = SuperSoldier.damageForAppearance(appearance);
     this.setScale(SuperSoldier.scale);
     // Полоска HP у предка узкая. После super её можно расширить и сразу перерисовать.

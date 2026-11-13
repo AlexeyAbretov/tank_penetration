@@ -451,7 +451,7 @@ export class GameScene extends Phaser.Scene {
       this.progressShop,
       this.enemyShots,
       {
-        onKill: (reward) => this.onEnemyKill(reward),
+        onKill: (coins, score) => this.onEnemyKill(coins, score),
         onBaseHit: (amount) => this.onBaseHit(amount),
       },
       this.progressShop.damageBonus(),
@@ -505,7 +505,7 @@ export class GameScene extends Phaser.Scene {
         }
         this.music.playForWave(wave);
       },
-      (reward) => this.onEnemyKill(reward),
+      (coins, score) => this.onEnemyKill(coins, score),
     );
 
     this.projectiles = new ProjectileSystem(
@@ -955,8 +955,9 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private onEnemyKill(coinReward: number): void {
-    this.score += 10 + this.progressShop.pointBonus();
+  private onEnemyKill(coinReward: number, scoreReward: number): void {
+    // scoreReward — очки вида: 10 у обычного врага, своё число у босса.
+    this.score += scoreReward + this.progressShop.pointBonus();
     // coinReward — монеты вида врага. coinBonus() — постоянная прибавка за каждое убийство.
     this.coins += coinReward + this.progressShop.coinBonus();
     this.hud.setScore(this.score);

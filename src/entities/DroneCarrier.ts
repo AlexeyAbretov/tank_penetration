@@ -18,8 +18,9 @@ export class DroneCarrier extends Infantry {
   static readonly maxOnField = 2;
   static readonly baseHp = 800;
   static readonly hpPerAppearance = 400;
-  // Та же касса, что у суперсолдата: 25 монет за номер босс-волны.
-  static readonly coinsPerAppearance = 25;
+  // Свои монеты и очки. Ознакомительная 30-я подставляет меньшую пару, её задаёт фабрика.
+  static readonly coinReward = 250;
+  static readonly scoreReward = 250;
 
   static readonly droneMin = 8;
   static readonly droneMax = 16;
@@ -79,7 +80,8 @@ export class DroneCarrier extends Infantry {
   private readonly shots: Phaser.Physics.Arcade.Group;
   private readonly fireTarget: WorldPoint;
 
-  // Волна 50 — первое появление. Дальше каждый свой выход на босс-волне.
+  // Волна шкалы. 50 — первое появление на ней, дальше каждый свой выход.
+  // Партия передаёт номер на 40 меньше: 90-я считается как 50-я.
   static appearanceOn(wave: number): number {
     const boss = Math.floor(wave / 10);
     const first = Math.floor(DroneCarrier.debutWave / 10);
@@ -89,20 +91,6 @@ export class DroneCarrier extends Infantry {
   static hpForAppearance(appearance: number): number {
     const extra = Math.max(0, Math.floor(appearance) - 1);
     return this.baseHp + extra * this.hpPerAppearance;
-  }
-
-  // Доля одного тела. Сумма по местам 0 .. count−1 равна кассе волны.
-  static coinsForBody(appearance: number, index: number, count: number): number {
-    const n = Math.max(1, Math.floor(appearance));
-    const bodies = Math.max(1, Math.floor(count));
-    const purse = this.coinsPerAppearance * n;
-    const base = Math.floor(purse / bodies);
-    const extra = purse % bodies;
-    const slot = Math.max(0, Math.floor(index));
-    if (slot >= bodies) {
-      return base;
-    }
-    return base + (slot < extra ? 1 : 0);
   }
 
   // На волне дебюта восемь. Дальше +1 каждые 10 волн, не больше шестнадцати.
@@ -175,15 +163,16 @@ export class DroneCarrier extends Infantry {
     hp: number,
     shots: Phaser.Physics.Arcade.Group,
     fireTarget: WorldPoint,
-    purse: number,
-    slot: number,
-    count: number,
+    slot = 0,
+    coins = DroneCarrier.coinReward,
+    score = DroneCarrier.scoreReward,
   ) {
     super(scene, x, y, hp, DroneCarrier.bodyKey, DroneCarrier.animKey, 0x6a8f3a);
     this.shots = shots;
     this.fireTarget = fireTarget;
     this.slot = slot;
-    this.coinReward = DroneCarrier.coinsForBody(purse, slot, count);
+    this.coinReward = coins;
+    this.scoreReward = score;
     const placed = DroneCarrier.placed;
     this.setScale(placed.scale);
     this.setOrigin(placed.originX, placed.originY);

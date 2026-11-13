@@ -33,7 +33,9 @@ export class Btr extends RangedEnemy {
   static readonly debutWave = 60;
   static readonly baseHp = 1000;
   static readonly hpPerAppearance = 500;
-  static readonly coinsPerAppearance = 25;
+  // Свои монеты и очки. Ознакомительная 40-я подставляет меньшую пару, её задаёт фабрика.
+  static readonly coinReward = 250;
+  static readonly scoreReward = 250;
 
   static readonly bodyKey = 'btr';
   static readonly gunKey = 'btr-gun';
@@ -134,7 +136,8 @@ export class Btr extends RangedEnemy {
   private gunArmed = false;
   private smoke?: Phaser.GameObjects.Particles.ParticleEmitter;
 
-  // Волна 60 — первый выход. Дальше каждый десяток.
+  // Волна шкалы. 60 — первый выход на ней, дальше каждый десяток.
+  // Партия передаёт номер на 40 меньше: 100-я считается как 60-я.
   static appearanceOn(wave: number): number {
     const boss = Math.floor(wave / 10);
     const first = Math.floor(Btr.debutWave / 10);
@@ -144,20 +147,6 @@ export class Btr extends RangedEnemy {
   static hpForAppearance(appearance: number): number {
     const extra = Math.max(0, Math.floor(appearance) - 1);
     return this.baseHp + extra * this.hpPerAppearance;
-  }
-
-  // Доля одного тела. Сумма по местам 0 .. count−1 равна кассе волны.
-  static coinsForBody(appearance: number, index: number, count: number): number {
-    const n = Math.max(1, Math.floor(appearance));
-    const bodies = Math.max(1, Math.floor(count));
-    const purse = this.coinsPerAppearance * n;
-    const base = Math.floor(purse / bodies);
-    const extra = purse % bodies;
-    const slot = Math.max(0, Math.floor(index));
-    if (slot >= bodies) {
-      return base;
-    }
-    return base + (slot < extra ? 1 : 0);
   }
 
   static preload(scene: Phaser.Scene): void {
@@ -295,16 +284,17 @@ export class Btr extends RangedEnemy {
     fireTarget: WorldPoint,
     deploy: TroopDrop | undefined,
     released = 0,
-    purse = 1,
     slot = 0,
-    count = 1,
+    coins = Btr.coinReward,
+    score = Btr.scoreReward,
   ) {
     super(scene, x, y, hp, Btr.bodyKey, 'btr-hold', 0xc4a15a, shots, fireTarget);
     this.deploy = deploy;
     this.released = Math.max(0, Math.floor(released));
     this.routeMark = this.released;
     this.slot = Math.max(0, Math.floor(slot));
-    this.coinReward = Btr.coinsForBody(purse, this.slot, count);
+    this.coinReward = coins;
+    this.scoreReward = score;
     const fit = Btr.hullFit;
     this.setScale(Btr.scale);
     this.setOrigin(fit.originX, fit.originY);

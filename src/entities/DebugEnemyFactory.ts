@@ -14,7 +14,7 @@
 // Дрономатка на своей волне: три первых круга одна, с четвёртого две, больше двух не бывает.
 // На общей волне она тоже одна. БТР на своей волне и на общей всегда один.
 // Появление здесь — волна / длину круга.
-// Монеты считает та же касса, что в партии: номер выхода умножается на 25, тела делят сумму.
+// Монеты и очки босса — его собственные, как в партии с 50-й волны. Касса не делится.
 
 import { AssaultInfantry } from './AssaultInfantry';
 import { Btr } from './Btr';
@@ -53,7 +53,7 @@ const REGULAR: EnemyKind[] = [
   Helicopter,
 ];
 
-// Общая босс-волна, по одному и в этом порядке. Касса делится на длину списка.
+// Общая босс-волна, по одному и в этом порядке.
 const PARADE: EnemyKind[] = [SuperSoldier, HeavyTank, DroneCarrier, Btr];
 
 // Свой ключ, не ключ партии: «новая игра» стирает бой, а размер волны остаётся.
@@ -84,6 +84,16 @@ export class DebugEnemyFactory extends EnemyFactory {
   // Пауза между выходами не сжимается: следующий круг такой же, как первый.
   static spawnGap(_wave: number): number {
     return this.timing.spawnGap;
+  }
+
+  // Ознакомительные 10, 20, 30 и 40 — это волны партии. В круге те же номера уже заняты.
+  protected static override isIntroWave(_wave: number): boolean {
+    return false;
+  }
+
+  // Урон дрономатки и БТР считает сам номер волны круга, без сдвига партии на 40.
+  protected static override statWave(wave: number): number {
+    return wave;
   }
 
   // Свои волны боссов не смешиваются. Общая после БТР берёт список PARADE:
@@ -194,43 +204,52 @@ export class DebugEnemyFactory extends EnemyFactory {
   }
 
   // Монеты юнита на этом месте очереди. У обычной волны вид один, номер не важен.
-  // У босса доля зависит от места: касса делится на все тела волны, остаток — первым.
-  // На общей волне это четверо, поэтому пропуск платит ту же долю, что и убийство.
+  // У босса награда своя и от места не зависит.
   // В смешанной у каждого места свой вид. Пропуск платит сумму и спрайт для них не создаёт.
   static coinReward(wave: number, index = 0): number {
     if (wave < 1) {
       return 0;
     }
+    return this.purseOf(wave, index).coins;
+  }
+
+  static scoreReward(wave: number, index = 0): number {
+    if (wave < 1) {
+      return 0;
+    }
+    return this.purseOf(wave, index).score;
+  }
+
+  private static purseOf(wave: number, index: number): { coins: number; score: number } {
     const kind = this.kindAt(wave, index);
-    const bodies = this.bossCount(wave) + this.carrierCount(wave) + this.btrCount(wave);
     if (kind === SuperSoldier) {
-      return SuperSoldier.coinsForBody(this.bossAppearance(wave), index, bodies);
+      return { coins: SuperSoldier.coinReward, score: SuperSoldier.scoreReward };
     }
     if (kind === HeavyTank) {
-      return HeavyTank.coinsForBody(this.bossAppearance(wave), index, bodies);
-    }
-    if (kind === GunnerInfantry) {
-      return GunnerInfantry.coinReward;
-    }
-    if (kind === PickupTruck) {
-      return PickupTruck.coinReward;
-    }
-    if (kind === RocketInfantry) {
-      return RocketInfantry.coinReward;
-    }
-    if (kind === RocketBuggy) {
-      return RocketBuggy.coinReward;
-    }
-    if (kind === Helicopter) {
-      return Helicopter.coinReward;
+      return { coins: HeavyTank.coinReward, score: HeavyTank.scoreReward };
     }
     if (kind === DroneCarrier) {
-      return DroneCarrier.coinsForBody(this.bossAppearance(wave), index, bodies);
+      return { coins: DroneCarrier.coinReward, score: DroneCarrier.scoreReward };
     }
     if (kind === Btr) {
-      return Btr.coinsForBody(this.bossAppearance(wave), index, bodies);
+      return { coins: Btr.coinReward, score: Btr.scoreReward };
     }
-    return AssaultInfantry.coinReward;
+    if (kind === GunnerInfantry) {
+      return { coins: GunnerInfantry.coinReward, score: Infantry.killScore };
+    }
+    if (kind === PickupTruck) {
+      return { coins: PickupTruck.coinReward, score: Infantry.killScore };
+    }
+    if (kind === RocketInfantry) {
+      return { coins: RocketInfantry.coinReward, score: Infantry.killScore };
+    }
+    if (kind === RocketBuggy) {
+      return { coins: RocketBuggy.coinReward, score: Infantry.killScore };
+    }
+    if (kind === Helicopter) {
+      return { coins: Helicopter.coinReward, score: Infantry.killScore };
+    }
+    return { coins: AssaultInfantry.coinReward, score: Infantry.killScore };
   }
 
   static create(index: number, ctx: SpawnContext): Infantry {
@@ -239,7 +258,7 @@ export class DebugEnemyFactory extends EnemyFactory {
 
   // pace из сохранения не нужен: ранг уже посчитан по номеру волны.
   // Текущее hp ставим поверх этого запаса, чтобы полоска помнила урон.
-  // slot — место в очереди. У босса от него доля кассы. Старое сохранение без места даёт 0.
+  // slot — место в очереди. Награда босса от места не зависит. Старое сохранение без места даёт 0.
   static restore(
     kind: EnemySaveKind,
     ctx: SpawnContext,
