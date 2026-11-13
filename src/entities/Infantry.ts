@@ -311,8 +311,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.paceWave = wave;
   }
 
-  // Тот же ранг, с которым юнит вышел на поле. Сохранение читает его, чтобы после
-  // перезагрузки собрать того же врага с тем же запасом здоровья.
+  // Ранг скорости. У пехоты он же равен запасу. Пикап, багги и вертолёт запас считают сами.
   get paceRank(): number {
     return this.paceWave;
   }
