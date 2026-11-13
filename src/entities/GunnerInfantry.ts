@@ -99,7 +99,7 @@ export class GunnerInfantry extends RangedEnemy {
   protected override readonly burstGap = GunnerInfantry.burstGap;
   protected readonly bulletSpeed = GunnerInfantry.shotSpeed;
   // База выстрела. Прибавку волны добавляет предок.
-  protected readonly shotDamage = 8;
+  protected readonly shotDamage = 4;
   // Стойка стрельбы: тело без винтовки. Пока идёт, в кадрах шага ствол уже нарисован.
   protected readonly idleTexture = GunnerInfantry.aimKey;
   protected readonly muzzle = GunnerInfantry.muzzleOffset;

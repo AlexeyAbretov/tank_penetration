@@ -96,7 +96,7 @@ export class SuperSoldier extends Infantry {
   // Пауза между патронами очереди. Пять выстрелов укладываются в полсекунды.
   static readonly burstGap = 100;
   // Урон одной пули на первом выходе. Дальше damageForAppearance прибавляет шаг за появление.
-  static readonly shotDamage = 1;
+  static readonly shotDamage = 2;
   static readonly damagePerAppearance = 1;
   static readonly shotSpeed = 640;
   static readonly moveSpeed = 220;

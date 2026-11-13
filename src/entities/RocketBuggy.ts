@@ -128,7 +128,7 @@ export class RocketBuggy extends RangedEnemy {
   protected readonly fireDelay = RocketBuggy.shotInterval;
   protected override readonly burstGap = RocketBuggy.burstGap;
   protected readonly bulletSpeed = RocketBuggy.shotSpeed;
-  protected readonly shotDamage = 3;
+  protected readonly shotDamage = 2;
   protected readonly idleTexture = RocketBuggy.bodyKey;
   // Дуло считает shotPose по трубкам. Это поле родитель требует, выстрел его не читает.
   protected readonly muzzle = { x: 0, y: 0 };
