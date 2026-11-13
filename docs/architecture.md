@@ -1,6 +1,6 @@
 # Архитектура
 
-Кто в Tank Penetration за что отвечает. Законы — в `docs/constitution.md`. Правила для игрока и числа баланса — в `README.md`. Сюда числа не копируют.
+Кто в Tank Penetration за что отвечает. Законы — в `docs/constitution.md`. Правила для игрока и числа баланса — в главах `docs/manual/`, оглавление в `README.md`. Сюда числа не копируют.
 
 ## Старт
 
@@ -175,15 +175,15 @@
 
 | Задача | Первый файл | Потом |
 | --- | --- | --- |
-| Урон, скорость, здоровье вида | Класс врага в `src/entities` | `README.md`, раздел врагов |
-| Кто выходит на волне | `EnemyFactory` и `debutWave` вида | `README.md`, сбор волны |
+| Урон, скорость, здоровье вида | Класс врага в `src/entities` | `docs/manual/enemies.md`, босс — `docs/manual/bosses.md` |
+| Кто выходит на волне | `EnemyFactory` и `debutWave` вида | `docs/manual/waves.md` |
 | Выстрел танка, радиус, перезарядка, полёт снаряда, отталкивание, пробивание | `Tank` | Карточка в `ShopController`, если меняется подпись |
 | Попадание по врагу, проволока, свои постройки | `CombatSystem` | Сущность, если меняется её число |
 | Пуля и ракета врага по танку | Выпуск — сущность. Попадание — `ProjectileSystem` | Звук в `src/sounds`, если клип новый |
-| Цена монет | `shop` сущности, `ArtilleryStrikeAbilityConfig.shop`, `EmpFlashAbilityConfig.shop` или `ShopController.upgradeCost` / `knockbackCost` / `pierceCost` / `flightCost` / `artilleryCooldownCost` / `bomberCooldownCost` / `ionCooldownCost` / `ionSweepCost` / `minesCooldownCost` / `nuclearCooldownCost` / `wallDurationCost` / `wallCooldownCost` / `empCooldownCost` / `empStunCost` | `README.md` |
-| Цена очков | `ProgressSave` (`cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`, `pierceCost`, `absorbCost`, `hpCost`, `countCost`, `laserCooldownCost`, `autoFireCost`, `autoAimCost`, `autoShopCost`, `autoArtilleryCost`, `autoIonCost`, `autoMinesCost`, `autoBomberCost`, `autoWallCost`, `wallDurationCost`, `wallCooldownCost`, `ionWidthCost`, `empStunCost`) | `README.md` |
+| Цена монет | `shop` сущности, `ArtilleryStrikeAbilityConfig.shop`, `EmpFlashAbilityConfig.shop` или `ShopController.upgradeCost` / `knockbackCost` / `pierceCost` / `flightCost` / `artilleryCooldownCost` / `bomberCooldownCost` / `ionCooldownCost` / `ionSweepCost` / `minesCooldownCost` / `nuclearCooldownCost` / `wallDurationCost` / `wallCooldownCost` / `empCooldownCost` / `empStunCost` | `docs/manual/shop.md` |
+| Цена очков | `ProgressSave` (`cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`, `pierceCost`, `absorbCost`, `hpCost`, `countCost`, `laserCooldownCost`, `autoFireCost`, `autoAimCost`, `autoShopCost`, `autoArtilleryCost`, `autoIonCost`, `autoMinesCost`, `autoBomberCost`, `autoWallCost`, `wallDurationCost`, `wallCooldownCost`, `ionWidthCost`, `empStunCost`) | `docs/manual/defeat.md` |
 | Новая кнопка витрины | Контроллер собирает карточку | Окно только если изменилась вёрстка карточки |
-| Новая клавиша способности | `CombatSystem` и строка в `AbilityList` | Клик в `GameScene.create`, `README.md` |
+| Новая клавиша способности | `CombatSystem` и строка в `AbilityList` | Клик в `GameScene.create`, `docs/manual/play.md` и `docs/manual/skills.md` |
 | Новый вид паузы | Класс `Pause` | Строка в `GameSceneFactory` |
 | Запись нового поля | Тип в `CombatSave` или `ProgressSave` и разбор старых сохранений | Таблица ключей здесь, если ключ новый |
 | Новый файл в `public/` | `preload` владельца буквальной строкой | `imagePreloader` или `soundPreloader`, `packedFiles` |
@@ -197,7 +197,7 @@
 3. Вид в `EnemyFactory`: в историю отряда и в круг, если он обязан выпадать повторно. Строка вида — в `src/types/EnemySave.ts`.
 4. `preload` картинок, вызов из `imagePreloader`, прогрев в `ensureGameTextures`.
 5. Каждый новый файл `public/` — в `packedFiles`.
-6. Раздел врагов и сбор волны в `README.md`.
+6. Обычный вид — `docs/manual/enemies.md`, босс — `docs/manual/bosses.md`, сбор волны — `docs/manual/waves.md`.
 
 ## Новая покупка партии
 
@@ -205,7 +205,7 @@
 2. Флаг и методы в `ShopController`, поле в `ShopSave`, карточка на своей вкладке.
 3. Если вещь действует в бою, тик в `CombatSystem`. Если её зовёт игрок — клавиша там же и иконка в `GameScene.create`.
 4. Если после перезагрузки должно остаться положение или перезарядка — поле в `CombatSave`. Старое сохранение без поля остаётся читаемым.
-5. Строка в таблице магазина `README.md`.
+5. Строка в таблице магазина `docs/manual/shop.md`.
 
 Покупка, которая живёт после поражения, идёт отдельно: поле в `ProgressSave`, карточка в `ProgressShopController`, чтение бонуса в `GameScene` при создании боя.
 

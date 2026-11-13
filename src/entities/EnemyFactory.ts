@@ -245,8 +245,9 @@ export class EnemyFactory {
     return null;
   }
 
-  // Собирает уже вышедшего врага на сохранённом месте. Запас здоровья берётся из ранга,
-  // как при обычном спавне, а полоска ставится на оставшиеся hp.
+  // Собирает уже вышедшего врага на сохранённом месте. Запас — как при обычном спавне,
+  // полоска ставится на оставшиеся hp. У пехоты запас равен рангу скорости.
+  // Пикап, багги и вертолёт берут свой запас у класса.
   // У суперсолдата ранг скорости всегда 1, запас считает номер появления на текущей волне.
   static restore(
     kind: EnemySaveKind,
@@ -256,7 +257,7 @@ export class EnemyFactory {
     slot = 0,
     dropped = 0,
   ): Infantry {
-    const rankHp = Infantry.waveHp(pace);
+    const rankHp = this.reserveHp(kind, ctx.wave, pace);
     const unit = this.spawnSaved(kind, ctx, rankHp, slot, dropped);
     unit.setPaceWave(pace);
     unit.setHealth(hp);
@@ -301,6 +302,20 @@ export class EnemyFactory {
     return unit;
   }
 
+  // Пехота держит запас в ранге скорости. Техника прибавляет к номеру волны свой дебют.
+  private static reserveHp(kind: EnemySaveKind, wave: number, pace: number): number {
+    if (kind === 'truck') {
+      return PickupTruck.hpForWave(wave);
+    }
+    if (kind === 'buggy') {
+      return RocketBuggy.hpForWave(wave);
+    }
+    if (kind === 'heli') {
+      return Helicopter.hpForWave(wave);
+    }
+    return Infantry.waveHp(pace);
+  }
+
   private static debutWave(kind: EnemyKind): number {
     if (kind === GunnerInfantry) {
       return GunnerInfantry.debutWave;
@@ -321,7 +336,8 @@ export class EnemyFactory {
   }
 
   // Здоровье и ранг скорости. Штурмовик растёт от номера волны.
-  // Остальные на своей первой волне получают ранг 1, дальше +1 за волну.
+  // Стрелок и ракетчик на своей первой волне получают ранг 1, дальше +1 за волну.
+  // Пикап, багги и вертолёт скорость считают тем же рангом, запас — номер волны плюс дебют.
   // Суперсолдат: с 50-й запас и урон как раньше с 10-й. Первая такая волна — 100 и 1, дальше +500 и +1.
   // Тяжёлый танк: запас и урон от своего выхода шкалы. Первый — 2000 и 50, дальше +500 и +1.
   // Ознакомительные 10, 20, 30 и 40 подставляют свой запас и свою награду.
@@ -362,19 +378,19 @@ export class EnemyFactory {
 
     if (kind === PickupTruck) {
       const rank = this.growthRank(wave, PickupTruck.debutWave);
-      const unit = new PickupTruck(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
+      const unit = new PickupTruck(scene, x, y, PickupTruck.hpForWave(wave), shots, fireTarget);
       return this.arm(unit, wave, rank);
     }
 
     if (kind === RocketBuggy) {
       const rank = this.growthRank(wave, RocketBuggy.debutWave);
-      const unit = new RocketBuggy(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
+      const unit = new RocketBuggy(scene, x, y, RocketBuggy.hpForWave(wave), shots, fireTarget);
       return this.arm(unit, wave, rank);
     }
 
     if (kind === Helicopter) {
       const rank = this.growthRank(wave, Helicopter.debutWave);
-      const unit = new Helicopter(scene, x, y, Infantry.waveHp(rank), shots, fireTarget);
+      const unit = new Helicopter(scene, x, y, Helicopter.hpForWave(wave), shots, fireTarget);
       return this.arm(unit, wave, rank);
     }
 

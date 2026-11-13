@@ -36,6 +36,12 @@ type ApartCut = {
 
 export class RocketBuggy extends RangedEnemy {
   static readonly debutWave = 30;
+
+  // Корпус толще штурмовика этой волны на волну дебюта.
+  // Иначе первая живая машина, на 31-й, выходила бы с рангом 2.
+  static hpForWave(wave: number): number {
+    return this.waveHp(wave) + this.debutWave;
+  }
   static readonly coinReward = 3;
   readonly coinReward = RocketBuggy.coinReward;
   // Холст картинки. Низ шин почти на последней строке.

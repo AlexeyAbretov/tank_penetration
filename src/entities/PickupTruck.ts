@@ -31,6 +31,12 @@ type PixelPad = {
 
 export class PickupTruck extends RangedEnemy {
   static readonly debutWave = 10;
+
+  // Корпус толще штурмовика этой волны на волну дебюта.
+  // Иначе первая живая машина, на 11-й, выходила бы с рангом 2.
+  static hpForWave(wave: number): number {
+    return this.waveHp(wave) + this.debutWave;
+  }
   // Крест через центр повторяется каждые 180°. Шесть кадров делят эту половину оборота.
   static readonly wheelFrames = 6;
   static readonly corpseKey = 'pickup-wreck';
