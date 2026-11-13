@@ -25,9 +25,13 @@ export class DebugProgressShopController extends ProgressShopController {
     this.addScore(GRANT);
   };
 
-  override bind(scene: Phaser.Scene & { paintAutoFire: () => void }, onNewGame: () => void): void {
+  override bind(
+    scene: Phaser.Scene & { paintAutoFire: () => void },
+    onContinue: () => void,
+    onNewGame: () => void,
+  ): void {
     this.drop();
-    super.bind(scene, onNewGame);
+    super.bind(scene, onContinue, onNewGame);
     const keyboard = scene.input.keyboard;
     if (keyboard) {
       this.fundsKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);

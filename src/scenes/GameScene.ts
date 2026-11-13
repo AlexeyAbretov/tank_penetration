@@ -24,6 +24,7 @@ import { BattleMusic } from '../sounds/BattleMusic';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem } from '../types/CombatSystem';
 import { FocusPause } from '../controllers/FocusPause';
+import { difficultyChosen, setDifficulty } from '../difficulty';
 import { onLanguage } from '../locale';
 import { PauseStack } from '../controllers/PauseStack';
 import { ProgressShopController } from '../controllers/ProgressShopController';
@@ -32,6 +33,7 @@ import { ProjectileSystem } from '../systems/ProjectileSystem';
 import { CombatSave, type SavedRun } from '../saves/CombatSave';
 import { ShopController } from '../controllers/ShopController';
 import { WaveManager } from '../systems/WaveManager';
+import { DifficultyPanel } from '../ui/difficulty/DifficultyPanel';
 import { GameHud } from '../ui/huds/GameHud';
 import { SettingsPanel } from '../ui/settings/SettingsPanel';
 import { ShopPanel, type ShopDelegate } from '../ui/shops/ShopPanel';
@@ -54,6 +56,8 @@ export class GameScene extends Phaser.Scene {
   private fx?: BattleEffects;
   // Окно громкости. Бой замирает, музыка нет: иначе ползунок музыки нечего слушать.
   private settings!: SettingsPanel;
+  // Выбор сложности. Первая партия и «Новая игра» не пускают волну, пока игрок не нажмёт строку.
+  private difficulty!: DifficultyPanel;
   // Когда в последний раз проиграли пример эффекта. Бой на паузе, this.time.now стоит.
   private effectsPreviewAt = 0;
   private settingsOpen = false;
@@ -234,15 +238,24 @@ export class GameScene extends Phaser.Scene {
     this.hud = new this.Hud(this, GAME, this.Player.baseHp(), [
       ...AbilityList
     ]);
-    this.progressShop.bind(this, () => {
-      // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
-      this.persistEnabled = false;
-      this.scene.restart();
-    });
+    this.difficulty = new DifficultyPanel(this, GAME);
+    this.progressShop.bind(
+      this,
+      () => {
+        // «В бой» оставляет ту же сложность. Старая партия без записи идёт как стандарт.
+        if (!difficultyChosen()) {
+          setDifficulty('normal');
+        }
+        // Рестарт сцены создаёт create() заново. Пока флаг выключен, старая сцена в save не пишет.
+        this.persistEnabled = false;
+        this.scene.restart();
+      },
+      () => this.askDifficulty(),
+    );
     this.hud.setAutoFireMode(this.progressShop.autoFireEnabled());
     this.hud.setHaste(1);
     this.hud.onHasteCycle(() => {
-      if (!this.pauses.blocking && !this.defeatShop) {
+      if (!this.difficulty.isOpen() && !this.pauses.blocking && !this.defeatShop) {
         this.cycleEnemyHaste();
       }
     });
@@ -360,8 +373,8 @@ export class GameScene extends Phaser.Scene {
       this.applyAutoStrikes();
       this.paintAutoStrikes();
     });
-    // Стирает и партию, и постоянные улучшения. Кнопка живёт на плашке паузы.
-    this.hud.onNewGame(() => this.restartRun());
+    // Сначала выбор сложности. Стирание партии — уже после строки.
+    this.hud.onNewGame(() => this.askDifficulty());
     if (isDebugRun()) {
       this.events.on(DEBUG_FORFEIT_EVENT, this.onDebugForfeit, this);
       // Раньше волн: на одном событии сцена закрывает витрину, и только потом менеджер
@@ -539,7 +552,11 @@ export class GameScene extends Phaser.Scene {
       // Магазин между волнами уже остановил поле. Пауза поверх карточек не нужна.
       // Магазин очков закрыт флагом defeatShop.
       canPause: () =>
-        !this.settingsOpen && !this.player.isGameOver && !this.defeatShop && !this.shop.shopOpen,
+        !this.difficulty.isOpen() &&
+        !this.settingsOpen &&
+        !this.player.isGameOver &&
+        !this.defeatShop &&
+        !this.shop.shopOpen,
       acquire: () => this.acquireClock(),
       release: () => this.releaseClock(),
       save: () => this.writeSave(),
@@ -557,6 +574,7 @@ export class GameScene extends Phaser.Scene {
   // Смена языка в настройках. Окна переписывают уже нарисованные строки.
   private applyLanguage(): void {
     this.hud.applyLanguage();
+    this.difficulty.applyLanguage();
     this.settings.applyLanguage();
     this.shop.applyLanguage();
     this.progressShop.applyLanguage();
@@ -571,6 +589,7 @@ export class GameScene extends Phaser.Scene {
     this.field.setPosition(GAME.width / 2, GAME.height / 2);
     this.field.setDisplaySize(GAME.width, GAME.height);
     this.hud.layout();
+    this.difficulty.layout();
     this.settings.layout();
     this.shop.panel.place();
     this.progressShop.layout();
@@ -619,6 +638,14 @@ export class GameScene extends Phaser.Scene {
 
   // Кадр боя. delta — миллисекунды с прошлого кадра, его забирают системы.
   update(_time: number, delta: number): void {
+    // Выбор сложности перекрывает паузу, поражение и бой. Esc возвращает назад, если назад есть куда.
+    if (this.difficulty.isOpen()) {
+      if (this.difficulty.canDismiss() && this.pausePressed()) {
+        this.difficulty.hide();
+      }
+      return;
+    }
+
     // Раньше магазинов и паузы: иначе F молчит, пока витрина открыта.
     if (this.forfeitPressed()) {
       this.forfeitRun();
@@ -805,7 +832,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private blocksPlay(): boolean {
-    return this.pauses.blocking || this.settingsOpen || this.player.isGameOver || this.defeatShop;
+    return (
+      this.difficulty.isOpen() ||
+      this.pauses.blocking ||
+      this.settingsOpen ||
+      this.player.isGameOver ||
+      this.defeatShop
+    );
   }
 
   // Ползунок эффектов. Бой стоит, поэтому без примера новую громкость не услышать.
@@ -991,11 +1024,19 @@ export class GameScene extends Phaser.Scene {
     this.writeSave();
   }
 
-  // Новая игра: партия, score и все купленные уровни стираются.
-  private restartRun(): void {
-    if (this.player.isGameOver || this.defeatShop) {
+  // «Новая игра» и первая партия без записи. Крестик есть, только если под окном уже что-то идёт.
+  private askDifficulty(): void {
+    if (this.difficulty.isOpen()) {
       return;
     }
+    this.difficulty.open((id) => {
+      setDifficulty(id);
+      this.beginChosenRun();
+    }, () => this.difficulty.hide());
+  }
+
+  // Выбор уже записан. Партия, score и все купленные уровни стираются, сцена поднимается заново.
+  private beginChosenRun(): void {
     this.persistEnabled = false;
     this.progressShop.clearProgress();
     this.combatSave.clear();
@@ -1033,6 +1074,14 @@ export class GameScene extends Phaser.Scene {
     }
     if (!saved) {
       this.shop.syncTankStats();
+      // Первая партия ещё без выбора. Волна ждёт строку, стирать пока нечего.
+      if (!difficultyChosen()) {
+        this.difficulty.open((id) => {
+          setDifficulty(id);
+          this.beginChosenRun();
+        });
+        return;
+      }
       this.waves.scheduleFirstWave();
       return;
     }

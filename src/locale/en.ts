@@ -75,6 +75,15 @@ export const en: Locale = {
     fight: 'TO BATTLE',
   },
 
+  difficulty: {
+    title: 'DIFFICULTY',
+    options: {
+      easy: { name: 'EASY', hint: 'Every purchase costs 1. Enemies stay as on Standard.' },
+      normal: { name: 'STANDARD', hint: 'Prices, health and damage are ordinary.' },
+      hard: { name: 'HARD', hint: 'Prices, enemy health and damage are doubled.' },
+    },
+  },
+
   tabs: {
     tank: 'Tank',
     gun: 'Machine gun',

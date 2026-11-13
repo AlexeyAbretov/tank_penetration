@@ -1,6 +1,7 @@
 // Пуля врага: маленькая картинка с физическим телом и своим уроном.
 
 import { GameObjects, Physics, Scene } from 'phaser';
+import { difficultyEnemy } from '../difficulty';
 import { enemyHasteOf } from '../gameConfig';
 import { BULLET_FRAME, BULLET_PAINT, type BulletPaint } from '../gfx/looks';
 import { bake } from '../gfx/textures';
@@ -41,7 +42,8 @@ export class EnemyShot extends Physics.Arcade.Image {
     
     scene.add.existing(this);
     scene.physics.add.existing(this);
-    this.damage = damage;
+    // Урон выстрела, уже со сложностью. Рикошет бьёт врагов тем же числом.
+    this.damage = difficultyEnemy(damage);
     // Чуть выше солдат (10) и чуть ниже снаряда танка (15), чтобы вспышки читались.
     this.setDepth(14);
 

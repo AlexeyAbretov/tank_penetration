@@ -5,6 +5,7 @@
 // Суперсолдат, вертолёт и дрономатка наследуют Infantry напрямую и ходят по своему циклу.
 
 import Phaser from 'phaser';
+import { difficultyEnemy } from '../difficulty';
 import { enemyHasteOf, GAME, isDebugRun } from '../gameConfig';
 import { bisectImage } from '../gfx/bisect';
 import { floatDamage } from '../gfx/damageFloat';
@@ -86,8 +87,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Урон касанием. contactDamage — база наследника, сверху шаг каждых 10 волн.
+  // Сложность множит уже сумму: шаг волны тоже растёт вместе с базой.
   touchDamage(): number {
-    return this.contactDamage + this.extraDamage();
+    return difficultyEnemy(this.contactDamage + this.extraDamage());
   }
 
   // Центр круга попадания. Снаряд и пуля пулемёта меряют расстояние до этой точки.
@@ -152,8 +154,10 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     // Включаем Arcade-физику: появится body со скоростью и размером.
     scene.physics.add.existing(this);
 
-    this.maxHp = hp;
-    this.hp = hp;
+    // Запас приходит формулой вида. Сложность множит его один раз, в том числе у босса.
+    const life = difficultyEnemy(hp);
+    this.maxHp = life;
+    this.hp = life;
 
     const placed = Infantry.placed;
     // Глубина от ноги: нижний на экране ближе и рисуется поверх верхнего.
@@ -185,7 +189,7 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     // Цифра только в дебаг-партии. Обводка читается и на небе, и на земле.
     this.hpLabel = isDebugRun()
       ? scene.add
-          .text(x, y, String(hp), {
+          .text(x, y, String(life), {
             fontSize: '13px',
             color: '#fff4e8',
             stroke: '#1a0808',

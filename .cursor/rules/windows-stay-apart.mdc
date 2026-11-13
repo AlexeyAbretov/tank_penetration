@@ -7,7 +7,7 @@ alwaysApply: true
 
 Файл окна не импортирует другой файл окна.
 
-Окна — это `GameHud`, `ShopPanel`, `ProgressShopPanel`, `SettingsPanel` и их дебаг-наследники.
+Окна — это `GameHud`, `ShopPanel`, `ProgressShopPanel`, `SettingsPanel`, `DifficultyPanel` и их дебаг-наследники.
 
 Исключение одно: наследник импортирует свою базу (`DebugGameHud` — `GameHud`, `DebugSettingsPanel` — `SettingsPanel`).
 

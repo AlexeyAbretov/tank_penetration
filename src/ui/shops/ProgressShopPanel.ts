@@ -46,7 +46,7 @@ export const scoreCostPrefix = '¤ ';
 // «Новая игра» и «в бой». Сами покупки приходят в карточке.
 export type ProgressShopDelegate = {
   closeAndRestart(): void;
-  wipeAndRestart(): void;
+  requestNewGame(): void;
 };
 
 const PANEL_W = 980;
@@ -175,7 +175,7 @@ export class ProgressShopPanel {
       this.scoreText,
     ]);
 
-    const fresh = this.makeButton(scene, FRESH_X, BUTTON_Y, BUTTON_W, t().defeat.newGame, () => shop.wipeAndRestart());
+    const fresh = this.makeButton(scene, FRESH_X, BUTTON_Y, BUTTON_W, t().defeat.newGame, () => shop.requestNewGame());
     const next = this.makeButton(scene, NEXT_X, BUTTON_Y, BUTTON_W, t().defeat.fight, () => shop.closeAndRestart());
     this.freshLabel = fresh.label;
     this.fightLabel = next.label;

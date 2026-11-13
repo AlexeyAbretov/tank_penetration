@@ -76,6 +76,7 @@ export class ProgressShopController {
   private readonly progress: SavedProgress;
   // Пауза сцены. Покупки очков ждут продолжения. «В бой» паузу не спрашивает.
   private paused = false;
+  private onContinue: () => void = () => {};
   private onNewGame: () => void = () => {};
 
   // Сохранение и витрина приходят снаружи. restart() контроллер не создаёт заново и ключ не подменяет.
@@ -92,7 +93,13 @@ export class ProgressShopController {
   }
 
   // До create() нет scene.add. Сюда сцена приходит уже запущенной и отдаёт свежий интерфейс.
-  bind(scene: Phaser.Scene & { paintAutoFire: () => void }, onNewGame: () => void): void {
+  // «В бой» продолжает ту же сложность. «Новая игра» сначала спрашивает её у сцены.
+  bind(
+    scene: Phaser.Scene & { paintAutoFire: () => void },
+    onContinue: () => void,
+    onNewGame: () => void,
+  ): void {
+    this.onContinue = onContinue;
     this.onNewGame = onNewGame;
     this.paused = false;
     this.scene = scene;
@@ -455,12 +462,11 @@ export class ProgressShopController {
     this.progress.awaitingShop = false;
     this.progressSave.save(this.progress);
     this.panel.hide();
-    this.onNewGame();
+    this.onContinue();
   }
 
-  wipeAndRestart(): void {
-    this.clearProgress();
-    this.panel.hide();
+  // Стирание ждёт выбора сложности. Сцена сотрёт партию и прогресс уже после строки.
+  requestNewGame(): void {
     this.onNewGame();
   }
 
