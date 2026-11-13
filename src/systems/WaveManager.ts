@@ -38,7 +38,7 @@ export class WaveManager {
   private onWaveBegan!: (wave: number, banner?: { boss: boolean; title: string | null }) => void;
   // Очки и монеты за убийство. Обычная волна сюда не пишет: награду даёт бой.
   // Дебаг-пропуск зовёт сам: враг умирает без попадания, а невышедший вообще не появляется.
-  protected onKill: (coinReward: number) => void = () => {};
+  protected onKill: (coinReward: number, scoreReward: number) => void = () => {};
 
   // Поколение отложенных выходов. Новый заезд увеличивает штамп, и старый таймер врага уже не выпускает.
   // Наследник тоже может его увеличить, когда отменяет ещё не вышедших.
@@ -60,7 +60,7 @@ export class WaveManager {
     onWaveCleared: () => void,
     onProgress: () => void,
     onWaveBegan: (wave: number, banner?: { boss: boolean; title: string | null }) => void,
-    onKill: (coinReward: number) => void,
+    onKill: (coinReward: number, scoreReward: number) => void,
   ): void {
     this.scene = scene;
     this.infantry = infantry;

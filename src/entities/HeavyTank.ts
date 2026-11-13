@@ -104,8 +104,9 @@ export class HeavyTank extends RangedEnemy {
   static readonly hpPerAppearance = 500;
   static readonly shotDamage = 50;
   static readonly damagePerAppearance = 1;
-  // Та же касса, что у суперсолдата: 25 монет за номер босс-волны.
-  static readonly coinsPerAppearance = 25;
+  // Свои монеты и очки. Ознакомительная 20-я подставляет меньшую пару, её задаёт фабрика.
+  static readonly coinReward = 200;
+  static readonly scoreReward = 200;
   static readonly fireDelay = 4000;
   static readonly shellSpeed = 360;
   // Рубеж стрелка. Отсюда ствол ещё целиком в кадре и не упирается в игрока.
@@ -145,7 +146,8 @@ export class HeavyTank extends RangedEnemy {
   private rutRear = Number.NaN;
   private rutRibbon: Phaser.GameObjects.TileSprite[] = [];
 
-  // 20-я волна — первый выход. 30-я танка не выпускает. 40-я — второй, 50-я — третий.
+  // Волна шкалы, которая начинается с 10. 20-я — первый выход, 30-я танка не выпускает.
+  // 40-я — второй, 50-я — третий. Партия передаёт номер на 40 меньше: 60-я считается как 20-я.
   static appearanceOn(wave: number): number {
     const boss = Math.max(0, Math.floor(wave / 10));
     if (boss <= 2 || boss === 3) {
@@ -162,20 +164,6 @@ export class HeavyTank extends RangedEnemy {
   static damageForAppearance(appearance: number): number {
     const extra = Math.max(0, Math.floor(appearance) - 1);
     return this.shotDamage + extra * this.damagePerAppearance;
-  }
-
-  // Доля одного тела. Сумма по местам 0 .. count−1 равна кассе волны.
-  static coinsForBody(appearance: number, index: number, count: number): number {
-    const n = Math.max(1, Math.floor(appearance));
-    const bodies = Math.max(1, Math.floor(count));
-    const purse = this.coinsPerAppearance * n;
-    const base = Math.floor(purse / bodies);
-    const extra = purse % bodies;
-    const slot = Math.max(0, Math.floor(index));
-    if (slot >= bodies) {
-      return base;
-    }
-    return base + (slot < extra ? 1 : 0);
   }
 
   static preload(scene: Scene): void {
@@ -282,17 +270,18 @@ export class HeavyTank extends RangedEnemy {
     hp: number,
     shots: Phaser.Physics.Arcade.Group,
     fireTarget: WorldPoint,
-    // showing — какой по счёту выход танка. purse — номер босс-волны для кассы.
+    // showing — какой по счёту выход танка на шкале с 10-й.
     showing = 1,
-    purse = 1,
     slot = 0,
-    count = 1,
+    coins = HeavyTank.coinReward,
+    score = HeavyTank.scoreReward,
   ) {
     super(scene, x, y, hp, HeavyTank.textureKey, 'heavy-tank-hold', 0xff3348, shots, fireTarget);
     // Волна ставит случайную полосу. Этот босс всегда напротив танка: точка прицела уже его линия.
     this.setY(HeavyTank.laneY(fireTarget.y));
     this.slot = Math.max(0, Math.floor(slot));
-    this.coinReward = HeavyTank.coinsForBody(purse, this.slot, count);
+    this.coinReward = coins;
+    this.scoreReward = score;
     this.shellDamage = HeavyTank.damageForAppearance(showing);
     const fit = HeavyTank.placed;
     this.setScale(fit.scale);

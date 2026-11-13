@@ -63,6 +63,11 @@ type ShellFlight = {
   passed: Infantry | null;
 };
 
+// Ударный дрон на пути снаряда — такая же цель, как пехота: ближний забирает прошивку или разрыв.
+type ShellStrike =
+  | { kind: 'unit'; unit: Infantry; dist: number; along: number }
+  | { kind: 'drone'; drone: StrikeDrone; dist: number; along: number };
+
 type FlamePoint = { x: number; y: number };
 
 type FlameSweep = {
@@ -1140,7 +1145,7 @@ export class CombatSystem implements Combat {
     if (!unit.hit(this.ionDamage())) {
       return;
     }
-    this.callbacks.onKill(unit.coinReward);
+    this.callbacks.onKill(unit.coinReward, unit.scoreReward);
     if (this.isVehicle(unit)) {
       this.effects.vehicleExplosion.play();
     } else {
@@ -1562,7 +1567,7 @@ export class CombatSystem implements Combat {
         return;
       }
       if (unit.hit(1_000_000)) {
-        this.callbacks.onKill(unit.coinReward);
+        this.callbacks.onKill(unit.coinReward, unit.scoreReward);
         unit.kill();
       }
     });
@@ -1656,6 +1661,31 @@ export class CombatSystem implements Combat {
         this.shellHit(unit);
       }
     });
+    this.blastDrones(x, y, blastRadius);
+  }
+
+  // Осколки сбивают ударный дрон, чей центр в радиусе. Разрыв снаряда уже звучит.
+  private blastDrones(x: number, y: number, radius: number): void {
+    for (const obj of [...this.enemyShots.getChildren()]) {
+      if (!(obj instanceof StrikeDrone) || !obj.active) {
+        continue;
+      }
+      if (Phaser.Math.Distance.Between(x, y, obj.x, obj.y) > radius) {
+        continue;
+      }
+      this.downDrone(obj, false);
+    }
+  }
+
+  // Пушка сбивает дрон. Свой разрыв звучит только у прошивки: обычный снаряд уже играет попадание.
+  private downDrone(drone: StrikeDrone, sound: boolean): void {
+    if (!drone.active) {
+      return;
+    }
+    const x = drone.x;
+    const y = drone.y;
+    drone.destroy();
+    StrikeDrone.burstAt(this.scene, x, y, sound);
   }
 
   // Урон снаряда и отталкивание из магазинов. Мёртвого уже не двигаем.
@@ -1679,7 +1709,8 @@ export class CombatSystem implements Combat {
         continue;
       }
       const flight = this.shellFlights.get(shell);
-      const hit: Infantry[] = [];
+      const step = this.mgStep(shell);
+      const hit: ShellStrike[] = [];
       for (const unit of units) {
         if (!unit.active || unit.reachedWall) {
           continue;
@@ -1690,17 +1721,52 @@ export class CombatSystem implements Combat {
         if (!this.shellHitsUnit(shell, unit)) {
           continue;
         }
-        hit.push(unit);
+        const center = unit.hitCenter();
+        const at = this.reachAlong(step, center.x, center.y, unit.shellRadius());
+        hit.push({ kind: 'unit', unit, dist: this.hitDistance(shell, unit), along: at ?? 1 });
       }
-      // Ближний забирает прошивку, следующий по дистанции — разрыв.
-      hit.sort((a, b) => this.hitDistance(shell, a) - this.hitDistance(shell, b));
-      for (const unit of hit) {
+      for (const obj of this.enemyShots.getChildren()) {
+        if (!(obj instanceof StrikeDrone) || !obj.active) {
+          continue;
+        }
+        const along = this.reachAlong(step, obj.x, obj.y, StrikeDrone.reach);
+        const dist = Phaser.Math.Distance.Between(shell.x, shell.y, obj.x, obj.y);
+        if (along === null && dist > StrikeDrone.reach) {
+          continue;
+        }
+        hit.push({ kind: 'drone', drone: obj, dist, along: along ?? 1 });
+      }
+      // Без дрона порядок прежний: ближний к снаряду. С дроном раньше тот, кого отрезок полёта задел первым.
+      const orderByPath = hit.some((strike) => strike.kind === 'drone');
+      hit.sort((a, b) => (orderByPath ? a.along - b.along || a.dist - b.dist : a.dist - b.dist));
+      for (const strike of hit) {
         if (!shell.active) {
           break;
         }
-        this.deliverShell(shell, unit);
+        if (strike.kind === 'unit') {
+          this.deliverShell(shell, strike.unit);
+        } else {
+          this.deliverShellDrone(shell, strike.drone);
+        }
       }
     }
+  }
+
+  // Прошивка тратится на дрона и рвёт его без взрыва снаряда. Обычное касание взрывается на дроне.
+  private deliverShellDrone(shell: Phaser.Physics.Arcade.Image, drone: StrikeDrone): void {
+    if (!shell.active || !drone.active) {
+      return;
+    }
+    const flight = this.shellFlights.get(shell);
+    if (flight?.pierce) {
+      flight.pierce = false;
+      this.downDrone(drone, true);
+      return;
+    }
+    // Кадр мог пронести снаряд сквозь круг. Разрыв остаётся на дроне, а не в конце шага.
+    shell.setPosition(drone.x, drone.y);
+    this.downDrone(drone, false);
+    this.detonateShell(shell);
   }
 
   // Прошивка тратит заряд и не рвёт снаряд. Обычное касание взрывается как раньше.
@@ -2361,7 +2427,7 @@ export class CombatSystem implements Combat {
       return;
     }
     if (unit.hit(damage, wire)) {
-      this.callbacks.onKill(unit.coinReward);
+      this.callbacks.onKill(unit.coinReward, unit.scoreReward);
       // Пикап — техника: свой взрыв, не крик пехоты.
       // Дошедший до базы сюда не попадает: его убивает hitBase.
       if (this.isVehicle(unit)) {
