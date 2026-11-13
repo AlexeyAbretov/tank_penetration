@@ -1,22 +1,27 @@
-// Окно громкости и паузы при потере фокуса. Бой на это время стоит, музыка играет:
+// Окно громкости, паузы при потере фокуса и языка. Бой на это время стоит, музыка играет:
 // ползунок музыки сразу слышно. Закрывает его только кнопка «Готово».
 // Второй ползунок — эффекты. Музыку он не трогает.
 // Переключатель паузы только рисует флаг. Решает сцена, пишет FocusPause.
+// Язык пишет locale. Кнопка идёт по кругу языков из index.ts.
 
 import Phaser from 'phaser';
+import { cycleLanguage, t } from '../../locale';
 import { fieldInk, fieldInkStroke, fieldMuted, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 
 const PANEL_W = 520;
-// Ниже ползунков стоит переключатель. Верх карточки остаётся на −200, низ уезжает вниз.
+// Ниже ползунков стоят переключатель и язык. Верх карточки остаётся на −200, низ уезжает вниз.
 const PANEL_H = 448;
 const CARD_TOP = -200;
 const PANEL_HALF = PANEL_W / 2;
 const MUSIC_Y = -56;
-const EFFECTS_Y = 64;
-const PAUSE_Y = 116;
+// Эффекты подняты к музыке: между паузой и «Готово» встал язык.
+const EFFECTS_Y = 16;
+const PAUSE_Y = 76;
+const LANG_Y = 132;
 const DONE_Y = 196;
 const FOCUS_W = 72;
 const FOCUS_H = 40;
+const LANG_W = 156;
 // Отступ карточки до контента. Дорожка, «0%» и строки дебага стоят в этих краях.
 const INSET = 24;
 const PERCENT_HALF = 18;
@@ -48,6 +53,12 @@ export class SettingsPanel {
   protected done!: Phaser.GameObjects.Rectangle;
   protected doneFace!: Phaser.GameObjects.Graphics;
   protected doneLabel!: Phaser.GameObjects.Text;
+  private titleText!: Phaser.GameObjects.Text;
+  private musicLabel!: Phaser.GameObjects.Text;
+  private effectsLabel!: Phaser.GameObjects.Text;
+  private focusCaption!: Phaser.GameObjects.Text;
+  private langCaption!: Phaser.GameObjects.Text;
+  private langValue!: Phaser.GameObjects.Text;
   private readonly music: Slider;
   private readonly effects: Slider;
   private readonly focusLabel: Phaser.GameObjects.Text;
@@ -72,23 +83,29 @@ export class SettingsPanel {
     this.cardFace = scene.add.graphics();
     this.paintCard();
 
+    const copy = t();
     const title = scene.add
-      .text(0, -158, 'НАСТРОЙКИ', {
+      .text(0, -158, copy.settings.title, {
         fontSize: '40px',
         color: fieldInk,
         stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
+    this.titleText = title;
     const rule = scene.add.graphics();
     paintFieldRule(rule, -124, 180);
 
-    const musicLabel = label(scene, -100, 'Громкость музыки');
-    const effectsLabel = label(scene, 20, 'Громкость эффектов');
+    const musicLabel = label(scene, -100, copy.settings.music);
+    const effectsLabel = label(scene, -28, copy.settings.effects);
+    this.musicLabel = musicLabel;
+    this.effectsLabel = effectsLabel;
     this.music = this.makeSlider(scene, MUSIC_Y, onMusic);
     this.effects = this.makeSlider(scene, EFFECTS_Y, onEffects);
     const focusRow = this.makeFocusToggle(scene, onFocusPause);
     this.focusLabel = focusRow.label;
+    this.focusCaption = focusRow.caption;
+    const langRow = this.makeLanguageRow(scene);
 
     const onMove = (pointer: Phaser.Input.Pointer): void => {
       if (!this.dragging || !this.container.visible) {
@@ -112,7 +129,7 @@ export class SettingsPanel {
     this.done.setInteractive({ useHandCursor: true });
     this.done.on('pointerup', () => this.onClose());
     this.doneLabel = scene.add
-      .text(0, DONE_Y, 'ГОТОВО', {
+      .text(0, DONE_Y, copy.settings.done, {
         fontSize: '18px',
         color: fieldInk,
       })
@@ -130,6 +147,7 @@ export class SettingsPanel {
         ...this.music.nodes,
         ...this.effects.nodes,
         ...focusRow.nodes,
+        ...langRow,
         this.doneFace,
         this.done,
         this.doneLabel,
@@ -156,6 +174,19 @@ export class SettingsPanel {
   // Только рисунок. Флаг пишет сцена, когда кнопку реально нажали.
   setFocusPause(on: boolean): void {
     this.paintFocus(on);
+  }
+
+  // Подписи текущего языка. Карточки магазинов сцена обновляет отдельно.
+  applyLanguage(): void {
+    const copy = t();
+    this.titleText.setText(copy.settings.title);
+    this.musicLabel.setText(copy.settings.music);
+    this.effectsLabel.setText(copy.settings.effects);
+    this.focusCaption.setText(copy.settings.focus);
+    this.langCaption.setText(copy.settings.language);
+    this.langValue.setText(copy.name);
+    this.doneLabel.setText(copy.settings.done);
+    this.paintFocus(this.focusOn);
   }
 
   setOpen(open: boolean): void {
@@ -220,9 +251,9 @@ export class SettingsPanel {
   private makeFocusToggle(
     scene: Phaser.Scene,
     onChange: (on: boolean) => void,
-  ): { nodes: Phaser.GameObjects.GameObject[]; label: Phaser.GameObjects.Text } {
+  ): { nodes: Phaser.GameObjects.GameObject[]; label: Phaser.GameObjects.Text; caption: Phaser.GameObjects.Text } {
     const caption = scene.add
-      .text(SETTINGS_CONTENT_LEFT, PAUSE_Y, 'Пауза при потере фокуса', {
+      .text(SETTINGS_CONTENT_LEFT, PAUSE_Y, t().settings.focus, {
         fontSize: '22px',
         color: fieldPaper,
       })
@@ -233,7 +264,7 @@ export class SettingsPanel {
       .setStrokeStyle(2, 0x6e6240)
       .setInteractive({ useHandCursor: true });
     const value = scene.add
-      .text(btnX, PAUSE_Y, 'ВКЛ', {
+      .text(btnX, PAUSE_Y, t().settings.on, {
         fontSize: '22px',
         color: fieldInk,
       })
@@ -243,12 +274,39 @@ export class SettingsPanel {
       this.paintFocus(next);
       onChange(next);
     });
-    return { nodes: [caption, button, value], label: value };
+    return { nodes: [caption, button, value], label: value, caption };
+  }
+
+  // Имя языка на кнопке — его собственное. Следующий щелчок берёт следующий файл из index.ts.
+  private makeLanguageRow(scene: Phaser.Scene): Phaser.GameObjects.GameObject[] {
+    const copy = t();
+    const caption = scene.add
+      .text(SETTINGS_CONTENT_LEFT, LANG_Y, copy.settings.language, {
+        fontSize: '22px',
+        color: fieldPaper,
+      })
+      .setOrigin(0, 0.5);
+    this.langCaption = caption;
+    const btnX = SETTINGS_CONTENT_RIGHT - LANG_W / 2;
+    const button = scene.add
+      .rectangle(btnX, LANG_Y, LANG_W, FOCUS_H, 0x1a2214)
+      .setStrokeStyle(2, 0x6e6240)
+      .setInteractive({ useHandCursor: true });
+    const value = scene.add
+      .text(btnX, LANG_Y, copy.name, {
+        fontSize: '18px',
+        color: fieldInk,
+      })
+      .setOrigin(0.5);
+    this.langValue = value;
+    button.on('pointerup', () => cycleLanguage());
+    return [caption, button, value];
   }
 
   private paintFocus(on: boolean): void {
     this.focusOn = on;
-    this.focusLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    const copy = t().settings;
+    this.focusLabel.setText(on ? copy.on : copy.off);
     this.focusLabel.setColor(on ? fieldInk : fieldMuted);
   }
 }

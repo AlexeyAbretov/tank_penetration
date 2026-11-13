@@ -3,6 +3,7 @@
 // Рисует, только пока включены PierceMarks. Урон от надписи не меняется.
 
 import Phaser from 'phaser';
+import { t } from '../locale';
 import { PierceMarks } from './PierceMarks';
 
 export class PierceMarkOverlay {
@@ -37,7 +38,7 @@ export class PierceMarkOverlay {
       const label = this.labelAt(at);
       at += 1;
       const pierce = this.pierces(shell);
-      label.setText(pierce ? 'пробивает' : 'не пробивает');
+      label.setText(pierce ? t().debug.pierces : t().debug.misses);
       label.setColor(pierce ? '#b6f5a0' : '#ffb4a8');
       label.setPosition(shell.x, shell.y - 14);
       label.setVisible(true);

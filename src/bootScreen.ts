@@ -3,6 +3,7 @@
 // страница и шрифт ещё не отчитались. restart() сцены полосу не возвращает.
 
 import Phaser from 'phaser';
+import { t } from './locale';
 
 const SCENE_KEY = 'game';
 
@@ -27,10 +28,21 @@ export function showBootProgress(fraction: number): void {
   shown = pct;
   rail.classList.add('is-known');
   bar.style.width = `${pct}%`;
-  const text = `Загрузка ${pct}%`;
+  const text = t().boot.progress(pct);
   label.textContent = text;
   rail.setAttribute('aria-valuenow', String(pct));
   rail.setAttribute('aria-valuetext', text);
+}
+
+// До первого кадра: сохранённый язык уже на полосе, пока Phaser ещё молчит.
+export function paintBootLabel(): void {
+  const label = document.getElementById('boot-label');
+  const rail = document.getElementById('boot-track');
+  const text = t().boot.label;
+  if (label) {
+    label.textContent = text;
+  }
+  rail?.setAttribute('aria-label', text);
 }
 
 export function hideBootScreen(): void {

@@ -17,6 +17,7 @@
 // Появление здесь — волна / длину круга.
 // Монеты и очки босса — его собственные, как в партии с 50-й волны. Касса не делится.
 
+import { t } from '../locale';
 import { AssaultInfantry } from './AssaultInfantry';
 import { Btr } from './Btr';
 import { DroneCarrier } from './DroneCarrier';
@@ -173,20 +174,21 @@ export class DebugEnemyFactory extends EnemyFactory {
   }
 
   static override bossTitle(wave: number): string | null {
+    const boss = t().boss;
     if (this.isAllBossWave(wave)) {
-      return 'ВСЕ БОССЫ';
+      return boss.all;
     }
     if (this.isBtrWave(wave)) {
-      return 'БТР';
+      return boss.btr;
     }
     if (this.isCarrierWave(wave)) {
-      return 'ДРОНОМАТКА';
+      return boss.carrier;
     }
     if (this.isTankWave(wave)) {
-      return 'ТЯЖЁЛЫЙ ТАНК';
+      return boss.heavy;
     }
     if (this.isSuperWave(wave)) {
-      return 'СУПЕРСОЛДАТ';
+      return boss.super;
     }
     return null;
   }

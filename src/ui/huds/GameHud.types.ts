@@ -5,11 +5,10 @@ export type HudFrame = {
     bannerY: number;
 };
 
-// Строка списка способностей. Картинка, подпись и откат лежат в AbilityList.
+// Строка списка способностей. Картинка и откат лежат в AbilityList. Подпись — в locale.
 export type HudAbility = {
     id: string;
     texture: string;
-    hint: string;
     cooldownMs: number;
     iconRadius: number;
 };
@@ -23,7 +22,6 @@ export type AbilityIcon = {
     time: Phaser.GameObjects.Text;
     lit: boolean;
     owned: boolean;
-    hint: string;
     cooldownMs: number;
     iconRadius: number;
     request?: () => void;

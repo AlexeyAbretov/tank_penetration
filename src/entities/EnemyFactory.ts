@@ -14,6 +14,7 @@ import { PickupTruck } from './PickupTruck';
 import { RocketBuggy } from './RocketBuggy';
 import { RocketInfantry } from './RocketInfantry';
 import { SuperSoldier } from './SuperSoldier';
+import { t } from '../locale';
 import type { SpawnContext, TroopKind } from '../types/SpawnContext';
 import type { EnemySaveKind } from '../types/EnemySave';
 import type { WaveUnit } from '../types/WaveUnit';
@@ -523,26 +524,23 @@ export class EnemyFactory {
       }
     }
     const names: string[] = [];
+    const boss = t().boss;
     if (soldier) {
-      names.push('СУПЕРСОЛДАТ');
+      names.push(boss.super);
     }
     if (tank) {
-      names.push('ТЯЖЁЛЫЙ ТАНК');
+      names.push(boss.heavy);
     }
     if (this.carrierCount(wave) > 0) {
-      names.push('ДРОНОМАТКА');
+      names.push(boss.carrier);
     }
     if (this.btrCount(wave) > 0) {
-      names.push('БТР');
+      names.push(boss.btr);
     }
     if (names.length === 0) {
       return null;
     }
-    if (names.length === 1) {
-      return names[0];
-    }
-    const last = names[names.length - 1];
-    return `${names.slice(0, -1).join(', ')} И ${last}`;
+    return boss.join(names);
   }
 
   protected static growthRank(wave: number, debutWave: number): number {

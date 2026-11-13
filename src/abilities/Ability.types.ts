@@ -9,7 +9,6 @@ export type AbilityConfig = {
 export type Ability = {
     id: string;
     texture: string;
-    hint: string;
     cooldownMs: number;
     iconRadius: number;
     path: string;

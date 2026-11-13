@@ -15,6 +15,7 @@ import {
   paintOrderBar,
 } from '../militaryDialog';
 import { scoreMarkKey } from '../../gfx/scoreMark';
+import { t } from '../../locale';
 
 export type ProgressCardView = {
   title: string;
@@ -106,6 +107,9 @@ export class ProgressShopPanel {
   readonly container: Phaser.GameObjects.Container;
 
   private readonly scoreText: Phaser.GameObjects.Text;
+  private readonly titleText: Phaser.GameObjects.Text;
+  private readonly freshLabel: Phaser.GameObjects.Text;
+  private readonly fightLabel: Phaser.GameObjects.Text;
   // Правый край знака прижат к числу. Дебаг-наследник ставит «+» слева от него.
   protected readonly scoreMark: Phaser.GameObjects.Image;
   private readonly scoreAspect: number;
@@ -141,13 +145,14 @@ export class ProgressShopPanel {
     paintFieldRule(rule, RULE_Y, PANEL_W / 2 - 36);
 
     const title = scene.add
-      .text(0, TITLE_Y, 'БАЗА РАЗБИТА', {
+      .text(0, TITLE_Y, t().defeat.title, {
         fontSize: '40px',
         color: fieldInk,
         stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
+    this.titleText = title;
 
     const frame = scene.textures.get(scoreMarkKey).get();
     this.scoreAspect = frame.width / frame.height;
@@ -170,13 +175,22 @@ export class ProgressShopPanel {
       this.scoreText,
     ]);
 
-    const fresh = this.makeButton(scene, FRESH_X, BUTTON_Y, BUTTON_W, 'НОВАЯ ИГРА', () => shop.wipeAndRestart());
-    const next = this.makeButton(scene, NEXT_X, BUTTON_Y, BUTTON_W, 'В БОЙ', () => shop.closeAndRestart());
-    this.container.add([fresh, next]);
+    const fresh = this.makeButton(scene, FRESH_X, BUTTON_Y, BUTTON_W, t().defeat.newGame, () => shop.wipeAndRestart());
+    const next = this.makeButton(scene, NEXT_X, BUTTON_Y, BUTTON_W, t().defeat.fight, () => shop.closeAndRestart());
+    this.freshLabel = fresh.label;
+    this.fightLabel = next.label;
+    this.container.add([fresh.root, next.root]);
 
     // Выше игрового UI и окна между волнами. Пауза (90) остаётся сверху.
     this.container.setDepth(85).setVisible(false);
     this.layout();
+  }
+
+  applyLanguage(): void {
+    const copy = t().defeat;
+    this.titleText.setText(copy.title);
+    this.freshLabel.setText(copy.newGame);
+    this.fightLabel.setText(copy.fight);
   }
 
   // Поле шире 1280 — окно и затемнение остаются по центру.
@@ -461,7 +475,7 @@ export class ProgressShopPanel {
     w: number,
     label: string,
     fire: () => void,
-  ): Phaser.GameObjects.Container {
+  ): { root: Phaser.GameObjects.Container; label: Phaser.GameObjects.Text } {
     const button = scene.add.container(x, y);
     const face = scene.add.graphics();
     paintOrderBar(face, w, 52);
@@ -477,7 +491,7 @@ export class ProgressShopPanel {
         fire();
       }
     });
-    return button;
+    return { root: button, label: text };
   }
 
   private arm(zone: Phaser.GameObjects.Container, w: number, h: number, fire: () => void): void {

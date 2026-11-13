@@ -6,6 +6,7 @@ import { AbilityIcon, AutoApplyBadge, HudAbility, HudFrame } from './GameHud.typ
 
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 import { AbilityList, AutoAimAbilityIcon, AutoFireAbilityIcon, AutoShopAbilityIcon, cooldownLabel } from '../../abilities';
+import { t, type AbilityId, type KeyLine } from '../../locale';
 import { coinMarkKey } from '../../gfx/coinMark';
 import { scoreMarkKey } from '../../gfx/scoreMark';
 import { hpMarkColor, preloadTextures } from '../../gfx/textures';
@@ -106,6 +107,14 @@ export class GameHud {
   private readonly settingsGear: Phaser.GameObjects.Graphics;
   private readonly pauseOverlay: Phaser.GameObjects.Container;
   private readonly pauseDim: Phaser.GameObjects.Rectangle;
+  private pauseTitle!: Phaser.GameObjects.Text;
+  private pauseHint!: Phaser.GameObjects.Text;
+  private pauseFresh!: Phaser.GameObjects.Text;
+  private wave = 0;
+  private bannerWave = 0;
+  private bannerBoss = false;
+  private bannerTitle: string | null = null;
+  private bannerLive = false;
   protected readonly frame: HudFrame;
   private maxHp: number;
   private hasteCycle?: () => void;
@@ -200,7 +209,7 @@ export class GameHud {
       .setOrigin(0, 0.5)
       .setDepth(51);
     this.waveText = scene.add
-      .text(0, this.statusY, 'WAVE  0', { ...this.statusStyle, color: '#e8c48a' })
+      .text(0, this.statusY, t().hud.wave(0), { ...this.statusStyle, color: '#e8c48a' })
       .setOrigin(0, 0.5)
       .setDepth(51);
     const coinFrame = scene.textures.get(coinMarkKey).get();
@@ -319,7 +328,7 @@ export class GameHud {
     this.keysPlate = scene.add.graphics();
     this.keysClose = this.makeKeysClose(scene);
     this.keysTitle = scene.add
-      .text(0, 0, 'КЛАВИШИ', {
+      .text(0, 0, t().hud.keys, {
         fontSize: '32px',
         color: fieldInk,
         stroke: fieldInkStroke,
@@ -353,29 +362,33 @@ export class GameHud {
     paintFieldPlate(pausePlate, pauseW, pauseH);
     const pauseRule = scene.add.graphics();
     paintFieldRule(pauseRule, -32, 180);
+    const hudCopy = t().hud;
     const pauseTitle = scene.add
-      .text(0, -70, 'ПАУЗА', {
+      .text(0, -70, hudCopy.pause, {
         fontSize: '48px',
         color: fieldInk,
         stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
+    this.pauseTitle = pauseTitle;
     const pauseHint = scene.add
-      .text(0, -8, 'Esc, чтобы продолжить', {
+      .text(0, -8, hudCopy.resume, {
         fontSize: '20px',
         color: fieldPaper,
       })
       .setOrigin(0.5);
+    this.pauseHint = pauseHint;
     const fresh = scene.add.container(0, 78);
     const freshFace = scene.add.graphics();
     paintOrderBar(freshFace, 300, 52);
     const freshLabel = scene.add
-      .text(0, 0, 'НОВАЯ ИГРА', {
+      .text(0, 0, hudCopy.newGame, {
         fontSize: '18px',
         color: fieldInk,
       })
       .setOrigin(0.5);
+    this.pauseFresh = freshLabel;
     fresh.add([freshFace, freshLabel]);
     fresh.setInteractive({
       hitArea: new Phaser.Geom.Rectangle(-150, -26, 300, 52),
@@ -480,7 +493,8 @@ export class GameHud {
   }
 
   setWave(wave: number): void {
-    this.waveText.setText(`WAVE  ${wave}`);
+    this.wave = wave;
+    this.waveText.setText(t().hud.wave(wave));
 
     this.layoutStatus();
   }
@@ -531,14 +545,38 @@ export class GameHud {
 
   private paintTankStats(): void {
     const stats = this.tankStats;
-    const fireSec = (stats.fireDelayMs / 1000).toFixed(2);
-    const flightSec = (stats.flightMs / 1000).toFixed(2);
-    const mode = this.autoFireMode ? 'авто' : 'ЛКМ';
-    const coins = stats.coinBonus > 0 ? `   МОНЕТЫ +${stats.coinBonus}` : '';
-    const points = stats.pointBonus > 0 ? `   ОЧКИ +${stats.pointBonus}` : '';
     this.tankStatsText.setText(
-      `УРОН  ${stats.damage}   ВЗРЫВ  ${stats.blastRadius}   ПРОБИВ  ${stats.pierceChance}%   ОГОНЬ  ${fireSec} с   ПОЛЁТ  ${flightSec} с${coins}${points}   ${mode}`,
+      t().hud.stats({
+        damage: stats.damage,
+        blast: stats.blastRadius,
+        pierce: stats.pierceChance,
+        fire: (stats.fireDelayMs / 1000).toFixed(2),
+        flight: (stats.flightMs / 1000).toFixed(2),
+        coins: stats.coinBonus,
+        points: stats.pointBonus,
+        auto: this.autoFireMode,
+      }),
     );
+  }
+
+  // Уже нарисованные надписи. Открытый список клавиш собирается заново.
+  applyLanguage(): void {
+    const copy = t().hud;
+    this.waveText.setText(copy.wave(this.wave));
+    this.layoutStatus();
+    if (this.tankStatsReady) {
+      this.paintTankStats();
+    }
+    this.pauseTitle.setText(copy.pause);
+    this.pauseHint.setText(copy.resume);
+    this.pauseFresh.setText(copy.newGame);
+    this.keysTitle.setText(copy.keys);
+    if (this.keysOverlay.visible) {
+      this.layoutKeys();
+    }
+    if (this.bannerLive && this.waveBanner.alpha > 0.05) {
+      this.paintWaveBanner(this.bannerWave, this.bannerBoss, this.bannerTitle);
+    }
   }
 
   onHasteCycle(cycle: () => void): void {
@@ -929,8 +967,11 @@ export class GameHud {
 
   showWaveBanner(wave: number, boss = false, title: string | null = null): void {
     const scene = this.waveBanner.scene;
-    const name = boss ? (title ? `БОСС\n${title}` : 'БОСС') : `ВОЛНА ${wave}`;
-    this.waveBanner.setText(name);
+    this.bannerWave = wave;
+    this.bannerBoss = boss;
+    this.bannerTitle = title;
+    this.bannerLive = true;
+    this.paintWaveBanner(wave, boss, title);
     this.waveBanner.setFontSize(boss && title ? 40 : 56);
     this.waveBanner.setLineSpacing(6);
     this.waveBanner.setColor(boss ? '#ff5a48' : '#f3d56a');
@@ -951,43 +992,58 @@ export class GameHud {
     });
   }
 
+  private paintWaveBanner(wave: number, boss: boolean, title: string | null): void {
+    const copy = t().hud;
+    const name = boss ? (title ? copy.bossNamed(title) : copy.boss) : copy.bannerWave(wave);
+    this.waveBanner.setText(name);
+  }
+
   private syncControls(): void {
     this.layoutKeys();
   }
 
   // Строки окна. Купленная способность дописывает свою, пока её нет — в списке её нет.
-  protected controlHints(): readonly string[] {
-    const hints = ['мышь — прицел', 'ЛКМ — огонь', '+ — темп', 'Esc — пауза', 'шестерёнка — звук'];
+  protected controlHints(): readonly KeyLine[] {
+    const keys = t().keys;
+    const hints: KeyLine[] = [keys.aim, keys.fire, keys.haste, keys.pause, keys.sound];
     if (this.autoShopOwned) {
-      hints.push('иконка справа — автопокупка');
+      hints.push(keys.autoShop);
     }
     if (this.autoFireOwned) {
-      hints.push('иконка справа — автострельба');
+      hints.push(keys.autoFire);
     }
     if (this.autoAimOwned) {
-      hints.push(this.autoShopOwned ? 'слева от автопокупки — автонаведение' : 'иконка у края — автонаведение');
+      hints.push(this.autoShopOwned ? keys.autoAimBeside : keys.autoAimEdge);
     }
     for (const icon of this.abilities) {
       if (icon.owned) {
-        hints.push(icon.hint);
+        hints.push(this.abilityLine(icon.id));
       }
     }
     if (this.autoApplyShown('artillery')) {
-      hints.push('выключатель удара — автоприменение');
+      hints.push(keys.artillerySwitch);
     }
     if (this.autoApplyShown('mines')) {
-      hints.push('выключатель мин — автоприменение');
+      hints.push(keys.minesSwitch);
     }
     if (this.autoApplyShown('ion')) {
-      hints.push('выключатель луча — автоприменение');
+      hints.push(keys.ionSwitch);
     }
     if (this.autoApplyShown('wall')) {
-      hints.push('выключатель стены — автоприменение');
+      hints.push(keys.wallSwitch);
     }
     if (this.autoApplyShown('bomber')) {
-      hints.push('выключатель бомб — автоприменение');
+      hints.push(keys.bomberSwitch);
     }
     return hints;
+  }
+
+  private abilityLine(id: string): KeyLine {
+    const lines = t().keys.ability;
+    if (id in lines) {
+      return lines[id as AbilityId];
+    }
+    return { key: id, action: '' };
   }
 
   private setKeysOpen(open: boolean): void {
@@ -1031,12 +1087,9 @@ export class GameHud {
     const actionStyle = { ...keyStyle, color: fieldPaper };
 
     hints.forEach((line, index) => {
-      const parts = line.split(' — ');
-      const key = parts[0] ?? line;
-      const action = parts.length > 1 ? parts.slice(1).join(' — ') : '';
       const y = firstY + index * rowH;
-      const keyText = scene.add.text(keyX, y, key, keyStyle).setOrigin(0, 0.5);
-      const actionText = scene.add.text(actionX, y, action, actionStyle).setOrigin(0, 0.5);
+      const keyText = scene.add.text(keyX, y, line.key, keyStyle).setOrigin(0, 0.5);
+      const actionText = scene.add.text(actionX, y, line.action, actionStyle).setOrigin(0, 0.5);
       this.keysOverlay.add([keyText, actionText]);
       this.keyRows.push(keyText, actionText);
     });
@@ -1086,7 +1139,6 @@ export class GameHud {
       time,
       lit: false,
       owned: false,
-      hint: spec.hint,
       cooldownMs: spec.cooldownMs,
       iconRadius: spec.iconRadius,
     };

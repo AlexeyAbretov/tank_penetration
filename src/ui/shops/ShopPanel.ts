@@ -13,6 +13,7 @@ import {
   paintOrderBar,
 } from '../militaryDialog';
 import { coinMarkKey } from '../../gfx/coinMark';
+import { t } from '../../locale';
 
 export type ShopCardView = {
   title: string;
@@ -100,6 +101,8 @@ export class ShopPanel {
   private readonly dim: Phaser.GameObjects.Rectangle;
   private readonly offers: Offer[] = [];
   private readonly waveButton: Phaser.GameObjects.Graphics;
+  private readonly titleText: Phaser.GameObjects.Text;
+  private readonly nextLabel: Phaser.GameObjects.Text;
   private readonly tabs: Tab[] = [];
 
   private paused = false;
@@ -130,13 +133,14 @@ export class ShopPanel {
     paintFieldRule(rule, RULE_Y, PANEL_W / 2 - 36);
 
     const title = scene.add
-      .text(0, TITLE_Y, 'МАГАЗИН', {
+      .text(0, TITLE_Y, t().shop.title, {
         fontSize: '40px',
         color: fieldInk,
         stroke: fieldInkStroke,
         strokeThickness: 6,
       })
       .setOrigin(0.5);
+    this.titleText = title;
 
     const frame = scene.textures.get(coinMarkKey).get();
     this.coinAspect = frame.width / frame.height;
@@ -160,11 +164,12 @@ export class ShopPanel {
       }
     });
     const nextLabel = scene.add
-      .text(0, BUTTON_Y, 'СЛЕДУЮЩАЯ ВОЛНА', {
+      .text(0, BUTTON_Y, t().shop.nextWave, {
         fontSize: '18px',
         color: fieldInk,
       })
       .setOrigin(0.5);
+    this.nextLabel = nextLabel;
 
     this.container = scene.add.container(this.screen.width / 2, this.screen.height / 2, [
       this.dim,
@@ -181,6 +186,12 @@ export class ShopPanel {
     // Выше игрового UI (51–60), ниже плашки поражения (80) и паузы (90).
     this.container.setDepth(70).setVisible(false);
     this.place();
+  }
+
+  applyLanguage(): void {
+    const copy = t().shop;
+    this.titleText.setText(copy.title);
+    this.nextLabel.setText(copy.nextWave);
   }
 
   // Поле шире 1280 — окно и затемнение остаются по центру.

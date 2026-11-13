@@ -16,6 +16,7 @@ import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
 import { TankBaseHp } from '../entities/Tank/TankBaseHp';
 import { GAME } from '../gameConfig';
+import { t } from '../locale';
 import { shopPrice } from '../shopPrice';
 import {
   ProgressShopPanel,
@@ -416,6 +417,29 @@ export class ProgressShopController {
   // До bind() панели ещё нет: досыпка тогда не к чему привязана.
   protected isShown(): boolean {
     return this.panel?.container.visible ?? false;
+  }
+
+  // Заголовок окна и, если витрина открыта, карточки на новом языке.
+  applyLanguage(): void {
+    this.panel.applyLanguage();
+    if (this.isShown()) {
+      this.panel.refresh(this.view());
+    }
+  }
+
+  private step(maxed: boolean, level: number, now: string | number, next: string | number): string {
+    const line = t().line;
+    return maxed ? line.now(level, now) : line.step(level, now, next);
+  }
+
+  private pctLine(maxed: boolean, level: number, now: number, next: number): string {
+    const line = t().line;
+    return maxed ? line.pct(level, now) : line.pctStep(level, now, next);
+  }
+
+  private timesLine(maxed: boolean, level: number, now: string, next: string): string {
+    const line = t().line;
+    return maxed ? line.times(level, now) : line.timesStep(level, now, next);
   }
 
   open(): void {
@@ -877,7 +901,7 @@ export class ProgressShopController {
     return {
       score,
       tabs: [
-        this.tab('tank', 'Танк', [
+        this.tab('tank', t().tabs.tank, [
           this.damageCard(score),
           this.blastCard(score),
           this.speedCard(score),
@@ -889,48 +913,48 @@ export class ProgressShopController {
           this.autoFireCard(score),
           this.autoAimCard(score),
         ]),
-        this.tab('gun', 'Пулемёт', [
+        this.tab('gun', t().tabs.gun, [
           this.bulletsCard(score),
           this.mgDamageCard(score),
           this.mgSpeedCard(score),
           this.mgFlightCard(score),
         ]),
-        this.tab('wire', 'Колючая проволока', [this.wireDamageCard(score)]),
-        this.tab('flame', 'Огнемёт', [this.flameDamageCard(score)]),
-        this.tab('laser', 'Лазерная установка', [this.laserCard(score), this.laserCooldownCard(score)]),
-        this.tab('salvo', 'РСЗО', [this.salvoRocketsCard(score), this.salvoDamageCard(score)]),
-        this.tab('artillery', 'Артиллерия', [
+        this.tab('wire', t().tabs.wire, [this.wireDamageCard(score)]),
+        this.tab('flame', t().tabs.flame, [this.flameDamageCard(score)]),
+        this.tab('laser', t().tabs.laser, [this.laserCard(score), this.laserCooldownCard(score)]),
+        this.tab('salvo', t().tabs.salvo, [this.salvoRocketsCard(score), this.salvoDamageCard(score)]),
+        this.tab('artillery', t().tabs.artillery, [
           this.artilleryShellsCard(score),
           this.artilleryDamageCard(score),
           this.artilleryCooldownCard(score),
           this.autoArtilleryCard(score),
         ]),
-        this.tab('ion', 'Ионная пушка', [
+        this.tab('ion', t().tabs.ion, [
           this.ionDamageCard(score),
           this.ionCooldownCard(score),
           this.ionSweepCard(score),
           this.ionWidthCard(score),
           this.autoIonCard(score),
         ]),
-        this.tab('mines', 'Мина', [
+        this.tab('mines', t().tabs.mines, [
           this.minesCountCard(score),
           this.minesDamageCard(score),
           this.minesCooldownCard(score),
           this.autoMinesCard(score),
         ]),
-        this.tab('nuclear', 'Атомный взрыв', [this.nuclearCooldownCard(score)]),
-        this.tab('wall', 'Энергетическая стена', [
+        this.tab('nuclear', t().tabs.nuclear, [this.nuclearCooldownCard(score)]),
+        this.tab('wall', t().tabs.wall, [
           this.wallDurationCard(score),
           this.wallCooldownCard(score),
           this.autoWallCard(score),
         ]),
-        this.tab('bomber', 'Бомбардировщик', [
+        this.tab('bomber', t().tabs.bomber, [
           this.bomberDamageCard(score),
           this.bomberCooldownCard(score),
           this.autoBomberCard(score),
         ]),
-        this.tab('emp', 'ЭМИ', [this.empCooldownCard(score), this.empStunCard(score)]),
-        this.tab('resources', 'Ресурсы', [
+        this.tab('emp', t().tabs.emp, [this.empCooldownCard(score), this.empStunCard(score)]),
+        this.tab('resources', t().tabs.resources, [
           this.coinsCard(score),
           this.pointsCard(score),
           this.autoShopCard(score),
@@ -947,9 +971,9 @@ export class ProgressShopController {
     const owned = this.progress.autoFire;
     const price = shopPrice(ProgressSave.autoFireCost());
     return {
-      title: 'автострельба',
+      title: t().auto.fire,
       buy: () => this.buyAutoFire(),
-      info: 'танк стреляет сам',
+      info: t().auto.fireInfo,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -961,9 +985,9 @@ export class ProgressShopController {
     const owned = this.progress.autoAim;
     const price = shopPrice(ProgressSave.autoAimCost());
     return {
-      title: 'автонаведение',
+      title: t().auto.aim,
       buy: () => this.buyAutoAim(),
-      info: owned ? 'держит одну цель' : 'башня сама держит врага',
+      info: owned ? t().auto.aimHeld : t().auto.aimOffer,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -975,9 +999,9 @@ export class ProgressShopController {
     const owned = this.progress.autoShop;
     const price = shopPrice(ProgressSave.autoShopCost());
     return {
-      title: 'автопокупка',
+      title: t().auto.shop,
       buy: () => this.buyAutoShop(),
-      info: owned ? 'через 1 с на следующую волну' : 'магазин волны тратит монеты',
+      info: owned ? t().auto.shopHeld : t().auto.shopOffer,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -989,9 +1013,9 @@ export class ProgressShopController {
     const owned = this.progress.autoArtillery;
     const price = shopPrice(ProgressSave.autoArtilleryCost());
     return {
-      title: 'автоприменение',
+      title: t().auto.use,
       buy: () => this.buyAutoArtillery(),
-      info: 'удар сам через 1 с',
+      info: t().auto.strike,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -1003,9 +1027,9 @@ export class ProgressShopController {
     const owned = this.progress.autoIon;
     const price = shopPrice(ProgressSave.autoIonCost());
     return {
-      title: 'автоприменение',
+      title: t().auto.use,
       buy: () => this.buyAutoIon(),
-      info: 'луч сам через 1 с',
+      info: t().auto.beam,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -1017,9 +1041,9 @@ export class ProgressShopController {
     const owned = this.progress.autoBomber;
     const price = shopPrice(ProgressSave.autoBomberCost());
     return {
-      title: 'автоприменение',
+      title: t().auto.use,
       buy: () => this.buyAutoBomber(),
-      info: 'пролёт сам через 1 с',
+      info: t().auto.flyover,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -1031,9 +1055,9 @@ export class ProgressShopController {
     const owned = this.progress.autoWall;
     const price = shopPrice(ProgressSave.autoWallCost());
     return {
-      title: 'автоприменение',
+      title: t().auto.use,
       buy: () => this.buyAutoWall(),
-      info: 'гасит входящий выстрел',
+      info: t().auto.wall,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -1045,9 +1069,9 @@ export class ProgressShopController {
     const owned = this.progress.autoMines;
     const price = shopPrice(ProgressSave.autoMinesCost());
     return {
-      title: 'автоприменение',
+      title: t().auto.use,
       buy: () => this.buyAutoMines(),
-      info: 'мины сами через 1 с',
+      info: t().auto.mines,
       cost: this.coin(price),
       open: !owned,
       owned,
@@ -1059,9 +1083,9 @@ export class ProgressShopController {
     const level = this.progress.coins;
     const price = this.price(level);
     return {
-      title: '+1 монета',
+      title: t().card.coin,
       buy: () => this.buyCoins(),
-      info: `ур. ${level} · +${level}→+${level + 1}`,
+      info: t().line.plus(level),
       cost: this.coin(price),
       open: true,
       canBuy: score >= price,
@@ -1072,9 +1096,9 @@ export class ProgressShopController {
     const level = this.progress.points;
     const price = this.price(level);
     return {
-      title: '+1 очко',
+      title: t().card.point,
       buy: () => this.buyPoints(),
-      info: `ур. ${level} · +${level}→+${level + 1}`,
+      info: t().line.plus(level),
       cost: this.coin(price),
       open: true,
       canBuy: score >= price,
@@ -1086,9 +1110,9 @@ export class ProgressShopController {
     const price = this.price(level);
     const now = Infantry.shellDamage + level;
     return {
-      title: '+1 урон',
+      title: t().card.damage,
       buy: () => this.buyDamage(),
-      info: `ур. ${level} · ${now}→${now + 1}`,
+      info: t().line.step(level, now, now + 1),
       cost: this.coin(price),
       open: true,
       canBuy: score >= price,
@@ -1102,10 +1126,10 @@ export class ProgressShopController {
     const next = Tank.blastRadiusFor(level + 1);
     const maxed = level >= Tank.maxProgressBlastLevel;
     return {
-      title: '+1 взрыв',
+      title: t().card.blast,
       buy: () => this.buyBlast(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1120,10 +1144,10 @@ export class ProgressShopController {
     const delay = this.formatSeconds(now);
     const ahead = this.formatSeconds(next);
     return {
-      title: '−0.01 с перезарядки',
+      title: t().card.reload001,
       buy: () => this.buySpeed(),
-      info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${ahead}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, delay, ahead),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1138,10 +1162,10 @@ export class ProgressShopController {
     const flight = this.formatSeconds(now);
     const ahead = this.formatSeconds(next);
     return {
-      title: '−0.10 с полёта',
+      title: t().card.flight01,
       buy: () => this.buyFlight(),
-      info: maxed ? `ур. ${level} · ${flight}` : `ур. ${level} · ${flight}→${ahead}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, flight, ahead),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1154,10 +1178,10 @@ export class ProgressShopController {
     const next = Tank.knockbackPxFor(0, level + 1);
     const maxed = level >= Tank.maxProgressKnockbackLevel;
     return {
-      title: '+1 отталкивание',
+      title: t().card.knock1,
       buy: () => this.buyKnockback(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1170,10 +1194,10 @@ export class ProgressShopController {
     const next = Tank.pierceChanceFor(0, level + 1);
     const maxed = level >= Tank.maxProgressPierceLevel;
     return {
-      title: '+1% пробивание',
+      title: t().card.pierce1,
       buy: () => this.buyPierce(),
-      info: maxed ? `ур. ${level} · ${now}%` : `ур. ${level} · ${now}%→${next}%`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.pctLine(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1186,10 +1210,10 @@ export class ProgressShopController {
     const next = Tank.absorbChanceFor(level + 1);
     const maxed = level >= Tank.maxAbsorbChance;
     return {
-      title: '+1% поглощение урона',
+      title: t().card.absorb,
       buy: () => this.buyAbsorb(),
-      info: maxed ? `ур. ${level} · ${now}%` : `ур. ${level} · ${now}%→${next}%`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.pctLine(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1202,10 +1226,10 @@ export class ProgressShopController {
     const next = TankBaseHp.hpForLevel(level + 1);
     const maxed = level >= TankBaseHp.maxLevel;
     return {
-      title: '+10 здоровья',
+      title: t().card.hp,
       buy: () => this.buyHp(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1218,10 +1242,10 @@ export class ProgressShopController {
     const next = MachineGun.bulletCount(level + 1);
     const maxed = level >= MachineGun.maxBulletLevel;
     return {
-      title: '+1 пуля',
+      title: t().card.bullet,
       buy: () => this.buyBullets(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1236,10 +1260,10 @@ export class ProgressShopController {
     const delay = this.formatSeconds(now);
     const ahead = this.formatSeconds(next);
     return {
-      title: '−0.01 с перезарядки',
+      title: t().card.reload001,
       buy: () => this.buyMgSpeed(),
-      info: maxed ? `ур. ${level} · ${delay}` : `ур. ${level} · ${delay}→${ahead}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, delay, ahead),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1254,10 +1278,10 @@ export class ProgressShopController {
     const flight = this.formatSeconds(now);
     const ahead = this.formatSeconds(next);
     return {
-      title: '−0.10 с полёта',
+      title: t().card.flight01,
       buy: () => this.buyMgFlight(),
-      info: maxed ? `ур. ${level} · ${flight}` : `ур. ${level} · ${flight}→${ahead}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, flight, ahead),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1270,10 +1294,10 @@ export class ProgressShopController {
     const next = LaserDefense.shotCount(level + 1);
     const maxed = level >= LaserDefense.maxShotLevel;
     return {
-      title: '+1 луч',
+      title: t().card.beam,
       buy: () => this.buyLaserShots(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1286,12 +1310,10 @@ export class ProgressShopController {
     const next = LaserDefense.fireIntervalFor(level + 1);
     const maxed = !LaserDefense.progressCooldownShortens(level);
     return {
-      title: '−1 с перезарядки',
+      title: t().card.reload1,
       buy: () => this.buyLaserCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1304,10 +1326,10 @@ export class ProgressShopController {
     const next = RocketSalvo.rocketCount(level + 1);
     const maxed = level >= RocketSalvo.maxRocketLevel;
     return {
-      title: '+1 ракета',
+      title: t().card.rocket,
       buy: () => this.buySalvoRockets(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1338,12 +1360,10 @@ export class ProgressShopController {
     const next = BomberStrike.cooldownFor(BomberStrike.shopCooldownLevel, level + 1);
     const maxed = !BomberStrike.progressCooldownShortens(level);
     return {
-      title: '−0,1 мин перезарядки',
+      title: t().card.reloadMin,
       buy: () => this.buyBomberCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1389,9 +1409,9 @@ export class ProgressShopController {
     const price = this.mgDamagePrice(level);
     const now = base + level;
     return {
-      title: '+1 урон',
+      title: t().card.damage,
       buy,
-      info: `ур. ${level} · ${now}→${now + 1}`,
+      info: t().line.step(level, now, now + 1),
       cost: this.coin(price),
       open: true,
       canBuy: score >= price,
@@ -1414,10 +1434,10 @@ export class ProgressShopController {
     const next = this.shellCount(level + 1);
     const maxed = level >= ArtilleryStrikeAbilityConfig.maxShellLevel();
     return {
-      title: '+1 снаряд',
+      title: t().card.shell,
       buy: () => this.buyArtilleryShells(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1430,10 +1450,10 @@ export class ProgressShopController {
     const next = Mines.mineCount(level + 1);
     const maxed = level >= Mines.maxMineLevel;
     return {
-      title: '+1 мина',
+      title: t().card.mine,
       buy: () => this.buyMinesCount(),
-      info: maxed ? `ур. ${level} · ${now}` : `ур. ${level} · ${now}→${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1447,12 +1467,10 @@ export class ProgressShopController {
     const next = cooldownFor(0, level + 1, EmpFlashAbilityConfig);
     const maxed = !this.progressCooldownShortens(level, 0, EmpFlashAbilityConfig);
     return {
-      title: '−1 с перезарядки',
+      title: t().card.reload1,
       buy: () => this.buyEmpCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1465,12 +1483,15 @@ export class ProgressShopController {
     const next = EmpFlashAbilityConfig.stunFor(0, level + 1);
     const maxed = !EmpFlashAbilityConfig.progressStunGrows(level);
     return {
-      title: '+0.10 с оглушения',
+      title: t().card.stun,
       buy: () => this.buyEmpStun(),
-      info: maxed
-        ? `ур. ${level} · ${EmpFlashAbilityConfig.stunLabel(now)}`
-        : `ур. ${level} · ${EmpFlashAbilityConfig.stunLabel(now)}→${EmpFlashAbilityConfig.stunLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(
+        maxed,
+        level,
+        EmpFlashAbilityConfig.stunLabel(now),
+        EmpFlashAbilityConfig.stunLabel(next),
+      ),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1489,12 +1510,10 @@ export class ProgressShopController {
       ArtilleryStrikeAbilityConfig);
     const maxed = !this.progressCooldownShortens(level, 0, ArtilleryStrikeAbilityConfig);
     return {
-      title: '−1 с перезарядки',
+      title: t().card.reload1,
       buy: () => this.buyArtilleryCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1507,12 +1526,10 @@ export class ProgressShopController {
     const next = IonCannon.cooldownFor(IonCannon.shopCooldownLevel, level + 1);
     const maxed = !IonCannon.progressCooldownShortens(level);
     return {
-      title: '−1 с перезарядки',
+      title: t().card.reload1,
       buy: () => this.buyIonCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1527,10 +1544,10 @@ export class ProgressShopController {
     const sweep = this.formatSeconds(now);
     const ahead = this.formatSeconds(next);
     return {
-      title: '−0.20 с хода',
+      title: t().card.sweep02,
       buy: () => this.buyIonSweep(),
-      info: maxed ? `ур. ${level} · ${sweep}` : `ур. ${level} · ${sweep}→${ahead}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, sweep, ahead),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1543,10 +1560,10 @@ export class ProgressShopController {
     const next = IonCannon.widthScale(level + 1).toFixed(1);
     const maxed = !IonCannon.progressWidthGrows(level);
     return {
-      title: '+10% ширины',
+      title: t().card.width,
       buy: () => this.buyIonWidth(),
-      info: maxed ? `ур. ${level} · ×${now}` : `ур. ${level} · ×${now}→×${next}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.timesLine(maxed, level, now, next),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1559,12 +1576,10 @@ export class ProgressShopController {
     const next = Mines.cooldownFor(Mines.shopCooldownLevel, level + 1);
     const maxed = !Mines.progressCooldownShortens(level);
     return {
-      title: '−1 с перезарядки',
+      title: t().card.reload1,
       buy: () => this.buyMinesCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1577,12 +1592,10 @@ export class ProgressShopController {
     const next = NuclearStrike.cooldownFor(NuclearStrike.shopCooldownLevel, level + 1);
     const maxed = !NuclearStrike.progressCooldownShortens(level);
     return {
-      title: '−1 с перезарядки',
+      title: t().card.reload1,
       buy: () => this.buyNuclearCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1595,12 +1608,15 @@ export class ProgressShopController {
     const next = EnergyWall.durationFor(EnergyWall.shopDurationLevel, level + 1);
     const maxed = !EnergyWall.progressDurationLengthens(level);
     return {
-      title: '+0.10 с длительности',
+      title: t().card.duration,
       buy: () => this.buyWallDuration(),
-      info: maxed
-        ? `ур. ${level} · ${EnergyWall.durationLabel(now)}`
-        : `ур. ${level} · ${EnergyWall.durationLabel(now)}→${EnergyWall.durationLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(
+        maxed,
+        level,
+        EnergyWall.durationLabel(now),
+        EnergyWall.durationLabel(next),
+      ),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1613,12 +1629,10 @@ export class ProgressShopController {
     const next = EnergyWall.cooldownFor(EnergyWall.shopCooldownLevel, level + 1);
     const maxed = !EnergyWall.progressCooldownShortens(level);
     return {
-      title: '−0.10 с перезарядки',
+      title: t().card.reload01,
       buy: () => this.buyWallCooldown(),
-      info: maxed
-        ? `ур. ${level} · ${cooldownLabel(now)}`
-        : `ур. ${level} · ${cooldownLabel(now)}→${cooldownLabel(next)}`,
-      cost: maxed ? 'макс.' : this.coin(price),
+      info: this.step(maxed, level, cooldownLabel(now), cooldownLabel(next)),
+      cost: maxed ? t().card.maxShort : this.coin(price),
       open: !maxed,
       canBuy: !maxed && score >= price,
     };
@@ -1629,9 +1643,9 @@ export class ProgressShopController {
     const price = this.mgDamagePrice(level);
     const now = MachineGun.shop.damage + level;
     return {
-      title: '+1 урон пули',
+      title: t().card.bulletDamage,
       buy: () => this.buyMgDamage(),
-      info: `ур. ${level} · ${now}→${now + 1}`,
+      info: t().line.step(level, now, now + 1),
       cost: this.coin(price),
       open: true,
       canBuy: score >= price,

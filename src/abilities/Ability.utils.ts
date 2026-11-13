@@ -1,3 +1,4 @@
+import { t } from "../locale";
 import { AbilityConfig } from "./Ability.types";
 
 // Карточка магазина держит десятую: шаг завесы 0,1 с. Кружок на поле считает целые секунды.
@@ -7,7 +8,7 @@ export const cooldownLabel = (ms: number, withSeconds = true, withTenths = true)
     if (totalSec < 60) {
         const text = Number.isInteger(totalSec) ? String(totalSec) : totalSec.toFixed(1);
 
-        return withSeconds ? `${text} с` : text;
+        return withSeconds ? t().time.seconds(text) : text;
     }
 
     const min = Math.floor(totalSec / 60);

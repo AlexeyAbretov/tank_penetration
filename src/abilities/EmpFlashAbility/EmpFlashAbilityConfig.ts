@@ -1,6 +1,7 @@
 // Числа ЭМИ. Урона нет: вспышка только держит живых и рвёт уже летящие ракеты.
 // Откат и длина глушения считаются здесь, магазины только покупают уровни.
 
+import { t } from '../../locale';
 import { AbilityConfig } from '../Ability.types';
 
 export const EmpFlashAbilityConfig: AbilityConfig & {
@@ -63,7 +64,7 @@ export const EmpFlashAbilityConfig: AbilityConfig & {
 
   // 2.0 с, следующий шаг 2.1 с. Потолок обоих магазинов — 3.0 с.
   stunLabel(ms: number): string {
-    return `${(ms / 1000).toFixed(1)} с`;
+    return t().time.seconds((ms / 1000).toFixed(1));
   },
 
   // Свой запас прогресса уже выбран — следующий уровень глушение не удлиняет.

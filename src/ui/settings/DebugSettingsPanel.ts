@@ -10,6 +10,7 @@
 
 import Phaser from 'phaser';
 import { FieldRuler } from '../../debug/FieldRuler';
+import { t } from '../../locale';
 import { Hitboxes } from '../../debug/Hitboxes';
 import { PierceMarks } from '../../debug/PierceMarks';
 import { TankDebugBaseHp } from '../../entities/Tank/TankDebugBaseHp';
@@ -38,6 +39,13 @@ export class DebugSettingsPanel extends SettingsPanel {
   private readonly hitboxLabel: Phaser.GameObjects.Text;
   private readonly rulerLabel: Phaser.GameObjects.Text;
   private readonly pierceLabel: Phaser.GameObjects.Text;
+  private readonly waveCaption: Phaser.GameObjects.Text;
+  private readonly hpCaption: Phaser.GameObjects.Text;
+  private readonly hitboxCaption: Phaser.GameObjects.Text;
+  private readonly rulerCaption: Phaser.GameObjects.Text;
+  private readonly pierceCaption: Phaser.GameObjects.Text;
+  private readonly hitboxButton: Phaser.GameObjects.Rectangle;
+  private readonly pierceButton: Phaser.GameObjects.Rectangle;
   private readonly scene: Phaser.Scene;
   private readonly view: { width: number; height: number };
 
@@ -62,12 +70,14 @@ export class DebugSettingsPanel extends SettingsPanel {
     this.doneLabel.y = DONE_Y;
     this.centerExtended();
 
-    this.container.add(this.caption(scene, WAVE_Y, 'Обычных в волне'));
-    this.container.add(this.caption(scene, HP_Y, 'Здоровье танка'));
+    const copy = t().debug;
+    this.waveCaption = this.caption(scene, WAVE_Y, copy.waveCount);
+    this.hpCaption = this.caption(scene, HP_Y, copy.tankHp);
+    this.container.add([this.waveCaption, this.hpCaption]);
 
     this.field = this.mountField(
       'debug-wave-count',
-      'Обычных в волне',
+      copy.waveCount,
       1,
       DebugEnemyFactory.regularMax,
       String(DebugEnemyFactory.regularCountOf()),
@@ -77,7 +87,7 @@ export class DebugSettingsPanel extends SettingsPanel {
 
     this.hpField = this.mountField(
       'debug-tank-hp',
-      'Здоровье танка',
+      copy.tankHp,
       TankDebugBaseHp.min,
       TankDebugBaseHp.max,
       String(TankDebugBaseHp.currentOf()),
@@ -85,25 +95,30 @@ export class DebugSettingsPanel extends SettingsPanel {
 
     this.placeFields();
 
-    const hitbox = this.makeLeftToggle(scene, 'Хитбокс', () => {
+    const hitbox = this.makeLeftToggle(scene, copy.hitbox, () => {
       Hitboxes.toggle();
       this.paintHitbox();
     });
     this.hitboxLabel = hitbox.label;
+    this.hitboxCaption = hitbox.caption;
+    this.hitboxButton = hitbox.button;
     this.paintHitbox();
 
-    const ruler = this.makeToggle(scene, RULER_BTN_X, 'Линейка', () => {
+    const ruler = this.makeToggle(scene, RULER_BTN_X, copy.ruler, () => {
       FieldRuler.toggle();
       this.paintRuler();
     });
     this.rulerLabel = ruler.label;
+    this.rulerCaption = ruler.caption;
     this.paintRuler();
 
-    const pierce = this.makeLeftToggle(scene, 'Пробитие', () => {
+    const pierce = this.makeLeftToggle(scene, copy.pierce, () => {
       PierceMarks.toggle();
       this.paintPierce();
     }, PIERCE_Y);
     this.pierceLabel = pierce.label;
+    this.pierceCaption = pierce.caption;
+    this.pierceButton = pierce.button;
     this.paintPierce();
 
     scene.scale.on(Phaser.Scale.Events.RESIZE, this.placeFields, this);
@@ -112,6 +127,23 @@ export class DebugSettingsPanel extends SettingsPanel {
       this.field.remove();
       this.hpField.remove();
     });
+  }
+
+  override applyLanguage(): void {
+    super.applyLanguage();
+    const copy = t().debug;
+    this.waveCaption.setText(copy.waveCount);
+    this.hpCaption.setText(copy.tankHp);
+    this.hitboxCaption.setText(copy.hitbox);
+    this.rulerCaption.setText(copy.ruler);
+    this.pierceCaption.setText(copy.pierce);
+    this.placeLeftToggle(this.hitboxCaption, this.hitboxButton, this.hitboxLabel);
+    this.placeLeftToggle(this.pierceCaption, this.pierceButton, this.pierceLabel);
+    this.field.setAttribute('aria-label', copy.waveCount);
+    this.hpField.setAttribute('aria-label', copy.tankHp);
+    this.paintHitbox();
+    this.paintRuler();
+    this.paintPierce();
   }
 
   override layout(): void {
@@ -162,14 +194,14 @@ export class DebugSettingsPanel extends SettingsPanel {
     title: string,
     onClick: () => void,
     y = TOGGLE_Y,
-  ): { label: Phaser.GameObjects.Text } {
+  ): { label: Phaser.GameObjects.Text; caption: Phaser.GameObjects.Text; button: Phaser.GameObjects.Rectangle } {
     const caption = scene.add
       .text(CONTENT_LEFT, y, title, {
         fontSize: '22px',
         color: '#d4ccb8',
       })
       .setOrigin(0, 0.5);
-    const btnX = CONTENT_LEFT + caption.width + GAP + TOGGLE_W / 2;
+    const btnX = this.leftToggleX(caption);
     const button = scene.add
       .rectangle(btnX, y, TOGGLE_W, INPUT_H, 0x1a2214)
       .setStrokeStyle(2, 0x6e6240)
@@ -182,7 +214,22 @@ export class DebugSettingsPanel extends SettingsPanel {
       .setOrigin(0.5);
     button.on('pointerup', onClick);
     this.container.add([caption, button, label]);
-    return { label };
+    return { label, caption, button };
+  }
+
+  // Кнопка едет за подписью: английское слово короче русского.
+  private placeLeftToggle(
+    caption: Phaser.GameObjects.Text,
+    button: Phaser.GameObjects.Rectangle,
+    label: Phaser.GameObjects.Text,
+  ): void {
+    const x = this.leftToggleX(caption);
+    button.x = x;
+    label.x = x;
+  }
+
+  private leftToggleX(caption: Phaser.GameObjects.Text): number {
+    return CONTENT_LEFT + caption.width + GAP + TOGGLE_W / 2;
   }
 
   private makeToggle(
@@ -190,7 +237,7 @@ export class DebugSettingsPanel extends SettingsPanel {
     btnX: number,
     title: string,
     onClick: () => void,
-  ): { label: Phaser.GameObjects.Text } {
+  ): { label: Phaser.GameObjects.Text; caption: Phaser.GameObjects.Text } {
     const caption = scene.add
       .text(btnX - TOGGLE_W / 2 - GAP, TOGGLE_Y, title, {
         fontSize: '22px',
@@ -209,7 +256,7 @@ export class DebugSettingsPanel extends SettingsPanel {
       .setOrigin(0.5);
     button.on('pointerup', onClick);
     this.container.add([caption, button, label]);
-    return { label };
+    return { label, caption };
   }
 
   private caption(scene: Phaser.Scene, y: number, text: string): Phaser.GameObjects.Text {
@@ -310,19 +357,22 @@ export class DebugSettingsPanel extends SettingsPanel {
 
   private paintHitbox(): void {
     const on = Hitboxes.isEnabled;
-    this.hitboxLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    const copy = t().settings;
+    this.hitboxLabel.setText(on ? copy.on : copy.off);
     this.hitboxLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
   }
 
   private paintRuler(): void {
     const on = FieldRuler.isEnabled;
-    this.rulerLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    const copy = t().settings;
+    this.rulerLabel.setText(on ? copy.on : copy.off);
     this.rulerLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
   }
 
   private paintPierce(): void {
     const on = PierceMarks.isEnabled;
-    this.pierceLabel.setText(on ? 'ВКЛ' : 'ВЫКЛ');
+    const copy = t().settings;
+    this.pierceLabel.setText(on ? copy.on : copy.off);
     this.pierceLabel.setColor(on ? '#e6d7a8' : '#8a7d68');
   }
 

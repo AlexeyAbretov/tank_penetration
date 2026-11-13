@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 
+import { t, type KeyLine } from '../../locale';
 import { GameHud } from './GameHud';
 import { HudFrame } from './GameHud.types';
 
@@ -42,19 +43,32 @@ export class DebugGameHud extends GameHud {
   private readonly losePlate: Phaser.GameObjects.Rectangle;
   private readonly loseFace: Phaser.GameObjects.Graphics;
   private readonly loseMark: Phaser.GameObjects.Text;
+  private quietOn = false;
 
   // Дебаг-клавиши только в окне списка. Верхняя плашка остаётся статусом партии.
-  protected override controlHints(): readonly string[] {
+  protected override controlHints(): readonly KeyLine[] {
+    const debug = t().debug;
     return [
       ...super.controlHints(),
-      'пробел — пауза без экрана',
-      'двойное нажатие — сброс',
-      'A — ещё юнит',
-      'R — перезапуск волны',
-      'N — пропуск волны',
-      'F — проигрыш',
-      'иконка слева — урон врагов',
+      debug.space,
+      debug.doubleTap,
+      debug.addUnit,
+      debug.restart,
+      debug.skip,
+      debug.lose,
+      debug.enemyDamage,
     ];
+  }
+
+  override applyLanguage(): void {
+    super.applyLanguage();
+    this.paintDebugLabel();
+  }
+
+  private paintDebugLabel(): void {
+    const debug = t().debug;
+    this.debugLabel.setText(this.quietOn ? debug.quiet : debug.mark);
+    this.placeDebugLabel();
   }
 
   // Четыре плашки. База сдвигает шестерёнку на это число и сама место не рисует.
@@ -66,7 +80,7 @@ export class DebugGameHud extends GameHud {
     super(scene, frame, maxHp);
 
     this.debugLabel = scene.add
-      .text(frame.width / 2, this.statusY, 'DEBUG', {
+      .text(frame.width / 2, this.statusY, t().debug.mark, {
         ...this.statusStyle,
         color: debugMark,
       })
@@ -81,8 +95,8 @@ export class DebugGameHud extends GameHud {
       if (!this.debugLabel.scene) {
         return;
       }
-      this.debugLabel.setText(on ? 'DEBUG  ПАУЗА' : 'DEBUG');
-      this.placeDebugLabel();
+      this.quietOn = on;
+      this.paintDebugLabel();
     };
 
     scene.events.on('quiet-pause', onQuietPause);

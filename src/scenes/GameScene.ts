@@ -24,6 +24,7 @@ import { BattleMusic } from '../sounds/BattleMusic';
 import type { CombatCallbacks } from '../types/CombatCallbacks';
 import type { CombatSystem } from '../types/CombatSystem';
 import { FocusPause } from '../controllers/FocusPause';
+import { onLanguage } from '../locale';
 import { PauseStack } from '../controllers/PauseStack';
 import { ProgressShopController } from '../controllers/ProgressShopController';
 import { PlayerController } from '../controllers/PlayerController';
@@ -101,6 +102,7 @@ export class GameScene extends Phaser.Scene {
   private field!: Phaser.GameObjects.Image;
   // Ширина, под которую уже стоят юниты. Сужение сравнивает новый холст с ней.
   private fieldWidth = GAME.width;
+  private stopLanguage?: () => void;
 
   constructor(
     private readonly combatSave: CombatSave,
@@ -548,6 +550,16 @@ export class GameScene extends Phaser.Scene {
       this.pauses.onHidden();
     }
     this.scale.on(Phaser.Scale.Events.RESIZE, this.layoutFrame, this);
+    this.stopLanguage?.();
+    this.stopLanguage = onLanguage(() => this.applyLanguage());
+  }
+
+  // Смена языка в настройках. Окна переписывают уже нарисованные строки.
+  private applyLanguage(): void {
+    this.hud.applyLanguage();
+    this.settings.applyLanguage();
+    this.shop.applyLanguage();
+    this.progressShop.applyLanguage();
   }
 
   // Ширина поля изменилась вместе с окном. Фон и окна, которые стоят по центру, едут за ней.
@@ -856,6 +868,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onShutdown(): void {
+    this.stopLanguage?.();
+    this.stopLanguage = undefined;
     this.scale.off(Phaser.Scale.Events.RESIZE, this.layoutFrame, this);
     this.game.events.off(Phaser.Core.Events.HIDDEN, this.onTabHidden, this);
     window.removeEventListener('pagehide', this.onPageHide);

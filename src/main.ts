@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 // Размер холста — в gameConfig.ts. Сцену собирает GameSceneFactory.
 import { GAME, fitGameTo } from './gameConfig';
 import { GameSceneFactory } from './scenes/GameSceneFactory';
-import { watchBootProgress } from './bootScreen';
+import { paintBootLabel, watchBootProgress } from './bootScreen';
 import { installClipVolumes } from './sounds/clipVolume';
 import { installGameFont, loadGameFont } from './ui/gameFont';
 
@@ -17,6 +17,8 @@ function parentBox(): { width: number; height: number } {
     height: parent?.clientHeight ?? window.innerHeight,
   };
 }
+
+paintBootLabel();
 
 const initial = parentBox();
 fitGameTo(initial.width, initial.height);

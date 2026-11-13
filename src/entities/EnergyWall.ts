@@ -4,6 +4,7 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../gameConfig';
+import { t } from '../locale';
 
 type Glint = {
   y: number;
@@ -136,7 +137,7 @@ export class EnergyWall {
 
   // 1.0 с, следующий шаг 1.1 с. Потолок обоих магазинов — 3.0 с.
   static durationLabel(ms: number): string {
-    return `${(ms / 1000).toFixed(1)} с`;
+    return t().time.seconds((ms / 1000).toFixed(1));
   }
 
   static preload(scene: Phaser.Scene): void {
