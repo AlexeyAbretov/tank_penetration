@@ -9,6 +9,7 @@
 // Пробитие только пишет на снаряде, пробьёт он или нет. Сам выстрел не меняет.
 
 import Phaser from 'phaser';
+import { cameraView } from '../../gameConfig';
 import { FieldRuler } from '../../debug/FieldRuler';
 import { t } from '../../locale';
 import { Hitboxes } from '../../debug/Hitboxes';
@@ -183,7 +184,8 @@ export class DebugSettingsPanel extends SettingsPanel {
 
   // Карточка после роста смещена вниз. Поднимаем контейнер, затемнение оставляем в центре экрана.
   private centerExtended(): void {
-    this.container.setPosition(this.view.width / 2, this.view.height / 2 - this.card.y);
+    const view = cameraView(this.view.width, this.view.height);
+    this.container.setPosition(view.x + view.width / 2, view.y + view.height / 2 - this.card.y);
     this.dim.setPosition(0, this.card.y);
     this.dim.setSize(this.view.width, this.view.height);
   }
@@ -323,10 +325,11 @@ export class DebugSettingsPanel extends SettingsPanel {
     if (rect.width < 1 || rect.height < 1) {
       return;
     }
-    const sx = rect.width / this.view.width;
-    const sy = rect.height / this.view.height;
-    const x = this.container.x + INPUT_CENTER_X;
-    const y = this.container.y + fieldY;
+    const view = cameraView(this.view.width, this.view.height);
+    const sx = rect.width / view.width;
+    const sy = rect.height / view.height;
+    const x = this.container.x + INPUT_CENTER_X - view.x;
+    const y = this.container.y + fieldY - view.y;
     const w = INPUT_W * sx;
     const h = INPUT_H * sy;
     const style = field.style;

@@ -2,6 +2,7 @@
 // Первая партия закрывается только выбором. «Новая игра» поверх паузы или магазина очков ещё и крестиком.
 
 import Phaser from 'phaser';
+import { cameraView } from '../../gameConfig';
 import { DIFFICULTIES, type DifficultyId } from '../../difficulty';
 import { t } from '../../locale';
 import { fieldInk, fieldInkStroke, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
@@ -80,15 +81,17 @@ export class DifficultyPanel {
     this.closeRoot.setVisible(false);
     nodes.push(this.closeRoot);
 
+    const view = cameraView(frame.width, frame.height);
     this.container = scene.add
-      .container(frame.width / 2, frame.height / 2, nodes)
+      .container(view.x + view.width / 2, view.y + view.height / 2, nodes)
       .setDepth(96)
       .setVisible(false);
     this.applyLanguage();
   }
 
   layout(): void {
-    this.container.setPosition(this.frame.width / 2, this.frame.height / 2);
+    const view = cameraView(this.frame.width, this.frame.height);
+    this.container.setPosition(view.x + view.width / 2, view.y + view.height / 2);
     this.dim.setSize(this.frame.width, this.frame.height);
   }
 

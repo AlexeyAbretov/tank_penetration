@@ -422,41 +422,43 @@ export class GameHud {
     const pauseX = this.plateXLeftOfPause(0);
     const settingsX = this.plateXLeftOfPause(1 + this.platesBetweenSettingsAndPause());
     const hasteX = pauseX + this.plateGap + icon;
-    const y = this.plateY;
+    const y = this.viewY(this.plateY);
+    const band = this.viewY(this.bandY());
 
     // setSize удлиняет ленту. setDisplaySize растянул бы саму плитку.
-    this.banner.setPosition(width / 2, 677).setSize(width, 86);
-    this.title.setX(width / 2);
+    this.banner.setPosition(this.viewX(width / 2), band).setSize(width, 86);
+    this.title.setPosition(this.viewX(width / 2), band);
     this.placeVersion(width);
-    this.waveBanner.setX(width / 2);
+    this.waveBanner.setPosition(this.viewX(width / 2), this.viewY(120));
+    this.tankStatsText.setPosition(this.viewX(28), this.viewY(56));
 
-    this.hastePlate.setPosition(hasteX, y);
-    this.hasteFace.setPosition(hasteX, y);
-    this.hasteIcon.setPosition(hasteX, y);
-    this.pausePlate.setPosition(pauseX, y);
-    this.pauseFace.setPosition(pauseX, y);
-    this.pauseLeft.setPosition(pauseX - 4, y);
-    this.pauseRight.setPosition(pauseX + 4, y);
-    this.settingsPlate.setPosition(settingsX, y);
-    this.settingsFace.setPosition(settingsX, y);
-    this.settingsGear.setPosition(settingsX, y);
+    this.hastePlate.setPosition(this.viewX(hasteX), y);
+    this.hasteFace.setPosition(this.viewX(hasteX), y);
+    this.hasteIcon.setPosition(this.viewX(hasteX), y);
+    this.pausePlate.setPosition(this.viewX(pauseX), y);
+    this.pauseFace.setPosition(this.viewX(pauseX), y);
+    this.pauseLeft.setPosition(this.viewX(pauseX) - 4, y);
+    this.pauseRight.setPosition(this.viewX(pauseX) + 4, y);
+    this.settingsPlate.setPosition(this.viewX(settingsX), y);
+    this.settingsFace.setPosition(this.viewX(settingsX), y);
+    this.settingsGear.setPosition(this.viewX(settingsX), y);
     // Широкое окно сдвигает ряд вместе с полем. Некупленный круг слот не держит.
     this.placeSkillRow();
     this.placeAutoApplies();
 
-    this.hpFrame.setPosition(hpCenter, 28);
-    this.hpTrack.setPosition(barLeft, 28);
-    this.hpFill.setPosition(barLeft, 28);
+    this.hpFrame.setPosition(this.viewX(hpCenter), this.viewY(28));
+    this.hpTrack.setPosition(this.viewX(barLeft), this.viewY(28));
+    this.hpFill.setPosition(this.viewX(barLeft), this.viewY(28));
 
-    const keysX = width - 56;
-    this.keysButton.setPosition(keysX, 677);
-    this.keysFace.setPosition(keysX, 677);
-    this.keysMark.setPosition(keysX, 677);
+    const keysX = this.viewX(width - 56);
+    this.keysButton.setPosition(keysX, band);
+    this.keysFace.setPosition(keysX, band);
+    this.keysMark.setPosition(keysX, band);
 
     this.keysDim.setSize(width, height);
-    this.keysOverlay.setPosition(width / 2, height / 2);
+    this.keysOverlay.setPosition(this.viewX(width / 2), this.viewY(height / 2));
     this.pauseDim.setSize(width, height);
-    this.pauseOverlay.setPosition(width / 2, height / 2);
+    this.pauseOverlay.setPosition(this.viewX(width / 2), this.viewY(height / 2));
   }
 
   // Плашка той плитки, что справа от названия и левее кнопки «?».
@@ -468,7 +470,7 @@ export class GameHud {
     const plate = this.versionPlate;
     const plateLeft = plate.left * scale;
     const plateRight = plate.right * scale;
-    const titleRight = this.title.x + this.title.width / 2;
+    const titleRight = width / 2 + this.title.width / 2;
     const keysLeft = width - 56 - 20;
     let chosen = -1;
     for (let tile = 0; tile < 16; tile += 1) {
@@ -479,11 +481,11 @@ export class GameHud {
       }
     }
     if (chosen < 0) {
-      chosen = Math.max(0, Math.floor(this.title.x / tileW));
+      chosen = Math.max(0, Math.floor((width / 2) / tileW));
     }
     const x = chosen * tileW + (plateLeft + plateRight) / 2;
-    const y = 677 - 43 + ((plate.top + plate.bottom) / 2) * scale;
-    this.versionText.setPosition(Math.round(x), Math.round(y));
+    const y = this.bandY() - 43 + ((plate.top + plate.bottom) / 2) * scale;
+    this.versionText.setPosition(this.viewX(Math.round(x)), this.viewY(Math.round(y)));
   }
 
   setScore(score: number): void {
@@ -512,13 +514,14 @@ export class GameHud {
     const scoreHeight = this.scoreText.height;
     const coinHeight = this.coinsText.height;
 
+    const y = this.viewY(this.statusY);
     this.scoreMark.setDisplaySize(scoreHeight * this.scoreAspect, scoreHeight);
-    this.scoreMark.setPosition(28, this.statusY);
-    this.scoreText.setPosition(28 + this.scoreMark.displayWidth + markGap, this.statusY);
-    this.waveText.setX(this.scoreText.x + this.scoreText.width + gap);
+    this.scoreMark.setPosition(this.viewX(28), y);
+    this.scoreText.setPosition(this.viewX(28 + this.scoreMark.displayWidth + markGap), y);
+    this.waveText.setPosition(this.scoreText.x + this.scoreText.width + gap, y);
     this.coinMark.setDisplaySize(coinHeight * this.coinAspect, coinHeight);
-    this.coinMark.setPosition(this.waveText.x + this.waveText.width + gap, this.statusY);
-    this.coinsText.setPosition(this.coinMark.x + this.coinMark.displayWidth + markGap, this.statusY);
+    this.coinMark.setPosition(this.waveText.x + this.waveText.width + gap, y);
+    this.coinsText.setPosition(this.coinMark.x + this.coinMark.displayWidth + markGap, y);
   }
 
   setTankStats(
@@ -642,7 +645,7 @@ export class GameHud {
       .setAlpha(0.5)
       .setVisible(false);
     const root = scene.add
-      .container(this.edgeIconX(fromRight), this.skillY(), [glyph, glow])
+      .container(this.viewX(this.edgeIconX(fromRight)), this.viewY(this.skillY()), [glyph, glow])
       .setDepth(depth)
       .setVisible(false);
     return { root, glow };
@@ -671,6 +674,20 @@ export class GameHud {
     return this.frame.bannerY - 48;
   }
 
+  // Локальная точка видимого кадра на поле. На компьютере origin нулевой.
+  protected viewX(local: number): number {
+    return this.frame.originX + local;
+  }
+
+  protected viewY(local: number): number {
+    return this.frame.originY + local;
+  }
+
+  // Центр ленты. На поле 720 это 677: низ ленты совпадает с низом поля.
+  private bandY(): number {
+    return this.frame.height - 43;
+  }
+
   // Слева купленные удары идут от края вправо. Справа круги — от края влево. Дыр между ними нет.
   private placeSkillRow(): void {
     const y = this.skillY();
@@ -679,11 +696,11 @@ export class GameHud {
       if (!icon.owned) {
         continue;
       }
-      icon.root.setPosition(this.skillInset + fromLeft * this.skillStep, y);
+      icon.root.setPosition(this.viewX(this.skillInset + fromLeft * this.skillStep), this.viewY(y));
       fromLeft += 1;
     }
     this.rightSkillRoots().forEach((root, fromRight) => {
-      root.setPosition(this.edgeIconX(fromRight), y);
+      root.setPosition(this.viewX(this.edgeIconX(fromRight)), this.viewY(y));
     });
   }
 
@@ -1066,6 +1083,10 @@ export class GameHud {
     const padBottom = 28;
     const w = 540;
     const h = titleBand + hints.length * rowH + padBottom;
+    // Список выше видимого кадра ужимается целиком, крестик остаётся на экране.
+    const fit = Math.min(1, this.frame.height / h);
+    this.keysOverlay.setScale(fit);
+    this.keysDim.setScale(1 / fit);
     this.keysPanel.setSize(w, h);
     paintFieldPlate(this.keysPlate, w, h, 0.88);
     this.keysTitle.setY(-h / 2 + 34);
@@ -1128,7 +1149,7 @@ export class GameHud {
       })
       .setOrigin(0.5);
     const root = scene.add
-      .container(this.skillInset + index * this.skillStep, this.skillY(), [glyph, glow, sweep, time])
+      .container(this.viewX(this.skillInset + index * this.skillStep), this.viewY(this.skillY()), [glyph, glow, sweep, time])
       .setDepth(53)
       .setVisible(false);
     const icon: AbilityIcon = {

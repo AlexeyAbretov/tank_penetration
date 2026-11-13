@@ -148,7 +148,10 @@ export class DebugGameHud extends GameHud {
 
     this.placeDebugRow();
     this.placeDebugLabel();
-    this.enemyDamageRoot.setPosition(this.edgeIconX(this.rightSkillRoots().length), this.skillY());
+    this.enemyDamageRoot.setPosition(
+      this.viewX(this.edgeIconX(this.rightSkillRoots().length)),
+      this.viewY(this.skillY()),
+    );
   }
 
   override coversEnemyDamage(pointer: Phaser.Input.Pointer): boolean {
@@ -171,20 +174,23 @@ export class DebugGameHud extends GameHud {
       this.plateXLeftOfPause(1 + this.platesBetweenSettingsAndPause()) - this.plateSize / 2;
     const roomRight = gearLeft - this.plateGap;
     const half = this.debugLabel.width / 2;
-    this.debugLabel.setX(Math.min(this.frame.width / 2, roomRight - half));
+    this.debugLabel.setPosition(
+      this.viewX(Math.min(this.frame.width / 2, roomRight - half)),
+      this.viewY(this.statusY),
+    );
   }
 
   // Слева направо от шестерёнки: тихая пауза, перезапуск, пропуск, проигрыш, затем обычная пауза.
   private placeDebugRow(): void {
-    const y = this.plateY;
-    this.placePlate(this.quietPlate, this.quietFace, this.plateXLeftOfPause(4), y);
+    const y = this.viewY(this.plateY);
+    this.placePlate(this.quietPlate, this.quietFace, this.viewX(this.plateXLeftOfPause(4)), y);
     this.quietLeft.setPosition(this.quietPlate.x - 4, y);
     this.quietRight.setPosition(this.quietPlate.x + 4, y);
-    this.placePlate(this.restartPlate, this.restartFace, this.plateXLeftOfPause(3), y);
+    this.placePlate(this.restartPlate, this.restartFace, this.viewX(this.plateXLeftOfPause(3)), y);
     this.restartMark.setPosition(this.restartPlate.x, y);
-    this.placePlate(this.skipPlate, this.skipFace, this.plateXLeftOfPause(2), y);
+    this.placePlate(this.skipPlate, this.skipFace, this.viewX(this.plateXLeftOfPause(2)), y);
     this.skipMark.setPosition(this.skipPlate.x, y);
-    this.placePlate(this.losePlate, this.loseFace, this.plateXLeftOfPause(1), y);
+    this.placePlate(this.losePlate, this.loseFace, this.viewX(this.plateXLeftOfPause(1)), y);
     this.loseMark.setPosition(this.losePlate.x, y);
   }
 

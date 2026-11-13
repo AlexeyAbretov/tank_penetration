@@ -1,8 +1,11 @@
-// Размер холста и линия баннера. Сцена передаёт их сама, HUD не читает gameConfig.
+// Видимый кадр и линия баннера внутри него. Сцена передаёт их сама, HUD не читает gameConfig.
+// originX/Y — левый верх этого кадра на поле. На компьютере оба нули, размер совпадает с полем.
 export type HudFrame = {
-    width: number;
-    height: number;
-    bannerY: number;
+  width: number;
+  height: number;
+  bannerY: number;
+  originX: number;
+  originY: number;
 };
 
 // Строка списка способностей. Картинка и откат лежат в AbilityList. Подпись — в locale.

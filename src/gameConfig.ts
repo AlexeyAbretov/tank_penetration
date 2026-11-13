@@ -23,6 +23,35 @@ export function fitGameTo(parentWidth: number, parentHeight: number): void {
   GAME.height = FIELD_H;
 }
 
+// Телефон: основной указатель — палец. Камера приближает картинку, холст тот же.
+// Левый край с танком остаётся в кадре. Сверху и снизу режется поровну, справа — остаток.
+export const PHONE_ZOOM = 1.1;
+
+export function cameraZoom(): number {
+  if (typeof matchMedia !== 'function') {
+    return 1;
+  }
+  return matchMedia('(pointer: coarse)').matches ? PHONE_ZOOM : 1;
+}
+
+// Прямоугольник поля, который камера оставляет на экране.
+export function cameraView(width: number, height: number): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
+  const zoom = cameraZoom();
+  const viewW = width / zoom;
+  const viewH = height / zoom;
+  return {
+    x: 0,
+    y: (height - viewH) / 2,
+    width: viewW,
+    height: viewH,
+  };
+}
+
 // Темп врагов. Игрок переключает 1 → 2 → 3. Танк и магазин этот множитель не читают.
 export const ENEMY_HASTE = {
   key: 'enemyHaste',

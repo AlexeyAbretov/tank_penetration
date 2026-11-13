@@ -12,6 +12,7 @@ import {
   paintFieldRule,
   paintOrderBar,
 } from '../militaryDialog';
+import { cameraView } from '../../gameConfig';
 import { coinMarkKey } from '../../gfx/coinMark';
 import { t } from '../../locale';
 
@@ -194,10 +195,15 @@ export class ShopPanel {
     this.nextLabel.setText(copy.nextWave);
   }
 
-  // Поле шире 1280 — окно и затемнение остаются по центру.
+  // Поле шире 1280 — окно и затемнение остаются по центру видимого кадра.
+  // На телефоне плашка выше кадра: уменьшается целиком, затемнение остаётся на всё поле.
   place(): void {
-    this.container.setPosition(this.screen.width / 2, this.screen.height / 2);
+    const view = cameraView(this.screen.width, this.screen.height);
+    const fit = Math.min(1, view.width / PANEL_W, view.height / PANEL_H);
+    this.container.setPosition(view.x + view.width / 2, view.y + view.height / 2);
+    this.container.setScale(fit);
     this.dim.setSize(this.screen.width, this.screen.height);
+    this.dim.setScale(1 / fit);
   }
 
   show(view: ShopView): void {

@@ -15,7 +15,7 @@ import { Mines } from '../entities/Mines';
 import { NuclearStrike } from '../entities/NuclearStrike';
 import { RocketSalvo } from '../entities/RocketSalvo';
 import { Tank } from '../entities/Tank/Tank';
-import { DEBUG_FORFEIT_EVENT, DEBUG_RESTART_WAVE_EVENT, ENEMY_HASTE, GAME, enemyHasteOf, isDebugRun } from '../gameConfig';
+import { DEBUG_FORFEIT_EVENT, DEBUG_RESTART_WAVE_EVENT, ENEMY_HASTE, GAME, cameraView, cameraZoom, enemyHasteOf, isDebugRun } from '../gameConfig';
 import { boom } from '../gfx/boom';
 import { createAmbientEmbers } from '../gfx/particles';
 import { ensureGameTextures } from '../gfx/ensureGameTextures';
@@ -103,6 +103,14 @@ export class GameScene extends Phaser.Scene {
   // Классы интерфейса и боя приходят снаружи. Экземпляры создаются в create():
   // restart() конструктор сцены не вызывает, а до create() нет scene.add и текстуры баннера.
   private hud!: GameHud;
+  // Видимый кадр счёта. На компьютере совпадает с полем. Камера читает тот же прямоугольник.
+  private readonly hudFrame: HudFrame = {
+    width: GAME.width,
+    height: GAME.height,
+    bannerY: GAME.bannerY,
+    originX: 0,
+    originY: 0,
+  };
   private field!: Phaser.GameObjects.Image;
   // Ширина, под которую уже стоят юниты. Сужение сравнивает новый холст с ней.
   private fieldWidth = GAME.width;
@@ -181,6 +189,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.syncCamera();
     ensureGameTextures(this);
     this.score = 0;
     this.coins = 0;
@@ -235,7 +244,7 @@ export class GameScene extends Phaser.Scene {
     this.infantry = this.physics.add.group();
 
     // Следующая покупка — ещё одна строка. Порядок слева направо.
-    this.hud = new this.Hud(this, GAME, this.Player.baseHp(), [
+    this.hud = new this.Hud(this, this.hudFrame, this.Player.baseHp(), [
       ...AbilityList
     ]);
     this.difficulty = new DifficultyPanel(this, GAME);
@@ -580,10 +589,26 @@ export class GameScene extends Phaser.Scene {
     this.progressShop.applyLanguage();
   }
 
+  // Телефон приближает камеру и оставляет левый край. Счёт читает видимый прямоугольник.
+  private syncCamera(): void {
+    const zoom = cameraZoom();
+    const view = cameraView(GAME.width, GAME.height);
+    this.hudFrame.width = view.width;
+    this.hudFrame.height = view.height;
+    this.hudFrame.originX = view.x;
+    this.hudFrame.originY = view.y;
+    this.hudFrame.bannerY = view.height - (GAME.height - GAME.bannerY);
+    const camera = this.cameras.main;
+    camera.setZoom(zoom);
+    // Середина кадра сдвигается так, чтобы мир у x = 0 остался у левого края.
+    camera.setScroll((GAME.width / 2) * (1 / zoom - 1), 0);
+  }
+
   // Ширина поля изменилась вместе с окном. Фон и окна, которые стоят по центру, едут за ней.
   // Лежащие мины правее нового края бой подтягивает на поле.
   // Юнит и снаряд правее нового края остаются на той же доле ширины.
   private layoutFrame(): void {
+    this.syncCamera();
     const previous = this.fieldWidth;
     this.fieldWidth = GAME.width;
     this.field.setPosition(GAME.width / 2, GAME.height / 2);

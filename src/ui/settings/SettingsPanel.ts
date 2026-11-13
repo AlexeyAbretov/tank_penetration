@@ -5,6 +5,7 @@
 // Язык пишет locale. Кнопка идёт по кругу языков из index.ts.
 
 import Phaser from 'phaser';
+import { cameraView } from '../../gameConfig';
 import { cycleLanguage, t } from '../../locale';
 import { fieldInk, fieldInkStroke, fieldMuted, fieldPaper, paintFieldPlate, paintFieldRule, paintOrderBar } from '../militaryDialog';
 
@@ -135,8 +136,9 @@ export class SettingsPanel {
       })
       .setOrigin(0.5);
 
+    const view = cameraView(frame.width, frame.height);
     this.container = scene.add
-      .container(frame.width / 2, frame.height / 2, [
+      .container(view.x + view.width / 2, view.y + view.height / 2, [
         this.dim,
         this.cardFace,
         this.card,
@@ -158,7 +160,8 @@ export class SettingsPanel {
 
   // Окно стало шире — затемнение и карточка остаются по центру нового поля.
   layout(): void {
-    this.container.setPosition(this.frame.width / 2, this.frame.height / 2);
+    const view = cameraView(this.frame.width, this.frame.height);
+    this.container.setPosition(view.x + view.width / 2, view.y + view.height / 2);
     this.dim.setSize(this.frame.width, this.frame.height);
   }
 
