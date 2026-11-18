@@ -1688,9 +1688,9 @@ export class CombatSystem implements Combat {
     StrikeDrone.burstAt(this.scene, x, y, sound);
   }
 
-  // Урон снаряда и отталкивание из магазинов. Мёртвого уже не двигаем.
+  // Урон снаряда и отталкивание из магазинов. Сдвиг до удара: добитый тоже уезжает,
+  // и труп, таяние или обломки остаются уже справа. Дошедшего до базы не толкаем.
   private shellHit(unit: Infantry): void {
-    this.hurtInfantry(unit, this.shellDamage(), false, undefined, 'shell');
     if (!unit.active || unit.reachedWall) {
       return;
     }
@@ -1698,6 +1698,7 @@ export class CombatSystem implements Combat {
     if (push > 0) {
       unit.knockBack(push);
     }
+    this.hurtInfantry(unit, this.shellDamage(), false, undefined, 'shell');
   }
 
   private resolveShellHits(): void {

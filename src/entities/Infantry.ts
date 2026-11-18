@@ -395,8 +395,9 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     this.syncBar();
   }
 
-  // Сдвиг вправо от разрыва снаряда танка. Тело двигаем сами: postUpdate перенесёт спрайт.
-  // Дошедшего до базы не трогаем — он уже выбыл.
+  // Сдвиг вправо от разрыва снаряда танка. Дошедшего до базы не трогаем — он уже выбыл.
+  // Картинку двигаем сразу: убитый в этом же ударе выключает тело, и postUpdate его уже не переносит.
+  // prevFrame сдвигаем вместе с телом, иначе конец кадра прибавит тот же сдвиг второй раз.
   // Проволока гасит шаг, и syncPace стоящего не отпускает. Если сдвиг унёс штурмовика
   // с линии, ход возвращаем. Тот же кадр снова поймает его, если он всё ещё на проволоке.
   knockBack(pixels: number): void {
@@ -407,7 +408,11 @@ export abstract class Infantry extends Phaser.Physics.Arcade.Sprite {
     if (!body?.enable) {
       return;
     }
+    this.x += pixels;
     body.x += pixels;
+    body.prevFrame.x += pixels;
+    body.updateCenter();
+    this.syncBar();
     // Глушение само вернёт шаг. Иначе стойка запомнит ход и после вспышки останется на месте.
     if (this.reachesBase && this.holdLeft <= 0) {
       this.resumeMarch();
