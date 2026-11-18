@@ -46,4 +46,4 @@
 
 Числа баланса лежат рядом с тем, кто их использует. Состав волны — `EnemyFactory.wave` и поле `debutWave` у врага. Выстрел танка — класс `Tank`. Перезарядка и полёт пулемёта — класс `MachineGun`. Разовые цены — поле `shop` у покупки. Откат и залп артиллерии — `ArtilleryStrikeAbilityConfig`. Откат и глушение ЭМИ — `EmpFlashAbilityConfig`. Повторяемая цена монет — `ShopController.upgradeCost`, `flightCost`, `knockbackCost` и `pierceCost`. Цены очков — `ProgressSave.cost`, `bulletCost`, `mgDamageCost`, `knockbackCost`, `pierceCost`, `countCost`, `autoFireCost`, `autoAimCost`, `autoShopCost`, `autoArtilleryCost`, `autoIonCost`, `autoMinesCost`, `autoBomberCost`, `autoWallCost`, `wallDurationCost`, `wallCooldownCost` и `empStunCost`.
 
-Стек: [Phaser 4](https://phaser.io/), TypeScript, Vite.
+Стек: [Phaser 4](https://phaser.io/), TypeScript, Vite. APK для Android собирает Capacitor вокруг той же игры: `capacitor.config.ts`, папка `android`, команда `npm run build:apk`.

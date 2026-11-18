@@ -14,6 +14,8 @@
 
 `npm run build` дописывает в `dist/` манифест и service worker. Их пишет плагин в `vite.config.ts`, в код игры регистрация не входит. `npm run dev` worker не регистрирует: кэш не держит старые картинки и звуки. Однофайловые команды плагин не подключают. Иконки домашнего экрана лежат в `public/icons` и в `packedFiles` не входят: это не текстура игры. Workflow `.github/workflows/pages.yml` публикует `dist/` на GitHub Pages при push в ветку, имя которой начинается с `release/release-`. Адрес сайта — подкаталог репозитория, `base: './'` оставляет worker в этом каталоге.
 
+`npm run build:apk` собирает ту же игру без манифеста и service worker (`vite build --mode android`: файлы уже внутри APK) и отдаёт её оболочке Capacitor. Настройки оболочки — `capacitor.config.ts`, проект Android — папка `android`. `scripts/android-apk.mjs` запускает Gradle и копирует отладочный APK в `release/tank-penetration-<version>.apk`. `<version>` — поле `version` в `package.json`, то же число, что на ленте. Внутри APK тот же номер стоит как `versionName`. Подпись отладочная: файл ставят на телефон, в Google Play он не идёт. Иконка и заставка оболочки берутся из `public/icons/icon-512.png`. Экран держится альбомным, системные полосы прячет `MainActivity`.
+
 ## Кадр
 
 `preload()` зовёт `preloadImages` и `preloadSounds`. Сами пути лежат у сущностей и в `soundPreloader`.

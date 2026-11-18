@@ -10,12 +10,17 @@
     "build:html": "tsc --noEmit && vite build --config vite.singlefile.config.ts",
     "build:html:gift": "tsc --noEmit && vite build --config vite.singlefile.config.ts --mode gift",
     "build:html:debug": "tsc --noEmit && vite build --config vite.singlefile.config.ts --mode debug",
+    "build:android": "tsc --noEmit && vite build --mode android",
+    "build:apk": "npm run build:android && cap sync android && node scripts/android-apk.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
     "phaser": "^4.2.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
     "@types/node": "^26.6.6",
     "typescript": "^5.8.3",
     "vite": "^7.1.5",
