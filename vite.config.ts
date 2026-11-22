@@ -2,7 +2,8 @@
 // и собирает готовые файлы командой npm run build.
 // Манифест и service worker живут только здесь. Однофайловая сборка их не подключает:
 // страницу с диска браузер как приложение не ставит.
-// Сборка --mode android их тоже не пишет: APK уже содержит файлы, второй кэш не нужен.
+// Сборки --mode android и --mode desktop их тоже не пишут:
+// файлы уже внутри APK или окна Windows, второй кэш не нужен.
 
 // defineConfig даёт подсказки TypeScript по полям конфига.
 import { defineConfig, type Plugin } from 'vite';
@@ -27,14 +28,15 @@ function appleTouchIcon(): Plugin {
 
 // export default — эту функцию Vite читает как главный конфиг.
 // mode android — команда npm run build:android, её забирает оболочка APK.
+// mode desktop — команды build:electron и build:webview, их забирают окна Windows.
 export default defineConfig(({ mode }) => {
-  const android = mode === 'android';
+  const shell = mode === 'android' || mode === 'desktop';
   return {
     // Относительные пути к скриптам и картинкам.
     // GitHub Pages кладёт игру в подкаталог репозитория, не в корень сайта.
     // Точка в начале пути оставляет worker в том же каталоге, что и страница.
     base: './',
-    plugins: android
+    plugins: shell
       ? []
       : [
     appleTouchIcon(),

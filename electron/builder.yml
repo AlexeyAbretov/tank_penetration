@@ -1,0 +1,25 @@
+# Упаковка окна Electron в один exe. Пути от корня репозитория, где лежит package.json.
+appId: com.tankpenetration.game
+productName: Tank Penetration
+executableName: tank-penetration
+npmRebuild: false
+asar: true
+directories:
+  output: build/electron
+# Зависимости npm в окно не входят: игра уже собрана в dist, Phaser оттуда.
+files:
+  - package.json
+  - electron/**/*
+  - dist/**/*
+  - "!node_modules"
+  - "!node_modules/**"
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: tank-penetration-electron-${version}.${ext}
+  signAndEditExecutable: true
+portable:
+  artifactName: tank-penetration-electron-${version}.${ext}
